@@ -15,7 +15,7 @@ var (
 //go:generate msgp
 type IterGen struct {
 	T0           uint32
-	intervalHint uint32 // a hint wrt expected alignment of points. useful to recover delta overflows in tsz.Series4h
+	IntervalHint uint32 // a hint wrt expected alignment of points. useful to recover delta overflows in tsz.Series4h, not used for other formats
 	B            []byte
 }
 
@@ -53,12 +53,12 @@ func (ig *IterGen) Get() (tsz.Iter, error) {
 		src := ig.B[1:]
 		dest := make([]byte, len(src))
 		copy(dest, src)
-		return tsz.NewIterator4h(dest, ig.intervalHint)
+		return tsz.NewIterator4h(dest, ig.IntervalHint)
 	case FormatStandardGoTszWithSpan:
 		src := ig.B[2:]
 		dest := make([]byte, len(src))
 		copy(dest, src)
-		return tsz.NewIterator4h(dest, ig.intervalHint)
+		return tsz.NewIterator4h(dest, ig.IntervalHint)
 	case FormatGoTszLongWithSpan:
 		src := ig.B[2:]
 		dest := make([]byte, len(src))
