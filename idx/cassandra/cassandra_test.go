@@ -420,7 +420,7 @@ func TestFind(t *testing.T) {
 
 func BenchmarkIndexing(b *testing.B) {
 	if testing.Short() {
-		b.Skip("skipping benchmark in short mode")
+		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
@@ -471,7 +471,7 @@ func insertDefs(ix idx.MetricIndex, i int) {
 
 func BenchmarkLoad(b *testing.B) {
 	if testing.Short() {
-		b.Skip("skipping benchmark in short mode")
+		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"
@@ -507,7 +507,7 @@ func BenchmarkLoad(b *testing.B) {
 
 func BenchmarkIndexingWithUpdates(b *testing.B) {
 	if testing.Short() {
-		b.Skip("skipping benchmark in short mode")
+		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
 	keyspace = "metrictank"

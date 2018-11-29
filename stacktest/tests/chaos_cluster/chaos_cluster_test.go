@@ -36,7 +36,7 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping test in short mode")
+		fmt.Println("skipping chaos cluster test in short mode")
 		return
 	}
 	ctx, cancelFunc := context.WithCancel(context.Background())

@@ -35,7 +35,7 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping test in short mode")
+		fmt.Println("skipping end2end carbon test (bigtable) in short mode")
 		return
 	}
 	log.Println("launching docker-dev-bigtable stack...")
