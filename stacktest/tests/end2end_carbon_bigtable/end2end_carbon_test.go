@@ -1,6 +1,8 @@
 package end2end_carbon_bigtable
 
 import (
+	"flag"
+	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -31,6 +33,11 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Short() {
+		fmt.Println("skipping end2end carbon test (bigtable) in short mode")
+		return
+	}
 	log.Println("launching docker-dev-bigtable stack...")
 	version := exec.Command("docker-compose", "version")
 	output, err := version.CombinedOutput()
