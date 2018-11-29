@@ -20,28 +20,23 @@ type Kafka struct {
 }
 
 func NewKafka(partitionBy string) (*Kafka, error) {
+	kafka := Kafka{
+		PartitionBy: partitionBy,
+	}
 	switch partitionBy {
 	case "byOrg":
-		return &Kafka{
-			PartitionBy:     partitionBy,
-			Partitioner:     sarama.NewHashPartitioner(""),
-			GetPartitionKey: func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyByOrgId(b) },
-		}, nil
+		kafka.Partitioner = sarama.NewHashPartitioner("")
+		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyByOrgId(b) }
 	case "bySeries":
-		return &Kafka{
-			PartitionBy:     partitionBy,
-			Partitioner:     sarama.NewHashPartitioner(""),
-			GetPartitionKey: func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeries(b) },
-		}, nil
+		kafka.Partitioner = sarama.NewHashPartitioner("")
+		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeries(b) }
 	case "bySeriesWithTags":
-		return &Kafka{
-			PartitionBy:     partitionBy,
-			Partitioner:     &jumpPartitioner{},
-			GetPartitionKey: func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeriesWithTags(b) },
-		}, nil
+		kafka.Partitioner = &jumpPartitioner{}
+		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeriesWithTags(b) }
 	default:
 		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)
 	}
+	return &kafka, nil
 }
 
 func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
