@@ -53,14 +53,15 @@ type writeReq struct {
 	recvTime time.Time
 }
 
-// Implements the the "MetricIndex" interface
+// CasIdx implements the the "MetricIndex" interface
 type CasIdx struct {
 	memory.MemoryIdx
-	cfg        *IdxConfig
-	cluster    *gocql.ClusterConfig
-	session    *gocql.Session
-	writeQueue chan writeReq
-	wg         sync.WaitGroup
+	cfg              *IdxConfig
+	cluster          *gocql.ClusterConfig
+	session          *gocql.Session
+	writeQueue       chan writeReq
+	wg               sync.WaitGroup
+	updateInterval32 uint32
 }
 
 type cqlIterator interface {
@@ -101,7 +102,7 @@ func New(cfg *IdxConfig) *CasIdx {
 		idx.writeQueue = make(chan writeReq, cfg.writeQueueSize)
 	}
 
-	cfg.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
+	idx.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
 
 	return idx
 }
@@ -230,7 +231,7 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive,
 
 		// check if we need to save to cassandra.
 		now := uint32(time.Now().Unix())
-		if archive.LastSave < (now - c.cfg.updateInterval32) {
+		if archive.LastSave < (now - c.updateInterval32) {
 			archive = c.updateCassandra(now, inMemory, archive, partition)
 		}
 	}
@@ -265,7 +266,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 
 	// check if we need to save to cassandra.
 	now := uint32(time.Now().Unix())
-	if archive.LastSave < (now - c.cfg.updateInterval32) {
+	if archive.LastSave < (now - c.updateInterval32) {
 		archive = c.updateCassandra(now, inMemory, archive, partition)
 	}
 
@@ -278,7 +279,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if archive.LastSave < (now - c.cfg.updateInterval32 - c.cfg.updateInterval32/2) {
+	if archive.LastSave < (now - c.updateInterval32 - c.updateInterval32/2) {
 		log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now

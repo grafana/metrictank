@@ -181,6 +181,8 @@ func main() {
 
 	cluster.Init("mt-whisper-importer-writer", gitHash, time.Now(), "http", int(80))
 
+	cassandra.ConfigProcess()
+
 	server := &Server{
 		Session:     store.Session,
 		TTLTables:   ttlTables,

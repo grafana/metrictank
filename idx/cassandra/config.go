@@ -17,11 +17,10 @@ var CliConfig = NewIdxConfig()
 
 // IdxConfig stores configuration settings for a cassandra index
 type IdxConfig struct {
-	Enabled          bool
-	pruneInterval    time.Duration
-	updateCassIdx    bool
-	updateInterval   time.Duration
-	updateInterval32 uint32
+	Enabled        bool
+	pruneInterval  time.Duration
+	updateCassIdx  bool
+	updateInterval time.Duration
 
 	writeQueueSize int
 
