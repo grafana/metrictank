@@ -31,7 +31,7 @@ func NewKafka(partitionBy string) (*Kafka, error) {
 		kafka.Partitioner = sarama.NewHashPartitioner("")
 		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeries(b) }
 	case "bySeriesWithTags":
-		kafka.Partitioner = &jumpPartitioner{}
+		kafka.Partitioner = jumpPartitioner{}
 		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeriesWithTags(b) }
 	default:
 		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)
@@ -46,7 +46,7 @@ func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int3
 
 type jumpPartitioner struct{}
 
-func (p *jumpPartitioner) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
+func (p jumpPartitioner) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
 	key, err := message.Key.Encode()
 	if err != nil {
 		return 0, err
@@ -65,6 +65,6 @@ func (p *jumpPartitioner) Partition(message *sarama.ProducerMessage, numPartitio
 	return jump.Hash(jumpKey, int(numPartitions)), nil
 }
 
-func (p *jumpPartitioner) RequiresConsistency() bool {
+func (p jumpPartitioner) RequiresConsistency() bool {
 	return true
 }
