@@ -134,6 +134,14 @@
   revision = "edcf2dfd90ff209a4434491d7f38e203b3163de2"
 
 [[projects]]
+  branch = "master"
+  digest = "1:8c443d962b23e312d4cafb803fab5ac5f501a90bf05519ab989fded99018caf3"
+  name = "github.com/dgryski/go-metro"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "280f6062b5bc97ee9b9afe7f2ccb361e59845baa"
+
+[[projects]]
   digest = "1:3cabbabc9e0e4aa7e12b882bdc213f41cf8bd2b2ce2a7b5e0aceaf8a6a78049b"
   name = "github.com/docker/distribution"
   packages = [
@@ -1047,6 +1055,7 @@
     "github.com/davecgh/go-spew/spew",
     "github.com/dgryski/go-jump",
     "github.com/dgryski/go-linlog",
+    "github.com/dgryski/go-metro",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/client",
     "github.com/go-macaron/binding",
