@@ -86,7 +86,7 @@ func (m *MetricData) KeyBySeries(b []byte) []byte {
 }
 
 func (m *MetricData) KeyBySeriesWithTags(b []byte) []byte {
-	nameWithTagsBuffer := bytes.NewBuffer(b[:0])
+	nameWithTagsBuffer := bytes.NewBuffer(b)
 	nameWithTagsBuffer.WriteString(m.Name)
 
 	sort.Strings(m.Tags)
