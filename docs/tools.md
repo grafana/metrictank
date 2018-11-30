@@ -135,23 +135,27 @@ cass config flags:
   -write-queue-size int
     	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
 
-output: either presets like dump|list|vegeta-render|vegeta-render-patterns
-output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'
+output:
+
+ * presets: dump|list|vegeta-render|vegeta-render-patterns
+ * templates, which may contain:
+   - fields,  e.g. '{{.Id}} {{.OrgId}} {{.Name}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'
+   - methods, e.g. '{{.NameWithTags}}' (works basically the same as a field)
+   - processing functions:
+     pattern:       transforms a graphite.style.metric.name into a pattern with wildcards inserted
+                    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough
+     patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:
+                    patternCustom <chance> <operation>[ <chance> <operation>...]
+                    the chances need to add up to 100
+                    operation is one of:
+                      * pass        (passthrough)
+                      * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards
+                      * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards
+                    example: {{.Name | patternCustom 15 "pass" 40 "1rcnw" 15 "2rcnw" 10 "3rcnw" 10 "3rccw" 10 "2rccw"}}\n
+     age:           subtracts the passed integer (typically .LastUpdate) from the query time
+     roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 
 
-You may also use processing functions in templates:
-pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted
-    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough
-patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:
-    patternCustom <chance> <operation>[ <chance> <operation>...]
-    the chances need to add up to 100
-    operation is one of:
-        * pass        (passthrough)
-        * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards
-        * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards
-    example: {{.Name | patternCustom 15 "pass" 40 "1rcnw" 15 "2rcnw" 10 "3rcnw" 10 "3rccw" 10 "2rccw"}}\n
-age: subtracts the passed integer (typically .LastUpdate) from the query time
-roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 EXAMPLES:
 mt-index-cat -from 60min cass -hosts cassandra:9042 list
 mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'
