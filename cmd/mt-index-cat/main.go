@@ -90,6 +90,7 @@ func main() {
 		fmt.Println()
 		fmt.Printf("output: either presets like %v\n", strings.Join(outputs, "|"))
 		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
+		fmt.Println("you can also use '{{.NameWithTags}}' which is technically not a field but a method, but works the same")
 		fmt.Println("You may also use processing functions in templates:")
 		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
 		fmt.Println("    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough")

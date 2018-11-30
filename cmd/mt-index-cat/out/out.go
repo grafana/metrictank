@@ -46,7 +46,7 @@ func Template(format string) func(d schema.MetricDefinition) {
 	tpl := template.Must(template.New("format").Funcs(funcs).Parse(format))
 
 	return func(d schema.MetricDefinition) {
-		err := tpl.Execute(os.Stdout, d)
+		err := tpl.Execute(os.Stdout, &d)
 		if err != nil {
 			panic(err)
 		}
