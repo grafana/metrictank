@@ -246,7 +246,7 @@ func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
 }
 
 func (m *MetricDefinition) KeyBySeriesWithTags(b []byte) []byte {
-	return []byte(m.NameWithTags())
+	return append(b, []byte(m.NameWithTags())...)
 }
 
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
