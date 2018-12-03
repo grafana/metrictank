@@ -393,7 +393,7 @@ partitions = *
 # When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
 # Should match your kafka-mdm-in setting
 offset = newest
-# Maximum time backlog processing can block during metrictank startup.
+# Maximum time backlog processing can block during metrictank startup. Setting to a low value may result in data loss
 backlog-process-timeout = 60s
 ```
 
