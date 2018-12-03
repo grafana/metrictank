@@ -54,18 +54,20 @@ func (ms *AggMetrics) GC() {
 		chunkMinTs := now - uint32(ms.chunkMaxStale)
 		metricMinTs := now - uint32(ms.metricMaxStale)
 
+		// as this is the only goroutine that can delete from ms.Metrics
+		// we only need to lock long enough to get the list of orgs, then for each org
+		// get the list of active metrics.
+		// It doesn't matter if new orgs or metrics are added while we iterate these lists.
 		ms.RLock()
 		orgs := make([]uint32, 0, len(ms.Metrics))
 		for o := range ms.Metrics {
 			orgs = append(orgs, o)
 		}
 		ms.RUnlock()
-		totalActive := 0
 		for _, org := range orgs {
-			// as this is the only goroutine that can delete from ms.Metrics
-			// we only need to lock long enough to get the list of active metrics.
-			// it doesn't matter if new metrics are added while we iterate this list.
+			orgActiveMetrics := promActiveMetrics.WithLabelValues(strconv.Itoa(int(org)))
 			keys := make([]schema.Key, 0, len(ms.Metrics[org]))
+			ms.RLock()
 			for k := range ms.Metrics[org] {
 				keys = append(keys, k)
 			}
@@ -79,14 +81,34 @@ func (ms *AggMetrics) GC() {
 					log.Debugf("metric %s is stale. Purging data from memory.", key)
 					ms.Lock()
 					delete(ms.Metrics[org], key)
+					orgActiveMetrics.Set(float64(len(ms.Metrics[org])))
 					ms.Unlock()
 				}
 			}
 			ms.RLock()
-			totalActive += len(ms.Metrics[org])
-			promActiveMetrics.WithLabelValues(strconv.Itoa(int(org))).Set(float64(len(ms.Metrics[org])))
+			orgActive := len(ms.Metrics[org])
+			orgActiveMetrics.Set(float64(orgActive))
 			ms.RUnlock()
+
+			// If this org has no keys, then delete the org from the map
+			if orgActive == 0 {
+				// To prevent races, we need to check that there are still no metrics for the org while holding a write lock
+				ms.Lock()
+				orgActive = len(ms.Metrics[org])
+				if orgActive == 0 {
+					delete(ms.Metrics, org)
+				}
+				ms.Unlock()
+			}
 		}
+
+		// Get the totalActive across all orgs.
+		totalActive := 0
+		ms.RLock()
+		for o := range ms.Metrics {
+			totalActive += len(ms.Metrics[o])
+		}
+		ms.RUnlock()
 		metricsActive.Set(totalActive)
 	}
 }
