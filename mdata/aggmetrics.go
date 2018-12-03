@@ -19,7 +19,7 @@ type AggMetrics struct {
 	cachePusher    cache.CachePusher
 	dropFirstChunk bool
 	sync.RWMutex
-	Metrics        map[uint32]map[schema.MKey]*AggMetric
+	Metrics        map[uint32]map[schema.Key]*AggMetric
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	gcInterval     time.Duration
@@ -30,7 +30,7 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bo
 		store:          store,
 		cachePusher:    cachePusher,
 		dropFirstChunk: dropFirstChunk,
-		Metrics:        make(map[uint32]map[schema.MKey]*AggMetric),
+		Metrics:        make(map[uint32]map[schema.Key]*AggMetric),
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
 		gcInterval:     gcInterval,
@@ -65,7 +65,7 @@ func (ms *AggMetrics) GC() {
 			// as this is the only goroutine that can delete from ms.Metrics
 			// we only need to lock long enough to get the list of active metrics.
 			// it doesn't matter if new metrics are added while we iterate this list.
-			keys := make([]schema.MKey, 0, len(ms.Metrics[org]))
+			keys := make([]schema.Key, 0, len(ms.Metrics[org]))
 			for k := range ms.Metrics[org] {
 				keys = append(keys, k)
 			}
@@ -96,7 +96,7 @@ func (ms *AggMetrics) Get(key schema.MKey) (Metric, bool) {
 	ms.RLock()
 	_, ok := ms.Metrics[key.Org]
 	if ok {
-		m, ok = ms.Metrics[key.Org][key]
+		m, ok = ms.Metrics[key.Org][key.Key]
 	}
 	ms.RUnlock()
 	return m, ok
@@ -108,7 +108,7 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metri
 	ms.RLock()
 	_, ok := ms.Metrics[key.Org]
 	if ok {
-		m, ok = ms.Metrics[key.Org][key]
+		m, ok = ms.Metrics[key.Org][key.Key]
 	}
 	ms.RUnlock()
 	if ok {
@@ -127,15 +127,15 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metri
 	// the meantime (quite rare, but anyway)
 	ms.Lock()
 	if _, ok := ms.Metrics[key.Org]; !ok {
-		ms.Metrics[key.Org] = make(map[schema.MKey]*AggMetric)
+		ms.Metrics[key.Org] = make(map[schema.Key]*AggMetric)
 	}
-	m, ok = ms.Metrics[key.Org][key]
+	m, ok = ms.Metrics[key.Org][key.Key]
 	if ok {
 		ms.Unlock()
 		return m
 	}
 	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, &agg, ms.dropFirstChunk)
-	ms.Metrics[key.Org][key] = m
+	ms.Metrics[key.Org][key.Key] = m
 	active := len(ms.Metrics[key.Org])
 	ms.Unlock()
 	metricsActive.Inc()
