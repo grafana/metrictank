@@ -94,15 +94,14 @@ func New(cfg *IdxConfig) *CasIdx {
 	}
 
 	idx := &CasIdx{
-		MemoryIdx: *memory.New(),
-		cfg:       cfg,
-		cluster:   cluster,
+		MemoryIdx:        *memory.New(),
+		cfg:              cfg,
+		cluster:          cluster,
+		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),
 	}
 	if cfg.updateCassIdx {
 		idx.writeQueue = make(chan writeReq, cfg.writeQueueSize)
 	}
-
-	idx.updateInterval32 = uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second))
 
 	return idx
 }
