@@ -108,7 +108,7 @@ func ConfigSetup() *flag.FlagSet {
 	return casIdx
 }
 
-// ConfigProcess calls IdxConfig.Validate() on CliConfig. If an error is discovered this will exist with status set to 1.
+// ConfigProcess calls IdxConfig.Validate() on CliConfig. If an error is discovered this will exit with status set to 1.
 func ConfigProcess() {
 	if err := CliConfig.Validate(); err != nil {
 		log.Fatalf("cassandra-idx: Config validation error. %s", err)
