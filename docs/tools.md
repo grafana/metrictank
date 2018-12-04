@@ -260,6 +260,19 @@ Flags:
 ```
 
 
+## mt-kafka-persist-sniff
+
+```
+mt-kafka-persist-sniff
+Print what's flowing through kafka metric persist topic
+
+Flags:
+
+  -config string
+    	configuration file path (default "/etc/metrictank/metrictank.ini")
+```
+
+
 ## mt-schemas-explain
 
 ```

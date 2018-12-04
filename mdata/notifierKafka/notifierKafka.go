@@ -51,6 +51,7 @@ func New(instance string, handler mdata.NotifierHandler) *NotifierKafka {
 		instance: instance,
 		in:       make(chan mdata.SavedChunk),
 		bPool:    util.NewBufferPool(),
+		handler:  handler,
 		client:   client,
 		consumer: consumer,
 		producer: producer,
