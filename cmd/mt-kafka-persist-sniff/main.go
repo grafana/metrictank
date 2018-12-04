@@ -37,10 +37,19 @@ func main() {
 	stats.NewDevnull() // make sure metrics don't pile up without getting discarded
 
 	notifierKafka.ConfigProcess(instance)
-	notifierKafka.New(instance, NewPrintNotifierHandler())
+
+	done := make(chan struct{})
+	go func() {
+		notifierKafka.New(instance, NewPrintNotifierHandler())
+		close(done)
+	}()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	sig := <-sigChan
-	log.Infof("Received signal %q. Shutting down", sig)
+
+	select {
+	case sig := <-sigChan:
+		log.Infof("Received signal %q. Shutting down", sig)
+	case <-done:
+	}
 	//	notifierKafka.Stop()
 }
