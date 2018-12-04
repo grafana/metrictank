@@ -33,7 +33,6 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/notifierKafka"
-	"github.com/grafana/metrictank/mdata/notifierNsq"
 	"github.com/grafana/metrictank/stats"
 	statsConfig "github.com/grafana/metrictank/stats/config"
 	bigtableStore "github.com/grafana/metrictank/store/bigtable"
@@ -112,9 +111,6 @@ func main() {
 	inKafkaMdm.ConfigSetup()
 	inPrometheus.ConfigSetup()
 
-	// load config for cluster notifiers
-	notifierNsq.ConfigSetup()
-
 	// load config for metricIndexers
 	memory.ConfigSetup()
 	cassandra.ConfigSetup()
@@ -184,7 +180,6 @@ func main() {
 	inKafkaMdm.ConfigProcess(*instance)
 	memory.ConfigProcess()
 	inPrometheus.ConfigProcess()
-	notifierNsq.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
@@ -392,10 +387,6 @@ func main() {
 		// The notifierKafka notifiers will block here until it has processed the backlog of metricPersist messages.
 		// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
 		notifiers = append(notifiers, notifierKafka.New(*instance, mdata.NewDefaultNotifierHandler(metrics, metricIndex)))
-	}
-
-	if notifierNsq.Enabled {
-		notifiers = append(notifiers, notifierNsq.New(*instance, metrics, metricIndex))
 	}
 
 	mdata.InitPersistNotifier(notifiers...)
