@@ -112,7 +112,7 @@ func main() {
 	inKafkaMdm.ConfigSetup()
 	inPrometheus.ConfigSetup()
 
-	// load config for cluster handlers
+	// load config for cluster notifiers
 	notifierNsq.ConfigSetup()
 
 	// load config for metricIndexers
@@ -387,18 +387,18 @@ func main() {
 	/***********************************
 		Initialize MetricPersist notifiers
 	***********************************/
-	handlers := make([]mdata.NotifierHandler, 0)
+	var notifiers []mdata.Notifier
 	if notifierKafka.Enabled {
-		// The notifierKafka handler will block here until it has processed the backlog of metricPersist messages.
+		// The notifierKafka notifiers will block here until it has processed the backlog of metricPersist messages.
 		// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
-		handlers = append(handlers, notifierKafka.New(*instance, metrics, metricIndex))
+		notifiers = append(notifiers, notifierKafka.New(*instance, mdata.NewDefaultNotifierHandler(metrics, metricIndex)))
 	}
 
 	if notifierNsq.Enabled {
-		handlers = append(handlers, notifierNsq.New(*instance, metrics, metricIndex))
+		notifiers = append(notifiers, notifierNsq.New(*instance, metrics, metricIndex))
 	}
 
-	mdata.InitPersistNotifier(handlers...)
+	mdata.InitPersistNotifier(notifiers...)
 
 	/***********************************
 		Start our inputs

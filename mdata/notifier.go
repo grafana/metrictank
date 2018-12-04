@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	notifierHandlers []NotifierHandler
+	notifiers []Notifier
 
 	// metric cluster.notifier.all.messages-received is a counter of messages received from cluster notifiers
 	messagesReceived = stats.NewCounter32("cluster.notifier.all.messages-received")
 )
 
-type NotifierHandler interface {
+type Notifier interface {
 	Send(SavedChunk)
 }
 
@@ -39,16 +39,40 @@ type SavedChunk struct {
 
 func SendPersistMessage(key string, t0 uint32) {
 	sc := SavedChunk{Key: key, T0: t0}
-	for _, h := range notifierHandlers {
+	for _, h := range notifiers {
 		h.Send(sc)
 	}
 }
 
-func InitPersistNotifier(handlers ...NotifierHandler) {
-	notifierHandlers = handlers
+func InitPersistNotifier(not ...Notifier) {
+	notifiers = not
 }
 
-func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
+type NotifierHandler interface {
+	// Handle handles an incoming message
+	Handle([]byte)
+	// PartitionOf is used for notifiers that want to flush and need partition information for metrics
+	PartitionOf(key schema.MKey) (int32, bool)
+}
+
+type DefaultNotifierHandler struct {
+	idx     idx.MetricIndex
+	metrics Metrics
+}
+
+func NewDefaultNotifierHandler(metrics Metrics, idx idx.MetricIndex) DefaultNotifierHandler {
+	return DefaultNotifierHandler{
+		idx:     idx,
+		metrics: metrics,
+	}
+}
+
+func (dn DefaultNotifierHandler) PartitionOf(key schema.MKey) (int32, bool) {
+	def, ok := dn.idx.Get(key)
+	return def.Partition, ok
+}
+
+func (dn DefaultNotifierHandler) Handle(data []byte) {
 	version := uint8(data[0])
 	if version == uint8(PersistMessageBatchV1) {
 		batch := PersistMessageBatch{}
@@ -66,12 +90,12 @@ func Handle(metrics Metrics, data []byte, idx idx.MetricIndex) {
 			}
 			// we only need to handle saves for series that we know about.
 			// if the series is not in the index, then we dont need to worry about it.
-			def, ok := idx.Get(amkey.MKey)
+			def, ok := dn.idx.Get(amkey.MKey)
 			if !ok {
 				log.Debugf("notifier: skipping metric with MKey %s as it is not in the index", amkey.MKey)
 				continue
 			}
-			agg := metrics.GetOrCreate(amkey.MKey, def.SchemaId, def.AggId)
+			agg := dn.metrics.GetOrCreate(amkey.MKey, def.SchemaId, def.AggId)
 			if amkey.Archive != 0 {
 				consolidator := consolidation.FromArchive(amkey.Archive.Method())
 				aggSpan := amkey.Archive.Span()
