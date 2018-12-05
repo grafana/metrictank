@@ -133,7 +133,7 @@ func TestGroupByTagsSingleGroupByName(t *testing.T) {
 		getModel("name1", sumabc),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, nil, t)
+	testGroupByTags("SingleGroupByName", in, out, "sum", []string{"name"}, nil, t)
 }
 
 func TestGroupByTagsMultipleGroupByName(t *testing.T) {
@@ -148,7 +148,7 @@ func TestGroupByTagsMultipleGroupByName(t *testing.T) {
 		getModel("name2", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsMultipleNamesMoreTags", in, out, "sum", []string{"name"}, nil, t)
+	testGroupByTags("MultipleGroupByName", in, out, "sum", []string{"name"}, nil, t)
 }
 
 func TestGroupByTagsMultipleSeriesMissingTag(t *testing.T) {
@@ -163,7 +163,7 @@ func TestGroupByTagsMultipleSeriesMissingTag(t *testing.T) {
 		getModel("name2;missingTag=;tag1=val1_1", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name", "missingTag"}, nil, t)
+	testGroupByTags("MultipleSeriesMissingTag", in, out, "sum", []string{"tag1", "name", "missingTag"}, nil, t)
 }
 
 func TestGroupByTagsAllAggregators(t *testing.T) {
@@ -257,62 +257,114 @@ func testGroupByTags(name string, in []models.Series, out []models.Series, agg s
 	}
 }
 
-func BenchmarkGroupByTags10k_1NoNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 1, test.RandFloats10k, test.RandFloats10k)
-}
-func BenchmarkGroupByTags10k_10NoNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 10, test.RandFloats10k, test.RandFloats10k)
-}
-func BenchmarkGroupByTags10k_100NoNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 100, test.RandFloats10k, test.RandFloats10k)
-}
-func BenchmarkGroupByTags10k_1000NoNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 1000, test.RandFloats10k, test.RandFloats10k)
+// Benchmarks:
+
+// input series: 1, 10, 100, 1k, 10k, 100k
+// output series: 1, same as input, then if applicable: 10, 100, 1k, 10k
+
+// 1 input series
+func BenchmarkGroupByTags1in1out(b *testing.B) {
+	benchmarkGroupByTags(b, 1, 1)
 }
 
-func BenchmarkGroupByTags10k_1SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 1, test.RandFloats10k, test.RandFloatsWithNulls10k)
-}
-func BenchmarkGroupByTags10k_10SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 10, test.RandFloats10k, test.RandFloatsWithNulls10k)
-}
-func BenchmarkGroupByTags10k_100SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 100, test.RandFloats10k, test.RandFloatsWithNulls10k)
-}
-func BenchmarkGroupByTags10k_1000SomeSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 1000, test.RandFloats10k, test.RandFloatsWithNulls10k)
+// 10 input Series
+func BenchmarkGroupByTags10in1out(b *testing.B) {
+	benchmarkGroupByTags(b, 10, 1)
 }
 
-func BenchmarkGroupByTags10k_1AllSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 1, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
-}
-func BenchmarkGroupByTags10k_10AllSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 10, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
-}
-func BenchmarkGroupByTags10k_100AllSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 100, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
-}
-func BenchmarkGroupByTags10k_1000AllSeriesHalfNulls(b *testing.B) {
-	benchmarkGroupByTags(b, 1000, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
+func BenchmarkGroupByTags10in10out(b *testing.B) {
+	benchmarkGroupByTags(b, 10, 10)
 }
 
-func benchmarkGroupByTags(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+// 100 input series
+func BenchmarkGroupByTags100in1out(b *testing.B) {
+	benchmarkGroupByTags(b, 100, 1)
+}
+
+func BenchmarkGroupByTags100in10out(b *testing.B) {
+	benchmarkGroupByTags(b, 100, 10)
+}
+
+func BenchmarkGroupByTags100in100out(b *testing.B) {
+	benchmarkGroupByTags(b, 100, 100)
+}
+
+// 1k input series
+func BenchmarkGroupByTags1000in1out(b *testing.B) {
+	benchmarkGroupByTags(b, 1000, 1)
+}
+
+func BenchmarkGroupByTags1000in10out(b *testing.B) {
+	benchmarkGroupByTags(b, 1000, 10)
+}
+
+func BenchmarkGroupByTags1000in100out(b *testing.B) {
+	benchmarkGroupByTags(b, 1000, 100)
+}
+
+func BenchmarkGroupByTags1000in1000out(b *testing.B) {
+	benchmarkGroupByTags(b, 1000, 1000)
+}
+
+// 10k input series
+func BenchmarkGroupByTags10000in1out(b *testing.B) {
+	benchmarkGroupByTags(b, 10000, 1)
+}
+
+func BenchmarkGroupByTags10000in10out(b *testing.B) {
+	benchmarkGroupByTags(b, 10000, 10)
+}
+
+func BenchmarkGroupByTags10000in100out(b *testing.B) {
+	benchmarkGroupByTags(b, 10000, 100)
+}
+
+func BenchmarkGroupByTags10000in1000out(b *testing.B) {
+	benchmarkGroupByTags(b, 10000, 1000)
+}
+
+func BenchmarkGroupByTags10000in10000out(b *testing.B) {
+	benchmarkGroupByTags(b, 10000, 10000)
+}
+
+// 100k input series
+func BenchmarkGroupByTags100000in1out(b *testing.B) {
+	benchmarkGroupByTags(b, 100000, 1)
+}
+
+func BenchmarkGroupByTags100000in10out(b *testing.B) {
+	benchmarkGroupByTags(b, 100000, 10)
+}
+
+func BenchmarkGroupByTags100000in100out(b *testing.B) {
+	benchmarkGroupByTags(b, 100000, 100)
+}
+
+func BenchmarkGroupByTags100000in1000out(b *testing.B) {
+	benchmarkGroupByTags(b, 100000, 1000)
+}
+
+func BenchmarkGroupByTags100000in10000out(b *testing.B) {
+	benchmarkGroupByTags(b, 100000, 10000)
+}
+
+func BenchmarkGroupByTags100000in100000out(b *testing.B) {
+	benchmarkGroupByTags(b, 100000, 100000)
+}
+
+func benchmarkGroupByTags(b *testing.B, numInputSeries, numOutputSeries int) {
 	var input []models.Series
 	tagValues := []string{"tag1", "tag2", "tag3", "tag4"}
-	for i := 0; i < numSeries; i++ {
-		tags := make(map[string]string, len(tagValues))
-
-		for t, tag := range tagValues {
-			tags[tag] = strconv.Itoa(t)
-		}
+	for i := 0; i < numInputSeries; i++ {
 		series := models.Series{
 			Target: strconv.Itoa(i),
 		}
-		if i%1 == 0 {
-			series.Datapoints = fn0()
-		} else {
-			series.Datapoints = fn1()
+
+		for _, tag := range tagValues {
+			series.Target += ";" + tag + "=" + strconv.Itoa(i%numOutputSeries)
 		}
+
+		series.Datapoints = test.RandFloats100()
 		input = append(input, series)
 	}
 	b.ResetTimer()
@@ -327,6 +379,16 @@ func benchmarkGroupByTags(b *testing.B, numSeries int, fn0, fn1 func() []schema.
 		if err != nil {
 			b.Fatalf("%s", err)
 		}
+
+		if len(results) != numOutputSeries {
+			b.Fatalf("Expected %d groups, got %d", numOutputSeries, len(results))
+		}
+
+		if true {
+			for _, serie := range results {
+				pointSlicePool.Put(serie.Datapoints[:0])
+			}
+		}
 	}
-	b.SetBytes(int64(numSeries * len(results[0].Datapoints) * 12))
+	b.SetBytes(int64(numInputSeries * len(results[0].Datapoints) * 12))
 }

@@ -13,6 +13,7 @@ import (
 var randFloats = make(map[int][]schema.Point)
 var randFloatsWithNulls = make(map[int][]schema.Point)
 
+func RandFloats100() []schema.Point { return RandFloats(100) }
 func RandFloats10k() []schema.Point { return RandFloats(10000) }
 func RandFloats1M() []schema.Point  { return RandFloats(1000000) }
 
@@ -30,6 +31,7 @@ func RandFloats(size int) []schema.Point {
 	return out
 }
 
+func RandFloatsWithNulls100() []schema.Point { return RandFloatsWithNulls(100) }
 func RandFloatsWithNulls10k() []schema.Point { return RandFloatsWithNulls(10000) }
 func RandFloatsWithNulls1M() []schema.Point  { return RandFloatsWithNulls(1000000) }
 
