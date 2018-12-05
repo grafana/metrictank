@@ -116,6 +116,7 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	}
 }
 
+// GC returns whether all of the associated series are stale and can be removed
 func (agg *Aggregator) GC(now, chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
 	ret := true
 
