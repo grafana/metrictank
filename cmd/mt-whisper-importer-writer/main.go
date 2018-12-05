@@ -155,6 +155,7 @@ func main() {
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)])
 	cassandra.CliConfig.Enabled = true
+	cassandra.ConfigProcess()
 
 	if *verbose {
 		log.SetLevel(log.DebugLevel)
@@ -180,8 +181,6 @@ func main() {
 	}
 
 	cluster.Init("mt-whisper-importer-writer", gitHash, time.Now(), "http", int(80))
-
-	cassandra.ConfigProcess()
 
 	server := &Server{
 		Session:     store.Session,
