@@ -227,7 +227,9 @@ func update(session *gocql.Session, ttl int, tableIn, tableOut string) {
 	close(jobs)
 	err := keyItr.Close()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeys, doneRows)
+		doneKeysSnap := atomic.LoadUint64(&doneKeys)
+		doneRowsSnap := atomic.LoadUint64(&doneRows)
+		fmt.Fprintf(os.Stderr, "ERROR: failed querying %s: %q. processed %d keys, %d rows", tableIn, err, doneKeysSnap, doneRowsSnap)
 		wg.Wait()
 		os.Exit(2)
 	}
