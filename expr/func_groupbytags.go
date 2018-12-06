@@ -106,7 +106,6 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 
 	// Now, for each key perform the requested aggregation
-	numPoints := len(series[0].Datapoints)
 	cons, queryCons := summarizeCons(series)
 
 	for name, groupSeries := range groups {
@@ -121,9 +120,6 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
 
-		if cap(newSeries.Datapoints) < numPoints {
-			newSeries.Datapoints = make([]schema.Point, 0, numPoints)
-		}
 		aggFunc(groupSeries, &newSeries.Datapoints)
 		cache[Req{}] = append(cache[Req{}], newSeries)
 
