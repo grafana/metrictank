@@ -528,7 +528,7 @@ Flags:
   -start-timestamp int
     	timestamp at which to start, defaults to 0
   -threads int
-    	number of workers to use to process data (default 1)
+    	number of workers to use to process data (default 10)
   -verbose
     	show every record being processed
 ```

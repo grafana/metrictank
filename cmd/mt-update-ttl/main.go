@@ -42,7 +42,7 @@ var (
 
 	startTs    = flag.Int("start-timestamp", 0, "timestamp at which to start, defaults to 0")
 	endTs      = flag.Int("end-timestamp", math.MaxInt32, "timestamp at which to stop, defaults to int max")
-	numThreads = flag.Int("threads", 1, "number of workers to use to process data")
+	numThreads = flag.Int("threads", 10, "number of workers to use to process data")
 
 	verbose = flag.Bool("verbose", false, "show every record being processed")
 
