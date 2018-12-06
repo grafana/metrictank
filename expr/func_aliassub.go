@@ -48,6 +48,7 @@ func (s *FuncAliasSub) Exec(cache map[Req][]models.Series) ([]models.Series, err
 		name := s.search.ReplaceAllString(metric, replace)
 		series[i].Target = name
 		series[i].QueryPatt = name
+		series[i].Tags["name"] = name
 	}
 	return series, err
 }
