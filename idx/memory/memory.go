@@ -1147,7 +1147,7 @@ func (m *MemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
 		delete(m.defById, idStr)
 	}
 
-	statMetricsActive.Add(-1 * len(ids))
+	statMetricsActive.Set(len(m.defById))
 
 	return deletedDefs
 }
@@ -1164,9 +1164,10 @@ func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) 
 
 	for _, f := range found {
 		deleted := m.delete(orgId, f, true, true)
-		statMetricsActive.DecUint32(uint32(len(deleted)))
 		deletedDefs = append(deletedDefs, deleted...)
 	}
+
+	statMetricsActive.Set(len(m.defById))
 	statDeleteDuration.Value(time.Since(pre))
 
 	return deletedDefs, nil
@@ -1391,7 +1392,7 @@ ORGS:
 		}
 	}
 
-	statMetricsActive.Add(-1 * len(pruned))
+	statMetricsActive.Set(len(m.defById))
 
 	duration := time.Since(pre)
 	log.Infof("memory-idx: finished pruning of %d series in %s", len(pruned), duration)
