@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"testing"
@@ -254,6 +255,128 @@ func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 	testSummarize("Nyquist Single Identity", input, outputSum[1], "10s", "sum", true, t)
 	testSummarize("Nyquist Single Identity", input, outputMax[0], "10s", "max", false, t)
 	testSummarize("Nyquist Single Identity", input, outputMax[1], "10s", "max", true, t)
+}
+
+func TestSummarizeAllFuncs(t *testing.T) {
+	input := []models.Series{
+		{
+			Target:    "a",
+			QueryPatt: "a",
+			QueryFrom: 10,
+			QueryTo:   60,
+			Interval:  10,
+			Datapoints: []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 0, Ts: 20},
+				{Val: 6, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: 1234567890, Ts: 60}},
+		},
+	}
+	cases := []struct {
+		funcName string
+		points   []schema.Point
+	}{
+		{
+			funcName: "sum",
+			points: []schema.Point{
+				{Val: 6, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+		{
+			funcName: "max",
+			points: []schema.Point{
+				{Val: 6, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+		{
+			funcName: "min",
+			points: []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+		{
+			funcName: "average",
+			points: []schema.Point{
+				{Val: 2, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+		{
+			funcName: "cnt",
+			points: []schema.Point{
+				{Val: 3, Ts: 10},
+				{Val: 1, Ts: 40},
+			},
+		},
+		{
+			funcName: "count",
+			points: []schema.Point{
+				{Val: 3, Ts: 10},
+				{Val: 1, Ts: 40},
+			},
+		},
+		{
+			funcName: "stddev",
+			points: []schema.Point{
+				{Val: 2.8284271247461903, Ts: 10},
+				{Val: 0, Ts: 40},
+			},
+		},
+		{
+			funcName: "diff",
+			points: []schema.Point{
+				{Val: -6, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+		{
+			funcName: "range",
+			points: []schema.Point{
+				{Val: 6, Ts: 10},
+				{Val: 0, Ts: 40},
+			},
+		},
+		{
+			funcName: "multiply",
+			points: []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: math.NaN(), Ts: 40},
+			},
+		},
+		{
+			funcName: "last",
+			points: []schema.Point{
+				{Val: 6, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+		{
+			funcName: "median",
+			points: []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 1234567890, Ts: 40},
+			},
+		},
+	}
+
+	for _, c := range cases {
+		target := fmt.Sprintf("summarize(a, \"30s\", \"%s\", true)", c.funcName)
+
+		result := []models.Series{{
+			Target:     target,
+			QueryPatt:  target,
+			QueryFrom:  10,
+			QueryTo:    60,
+			Interval:   30,
+			Datapoints: c.points,
+		}}
+		testSummarize("All Funcs", input, result, "30s", c.funcName, true, t)
+	}
 }
 
 func TestSummarizeMultipleIdentity(t *testing.T) {
