@@ -85,10 +85,6 @@ partition (%d) that we have not yet consumed.
 the size of the kafka partition (%d), aka the newest available offset.
 * `cluster.notifier.kafka.partition.%d.offset`:  
 the current offset for the partition (%d) that we have consumed
-* `cluster.notifier.nsq.message_size`:  
-the sizes seen of messages through the nsq cluster notifier
-* `cluster.notifier.nsq.messages-published`:  
-a counter of messages published to the nsq cluster notifier
 * `cluster.self.partitions`:  
 the number of partitions this instance consumes
 * `cluster.self.priority`:  

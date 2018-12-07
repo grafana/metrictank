@@ -39,7 +39,7 @@ The primary sends out persistence messages when it saves chunks to Cassandra.  T
 If you want to be able to promote secondaries to primaries, it's important they have been ingesting and processing these messages, so that the moment they become primary,
 they don't start saving all the chunks it has in memory, which could be a significant sudden load on Cassandra.
 
-Metrictank supports 2 transports for clustering (kafka and NSQ), configured in the [clustering transports section in the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#clustering-transports)
+Metrictank supports 1 transports for clustering: kafka, configured in the [clustering transports section in the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#clustering-transports)
 
 Instances should not become primary when they have incomplete chunks (though in worst case scenario, you might
 have to do just that).  So they expose metrics that describe when they are ready to be upgraded.

@@ -10,7 +10,6 @@ import (
 	"github.com/raintank/schema"
 
 	"github.com/Shopify/sarama"
-	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
@@ -21,9 +20,8 @@ type NotifierKafka struct {
 	in       chan mdata.SavedChunk
 	buf      []mdata.SavedChunk
 	wg       sync.WaitGroup
-	idx      idx.MetricIndex
-	metrics  mdata.Metrics
 	bPool    *util.BufferPool
+	handler  mdata.NotifierHandler
 	client   sarama.Client
 	consumer sarama.Consumer
 	producer sarama.SyncProducer
@@ -33,7 +31,7 @@ type NotifierKafka struct {
 	stopConsuming chan struct{}
 }
 
-func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierKafka {
+func New(instance string, handler mdata.NotifierHandler) *NotifierKafka {
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
 		log.Fatalf("kafka-cluster: failed to start client: %s", err)
@@ -52,9 +50,8 @@ func New(instance string, metrics mdata.Metrics, idx idx.MetricIndex) *NotifierK
 	c := NotifierKafka{
 		instance: instance,
 		in:       make(chan mdata.SavedChunk),
-		idx:      idx,
-		metrics:  metrics,
 		bPool:    util.NewBufferPool(),
+		handler:  handler,
 		client:   client,
 		consumer: consumer,
 		producer: producer,
@@ -137,7 +134,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 		select {
 		case msg := <-messages:
 			log.Debugf("kafka-cluster: received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
-			mdata.Handle(c.metrics, msg.Value, c.idx)
+			c.handler.Handle(msg.Value)
 			currentOffset = msg.Offset
 		case <-ticker.C:
 			if startingUp && currentOffset >= bootTimeOffset {
@@ -207,7 +204,7 @@ func (c *NotifierKafka) flush() {
 	}
 
 	// In order to correctly route the saveMessages to the correct partition,
-	// we cant send them in batches anymore.
+	// we can't send them in batches anymore.
 	payload := make([]*sarama.ProducerMessage, 0, len(c.buf))
 	var pMsg mdata.PersistMessageBatch
 	for i, msg := range c.buf {
@@ -217,7 +214,7 @@ func (c *NotifierKafka) flush() {
 			continue
 		}
 
-		def, ok := c.idx.Get(amkey.MKey)
+		partition, ok := c.handler.PartitionOf(amkey.MKey)
 		if !ok {
 			log.Errorf("kafka-cluster: failed to lookup metricDef with id %s", msg.Key)
 			continue
@@ -234,7 +231,7 @@ func (c *NotifierKafka) flush() {
 		kafkaMsg := &sarama.ProducerMessage{
 			Topic:     topic,
 			Value:     sarama.ByteEncoder(buf.Bytes()),
-			Partition: def.Partition,
+			Partition: partition,
 		}
 		payload = append(payload, kafkaMsg)
 	}

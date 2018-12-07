@@ -31,6 +31,8 @@ var partitionOffset map[int32]*stats.Gauge64
 var partitionLogSize map[int32]*stats.Gauge64
 var partitionLag map[int32]*stats.Gauge64
 
+var FlagSet *flag.FlagSet
+
 // metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
 var messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
 
@@ -38,15 +40,15 @@ var messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-publ
 var messagesSize = stats.NewMeter32("cluster.notifier.kafka.message_size", false)
 
 func init() {
-	fs := flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
-	fs.BoolVar(&Enabled, "enabled", false, "")
-	fs.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
-	fs.StringVar(&kafkaVersionStr, "kafka-version", "0.10.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
-	fs.StringVar(&topic, "topic", "metricpersist", "kafka topic")
-	fs.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
-	fs.StringVar(&offsetStr, "offset", "newest", "Set the offset to start consuming from. Can be oldest, newest or a time duration")
-	fs.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup.")
-	globalconf.Register("kafka-cluster", fs)
+	FlagSet = flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
+	FlagSet.BoolVar(&Enabled, "enabled", false, "")
+	FlagSet.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
+	FlagSet.StringVar(&kafkaVersionStr, "kafka-version", "0.10.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
+	FlagSet.StringVar(&topic, "topic", "metricpersist", "kafka topic")
+	FlagSet.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
+	FlagSet.StringVar(&offsetStr, "offset", "newest", "Set the offset to start consuming from. Can be oldest, newest or a time duration")
+	FlagSet.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup.")
+	globalconf.Register("kafka-cluster", FlagSet)
 }
 
 func ConfigProcess(instance string) {

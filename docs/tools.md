@@ -260,6 +260,31 @@ Flags:
 ```
 
 
+## mt-kafka-persist-sniff
+
+```
+mt-kafka-persist-sniff
+Print what's flowing through kafka metric persist topic
+
+Flags:
+
+  -backlog-process-timeout string
+    	Maximum time backlog processing can block during metrictank startup. (default "60s")
+  -brokers string
+    	tcp address for kafka (may be given multiple times as comma separated list) (default "kafka:9092")
+  -enabled
+    	
+  -kafka-version string
+    	Kafka version in semver format. All brokers must be this version or newer. (default "0.10.0.0")
+  -offset string
+    	Set the offset to start consuming from. Can be oldest, newest or a time duration (default "newest")
+  -partitions string
+    	kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in (default "*")
+  -topic string
+    	kafka topic (default "metricpersist")
+```
+
+
 ## mt-schemas-explain
 
 ```

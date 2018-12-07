@@ -94,14 +94,6 @@
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 
 [[projects]]
-  branch = "master"
-  digest = "1:018352bd981ae8415714487b6e3b60717a452213af7a8323da0f23accdd6c549"
-  name = "github.com/bitly/go-hostpool"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "a3a6125de9329587178a9792dc8f4bc98e620d2d"
-
-[[projects]]
   digest = "1:ac52ddd069a36a6545ba4869aa169de501b2d9711437688a632cf9f8d8f5053c"
   name = "github.com/cespare/xxhash"
   packages = ["."]
@@ -486,30 +478,12 @@
   revision = "b8bc1bf767474819792c23f32d8286a45736f1c6"
 
 [[projects]]
-  digest = "1:80915bfc790b409be02117f531b331545ad5e1d4ba4e2396f77688482cae17ee"
-  name = "github.com/mreiferson/go-snappystream"
-  packages = [
-    ".",
-    "snappy-go",
-  ]
-  pruneopts = "NUT"
-  revision = "028eae7ab5c4c9e2d1cb4c4ca1e53259bbe7e504"
-  version = "v0.2.3"
-
-[[projects]]
   branch = "master"
   digest = "1:fa21ce52102db5a5cbb134a550d3544e5aed27e990107ad38fb28147d08e8853"
   name = "github.com/nightlyone/lockfile"
   packages = ["."]
   pruneopts = "NUT"
   revision = "6a197d5ea61168f2ac821de2b7f011b250904900"
-
-[[projects]]
-  digest = "1:b84b455cdbb98f55cfdf21c970f221b36d7c23f24b51fd94c4d33a61bc7bb15b"
-  name = "github.com/nsqio/go-nsq"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "642a3f9935f12cb3b747294318d730f56f4c34b4"
 
 [[projects]]
   digest = "1:2d5cd1e32189ae4366eff373f2b2345c9072c236bd9e29d9ee2ce732dd6ee3c5"
@@ -678,14 +652,6 @@
   ]
   pruneopts = "NUT"
   revision = "05a94bb32ad1f23f4b01edb2edd06862d4a484d2"
-
-[[projects]]
-  branch = "master"
-  digest = "1:ea79ec2daa0cfdc22c6061c5bfa125bd04f1ec07cf3e105d04e17098f2b2eac5"
-  name = "github.com/raintank/misc"
-  packages = ["app"]
-  pruneopts = "NUT"
-  revision = "cb73203311ae2489b845469f622678f24ff98a16"
 
 [[projects]]
   digest = "1:695c08ec95bf5327704fdfc09fab1cb3856cc08b5e059f36e5aa60a6027f265f"
@@ -1061,7 +1027,6 @@
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/Shopify/sarama",
     "github.com/alyu/configparser",
-    "github.com/bitly/go-hostpool",
     "github.com/davecgh/go-spew/spew",
     "github.com/dgryski/go-linlog",
     "github.com/docker/docker/api/types",
@@ -1076,7 +1041,6 @@
     "github.com/kisielk/whisper-go/whisper",
     "github.com/metrics20/go-metrics20/carbon20",
     "github.com/mitchellh/go-homedir",
-    "github.com/nsqio/go-nsq",
     "github.com/opentracing/opentracing-go",
     "github.com/opentracing/opentracing-go/ext",
     "github.com/opentracing/opentracing-go/log",
@@ -1094,7 +1058,6 @@
     "github.com/raintank/gziper",
     "github.com/raintank/met",
     "github.com/raintank/met/helper",
-    "github.com/raintank/misc/app",
     "github.com/raintank/schema",
     "github.com/raintank/schema/msg",
     "github.com/rakyll/globalconf",
