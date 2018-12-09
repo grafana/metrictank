@@ -5,7 +5,7 @@ a [storage-schemas.conf file](https://github.com/grafana/metrictank/blob/master/
 a [storage-aggregation.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-aggregation.conf)
 an [index-rules.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/index-rules.conf)
 
-The files themselves are well documented, but for your convenience, they are replicated below.  
+The files themselves are well documented, but for your convenience, they are replicated below.
 
 Config values for the main ini config file can also be set, or overridden via environment variables.
 They require the 'MT_' prefix.  Any delimiter is represented as an underscore.
@@ -25,8 +25,8 @@ MT_KAFKA_MDM_IN_DATA_DIR: /your/data/dir  # MT_<section_title>_<setting_name>
 # Metrictank.ini
 
 
-sample config for metrictank  
-the defaults here match the default behavior.  
+sample config for metrictank
+the defaults here match the default behavior.
 ## misc ##
 
 ```
@@ -299,6 +299,10 @@ consumer-max-wait-time = 1s
 consumer-max-processing-time = 1s
 # How many outstanding requests a connection is allowed to have before sending on it blocks
 net-max-open-requests = 100
+# GOGC value during node startup (lag > maxPrio), default sets in runtime using GOGC env. variable
+#gogc-startup = 100
+# GOGC value during normal run (lag <= maxPrio), default sets in runtime using GOGC env. variable
+#gogc-ready = 100
 ```
 
 ## basic clustering settings ##
@@ -498,7 +502,7 @@ create-cf = true
 # * Valid units are s/sec/secs/second/seconds, m/min/mins/minute/minutes, h/hour/hours, d/day/days, w/week/weeks, mon/month/months, y/year/years
 
 [default]
-pattern = 
+pattern =
 max-stale = 0
 ```
 
@@ -539,7 +543,7 @@ aggregationMethod = avg,min,max
 # (note in particular that if you remove archives here, we will no longer read from them)
 # * Retentions must be specified in order of increasing interval and retention
 # * The reorderBuffer an optional buffer that temporarily keeps data points in memory as raw data and allows insertion at random order. The specified value is how many datapoints, based on the raw interval specified in the first defined retention, should be kept before they are flushed out. This is useful if the metric producers cannot guarantee that the data will arrive in order, but it is relatively memory intensive. If you are unsure whether you need this, better leave it disabled to not waste memory.
-# 
+#
 # A given rule is made up of at least 3 lines: the name, regex pattern, retentions and optionally the reorder buffer size.
 # The retentions line can specify multiple retention definitions. You need one or more, space separated.
 #
