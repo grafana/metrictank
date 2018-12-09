@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,6 +68,9 @@ var offsetDuration time.Duration
 var partitionOffset map[int32]*stats.Gauge64
 var partitionLogSize map[int32]*stats.Gauge64
 var partitionLag map[int32]*stats.Gauge64
+var NormalGCPercent int
+var StartupGCPercent int
+var goGC int
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -82,6 +87,17 @@ func ConfigSetup() {
 	inKafkaMdm.DurationVar(&consumerMaxWaitTime, "consumer-max-wait-time", time.Second, "The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it returns fewer than that anyway")
 	inKafkaMdm.DurationVar(&consumerMaxProcessingTime, "consumer-max-processing-time", time.Second, "The maximum amount of time the consumer expects a message takes to process")
 	inKafkaMdm.IntVar(&netMaxOpenRequests, "net-max-open-requests", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
+	if os.Getenv("GOGC") != "" {
+		var err error
+		goGC, err = strconv.Atoi(os.Getenv("GOGC"))
+		if err != nil {
+			goGC = 100
+		}
+	} else {
+		goGC = 100
+	}
+	inKafkaMdm.IntVar(&StartupGCPercent, "gogc-startup", goGC, "GOGC value during node startup (lag > maxPrio)")
+	inKafkaMdm.IntVar(&NormalGCPercent, "gogc-ready", goGC, "GOGC value during normal run (lag <= maxPrio)")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm)
 }
 
@@ -374,6 +390,18 @@ func (k *KafkaMdm) MaintainPriority() {
 				return
 			case <-ticker.C:
 				cluster.Manager.SetPriority(k.lagMonitor.Metric())
+				if NormalGCPercent != goGC || StartupGCPercent != goGC {
+					lag := k.lagMonitor.Metric()
+					if lag >= 0 && lag <= cluster.MaxPrio {
+						// resetting GOGC back to default
+						log.Infof("kafkamdm: lag is %d <= %d - good, setting GOGC to %d", lag, cluster.MaxPrio, NormalGCPercent)
+						debug.SetGCPercent(NormalGCPercent)
+					} else {
+						// we're probably starting
+						log.Infof("kafkamdm: lag is %d > %d, too big, setting GOGC to %d", lag, cluster.MaxPrio, StartupGCPercent)
+						debug.SetGCPercent(StartupGCPercent)
+					}
+				}
 			}
 		}
 	}()

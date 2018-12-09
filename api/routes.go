@@ -6,7 +6,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/raintank/gziper"
-	"gopkg.in/macaron.v1"
+	macaron "gopkg.in/macaron.v1"
 )
 
 func (s *Server) RegisterRoutes() {
@@ -77,4 +77,10 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/prometheus/api/v1/series", cBody, withOrg, ready, form(models.PrometheusSeriesQuery{})).Get(s.prometheusQuerySeries).Post(s.prometheusQuerySeries)
 	r.Get("/prometheus/api/v1/label/:name/values", cBody, withOrg, ready, s.prometheusLabelValues)
 	r.Get("/prometheus/metrics", promhttp.Handler())
+
+	// GC gontrol
+	r.Get("/gc/startup", noTrace, s.getStartupGCPercent)
+	r.Get("/gc/normal", noTrace, s.getNormalGCPercent)
+	r.Post("/gc/startup", bind(models.StartupGCPercent{}), s.setStartupGCPercent)
+	r.Post("/gc/normal", bind(models.NormalGCPercent{}), s.setNormalGCPercent)
 }

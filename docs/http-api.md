@@ -219,6 +219,52 @@ Remove chunks from the cache for matching series, or wipe the entire cache
 curl -v -X POST -d '{"propagate": true, "orgId": 1, "patterns": ["**"]}' -H 'Content-Type: application/json' http://localhost:6060/ccache/delete
 ```
 
+## GC control
+
+```
+GET /gc/startup
+GET /gc/normal
+```
+
+Get startup / normal GC percent value.
+
+#### Example
+
+```bash
+curl -v http://localhost:6060/gc/startup
+*   Trying ::1...
+* TCP_NODELAY set
+* Connected to localhost (::1) port 6060 (#0)
+> GET /gc/startup HTTP/1.1
+> Host: localhost:6060
+> User-Agent: curl/7.54.0
+> Accept: */*
+>
+< HTTP/1.1 200 OK
+< Content-Type: application/json
+< Vary: Origin
+< Date: Fri, 30 Nov 2018 16:12:06 GMT
+< Content-Length: 12
+<
+* Connection #0 to host localhost left intact
+{"value":50}
+```
+
+```
+POST /gc/startup
+POST /gc/normal
+```
+
+Set startup / normal GC percent value.
+* value : target GC percent 
+
+#### Example
+
+```bash
+curl -X POST --data value=200 http://localhost:6060/gc/normal
+OK
+```
+
 ## Misc
 
 ### Tspec
