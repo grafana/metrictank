@@ -19,12 +19,13 @@ import (
 const maxToken = math.MaxInt64 // 9223372036854775807
 
 var (
-	doneKeys   uint64
-	doneRows   uint64
-	startTs    int
-	endTs      int
-	numThreads int
-	verbose    bool
+	doneKeys    uint64
+	doneRows    uint64
+	startTs     int
+	endTs       int
+	numThreads  int
+	statusEvery int
+	verbose     bool
 )
 
 func init() {
@@ -62,6 +63,7 @@ func main() {
 	flag.IntVar(&startTs, "start-timestamp", 0, "timestamp at which to start, defaults to 0")
 	flag.IntVar(&endTs, "end-timestamp", math.MaxInt32, "timestamp at which to stop, defaults to int max")
 	flag.IntVar(&numThreads, "threads", 10, "number of workers to use to process data")
+	flag.IntVar(&statusEvery, "status-every", 100000, "print status every x keys")
 
 	flag.BoolVar(&verbose, "verbose", false, "show every record being processed")
 
@@ -151,7 +153,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, store *cassandra.Cas
 			}
 
 			doneRowsSnap := atomic.AddUint64(&doneRows, 1)
-			if doneRowsSnap%10000 == 0 {
+			if doneRowsSnap%uint64(statusEvery) == 0 {
 				doneKeysSnap := atomic.LoadUint64(&doneKeys)
 				completeness := completenessEstimate(token)
 				log.Infof("WORKING: id=%d processed %d keys, %d rows. (last token: %d, completeness estimate %.1f%%)", id, doneKeysSnap, doneRowsSnap, token, completeness*100)

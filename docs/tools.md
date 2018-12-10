@@ -556,6 +556,8 @@ Flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -start-timestamp int
     	timestamp at which to start, defaults to 0
+  -status-every int
+    	print status every x keys (default 100000)
   -threads int
     	number of workers to use to process data (default 10)
   -verbose
