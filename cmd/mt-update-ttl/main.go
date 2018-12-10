@@ -132,6 +132,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, store *cassandra.Cas
 	var ts int
 	var data []byte
 	var query string
+	pre := time.Now()
 	queryTpl := fmt.Sprintf("SELECT token(key), ts, data FROM %s where key=? AND ts>=? AND ts<?", tableIn)
 
 	for key := range jobs {
@@ -156,7 +157,15 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, store *cassandra.Cas
 			if doneRowsSnap%uint64(statusEvery) == 0 {
 				doneKeysSnap := atomic.LoadUint64(&doneKeys)
 				completeness := completenessEstimate(token)
-				log.Infof("WORKING: id=%d processed %d keys, %d rows. (last token: %d, completeness estimate %.1f%%)", id, doneKeysSnap, doneRowsSnap, token, completeness*100)
+				if completeness == 0 {
+					completeness = math.SmallestNonzeroFloat64
+				}
+
+				doneDur := time.Since(pre)
+				totalDur := doneDur.Seconds() / completeness
+				leftDur := (time.Second*time.Duration(int64(totalDur)) - doneDur).Round(time.Second)
+				eta := time.Now().Add(leftDur).Round(time.Second).Format("2006-1-2 15:04:05")
+				log.Infof("WORKING: id=%d processed %d keys, %d rows. (last token: %d, estimates: completeness %.1f%% - remaining %s - ETA %s)", id, doneKeysSnap, doneRowsSnap, token, completeness*100, leftDur, eta)
 			}
 		}
 		err := iter.Close()
