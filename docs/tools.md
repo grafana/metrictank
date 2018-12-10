@@ -515,7 +515,7 @@ mt-update-ttl [flags] ttl table-in [table-out]
 
 Adjusts the data in Cassandra to use a new TTL value. The TTL is applied counting from the timestamp of the data
 If table-out not specified or same as table-in, will update in place. Otherwise will not touch input table and store results in table-out
-In that case, it is up to you to assure table-out exists before running this tool
+Unless you disable create-keyspace, table-out is created when necessary
 Not supported yet: for the per-ttl tables as of 0.7, automatically putting data in the right table
 Flags:
   -cassandra-addrs string
@@ -525,13 +525,11 @@ Flags:
   -cassandra-ca-path string
     	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
   -cassandra-concurrency int
-    	max number of concurrent reads to cassandra. (default 20)
+    	number of concurrent connections to cassandra. (default 20)
   -cassandra-consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -cassandra-disable-initial-host-lookup
     	instruct the driver to not attempt to get host info from the system.peers table
-  -cassandra-host-selection-policy string
-    	 (default "tokenaware,hostpool-epsilon-greedy")
   -cassandra-host-verification
     	host (hostname and server cert) verification when using SSL (default true)
   -cassandra-keyspace string
@@ -548,14 +546,22 @@ Flags:
     	username for authentication (default "cassandra")
   -cql-protocol-version int
     	cql protocol version to use (default 4)
+  -create-keyspace
+    	enable the creation of the keyspace and tables (default true)
   -end-timestamp int
     	timestamp at which to stop, defaults to int max (default 2147483647)
+  -host-selection-policy string
+    	 (default "tokenaware,hostpool-epsilon-greedy")
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
   -start-timestamp int
     	timestamp at which to start, defaults to 0
   -threads int
     	number of workers to use to process data (default 10)
   -verbose
     	show every record being processed
+  -window-factor int
+    	size of compaction window relative to TTL (default 20)
 ```
 
 
