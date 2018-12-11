@@ -511,12 +511,11 @@ Flags:
 ## mt-update-ttl
 
 ```
-mt-update-ttl [flags] ttl table-in [table-out]
+mt-update-ttl [flags] ttl-old ttl-new
 
 Adjusts the data in Cassandra to use a new TTL value. The TTL is applied counting from the timestamp of the data
-If table-out not specified or same as table-in, will update in place. Otherwise will not touch input table and store results in table-out
-Unless you disable create-keyspace, table-out is created when necessary
-Not supported yet: for the per-ttl tables as of 0.7, automatically putting data in the right table
+Automatically resolves the corresponding tables based on ttl value.  If the table stays the same, will update in place. Otherwise will copy to the new table, not touching the input data
+Unless you disable create-keyspace, tables are created as needed
 Flags:
   -cassandra-addrs string
     	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
