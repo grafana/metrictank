@@ -604,24 +604,19 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 		return false
 	}
 
-	if currentChunk.Series.Finished {
-		// already closed and should be saved, though we cant guarantee that.
-		// Check if we should just delete the metric from memory.
-		if a.lastWrite < metricMinTs {
-			return a.gcAggregators(now, chunkMinTs, metricMinTs)
-		}
-	} else {
-		// chunk hasn't been written to in a while, and is not yet closed. Let's close it and persist it if
-		// we are a primary
+	if !currentChunk.Series.Finished {
+		// chunk hasn't been written to in a while, and is not yet closed.
+		// Let's close it and persist it if we are a primary
 		log.Debugf("AM: Found stale Chunk, adding end-of-stream bytes. key: %v T0: %d", a.Key, currentChunk.Series.T0)
 		currentChunk.Finish()
+		a.pushToCache(currentChunk)
 		if cluster.Manager.IsPrimary() {
 			log.Debugf("AM: persist(): node is primary, saving chunk. %v T0: %d", a.Key, currentChunk.Series.T0)
 			// persist the chunk. If the writeQueue is full, then this will block.
 			a.persist(a.CurrentChunkPos)
 		}
 	}
-	return false
+	return a.gcAggregators(now, chunkMinTs, metricMinTs) && a.lastWrite < metricMinTs
 }
 
 // gcAggregators returns whether all aggregators are stale and can be removed
