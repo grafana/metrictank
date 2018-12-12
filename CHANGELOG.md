@@ -1,3 +1,77 @@
+# UNRELEASED/DRAFT v0.11.0 Bigtable, chunk formats, fixes and breaking changes
+
+### Important changes that require your attention:
+
+1) with our previous chunk format, when both:
+   - using chunks of >4 hours
+   - the difference between start of chunk and first point is >4.5
+   the encoded delta became corrupted and reading the chunk results in incorrect data.
+   This release brings a remediation to recover the data at read time, as well
+   as writing a new chunk format that fixes the issue, and is also about 9 bytes
+   shorter in the typical case.  This means readers should be upgraded before writers,
+   to avoid the situation where an old reader cannot parse the chunk written by a newer
+   writer during an upgrade.  See #1126, #1129
+2) we now use logrus for logging #1056, #1083
+   Log levels are now strings, not integers.
+   See the [updated config file](https://github.com/grafana/metrictank/blob/master/docs/config.md#profiling-and-logging)
+3) index pruning is now configurable via [index-rules.conf](https://github.com/grafana/metrictank/blob/master/docs/config.md#index-rulesconf) #924, #1120
+   We no longer use a `max-stale` setting in the `cassandra-idx` section,
+   and instead gained a `index-rules-conf` setting.
+4) The NSQ cluster notifier has been removed. NSQ is a delight to work with, but we could
+   only use it for a small portion of our clustering needs, requiring Kafka anyway for data ingestion
+   and distribution. We've been using Kafka for years and neglected the NSQ notifier code, so it's time to rip it out.
+   See #1161
+5) the offset manager for the kafka input / notifier plugin has been removed since there was no need for it.
+   `offset=last` is thus no longer valid. See #1110 
+
+# index and store
+* support for bigtable index and storage #1082, #1114, #1121
+* index pruning rate limiting #1065 , #1088 
+* clusterByFind: limit series and streaming processing #1021 
+* idx: better log msg formatting, include more info #1119
+
+# clustering
+* drop node updates that are old or about thisNode, preventing an a bug where nodes didn't become ready. #948
+
+# operations
+* disable tracing for healthchecks #1054 
+* Expose AdvertiseAddr from the clustering configuration #1063 , #1097 
+* set sarama client KafkaVersion via config #1103 
+* Add cache overhead accounting #1090 
+* document cache delete #1122
+* support per-org `metrics_active` for scraping by prometheus #1160
+* fix idx active metrics setting #1169
+
+# tank
+* cleanup GC related code #1166
+* aggregated chunk GC fix (for sparse data, aggregated chunks were GC'd too late)
+  + lower default metric-max-stale #1175, #1176
+* allow specifying timestamps to mark archives being ready more granularly #1178
+
+## tools
+* mt-index-cat: add partition support #1068 , #1085 
+* mt-index-cat: add min-stale option, rename max-age to max-stale #1064 
+* mt-index-cat: support custom patterns and improve bench-realistic-workload-single-tenant.sh #1042 
+* mt-index-cat: make NameWithTags() callable from template format #1157
+* mt-store-cat: print t0 of chunks #1142
+* mt-store-cat: improvements: glob filter, chunk-csv output #1147
+* mt-update-ttl tweak default concurrency, stats fix, properly use logrus #1167
+* mt-update-ttl : use standard store, specify TTL's not tables, auto-create tables + misc #1173
+* add mt-kafka-persist-sniff tool #1161
+* fixes #1124
+
+# misc
+* better benchmark scripts #1015 
+* better documentation for our input formats #1071 
+* input: prevent integer values overflowing our index datatypes #1143
+* fix ccache memory leak #1078 
+* update jaeger-client to 2.15.0 #1093 
+* upgrade Sarama to v1.19 #1127
+* fix panic caused by multiple closes of pluginFatal channel #1107
+* correctly return error from NewCassandraStore() #1111
+* clean way of skipping expensive and integration tests. #1155, #1156
+* fix duration vars processing and error handling in cass idx #1141
+
 # v0.10.1. performance fix: pruning effect on latency, go 1.11, etc.  Sep 24, 2018
 
 * when pruning index, use more granular locking (prune individual metrics separately rather then all at once). this can significantly reduce request latencies, as previously, some render requests could be blocked a long time by long running index prunes (which was especially worse with high series churn). now there is practically no latency overhead (though prunes now run longer but that's not a problem) #1062
