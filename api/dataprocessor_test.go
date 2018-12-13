@@ -344,7 +344,7 @@ func TestGetSeriesFixed(t *testing.T) {
 	store.Drop = true
 
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, 0))
 
 	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 0)
 	srv, _ := NewServer()

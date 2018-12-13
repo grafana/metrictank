@@ -39,7 +39,7 @@ func NewSchemas(schemas []Schema) Schemas {
 		DefaultSchema: Schema{
 			Name:       "default",
 			Pattern:    regexp.MustCompile(".*"),
-			Retentions: Retentions([]Retention{NewRetentionMT(1, 3600*24*1, 600, 2, true)}), // 1s:1day:10mim:2:true
+			Retentions: Retentions([]Retention{NewRetentionMT(1, 3600*24*1, 600, 2, 0)}), // 1s:1day:10mim:2:true
 		},
 	}
 	s.BuildIndex()

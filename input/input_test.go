@@ -19,7 +19,7 @@ func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {
 
 	store := backendStore.NewDevnullStore()
 
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, 0))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
@@ -56,7 +56,7 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 
 	store := backendStore.NewDevnullStore()
 
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, true))
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, 0))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)

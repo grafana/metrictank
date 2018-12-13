@@ -88,7 +88,7 @@ func display(schema conf.Schema) {
 		}
 		chunkSpanStr := time.Duration(time.Duration(ret.ChunkSpan) * time.Second).String()
 		windowSizeStr := time.Duration(time.Duration(table.WindowSize) * time.Hour).String()
-		fmt.Printf("           %10d %10s %10s %10d %10t %15s %10s\n", ret.SecondsPerPoint, retStr, chunkSpanStr, ret.NumChunks, ret.Ready, table.Name, windowSizeStr)
+		fmt.Printf("           %10d %10s %10s %10d %12d %15s %10s\n", ret.SecondsPerPoint, retStr, chunkSpanStr, ret.NumChunks, ret.Ready, table.Name, windowSizeStr)
 	}
 	fmt.Println()
 }

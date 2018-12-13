@@ -567,8 +567,11 @@ aggregationMethod = avg,min,max
 # which may be a more effective method to cache data and alleviate workload for cassandra.
 # Defaults to 2
 #
-# ready: whether the archive is ready for querying.  This is useful if you recently introduced a new archive, but it's still being populated
-# so you rather query other archives, even if they don't have the retention to serve your queries
+# ready: whether, or as of what data timestamp, the archive is ready for querying.
+# This is useful if you recently introduced a new archive, but it's still being populated, so doesn't have the data metrictank might otherwise think there is
+# It supports two syntaxes:
+# * unix timestamp: the archive can be used for data as of this timestamp
+# * boolean: (legacy): whether or not the archive is completely ready or not ready at all.
 # Defaults to true
 #
 # Here's an example with multiple retentions:
