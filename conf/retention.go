@@ -149,6 +149,8 @@ func ParseRetentions(defs string) (Retentions, error) {
 			retention.NumChunks = uint32(i)
 		}
 		if len(parts) == 5 {
+			// user is allowed to specify both a bool or a timestamp.
+			// internally we map both to timestamp.
 			// 0 (default) is effectively the same as 'true'
 			// math.MaxUint32 is effectively the same as 'false'
 			readyInt, err := strconv.ParseUint(parts[4], 10, 32)
