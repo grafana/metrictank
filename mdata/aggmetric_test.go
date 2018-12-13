@@ -127,7 +127,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	mockCache.AddIfHotCb = func() { calledCb <- true }
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
-	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0)}
 	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), ret, 0, nil, false)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
@@ -163,7 +163,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, 0)}
 	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, nil, false))
 
 	// chunk t0's: 120, 240, 360, 480, 600, 720, 840, 960
@@ -241,7 +241,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		XFilesFactor:      0.5,
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
-	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, 0)}
 	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, &agg, false))
 
 	// basic adds and verifies with test data
@@ -281,7 +281,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	mockstore.Reset()
 	chunkSpan := uint32(10)
 	numChunks := uint32(5)
-	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, true)}
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0)}
 	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, nil, true)
 	m.Add(10, 10)
 	m.Add(11, 11)
@@ -317,7 +317,7 @@ func BenchmarkAggMetricAdd(b *testing.B) {
 			NumberOfPoints:  10e9, // TTL
 			ChunkSpan:       1800, // 30 min. contains 180 points at 10s resolution
 			NumChunks:       1,
-			Ready:           true,
+			Ready:           0,
 		},
 	}
 

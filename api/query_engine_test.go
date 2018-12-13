@@ -1,6 +1,7 @@
 package api
 
 import (
+	"math"
 	"regexp"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestAlignRequestsBasic(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -75,10 +76,10 @@ func TestAlignRequestsBasicDiff(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -99,9 +100,9 @@ func TestAlignRequestsAlerting(t *testing.T) {
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
 		[][]conf.Retention{{
-			conf.NewRetentionMT(10, 1200, 0, 0, true),
+			conf.NewRetentionMT(10, 1200, 0, 0, 0),
 		}, {
-			conf.NewRetentionMT(60, 1200, 0, 0, true),
+			conf.NewRetentionMT(60, 1200, 0, 0, 0),
 		},
 		},
 		[]models.Req{
@@ -122,9 +123,9 @@ func TestAlignRequestsBasicBestEffort(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 800, 0, 0, true),
+				conf.NewRetentionMT(10, 800, 0, 0, 0),
 			}, {
-				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -145,8 +146,8 @@ func TestAlignRequestsMultipleIntervalsPerSchema(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(1, 800, 0, 0, true),
-				conf.NewRetentionMT(60, 1100, 0, 0, true),
+				conf.NewRetentionMT(1, 800, 0, 0, 0),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -167,8 +168,8 @@ func TestAlignRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 800, 0, 0, true),
-				conf.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(10, 800, 0, 0, 0),
+				conf.NewRetentionMT(60, 1200, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -189,10 +190,10 @@ func TestAlignRequestsHalfGood(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 800, 0, 0, true),
+				conf.NewRetentionMT(10, 800, 0, 0, 0),
 			}, {
-				conf.NewRetentionMT(60, 1100, 0, 0, true),
-				conf.NewRetentionMT(120, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0),
+				conf.NewRetentionMT(120, 1200, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -213,12 +214,12 @@ func TestAlignRequestsGoodRollup(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1199, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1199, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, 0),
 			},
 		},
 		[]models.Req{
@@ -239,12 +240,12 @@ func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 1199, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(100, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1199, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(100, 1200, 600, 2, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1199, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(600, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1199, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(600, 1200, 600, 2, 0),
 			},
 		},
 		[]models.Req{
@@ -265,11 +266,11 @@ func TestAlignRequestsWeird(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 1199, 0, 0, true),
-				conf.NewRetentionMT(60, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1199, 0, 0, 0),
+				conf.NewRetentionMT(60, 1200, 600, 2, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1200, 0, 0, true),
+				conf.NewRetentionMT(60, 1200, 0, 0, 0),
 			},
 		},
 		[]models.Req{
@@ -290,12 +291,12 @@ func TestAlignRequestsWeird2(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(10, 1100, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(120, 1200, 600, 2, 0),
 			},
 		},
 		[]models.Req{
@@ -316,12 +317,12 @@ func TestAlignRequestsNoOtherChoice(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 1100, 0, 0, true),
-				conf.NewRetentionMT(120, 1199, 600, 2, true),
+				conf.NewRetentionMT(10, 1100, 0, 0, 0),
+				conf.NewRetentionMT(120, 1199, 600, 2, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1100, 0, 0, true),
-				conf.NewRetentionMT(120, 1199, 600, 2, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0),
+				conf.NewRetentionMT(120, 1199, 600, 2, 0),
 			},
 		},
 		[]models.Req{
@@ -342,13 +343,13 @@ func TestAlignRequests3rdBand(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(1, 1100, 0, 0, true),
-				conf.NewRetentionMT(120, 1199, 600, 2, true),
-				conf.NewRetentionMT(240, 1200, 600, 2, true),
+				conf.NewRetentionMT(1, 1100, 0, 0, 0),
+				conf.NewRetentionMT(120, 1199, 600, 2, 0),
+				conf.NewRetentionMT(240, 1200, 600, 2, 0),
 			},
 			{
-				conf.NewRetentionMT(60, 1100, 0, 0, true),
-				conf.NewRetentionMT(240, 1200, 600, 2, true),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0),
+				conf.NewRetentionMT(240, 1200, 600, 2, 0),
 			},
 		},
 		[]models.Req{
@@ -369,13 +370,13 @@ func TestAlignRequests2RollupsDisabled(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(10, 1100, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(120, 1199, 600, 2, false),
-				conf.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(10, 1100, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(120, 1199, 600, 2, math.MaxUint32),
+				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
 			},
 			{
-				conf.NewRetentionMT(60, 1100, 0, 0, true), // just not long enough
-				conf.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0), // just not long enough
+				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
 			},
 		},
 		[]models.Req{
@@ -394,13 +395,13 @@ func TestAlignRequestsHuh(t *testing.T) {
 	},
 		[][]conf.Retention{
 			{
-				conf.NewRetentionMT(1, 1000, 0, 0, true),
-				conf.NewRetentionMT(120, 1080, 600, 2, true),
-				conf.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(1, 1000, 0, 0, 0),
+				conf.NewRetentionMT(120, 1080, 600, 2, 0),
+				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
 			},
 			{
-				conf.NewRetentionMT(60, 1100, 0, 0, true),
-				conf.NewRetentionMT(240, 1200, 600, 2, false),
+				conf.NewRetentionMT(60, 1100, 0, 0, 0),
+				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
 			},
 		},
 		[]models.Req{
@@ -425,9 +426,9 @@ func testMaxPointsPerReq(maxPointsSoft, maxPointsHard int, reqs []models.Req, t 
 	mdata.Schemas = conf.NewSchemas([]conf.Schema{{
 		Pattern: regexp.MustCompile(".*"),
 		Retentions: conf.Retentions([]conf.Retention{
-			conf.NewRetentionMT(1, 2*day, 600, 2, true),
-			conf.NewRetentionMT(60, 7*day, 600, 2, true),
-			conf.NewRetentionMT(3600, 30*day, 600, 2, true),
+			conf.NewRetentionMT(1, 2*day, 600, 2, 0),
+			conf.NewRetentionMT(60, 7*day, 600, 2, 0),
+			conf.NewRetentionMT(3600, 30*day, 600, 2, 0),
 		}),
 	}})
 
@@ -495,30 +496,30 @@ func BenchmarkAlignRequests(b *testing.B) {
 			Pattern: regexp.MustCompile("a"),
 			Retentions: conf.Retentions(
 				[]conf.Retention{
-					conf.NewRetentionMT(10, 35*24*3600, 0, 0, true),
-					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
-					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
-					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+					conf.NewRetentionMT(10, 35*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, 0),
 				}),
 		},
 		{
 			Pattern: regexp.MustCompile("b"),
 			Retentions: conf.Retentions(
 				[]conf.Retention{
-					conf.NewRetentionMT(30, 35*24*3600, 0, 0, true),
-					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
-					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
-					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+					conf.NewRetentionMT(30, 35*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, 0),
 				}),
 		},
 		{
 			Pattern: regexp.MustCompile(".*"),
 			Retentions: conf.Retentions(
 				[]conf.Retention{
-					conf.NewRetentionMT(60, 35*24*3600, 0, 0, true),
-					conf.NewRetentionMT(600, 60*24*3600, 0, 0, true),
-					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, true),
-					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, true),
+					conf.NewRetentionMT(60, 35*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(600, 60*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, 0),
+					conf.NewRetentionMT(21600, 2*365*24*3600, 0, 0, 0),
 				}),
 		},
 	})

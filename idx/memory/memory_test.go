@@ -991,7 +991,7 @@ func TestMatchSchemaWithTags(t *testing.T) {
 		{
 			Name:       "tag1_is_value3_or_value5",
 			Pattern:    regexp.MustCompile(".*;tag1=value[35](;.*|$)"),
-			Retentions: conf.Retentions([]conf.Retention{conf.NewRetentionMT(1, 3600*24*1, 600, 2, true)}),
+			Retentions: conf.Retentions([]conf.Retention{conf.NewRetentionMT(1, 3600*24*1, 600, 2, 0)}),
 		},
 	})
 
