@@ -414,6 +414,28 @@ func TestAlignRequestsHuh(t *testing.T) {
 	)
 }
 
+func TestAlignRequestsDifferentReadyStates(t *testing.T) {
+	testAlign([]models.Req{
+		reqRaw(test.GetMKey(1), 100, 300, 800, 1, consolidation.Avg, 0, 0),
+	},
+		[][]conf.Retention{
+			{
+				conf.NewRetentionMT(1, 300, 120, 5, 0),              // TTL not good enough
+				conf.NewRetentionMT(5, 450, 600, 4, math.MaxUint32), // TTL good, but not ready
+				conf.NewRetentionMT(10, 460, 600, 3, 150),           // TTL good, but not ready since long enough
+				conf.NewRetentionMT(20, 470, 600, 2, 101),           // TTL good, but not ready since long enough
+				conf.NewRetentionMT(60, 480, 600, 1, 100),           // TTL good and ready since long enough
+			},
+		},
+		[]models.Req{
+			reqOut(test.GetMKey(1), 100, 300, 800, 1, consolidation.Avg, 0, 0, 4, 60, 480, 60, 1),
+		},
+		nil,
+		500,
+		t,
+	)
+}
+
 var hour uint32 = 60 * 60
 var day uint32 = 24 * hour
 
