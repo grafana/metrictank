@@ -63,7 +63,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 		retentions := mdata.Schemas.Get(req.SchemaId).Retentions
 		for i, ret := range retentions {
 			// skip non-ready option.
-			if !ret.Ready {
+			if ret.Ready > from {
 				continue
 			}
 			req.Archive = i
@@ -119,7 +119,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 			retentions := mdata.Schemas.Get(req.SchemaId).Retentions
 			for i, ret := range retentions[req.Archive+1:] {
 				archInterval := uint32(ret.SecondsPerPoint)
-				if interval == archInterval && ret.Ready {
+				if interval == archInterval && ret.Ready <= from {
 					// we're in luck. this will be more efficient than runtime consolidation
 					req.Archive = req.Archive + 1 + i
 					req.ArchInterval = archInterval
