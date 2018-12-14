@@ -273,7 +273,7 @@ Print what's flowing through kafka metric persist topic
 Flags:
 
   -backlog-process-timeout string
-    	Maximum time backlog processing can block during metrictank startup. (default "60s")
+    	Maximum time backlog processing can block during metrictank startup. Setting to a low value may result in data loss (default "60s")
   -brokers string
     	tcp address for kafka (may be given multiple times as comma separated list) (default "kafka:9092")
   -enabled
