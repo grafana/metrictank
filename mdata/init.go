@@ -7,11 +7,11 @@ import (
 	"flag"
 	"io/ioutil"
 
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -80,7 +80,7 @@ func ConfigSetup() {
 	retentionConf := flag.NewFlagSet("retention", flag.ExitOnError)
 	retentionConf.StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
 	retentionConf.StringVar(&aggFile, "aggregations-file", "/etc/metrictank/storage-aggregation.conf", "path to storage-aggregation.conf file")
-	globalconf.Register("retention", retentionConf)
+	globalconf.Register("retention", retentionConf, flag.ExitOnError)
 }
 
 func ConfigProcess() {

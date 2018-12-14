@@ -5,7 +5,7 @@ import (
 	"flag"
 	"time"
 
-	"github.com/rakyll/globalconf"
+	"github.com/grafana/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -72,7 +72,7 @@ func ConfigSetup() {
 	btIdx.DurationVar(&CliConfig.PruneInterval, "prune-interval", CliConfig.PruneInterval, "Interval at which the index should be checked for stale series.")
 	btIdx.BoolVar(&CliConfig.CreateCF, "create-cf", CliConfig.CreateCF, "enable the creation of the table and column families")
 
-	globalconf.Register("bigtable-idx", btIdx)
+	globalconf.Register("bigtable-idx", btIdx, flag.ExitOnError)
 }
 
 func ConfigProcess() {
