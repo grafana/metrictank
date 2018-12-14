@@ -1,9 +1,13 @@
 # Tags
 
-Metrictank uses [metrics2.0](http://metrics20.org/) for structuring metrics and naming them.
+Metrictank implements tag ingestion, storage, and querying to be compatible with the [graphite tags feature](https://graphite.readthedocs.io/en/latest/tags.html).
+
+# Future Metrics2.0 plans
+
+[metrics2.0](http://metrics20.org/)
 Note that tags are modeled as an array of strings, where you can have `key:value` tags but also simply `value` tags.
 
-While metrictank can ingest and store data in metrics2.0 format, making use out of this data is still on ongoing project.
+We want to go further with our tag support and adopt metrics2.0 fully, which brings naming conventions and leveraging semantics.
 
 Here are some goals:
 
