@@ -560,7 +560,7 @@ config:
 - configurable cassandra keyspace
 - better configs for docker stack vs in package
 - default consumer-fetch-min = 1
-- make statsd instrumentation optional, e.g. remove depedency on statsd.
+- make statsd instrumentation optional, e.g. remove dependency on statsd.
 - set consumer-fetch-default to sarama default of 32768
 - fix bug that was resetting consumer-fetch-default to 100
 
