@@ -324,11 +324,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:35772ed89320fd473d3ff0a434c155cfda5c577f91c4d31d78191275ef61b6c3"
+  digest = "1:817bb03ae4cb923f024602aa1753f1dcea87c83e10fb3a175ca4fa7a088b1cc7"
   name = "github.com/grafana/globalconf"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "1dcfee16dd532cf6206e704d3ae6ca31ff4c6df7"
+  revision = "7a1aae0695d90c7ce662097c9589dfe1ae3c4f47"
 
 [[projects]]
   digest = "1:a191ed8e21025522d5857d14c3ec0a6513f83bea2ff45967f301fb701f3849dd"
