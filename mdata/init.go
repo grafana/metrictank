@@ -69,11 +69,11 @@ var (
 	schemasFile = "/etc/metrictank/storage-schemas.conf"
 	aggFile     = "/etc/metrictank/storage-aggregation.conf"
 
-	promActiveMetrics = promauto.NewGauge(prometheus.GaugeOpts{
+	promActiveMetrics = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "metrictank",
 		Name:      "metrics_active",
 		Help:      "Current # of active metrics",
-	})
+	}, []string{"org"})
 )
 
 func ConfigSetup() {
