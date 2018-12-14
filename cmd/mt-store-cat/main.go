@@ -157,11 +157,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *showVersion {
-		fmt.Printf("mt-store-cat (version %s - runtime %s)\n", version, runtime.Version())
-		return
-	}
-
 	printTime = printTimeFormatted
 	if *printTs {
 		printTime = printTimeUnix
