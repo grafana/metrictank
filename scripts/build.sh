@@ -11,7 +11,8 @@ cd ${DIR}/..
 # and https://stackoverflow.com/questions/37531605/how-to-test-if-git-repository-is-shallow
 [ -f $(git rev-parse --git-dir)/shallow ] && git fetch --unshallow
 
-GITVERSION=`git describe --abbrev=7`
+source scripts/version-tag.sh
+
 BUILDDIR=$(pwd)/build
 
 # Make dir
@@ -36,10 +37,10 @@ for bin in *; do
   then
     set -x
     # -race requires CGO
-    CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$bin || fail
+    CGO_ENABLED=1 go build -race -ldflags "-X main.gitHash=$version" -o $BUILDDIR/$bin || fail
   else
     set -x
-    go build -ldflags "-X main.gitHash=$GITVERSION" -o $BUILDDIR/$bin || fail
+    go build -ldflags "-X main.gitHash=$version" -o $BUILDDIR/$bin || fail
   fi
   set +x
   cd ..
