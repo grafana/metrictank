@@ -1,6 +1,7 @@
 #!/bin/bash
 
 version=$(git describe --abbrev=7)
+version_raw=$(git describe --abbrev=7 | sed 's/^v//')
 gitroot=$(git rev-parse --show-toplevel)
 
 # only tag as latest if:
