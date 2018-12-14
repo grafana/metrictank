@@ -34,18 +34,12 @@ You need root access. All the commands shown assume you're root.
 
 ## Metrictank and graphite
 
-We automatically build rpms and debs on circleCi for all needed components whenever the build succeeds.
-These packages are pushed to packagecloud.
+Grafana Labs provides 2 repositories:
 
-You need to install these packages:
+* [raintank](https://packagecloud.io/raintank/raintank): stable repository for [official stable releases](https://github.com/grafana/metrictank/releases)
+* [testing](https://packagecloud.io/raintank/testing): testing repository that has the latest packages which typically bring improvements but possibly also new bugs. These packages are built from git master and are named `<base-release>-<commits-since-release>-<git-hash>`
 
-* metrictank
-
-Releases are simply tagged versions like `0.5.1` ([releases](https://github.com/grafana/metrictank/releases)),
-whereas commits in master following a release will be named `version-commit-after` for example `0.5.1-20` for
-the 20th commit after `0.5.1`
-
-We aim to keep master stable, so that's your best bet.
+See the installation instructions on those pages for how to enable the repositories for your distribution
 
 Supported distributions:
 
@@ -53,15 +47,19 @@ Supported distributions:
 * Debian 7 (wheezy), 8 (jessie)
 * Centos 6, 7
 
+You need to install these packages:
+
+* metrictank
+
+
 ### Install Metrictank
 You can enable our repository and install the metrictank package like so:
+(Feel free to use the testing repository instead)
 
 ```
 curl -s https://packagecloud.io/install/repositories/raintank/raintank/script.rpm.sh | bash
 apt-get install metrictank
 ```
-[more info](https://packagecloud.io/raintank/raintank/install)
-
 
 ### Install Graphite
 
