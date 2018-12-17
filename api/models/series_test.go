@@ -151,25 +151,26 @@ func TestSetTags(t *testing.T) {
 }
 
 func BenchmarkSetTags_00tags_00chars(b *testing.B) {
-	benchmarkSetTags(b, 0, 0, 0)
+	benchmarkSetTags(b, 0, 0, 0, true)
 }
 
 func BenchmarkSetTags_20tags_32chars(b *testing.B) {
-	benchmarkSetTags(b, 20, 32, 32)
+	benchmarkSetTags(b, 20, 32, 32, true)
 }
 
-func benchmarkSetTags(b *testing.B, numTags, tagKeyLength, tagValueLength int) {
+func BenchmarkSetTags_20tags_32chars_reused(b *testing.B) {
+	benchmarkSetTags(b, 20, 32, 32, false)
+}
+
+func benchmarkSetTags(b *testing.B, numTags, tagKeyLength, tagValueLength int, resetTags bool) {
 	in := Series{
 		Target: "my.metric.name",
 	}
 
 	for i := 0; i < numTags; i++ {
-		in.Target = in.Target + ";" + randString(tagKeyLength)
-		in.Target = in.Target + "="
-		in.Target = in.Target + randString(tagValueLength)
+		in.Target = in.Target + ";" + randString(tagKeyLength) + "=" + randString(tagValueLength)
 	}
 
-	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -177,8 +178,10 @@ func benchmarkSetTags(b *testing.B, numTags, tagKeyLength, tagValueLength int) {
 		if len(in.Tags) != numTags+1 {
 			b.Fatalf("Expected %d tags, got %d, target = %s, tags = %v", numTags+1, len(in.Tags), in.Target, in.Tags)
 		}
-		// Reset so as to not game the allocations
-		in.Tags = nil
+		if resetTags {
+			// Reset so as to not game the allocations
+			in.Tags = nil
+		}
 	}
 	b.SetBytes(int64(len(in.Target)))
 }
