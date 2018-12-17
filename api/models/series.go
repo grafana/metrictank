@@ -30,7 +30,7 @@ func (s *Series) SetTags() {
 
 	if s.Tags == nil {
 		// +1 for the name tag
-		s.Tags = make(map[string]string, numTags)
+		s.Tags = make(map[string]string, numTags+1)
 	} else {
 		for k := range s.Tags {
 			delete(s.Tags, k)
@@ -43,7 +43,7 @@ func (s *Series) SetTags() {
 	}
 
 	index := strings.IndexByte(s.Target, ';')
-	name := s.Target[0:index]
+	name := s.Target[:index]
 
 	remainder := s.Target
 	for index > 0 {
@@ -61,10 +61,10 @@ func (s *Series) SetTags() {
 			continue
 		}
 
-		s.Tags[tagPair[0:equalsPos]] = tagPair[equalsPos+1:]
+		s.Tags[tagPair[:equalsPos]] = tagPair[equalsPos+1:]
 	}
 
-	// Do this last to overwrite any invalid "name" tag that might be preset
+	// Do this last to overwrite any "name" tag that might have been specified in the series tags.
 	s.Tags["name"] = name
 }
 
