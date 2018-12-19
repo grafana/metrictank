@@ -6,7 +6,7 @@ cd $DIR/../..
 source scripts/version-tag.sh
 
 repo=raintank/testing
-[ $tag -eq latest ] && repo= raintank/raintank
+[ $tag == latest ] && repo=raintank/raintank
 
 # Ubuntu 14.04, 16.04, debian 7 (wheezy) & debian 8 (jessie)
 package_cloud push $repo/ubuntu/trusty build_pkg/upstart/*.deb
