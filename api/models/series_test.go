@@ -168,7 +168,7 @@ func benchmarkSetTags(b *testing.B, numTags, tagKeyLength, tagValueLength int, r
 	}
 
 	for i := 0; i < numTags; i++ {
-		in.Target = in.Target + ";" + randString(tagKeyLength) + "=" + randString(tagValueLength)
+		in.Target += ";" + randString(tagKeyLength) + "=" + randString(tagValueLength)
 	}
 
 	b.ResetTimer()
