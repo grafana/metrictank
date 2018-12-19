@@ -50,7 +50,7 @@
       "id": 37,
       "panels": [],
       "repeat": null,
-      "title": "Row",
+      "title": "key stats",
       "type": "row"
     },
     {
@@ -726,7 +726,7 @@
       "id": 39,
       "panels": [],
       "repeat": null,
-      "title": "New row",
+      "title": "memory, cpu and latency",
       "type": "row"
     },
     {
@@ -1209,7 +1209,7 @@
       "id": 40,
       "panels": [],
       "repeat": null,
-      "title": "Dashboard Row",
+      "title": "requests stats 1",
       "type": "row"
     },
     {
@@ -1498,7 +1498,7 @@
       "id": 41,
       "panels": [],
       "repeat": null,
-      "title": "New row",
+      "title": "requests stats 2",
       "type": "row"
     },
     {
@@ -1857,7 +1857,7 @@
       "id": 42,
       "panels": [],
       "repeat": null,
-      "title": "New row",
+      "title": "store stats 1",
       "type": "row"
     },
     {
@@ -2224,7 +2224,7 @@
       "id": 43,
       "panels": [],
       "repeat": null,
-      "title": "New row",
+      "title": "store stats 2",
       "type": "row"
     },
     {
@@ -2548,7 +2548,7 @@
       "id": 44,
       "panels": [],
       "repeat": null,
-      "title": "New row",
+      "title": "store stats 3",
       "type": "row"
     },
     {
