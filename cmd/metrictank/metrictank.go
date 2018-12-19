@@ -44,7 +44,7 @@ import (
 var (
 	warmupPeriod time.Duration
 	startupTime  time.Time
-	gitHash      = "(none)"
+	version      = "(none)"
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex
@@ -88,7 +88,7 @@ func main() {
 
 	// if the user just wants the version, give it and exit
 	if *showVersion {
-		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), gitHash)
+		fmt.Printf("metrictank (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
 
@@ -170,7 +170,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not parse port from listenAddr. %s", api.Addr)
 	}
-	cluster.Init(*instance, gitHash, startupTime, scheme, int(port))
+	cluster.Init(*instance, version, startupTime, scheme, int(port))
 
 	/***********************************
 		Validate remaining settings
@@ -226,9 +226,9 @@ func main() {
 	/***********************************
 		Report Version
 	***********************************/
-	log.Infof("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
+	log.Infof("Metrictank starting. version: %s - runtime: %s", version, runtime.Version())
 	// metric version.%s is the version of metrictank running.  The metric value is always 1
-	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(gitHash, ".", "_", -1)))
+	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(version, ".", "_", -1)))
 	mtVersion.Set(true)
 
 	/***********************************

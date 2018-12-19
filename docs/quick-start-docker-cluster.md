@@ -16,7 +16,7 @@ The docker-cluster image is similar to docker-standard, but with the following c
 * Short chunkspan & numchunks (benefits: easy to trigger mem and mem_and_cass requests, frequent cass saves, notifier messages etc)
 * Prometheus monitoring
 * Jaeger tracing
-* caddy-proxied endpooints/datasources to check with different org-id auth headers
+* caddy-proxied endpoints/datasources to check with different org-id auth headers
 * tsdb-gw
 
 

@@ -68,7 +68,7 @@ var (
 		"If true existing chunks may be overwritten",
 	)
 
-	gitHash = "(none)"
+	version = "(none)"
 )
 
 type Server struct {
@@ -180,7 +180,7 @@ func main() {
 		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
-	cluster.Init("mt-whisper-importer-writer", gitHash, time.Now(), "http", int(80))
+	cluster.Init("mt-whisper-importer-writer", version, time.Now(), "http", int(80))
 
 	server := &Server{
 		Session:     store.Session,
