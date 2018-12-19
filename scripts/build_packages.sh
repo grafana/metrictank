@@ -128,7 +128,8 @@ cp ${BUILD_ROOT}/{metrictank,mt-*} ${BUILD}/usr/bin/
 
 PACKAGE_NAME="${PKG}/metrictank-${version_raw}.el7.${ARCH}.rpm"
 fpm -s dir -t rpm \
-  -v ${version_raw} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \ --config-files /etc/metrictank/ \
+  -v ${version_raw} -n metrictank -a ${ARCH} --description "metrictank, the gorilla-inspired timeseries database backend for graphite" \
+  --config-files /etc/metrictank/ \
   -m "Raintank Inc. <hello@grafana.com>" --vendor "grafana.com" \
   --license "Apache2.0" -C ${BUILD} -p ${PACKAGE_NAME} .
 
