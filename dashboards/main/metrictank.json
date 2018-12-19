@@ -3068,10 +3068,10 @@
       "aliasColors": {
         "add-to-bulk-index-fail": "#BF1B00",
         "add-to-bulk-index-ok": "#3F6833",
-        "cassandra.fail": "#E24D42",
-        "cassandra.ok": "#3F6833",
         "bigtable.fail": "#E24D42",
         "bigtable.ok": "#3F6833",
+        "cassandra.fail": "#E24D42",
+        "cassandra.ok": "#3F6833",
         "indexed-fail": "#E0752D",
         "indexed-ok": "#629E51",
         "max": "#DEDAF7",
