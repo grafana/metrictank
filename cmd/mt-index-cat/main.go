@@ -88,14 +88,20 @@ func main() {
 		fmt.Printf("cass config flags:\n\n")
 		cassFlags.PrintDefaults()
 		fmt.Println()
-		fmt.Printf("output: either presets like %v\n", strings.Join(outputs, "|"))
-		fmt.Printf("output: or custom templates like '{{.Id}} {{.OrgId}} {{.Name}} {{.Metric}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'\n\n\n")
-		fmt.Println("You may also use processing functions in templates:")
-		fmt.Println("pattern: transforms a graphite.style.metric.name into a pattern with wildcards inserted")
-		fmt.Println("    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough")
-		out.PatternCustomUsage()
-		fmt.Println("age: subtracts the passed integer (typically .LastUpdate) from the query time")
-		fmt.Println("roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age")
+		fmt.Println("output:")
+		fmt.Println()
+		fmt.Printf(" * presets: %v\n", strings.Join(outputs, "|"))
+		fmt.Println(" * templates, which may contain:")
+		fmt.Println("   - fields,  e.g. '{{.Id}} {{.OrgId}} {{.Name}} {{.Interval}} {{.Unit}} {{.Mtype}} {{.Tags}} {{.LastUpdate}} {{.Partition}}'")
+		fmt.Println("   - methods, e.g. '{{.NameWithTags}}' (works basically the same as a field)")
+		fmt.Println("   - processing functions:")
+		fmt.Println("     pattern:       transforms a graphite.style.metric.name into a pattern with wildcards inserted")
+		fmt.Println("                    an operation is randomly selected between: replacing a node with a wildcard, replacing a character with a wildcard, and passthrough")
+		out.PatternCustomUsage("     ")
+		fmt.Println("     age:           subtracts the passed integer (typically .LastUpdate) from the query time")
+		fmt.Println("     roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age")
+		fmt.Println()
+		fmt.Println()
 		fmt.Println("EXAMPLES:")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 list")
 		fmt.Println("mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'")
@@ -152,7 +158,7 @@ func main() {
 
 	globalFlags.Parse(os.Args[1:cassI])
 	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)-1])
-	cassandra.Enabled = true
+	cassandra.CliConfig.Enabled = true
 
 	if regexStr != "" {
 		var err error
@@ -178,7 +184,7 @@ func main() {
 		show = out.Template(format)
 	}
 
-	idx := cassandra.New()
+	idx := cassandra.New(cassandra.CliConfig)
 	err := idx.InitBare()
 	perror(err)
 

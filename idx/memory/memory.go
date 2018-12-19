@@ -11,13 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -65,7 +65,7 @@ func ConfigSetup() {
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
-	globalconf.Register("memory-idx", memoryIdx)
+	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 }
 
 func ConfigProcess() {
@@ -1147,7 +1147,7 @@ func (m *MemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
 		delete(m.defById, idStr)
 	}
 
-	statMetricsActive.Add(-1 * len(ids))
+	statMetricsActive.Set(len(m.defById))
 
 	return deletedDefs
 }
@@ -1164,9 +1164,10 @@ func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) 
 
 	for _, f := range found {
 		deleted := m.delete(orgId, f, true, true)
-		statMetricsActive.DecUint32(uint32(len(deleted)))
 		deletedDefs = append(deletedDefs, deleted...)
 	}
+
+	statMetricsActive.Set(len(m.defById))
 	statDeleteDuration.Value(time.Since(pre))
 
 	return deletedDefs, nil
@@ -1391,7 +1392,7 @@ ORGS:
 		}
 	}
 
-	statMetricsActive.Add(-1 * len(pruned))
+	statMetricsActive.Set(len(m.defById))
 
 	duration := time.Since(pre)
 	log.Infof("memory-idx: finished pruning of %d series in %s", len(pruned), duration)

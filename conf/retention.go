@@ -3,6 +3,7 @@ package conf
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,8 @@ import (
 )
 
 const Month_sec = 60 * 60 * 24 * 28
+
+var errReadyFormat = errors.New("'ready' field must be a bool or unsigned integer")
 
 type Retentions []Retention
 
@@ -61,7 +64,7 @@ type Retention struct {
 	NumberOfPoints  int    // ~ttl
 	ChunkSpan       uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
 	NumChunks       uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
-	Ready           bool   // ready for reads?
+	Ready           uint32 // ready for reads for data as of this timestamp (or as of now-TTL, whichever is highest)
 }
 
 func (r Retention) MaxRetention() int {
@@ -75,7 +78,7 @@ func NewRetention(secondsPerPoint, numberOfPoints int) Retention {
 	}
 }
 
-func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks uint32, ready bool) Retention {
+func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks, ready uint32) Retention {
 	return Retention{
 		SecondsPerPoint: secondsPerPoint,
 		NumberOfPoints:  int(ttl) / secondsPerPoint,
@@ -145,11 +148,22 @@ func ParseRetentions(defs string) (Retentions, error) {
 			}
 			retention.NumChunks = uint32(i)
 		}
-		retention.Ready = true
 		if len(parts) == 5 {
-			retention.Ready, err = strconv.ParseBool(parts[4])
-			if err != nil {
-				return nil, err
+			// user is allowed to specify both a bool or a timestamp.
+			// internally we map both to timestamp.
+			// 0 (default) is effectively the same as 'true'
+			// math.MaxUint32 is effectively the same as 'false'
+			readyInt, err := strconv.ParseUint(parts[4], 10, 32)
+			if err == nil {
+				retention.Ready = uint32(readyInt)
+			} else {
+				readyBool, err := strconv.ParseBool(parts[4])
+				if err != nil {
+					return nil, errReadyFormat
+				}
+				if !readyBool {
+					retention.Ready = math.MaxUint32
+				}
 			}
 		}
 

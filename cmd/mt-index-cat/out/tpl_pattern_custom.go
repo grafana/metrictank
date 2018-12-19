@@ -13,21 +13,21 @@ type bucket struct {
 	fn     func(in string) string
 }
 
-func PatternCustomUsage() {
-	fmt.Println("patternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:")
-	fmt.Println("    patternCustom <chance> <operation>[ <chance> <operation>...]")
-	fmt.Println("    the chances need to add up to 100")
-	fmt.Println("    operation is one of:")
-	fmt.Println("        * pass        (passthrough)")
-	fmt.Println("        * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards")
-	fmt.Println("        * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards")
-	fmt.Println("    example: {{.Name | patternCustom 15 \"pass\" 40 \"1rcnw\" 15 \"2rcnw\" 10 \"3rcnw\" 10 \"3rccw\" 10 \"2rccw\"}}\\n")
+func PatternCustomUsage(indent string) {
+	fmt.Printf("%spatternCustom: transforms a graphite.style.metric.name into a pattern with wildcards inserted according to rules provided:\n", indent)
+	fmt.Printf("%s               patternCustom <chance> <operation>[ <chance> <operation>...]\n", indent)
+	fmt.Printf("%s               the chances need to add up to 100\n", indent)
+	fmt.Printf("%s               operation is one of:\n", indent)
+	fmt.Printf("%s                 * pass        (passthrough)\n", indent)
+	fmt.Printf("%s                 * <digit>rcnw (replace a randomly chosen sequence of <digit (0-9)> consecutive nodes with wildcards\n", indent)
+	fmt.Printf("%s                 * <digit>rccw (replace a randomly chosen sequence of <digit (0-9)> consecutive characters with wildcards\n", indent)
+	fmt.Printf("%s               example: {{.Name | patternCustom 15 \"pass\" 40 \"1rcnw\" 15 \"2rcnw\" 10 \"3rcnw\" 10 \"3rccw\" 10 \"2rccw\"}}\\n\n", indent)
 }
 
 // percentage chance, and function
 func patternCustom(in ...interface{}) string {
 	usage := func() {
-		PatternCustomUsage()
+		PatternCustomUsage("")
 		os.Exit(-1)
 	}
 

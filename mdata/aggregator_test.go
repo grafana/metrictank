@@ -71,7 +71,7 @@ func TestAggregator(t *testing.T) {
 		}
 		cluster.Manager.SetPrimary(false)
 	}
-	ret := conf.NewRetentionMT(60, 86400, 120, 10, true)
+	ret := conf.NewRetentionMT(60, 86400, 120, 10, 0)
 	aggs := conf.Aggregation{
 		AggregationMethod: []conf.Method{conf.Avg, conf.Min, conf.Max, conf.Sum, conf.Lst},
 	}

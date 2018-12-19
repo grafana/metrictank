@@ -24,7 +24,7 @@ func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {
 	srv.RegisterRoutes()
 
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, true))
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, 0))
 
 	store := mdata.NewMockStore()
 	store.Drop = true

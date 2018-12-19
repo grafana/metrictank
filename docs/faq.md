@@ -21,7 +21,6 @@ Metrictank will automatically combine the data together like so:
 
 ## Tag support
 
-Metrictank aims to provide a proper implementation of [metrics 2.0](http://metrics20.org/)
+Metrics can have tags and metrictank supports queries via the [graphite tag query api](https://graphite.readthedocs.io/en/latest/tags.html)
+In the future, metrictank aims to provide a proper implementation of [metrics 2.0](http://metrics20.org/)
 (it helps that both projects share the same main author)
-As such, metrics can have tags and they are indexed as such.  However we don't expose this yet through the search or query interface,
-but plan to do so in the future.

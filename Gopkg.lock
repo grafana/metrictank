@@ -323,6 +323,14 @@
   revision = "4b53e1bddba0e2f734514aeb6c02db652f4c6fe8"
 
 [[projects]]
+  branch = "master"
+  digest = "1:817bb03ae4cb923f024602aa1753f1dcea87c83e10fb3a175ca4fa7a088b1cc7"
+  name = "github.com/grafana/globalconf"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "7a1aae0695d90c7ce662097c9589dfe1ae3c4f47"
+
+[[projects]]
   digest = "1:a191ed8e21025522d5857d14c3ec0a6513f83bea2ff45967f301fb701f3849dd"
   name = "github.com/grpc-ecosystem/grpc-gateway"
   packages = [
@@ -663,14 +671,6 @@
   pruneopts = "NUT"
   revision = "62e6d7933846832d7f2381631fbd956cd40234cb"
   version = "v2.2"
-
-[[projects]]
-  branch = "master"
-  digest = "1:56e1fe0cbca1744fa51e946af6fcbecee6df3d57fd77647dd48e0ca2da049ada"
-  name = "github.com/rakyll/globalconf"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "f3ec558991f8d5e7b1efcc291fa36edef6c47123"
 
 [[projects]]
   branch = "master"
@@ -1035,6 +1035,7 @@
     "github.com/gocql/gocql",
     "github.com/gogo/protobuf/proto",
     "github.com/golang/snappy",
+    "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
     "github.com/hashicorp/memberlist",
     "github.com/kisielk/og-rek",
@@ -1060,7 +1061,6 @@
     "github.com/raintank/met/helper",
     "github.com/raintank/schema",
     "github.com/raintank/schema/msg",
-    "github.com/rakyll/globalconf",
     "github.com/rs/cors",
     "github.com/sergi/go-diff/diffmatchpatch",
     "github.com/sirupsen/logrus",

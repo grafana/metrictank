@@ -43,7 +43,7 @@ drop-first-chunk = false
 # max age for a chunk before to be considered stale and to be persisted to Cassandra
 chunk-max-stale = 1h
 # max age for a metric before to be considered stale and to be purged from in-memory ring buffer.
-metric-max-stale = 6h
+metric-max-stale = 3h
 # Interval to run garbage collection job
 gc-interval = 1h
 # duration before secondary nodes start serving requests
@@ -195,6 +195,8 @@ prefix = metrictank.stats.default.$instance
 addr = localhost:2003
 # interval at which to send statistics
 interval = 1
+# timeout after which a write is considered not successful
+timeout = 10s
 # how many messages (holding all measurements from one interval. rule of thumb: a message is ~25kB) to buffer up in case graphite endpoint is unavailable.
 # With the default of 20k you will use max about 500MB and bridge 5 hours of downtime when needed
 buffer-size = 20000
@@ -395,7 +397,7 @@ partitions = *
 # When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
 # Should match your kafka-mdm-in setting
 offset = newest
-# Maximum time backlog processing can block during metrictank startup.
+# Maximum time backlog processing can block during metrictank startup. Setting to a low value may result in data loss
 backlog-process-timeout = 60s
 ```
 
@@ -413,17 +415,17 @@ hosts = localhost:9042
 protocol-version = 4
 # write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one
 consistency = one
-# cassandra request timeout
+# cassandra request timeout. valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'
 timeout = 1s
 # number of concurrent connections to cassandra
 num-conns = 10
 # Max number of metricDefs allowed to be unwritten to cassandra
 write-queue-size = 100000
-#Interval at which the index should be checked for stale series.
+#Interval at which the index should be checked for stale series. valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'
 prune-interval = 3h
 # synchronize index changes to cassandra. not all your nodes need to do this.
 update-cassandra-index = true
-#frequency at which we should update flush changes to cassandra. only relevant if update-cassandra-index is true.
+#frequency at which we should update flush changes to cassandra. only relevant if update-cassandra-index is true. valid time units are 'ns', 'us' (or 'µs'), 'ms', 's', 'm', 'h'. Setting to '0s' will cause instant updates.
 update-interval = 4h
 # enable SSL connection to cassandra
 ssl = false
@@ -571,8 +573,11 @@ aggregationMethod = avg,min,max
 # which may be a more effective method to cache data and alleviate workload for cassandra.
 # Defaults to 2
 #
-# ready: whether the archive is ready for querying.  This is useful if you recently introduced a new archive, but it's still being populated
-# so you rather query other archives, even if they don't have the retention to serve your queries
+# ready: whether, or as of what data timestamp, the archive is ready for querying.
+# This is useful if you recently introduced a new archive, but it's still being populated, so doesn't have the data metrictank might otherwise think there is
+# It supports two syntaxes:
+# * unix timestamp: the archive can be used for data as of this timestamp
+# * boolean: (legacy): whether or not the archive is completely ready or not ready at all.
 # Defaults to true
 #
 # Here's an example with multiple retentions:

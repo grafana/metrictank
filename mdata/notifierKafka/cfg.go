@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,8 +47,8 @@ func init() {
 	FlagSet.StringVar(&topic, "topic", "metricpersist", "kafka topic")
 	FlagSet.StringVar(&partitionStr, "partitions", "*", "kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in")
 	FlagSet.StringVar(&offsetStr, "offset", "newest", "Set the offset to start consuming from. Can be oldest, newest or a time duration")
-	FlagSet.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup.")
-	globalconf.Register("kafka-cluster", FlagSet)
+	FlagSet.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup. Setting to a low value may result in data loss")
+	globalconf.Register("kafka-cluster", FlagSet, flag.ExitOnError)
 }
 
 func ConfigProcess(instance string) {

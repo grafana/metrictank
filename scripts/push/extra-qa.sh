@@ -4,7 +4,7 @@ log () {
         echo "$(date +'%Y/%m/%d %H:%M:%S') $@"
 }
 
-VERSION=`git describe --abbrev=7`
+source scripts/version-tag.sh
 
 echo
 echo "### extra-qa.sh"
@@ -13,8 +13,8 @@ echo
 # try returns if did not succeed and is retryable
 # exits in all other cases
 try () {
-	log "trying to push $VERSION to qa server"
-	res=$(curl -q https://mt-qa.grafana.net/try -d secret=$MTQA_SECRET -d version=$VERSION)
+	log "trying to push $version to qa server"
+	res=$(curl -q https://mt-qa.grafana.net/try -d secret=$MTQA_SECRET -d version=$version)
 	echo $res
 	if grep -q '^OK$' <<< "$res"; then
 		exit 0

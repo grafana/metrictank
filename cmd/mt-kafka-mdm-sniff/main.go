@@ -14,12 +14,12 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/grafana/globalconf"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 	"github.com/raintank/schema/msg"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 

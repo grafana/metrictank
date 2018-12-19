@@ -11,17 +11,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
-
 	"github.com/Shopify/sarama"
-	"github.com/rakyll/globalconf"
-	log "github.com/sirupsen/logrus"
-
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
+	log "github.com/sirupsen/logrus"
 )
 
 // metric input.kafka-mdm.metrics_per_message is how many metrics per message were seen.
@@ -98,7 +96,7 @@ func ConfigSetup() {
 	}
 	inKafkaMdm.IntVar(&StartupGCPercent, "gogc-startup", goGC, "GOGC value during node startup (lag > maxPrio)")
 	inKafkaMdm.IntVar(&NormalGCPercent, "gogc-ready", goGC, "GOGC value during normal run (lag <= maxPrio)")
-	globalconf.Register("kafka-mdm-in", inKafkaMdm)
+	globalconf.Register("kafka-mdm-in", inKafkaMdm, flag.ExitOnError)
 }
 
 func ConfigProcess(instance string) {

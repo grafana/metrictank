@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	l "log"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -14,10 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	_ "net/http/pprof"
-
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/api"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
@@ -38,14 +38,13 @@ import (
 	bigtableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	warmupPeriod time.Duration
 	startupTime  time.Time
-	gitHash      = "(none)"
+	version      = "(none)"
 
 	metrics     *mdata.AggMetrics
 	metricIndex idx.MetricIndex
@@ -61,7 +60,7 @@ var (
 	// Data:
 	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
-	metricMaxStaleStr = flag.String("metric-max-stale", "6h", "max age for a metric before to be considered stale and to be purged from memory.")
+	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
 	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
 	publicOrg         = flag.Int("public-org", 0, "org Id for publically (any org) accessible data. leave 0 to disable")
@@ -89,7 +88,7 @@ func main() {
 
 	// if the user just wants the version, give it and exit
 	if *showVersion {
-		fmt.Printf("metrictank (built with %s, git hash %s)\n", runtime.Version(), gitHash)
+		fmt.Printf("metrictank (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
 
@@ -171,7 +170,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not parse port from listenAddr. %s", api.Addr)
 	}
-	cluster.Init(*instance, gitHash, startupTime, scheme, int(port))
+	cluster.Init(*instance, version, startupTime, scheme, int(port))
 
 	/***********************************
 		Validate remaining settings
@@ -184,6 +183,7 @@ func main() {
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
 	memory.ConfigProcess()
+	cassandra.ConfigProcess()
 	bigtable.ConfigProcess()
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 
@@ -226,9 +226,9 @@ func main() {
 	/***********************************
 		Report Version
 	***********************************/
-	log.Infof("Metrictank starting. Built from %s - Go version %s", gitHash, runtime.Version())
+	log.Infof("Metrictank starting. version: %s - runtime: %s", version, runtime.Version())
 	// metric version.%s is the version of metrictank running.  The metric value is always 1
-	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(gitHash, ".", "_", -1)))
+	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(version, ".", "_", -1)))
 	mtVersion.Set(true)
 
 	/***********************************
@@ -336,11 +336,11 @@ func main() {
 		}
 		metricIndex = memory.New()
 	}
-	if cassandra.Enabled {
+	if cassandra.CliConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
-		metricIndex = cassandra.New()
+		metricIndex = cassandra.New(cassandra.CliConfig)
 	}
 	if bigtable.CliConfig.Enabled {
 		if metricIndex != nil {

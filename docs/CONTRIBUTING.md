@@ -48,3 +48,13 @@ see the [Makefile](../Makefile) for more targets
 * [docs](../docs) for users, operators and basic development instructions
 * [devdocs](../devdocs) in-depth implementation details for developers
 
+# Release process
+
+During normal development, maintain CHANGELOG.md, and mark interesting -to users- changes under "unreleased" version.
+Grafana Labs regularly deploys the latest code from `master`, but cannot possibly do extensive testing of all functionality in production, so users are encouraged to run master also, and report any issues they hit.
+When significant changes have been merged to master, and they have had a chance to be tested or run in production for a while, we tag a release, as follows:
+
+* update CHANGELOG.md from `unreleased` to the version.
+* create annotated git tag in the form `v<version>` and push to GitHub
+* wait for CircleCI to complete successfully.
+* create release on GitHub. copy entry from CHANGELOG.md to GitHub release page

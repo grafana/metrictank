@@ -9,22 +9,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raintank/schema"
-
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/logger"
-	opentracing "github.com/opentracing/opentracing-go"
-	log "github.com/sirupsen/logrus"
-
 	"github.com/grafana/metrictank/store/cassandra"
+	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
-	"github.com/rakyll/globalconf"
+	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 const tsFormat = "2006-01-02 15:04:05"
 
 var (
-	gitHash = "(none)"
+	version = "(none)"
 
 	// flags from metrictank.go, globals
 	showVersion = flag.Bool("version", false, "print version string")
@@ -113,7 +111,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
+		fmt.Printf("mt-store-cat (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
 	if flag.NArg() < 1 {
@@ -157,11 +155,6 @@ func main() {
 	if *groupTTL != "s" && *groupTTL != "m" && *groupTTL != "h" && *groupTTL != "d" {
 		log.Fatal("groupTTL must be one of s/m/h/d")
 		os.Exit(1)
-	}
-
-	if *showVersion {
-		fmt.Printf("mt-store-cat (built with %s, git hash %s)\n", runtime.Version(), gitHash)
-		return
 	}
 
 	printTime = printTimeFormatted

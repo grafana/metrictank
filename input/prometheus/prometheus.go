@@ -9,12 +9,12 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/snappy"
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/raintank/schema"
-	"github.com/rakyll/globalconf"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -139,7 +139,7 @@ func ConfigSetup() {
 	inPrometheus.BoolVar(&Enabled, "enabled", false, "")
 	inPrometheus.StringVar(&addr, "addr", ":8000", "http listen address")
 	inPrometheus.IntVar(&partitionID, "partition", 0, "partition Id.")
-	globalconf.Register("prometheus-in", inPrometheus)
+	globalconf.Register("prometheus-in", inPrometheus, flag.ExitOnError)
 }
 
 func ConfigProcess() {
