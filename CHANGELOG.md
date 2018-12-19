@@ -1,4 +1,4 @@
-# UNRELEASED/DRAFT v0.11.0 Bigtable, chunk formats, fixes and breaking changes
+# v0.11.0 Bigtable, chunk formats, fixes and breaking changes. Dec 19, 2018
 
 ### Important changes that require your attention:
 
@@ -41,6 +41,7 @@
 * document cache delete #1122
 * support per-org `metrics_active` for scraping by prometheus #1160
 * fix idx active metrics setting #1169
+* dashboard: give rows proper names #1184
 
 # tank
 * cleanup GC related code #1166
