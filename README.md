@@ -10,7 +10,7 @@ Metrictank is a multi-tenant timeseries engine for Graphite and friends.
 It provides long term storage, high availability, efficient storage, retrieval and processing for large scale environments.
 
 [GrafanaLabs](http://grafana.com) has been running metrictank in production since December 2015.
-It currently requires an external datastore like Cassandra, and we highly recommend using Kafka to support clustering, as well
+It currently requires an external datastore like Cassandra or Bigtable, and we highly recommend using Kafka to support clustering, as well
 as a clustering manager like Kubernetes. This makes it non-trivial to operate, though GrafanaLabs has an on-premise product
 that makes this process much easier.
 

@@ -72,6 +72,7 @@
 * clean way of skipping expensive and integration tests. #1155, #1156
 * fix duration vars processing and error handling in cass idx #1141
 * update release process, tagging, repo layout and version formatting. update to go1.11.4 #1177, #1180, #1181
+* update docs for bigtable, storage-schemas.conf and tank GC #1182
 
 # v0.10.1. performance fix: pruning effect on latency, go 1.11, etc.  Sep 24, 2018
 
