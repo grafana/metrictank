@@ -18,9 +18,6 @@
 /cmd/mt-whisper-importer-reader/mt-whisper-importer-reader
 /cmd/mt-whisper-importer-writer/mt-whisper-importer-writer
 /scripts/build
-
-# for circleCI
 build_docker
 build_pkg
 build_tmp
-
