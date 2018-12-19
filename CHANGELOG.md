@@ -37,7 +37,7 @@
 * disable tracing for healthchecks #1054 
 * Expose AdvertiseAddr from the clustering configuration #1063 , #1097 
 * set sarama client KafkaVersion via config #1103 
-* Add cache overhead accounting #1090 
+* Add cache overhead accounting #1090, #1184
 * document cache delete #1122
 * support per-org `metrics_active` for scraping by prometheus #1160
 * fix idx active metrics setting #1169
