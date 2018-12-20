@@ -163,7 +163,7 @@ func TestGroupByTagsMultipleSeriesMissingTag(t *testing.T) {
 		getModel("name2;missingTag=;tag1=val1_1", sumcd),
 	}
 
-	testGroupByTags("MultipleSeriesMultipleResultsGroupByName", in, out, "sum", []string{"tag1", "name", "missingTag"}, nil, t)
+	testGroupByTags("MultipleSeriesMissingTag", in, out, "sum", []string{"tag1", "name", "missingTag"}, nil, t)
 }
 
 func TestGroupByTagsAllAggregators(t *testing.T) {
@@ -306,7 +306,7 @@ func benchmarkGroupByTags(b *testing.B, numSeries, numGroups int, fn0, fn1 func(
 		}
 
 		for _, tag := range tagValues {
-			series.Target = series.Target + ";" + tag + "=" + strconv.Itoa(i%numGroups)
+			series.Target += ";" + tag + "=" + strconv.Itoa(i%numGroups)
 		}
 
 		if i%1 == 0 {
@@ -316,7 +316,6 @@ func benchmarkGroupByTags(b *testing.B, numSeries, numGroups int, fn0, fn1 func(
 		}
 		input = append(input, series)
 	}
-	b.ReportAllocs()
 	b.ResetTimer()
 	var err error
 	for i := 0; i < b.N; i++ {
