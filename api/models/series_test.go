@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"math/rand"
+	"reflect"
 	"testing"
 
 	"github.com/raintank/schema"
@@ -89,4 +91,107 @@ func TestJsonMarshal(t *testing.T) {
 			t.Fatalf("bad json output.\nexpected:%s\ngot:     %s\n", c.out, got)
 		}
 	}
+}
+
+func TestSetTags(t *testing.T) {
+	cases := []struct {
+		in  Series
+		out map[string]string
+	}{
+		{
+			in: Series{},
+			out: map[string]string{
+				"name": "",
+			},
+		},
+		{
+			in: Series{
+				Target: "a",
+			},
+			out: map[string]string{
+				"name": "a",
+			},
+		},
+		{
+			in: Series{
+				Target: `a\b`,
+			},
+			out: map[string]string{
+				"name": `a\b`,
+			},
+		},
+		{
+			in: Series{
+				Target: "a;b=c;c=d",
+			},
+			out: map[string]string{
+				"name": "a",
+				"b":    "c",
+				"c":    "d",
+			},
+		},
+		{
+			in: Series{
+				Target: "a;biglongtagkeyhere=andithasabiglongtagvaluetoo;c=d",
+			},
+			out: map[string]string{
+				"name":              "a",
+				"biglongtagkeyhere": "andithasabiglongtagvaluetoo",
+				"c":                 "d",
+			},
+		},
+	}
+
+	for _, c := range cases {
+		c.in.SetTags()
+		if !reflect.DeepEqual(c.out, c.in.Tags) {
+			t.Fatalf("SetTags incorrect\nexpected:%v\ngot:     %v\n", c.out, c.in.Tags)
+		}
+	}
+}
+
+func BenchmarkSetTags_00tags_00chars(b *testing.B) {
+	benchmarkSetTags(b, 0, 0, 0, true)
+}
+
+func BenchmarkSetTags_20tags_32chars(b *testing.B) {
+	benchmarkSetTags(b, 20, 32, 32, true)
+}
+
+func BenchmarkSetTags_20tags_32chars_reused(b *testing.B) {
+	benchmarkSetTags(b, 20, 32, 32, false)
+}
+
+func benchmarkSetTags(b *testing.B, numTags, tagKeyLength, tagValueLength int, resetTags bool) {
+	in := Series{
+		Target: "my.metric.name",
+	}
+
+	for i := 0; i < numTags; i++ {
+		in.Target += ";" + randString(tagKeyLength) + "=" + randString(tagValueLength)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		in.SetTags()
+		if len(in.Tags) != numTags+1 {
+			b.Fatalf("Expected %d tags, got %d, target = %s, tags = %v", numTags+1, len(in.Tags), in.Target, in.Tags)
+		}
+		if resetTags {
+			// Reset so as to not game the allocations
+			in.Tags = nil
+		}
+	}
+	b.SetBytes(int64(len(in.Target)))
+}
+
+func randString(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Int63()%int64(len(letterBytes))]
+	}
+	return string(b)
 }

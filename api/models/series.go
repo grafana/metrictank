@@ -26,19 +26,46 @@ type Series struct {
 }
 
 func (s *Series) SetTags() {
-	tagSplits := strings.Split(s.Target, ";")
+	numTags := strings.Count(s.Target, ";")
 
-	s.Tags = make(map[string]string, len(tagSplits))
+	if s.Tags == nil {
+		// +1 for the name tag
+		s.Tags = make(map[string]string, numTags+1)
+	} else {
+		for k := range s.Tags {
+			delete(s.Tags, k)
+		}
+	}
 
-	for _, tagPair := range tagSplits[1:] {
-		parts := strings.SplitN(tagPair, "=", 2)
-		if len(parts) != 2 {
+	if numTags == 0 {
+		s.Tags["name"] = s.Target
+		return
+	}
+
+	index := strings.IndexByte(s.Target, ';')
+	name := s.Target[:index]
+
+	remainder := s.Target
+	for index > 0 {
+		remainder = remainder[index+1:]
+		index = strings.IndexByte(remainder, ';')
+
+		tagPair := remainder
+		if index > 0 {
+			tagPair = remainder[:index]
+		}
+
+		equalsPos := strings.IndexByte(tagPair, '=')
+		if equalsPos < 1 {
 			// Shouldn't happen
 			continue
 		}
-		s.Tags[parts[0]] = parts[1]
+
+		s.Tags[tagPair[:equalsPos]] = tagPair[equalsPos+1:]
 	}
-	s.Tags["name"] = tagSplits[0]
+
+	// Do this last to overwrite any "name" tag that might have been specified in the series tags.
+	s.Tags["name"] = name
 }
 
 func (s Series) Copy(emptyDatapoints []schema.Point) Series {
