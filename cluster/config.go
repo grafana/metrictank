@@ -56,7 +56,7 @@ func ConfigSetup() {
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
 	globalconf.Register("cluster", clusterCfg, flag.ExitOnError)
-  MaxPrio = maxPrio
+	MaxPrio = maxPrio
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)
 	swimCfg.StringVar(&swimUseConfig, "use-config", "manual", "config setting to use. If set to anything but manual, will override all other swim settings. Use manual|default-lan|default-local|default-wan. see https://godoc.org/github.com/hashicorp/memberlist#Config . Note all our swim settings correspond to default-lan")
