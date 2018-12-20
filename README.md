@@ -65,6 +65,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 * [Inputs](https://github.com/grafana/metrictank/blob/master/docs/inputs.md)
 * [Metrics](https://github.com/grafana/metrictank/blob/master/docs/metrics.md)
 * [Operations](https://github.com/grafana/metrictank/blob/master/docs/operations.md)
+* [Startup](https://github.com/grafana/metrictank/blob/master/docs/startup.md)
 * [Tools](https://github.com/grafana/metrictank/blob/master/docs/tools.md)
 
 ### features in-depth
