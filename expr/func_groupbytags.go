@@ -106,9 +106,9 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 
 	// Now, for each key perform the requested aggregation
-	cons, queryCons := summarizeCons(series)
-
 	for name, groupSeries := range groups {
+		cons, queryCons := summarizeCons(groupSeries)
+
 		newSeries := models.Series{
 			Target:       name,
 			QueryPatt:    name,
