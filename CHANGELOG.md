@@ -8,12 +8,12 @@
 
    the encoded delta became corrupted and reading the chunk results in incorrect data.
    This release brings a remediation to recover the data at read time, as well
-   as automatically using a [new chunk format](https://github.com/grafana/metrictank/blob/master/devdocs/chunk-format.md#tszserieslong) that does not suffer from the issue.
+   as a [new chunk format](https://github.com/grafana/metrictank/blob/master/devdocs/chunk-format.md#tszserieslong) that does not suffer from the issue.
    The new chunks are also about 9 bytes shorter in the typical case.
+   While metrictank now writes to the store exclusively using the new format, it can read from the store in any of the formats.
    This means readers should be upgraded before writers,
    to avoid the situation where an old reader cannot parse the chunk written by a newer
    writer during an upgrade.  See #1126, #1129
-   Note: while metrictank now writes to the store exclusively using the new format, it can read from the store in any of the formats.
 2) we now use logrus for logging #1056, #1083
    Log levels are now strings, not integers.
    See the [updated config file](https://github.com/grafana/metrictank/blob/master/docs/config.md#profiling-and-logging)
