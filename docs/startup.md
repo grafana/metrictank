@@ -25,6 +25,6 @@ The full startup procedure has many details, but here we cover the main steps if
 | mark ready state        | immediately (primary) or after warmup period (secondary) (combined with priority for clustering)   | no                                                 |
 
 The CPU increase during the kafka backfilling is very significant. typically 10x compared to normal usage.
-The RAM usage during the input data backfilling is typically about 2x normal.
+The RAM usage during the input data backfilling is typically about 1.5x to 2x normal.
 
 This is true for v0.11.0, but may need revising later.
