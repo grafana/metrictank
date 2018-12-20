@@ -307,13 +307,6 @@ func TestSummarizeAllFuncs(t *testing.T) {
 			},
 		},
 		{
-			funcName: "cnt",
-			points: []schema.Point{
-				{Val: 3, Ts: 10},
-				{Val: 1, Ts: 40},
-			},
-		},
-		{
 			funcName: "count",
 			points: []schema.Point{
 				{Val: 3, Ts: 10},
