@@ -105,8 +105,8 @@ func FromConsolidateBy(c string) Consolidator {
 	switch c {
 	case "avg", "average":
 		return Avg
-	case "cnt":
-		return Cnt // bonus. not supported by graphite
+	case "count":
+		return Cnt
 	case "lst", "last", "current":
 		return Lst
 	case "min":
