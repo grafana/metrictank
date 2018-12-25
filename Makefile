@@ -1,4 +1,4 @@
-.PHONY: test bin docker
+.PHONY: test bin docker debug
 default:
 	$(MAKE) all
 test:
@@ -13,6 +13,15 @@ bin-race:
 	./scripts/build.sh -race
 docker:
 	./scripts/build_docker.sh
+
+#debug versions for remote debugging with delve
+bin-debug:
+	./scripts/build.sh -debug
+docker-debug:
+	./scripts/build_docker.sh -debug
+debug:
+	$(MAKE) bin-debug
+	$(MAKE) docker-debug
 
 qa: bin
 	# regular qa steps (can run directly on code)

@@ -38,6 +38,11 @@ for bin in *; do
     set -x
     # -race requires CGO
     CGO_ENABLED=1 go build -race -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail
+  elif [ "$1" == "-debug" ]
+  then
+    set -x
+    # -debug flags
+    CGO_ENABLED=0 go build -gcflags "all=-N -l" -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail
   else
     set -x
     go build -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail
