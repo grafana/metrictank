@@ -22,6 +22,20 @@ docker-debug:
 debug:
 	$(MAKE) bin-debug
 	$(MAKE) docker-debug
+	${MAKE} qa-debug
+
+qa-debug: bin-debug
+	# regular qa steps (can run directly on code)
+	scripts/qa/gofmt.sh
+	scripts/qa/go-generate.sh
+	scripts/qa/ineffassign.sh
+	scripts/qa/misspell.sh
+	scripts/qa/gitignore.sh
+	scripts/qa/unused.sh
+	scripts/qa/vendor.sh
+	scripts/qa/vet-high-confidence.sh
+	# qa-post-build steps minus stack tests
+	scripts/qa/docs.sh
 
 qa: bin
 	# regular qa steps (can run directly on code)
