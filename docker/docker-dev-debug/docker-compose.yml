@@ -5,7 +5,7 @@ services:
     security_opt:
       - seccomp:unconfined
     hostname: metrictank
-    image: grafana/metrictank-debug
+    image: grafana/metrictank:latest-debug
     ports:
      - "6060:6060"
      - "2003:2003"

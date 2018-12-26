@@ -42,7 +42,7 @@ for bin in *; do
   then
     set -x
     # -debug flags
-    CGO_ENABLED=0 go build -gcflags "all=-N -l" -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail
+    CGO_ENABLED=0 go build -gcflags "all=-N -l" -ldflags "-X main.version=${version}-debug" -o $BUILDDIR/$bin || fail
   else
     set -x
     go build -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail

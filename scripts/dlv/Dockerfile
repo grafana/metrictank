@@ -22,12 +22,12 @@ COPY config/schema-idx-scylladb.toml /usr/share/metrictank/examples/schema-idx-s
 
 COPY build/* /usr/bin/
 
-COPY util/wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
+COPY util/wait_for_endpoint_debug.sh /usr/bin/wait_for_endpoint_debug.sh
 
 COPY --from=gobase /go/bin/dlv /usr/bin/dlv
 
 EXPOSE 6060
 EXPOSE 40000
 
-ENTRYPOINT ["/usr/bin/wait_for_endpoint.sh"]
+ENTRYPOINT ["/usr/bin/wait_for_endpoint_debug.sh"]
 CMD [ "/usr/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--log", "--log-output=rpc", "exec", "/usr/bin/metrictank", "--" ,"-config=/etc/metrictank/metrictank.ini" ]

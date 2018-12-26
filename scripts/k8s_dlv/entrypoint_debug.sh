@@ -1,6 +1,20 @@
 #!/bin/sh
 set -x
 
+#shutdown metrictank and dlv
+kill_metrictank() {
+  echo "Killing metrictank"
+  pkill metrictank
+  sleep 1
+  echo "Killing dlv"
+  pkill dlv
+  sleep 1
+  exit 0
+}
+
+trap 'kill_metrictank' SIGTERM
+trap 'kill_metrictank' SIGINT
+
 export MT_SWIM_BIND_ADDR="${POD_IP}:7946"
 export MT_CLUSTER_MODE
 export MT_PROFTRIGGER_PATH=${MT_PROFTRIGGER_PATH:-/var/metrictank/$HOSTNAME}
@@ -62,8 +76,11 @@ if [ ! -z "$LABEL_SELECTOR" ]; then
 	export MT_CLUSTER_PEERS=$(echo $LIST | sed 's/,$//')
 fi
 
-if [ -z "$(echo $@)" ]; then
-	exec /usr/bin/metrictank -config=/etc/metrictank/metrictank.ini
-else
-	exec $@
-fi
+# can't use exec if we want to trap signals here
+$@ &
+
+while [ 1 ]
+do
+  # sleep until killed
+  sleep 1
+done

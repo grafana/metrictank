@@ -26,15 +26,15 @@ then
 elif [ "$1" == "-debug" ]
 then
     # normal debug/dlv version
-    docker build -t grafana/metrictank-debug -f ${DIR}/dlv/Dockerfile .
-    docker tag grafana/metrictank-debug grafana/metrictank-debug:$tag
-    docker tag grafana/metrictank-debug grafana/metrictank-debug:$version
+    docker build -t grafana/metrictank:latest-debug -f ${DIR}/dlv/Dockerfile .
+    docker tag grafana/metrictank:latest-debug grafana/metrictank:${tag}-debug
+    docker tag grafana/metrictank:latest-debug grafana/metrictank:${version}-debug
 
     # k8s debug/dlv version
     cd ${DIR}/k8s_dlv
-    docker build -t us.gcr.io/metrictank-gcr/metrictank-debug .
-    docker tag us.gcr.io/metrictank-gcr/metrictank-debug us.gcr.io/metrictank-gcr/metrictank-debug:$tag
-    docker tag us.gcr.io/metrictank-gcr/metrictank-debug us.gcr.io/metrictank-gcr/metrictank-debug:$version
+    docker build -t us.gcr.io/metrictank-gcr/metrictank:latest-debug .
+    docker tag us.gcr.io/metrictank-gcr/metrictank:latest-debug us.gcr.io/metrictank-gcr/metrictank:${tag}-debug
+    docker tag us.gcr.io/metrictank-gcr/metrictank:latest-debug us.gcr.io/metrictank-gcr/metrictank:${version}-debug
 else
     echo "Invalid argument supplied: ${1}"
     fail
