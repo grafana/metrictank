@@ -87,7 +87,7 @@ func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, e
 		metrics = append(metrics, m)
 	}
 	if len(metrics) > 1 {
-		panic(fmt.Sprintf("wtf. found more than one entry for id %v: %v", amkey, metrics))
+		panic(fmt.Sprintf("wtf. found more than one entry for id %s: %v", amkey.String(), metrics))
 	}
 	err := iter.Close()
 	if err != nil {

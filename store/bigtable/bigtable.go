@@ -57,7 +57,7 @@ var (
 )
 
 func formatRowKey(key schema.AMKey, month uint32) string {
-	return fmt.Sprintf("%s_%d", key.MKey, month)
+	return fmt.Sprintf("%s_%d", key.MKey.String(), month)
 }
 
 func formatFamily(ttl uint32) string {

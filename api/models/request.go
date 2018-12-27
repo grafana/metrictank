@@ -62,7 +62,7 @@ func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterv
 }
 
 func (r Req) String() string {
-	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s.", r.MKey, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.Consolidator)
+	return fmt.Sprintf("%s %d - %d (%s - %s) span:%ds. points <= %d. %s.", r.MKey.String(), r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.Consolidator)
 }
 
 func (r Req) DebugString() string {

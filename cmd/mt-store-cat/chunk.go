@@ -27,7 +27,7 @@ func printChunkSummary(ctx context.Context, store *cassandra.CassandraStore, tab
 		} else {
 			for _, metric := range metrics {
 				for num := startMonth; num <= endMonth; num += 1 {
-					row_key := fmt.Sprintf("%s_%d", metric.AMKey, num)
+					row_key := fmt.Sprintf("%s_%d", metric.AMKey.String(), num)
 					query := fmt.Sprintf("select key, ttl(data) from %s where key=?", tbl.Name)
 					iter := store.Session.Query(query, row_key).Iter()
 					showKeyTTL(iter, groupTTL)
@@ -50,7 +50,7 @@ func printChunkCsv(ctx context.Context, store *cassandra.CassandraStore, table c
 	for _, metric := range metrics {
 		i := 0
 		for num := startMonth; num <= endMonth; num += 1 {
-			rowKeys[i] = fmt.Sprintf("%s_%d", metric.AMKey, num)
+			rowKeys[i] = fmt.Sprintf("%s_%d", metric.AMKey.String(), num)
 			i++
 		}
 		params := []interface{}{rowKeys, end}
