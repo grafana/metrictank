@@ -27,7 +27,7 @@ func printChunkSummary(ctx context.Context, store *cassandra.CassandraStore, tab
 		} else {
 			for _, metric := range metrics {
 				for num := startMonth; num <= endMonth; num += 1 {
-					row_key := fmt.Sprintf("%s_%d", metric.AMKey.String(), num)
+					row_key := fmt.Sprintf("%s_%d", metric.AMKey, num)
 					query := fmt.Sprintf("select key, ttl(data) from %s where key=?", tbl.Name)
 					iter := store.Session.Query(query, row_key).Iter()
 					showKeyTTL(iter, groupTTL)

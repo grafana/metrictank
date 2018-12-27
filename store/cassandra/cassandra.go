@@ -435,7 +435,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because then we will miss some data at
 	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because chunkSpans
 	// may change over time.
 	// we effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.

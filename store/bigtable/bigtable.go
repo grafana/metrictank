@@ -57,7 +57,7 @@ var (
 )
 
 func formatRowKey(key schema.AMKey, month uint32) string {
-	return fmt.Sprintf("%s_%d", key.MKey.String(), month)
+	return fmt.Sprintf("%s_%d", key.MKey, month)
 }
 
 func formatFamily(ttl uint32) string {
@@ -357,7 +357,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because then we will miss some data at
 	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because ChunkSpans
 	// may change over time.
 	// We effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
