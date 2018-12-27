@@ -33,6 +33,7 @@ func (s *FuncAliasByNode) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		n := aggKey(serie, s.nodes)
 		series[i].Target = n
 		series[i].QueryPatt = n
+		series[i].Tags["name"] = n
 	}
 	return series, nil
 }

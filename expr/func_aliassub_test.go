@@ -64,6 +64,9 @@ func TestAliasSub(t *testing.T) {
 			if o != g.Target {
 				t.Fatalf("case %d: expected target %q, got %q", i, o, g.Target)
 			}
+			if o != g.Tags["name"] {
+				t.Fatalf("case %d: expected name tag %q, got %q", i, o, g.Tags["name"])
+			}
 		}
 	}
 }

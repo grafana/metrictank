@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"sort"
-	"strings"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/raintank/schema"
@@ -38,6 +37,10 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		return nil, err
 	}
 
+	if len(series) == 0 {
+		return series, nil
+	}
+
 	if len(s.tags) == 0 {
 		return nil, errors.New("No tags specified")
 	}
@@ -59,7 +62,7 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	if !useName {
 		// if all series have the same name, name becomes one of our tags
 		for _, serie := range series {
-			thisName := strings.Split(serie.Target, ";")[0]
+			thisName := serie.Tags["name"]
 			if nameReplace == "" {
 				nameReplace = thisName
 			} else if nameReplace != thisName {
@@ -75,12 +78,10 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	// First pass - group our series together by key
 	var buffer bytes.Buffer
 	for _, serie := range series {
-		name := strings.SplitN(serie.Target, ";", 2)[0]
-
 		buffer.Reset()
 
 		if useName {
-			buffer.WriteString(name)
+			buffer.WriteString(serie.Tags["name"])
 		} else {
 			buffer.WriteString(nameReplace)
 		}
@@ -106,7 +107,8 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 
 	// Now, for each key perform the requested aggregation
 	for name, groupSeries := range groups {
-		cons, queryCons := summarizeCons(series)
+		cons, queryCons := summarizeCons(groupSeries)
+
 		newSeries := models.Series{
 			Target:       name,
 			QueryPatt:    name,
@@ -117,6 +119,7 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		newSeries.SetTags()
 
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
+
 		aggFunc(groupSeries, &newSeries.Datapoints)
 		cache[Req{}] = append(cache[Req{}], newSeries)
 
