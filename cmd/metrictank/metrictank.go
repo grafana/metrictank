@@ -150,7 +150,7 @@ func main() {
 	log.Infof("logging level set to '%s'", *logLevel)
 
 	/***********************************
-		Validate  settings needed for clustering
+		Validate settings needed for clustering
 	***********************************/
 	if *instance == "" {
 		log.Fatal("instance can't be empty")
