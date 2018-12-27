@@ -42,6 +42,7 @@ see the [Makefile](../Makefile) for more targets
     * first a structure, then its constructor, and then its methods
 13. Documentation in the [docs](../docs) folder should be kept in sync with current state of affairs
 14. HTTP status codes: use the [named codes defined in the standard library](https://golang.org/pkg/net/http/#pkg-constants) for easy searchability
+15. Don't rely on `.String()` being called implicitly, instead write the call out. This is to prevent that adding a `.Error()` method to structs can unexpectedly change the printed values.
 
 # Documentation
 
