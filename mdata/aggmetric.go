@@ -17,7 +17,6 @@ import (
 )
 
 var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less than to")
-var ErrNilChunk = errors.New("AggMetric: unexpected nil chunk")
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
 // it uses a circular buffer of chunks
@@ -248,10 +247,6 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 	}
 
 	oldestChunk := a.Chunks[oldestPos]
-	if oldestChunk == nil {
-		log.Error(ErrNilChunk.Error())
-		return result, ErrNilChunk
-	}
 
 	if to <= oldestChunk.Series.T0 {
 		// the requested time range ends before any data we have.
@@ -272,11 +267,6 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 			oldestPos = 0
 		}
 		oldestChunk = a.Chunks[oldestPos]
-		if oldestChunk == nil {
-			result.Oldest = to
-			log.Error(ErrNilChunk.Error())
-			return result, ErrNilChunk
-		}
 	}
 
 	// find the newest Chunk that "to" falls in.  If "to" extends to after the newest data
@@ -292,11 +282,6 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 			newestPos += len(a.Chunks)
 		}
 		newestChunk = a.Chunks[newestPos]
-		if newestChunk == nil {
-			result.Oldest = to
-			log.Error(ErrNilChunk.Error())
-			return result, ErrNilChunk
-		}
 	}
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
@@ -585,9 +570,6 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 	}
 
 	currentChunk := a.Chunks[a.CurrentChunkPos]
-	if currentChunk == nil {
-		return false
-	}
 
 	// we must check collectable again. Imagine this scenario:
 	// * we didn't have any chunks when calling collectable() the first time so it returned true
