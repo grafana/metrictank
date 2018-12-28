@@ -1,7 +1,10 @@
 #!/bin/sh
 set -x
 
-#shutdown metrictank and dlv
+# If dlv runs as PID 1 in the container it will not properly kill metrictank during shutdown
+# when it receives SIGTERM (docker stop / docker-compose stop / etc...). So, instead we leave
+# this script running in an endless sleep loop and trap SIGTERM, SIGINT, and SIGHUP. Then we can
+# kill both metrictank and dlv and exit this script which will shutdown the container.
 kill_metrictank() {
   echo "Killing metrictank"
   pkill metrictank
@@ -14,6 +17,7 @@ kill_metrictank() {
 
 trap 'kill_metrictank' SIGTERM
 trap 'kill_metrictank' SIGINT
+trap 'kill_metrictank' SIGHUP
 
 export MT_SWIM_BIND_ADDR="${POD_IP}:7946"
 export MT_CLUSTER_MODE

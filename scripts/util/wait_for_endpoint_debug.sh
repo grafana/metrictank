@@ -4,7 +4,10 @@ log () {
 	echo "$(date +'%Y/%m/%d %H:%M:%S') $@"
 }
 
-#shutdown metrictank and dlv
+# If dlv runs as PID 1 in the container it will not properly kill metrictank during shutdown
+# when it receives SIGTERM (docker stop / docker-compose stop / etc...). So, instead we leave
+# this script running in an endless sleep loop and trap SIGTERM, SIGINT, and SIGHUP. Then we can
+# kill both metrictank and dlv and exit this script which will shutdown the container.
 kill_metrictank() {
   echo "Killing metrictank"
   pkill metrictank
@@ -17,6 +20,7 @@ kill_metrictank() {
 
 trap 'kill_metrictank' SIGTERM
 trap 'kill_metrictank' SIGINT
+trap 'kill_metrictank' SIGHUP
 
 WAIT_TIMEOUT=${WAIT_TIMEOUT:-10}
 CONN_HOLD=${CONN_HOLD:-3}
