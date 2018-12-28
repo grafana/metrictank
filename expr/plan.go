@@ -138,8 +138,8 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	//   might be dynamically typed. e.g. movingAvg returns 1..N series depending on how many it got as input
 
 	// first validate the mandatory args
-	pos := 0    // pos in args of next given arg to process
-	cutoff := 0 // marks the index of the first optional point (if any)
+	pos := 0    // e.args[pos]     : next given arg to process
+	cutoff := 0 // argsExp[cutoff] : will be first optional arg (if any)
 	var argExp Arg
 	for cutoff, argExp = range argsExp {
 		if argExp.Optional() {

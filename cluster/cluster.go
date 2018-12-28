@@ -72,7 +72,7 @@ type partitionCandidates struct {
 }
 
 // MembersForQuery returns the list of nodes to broadcast requests to
-// If partitions are assinged to nodes in groups
+// If partitions are assigned to nodes in groups
 // (a[0,1], b[0,1], c[2,3], d[2,3] as opposed to a[0,1], b[0,2], c[1,3], d[2,3]),
 // only 1 member per partition is returned.
 // The nodes are selected based on priority, preferring thisNode if it
