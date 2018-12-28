@@ -133,13 +133,6 @@ func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consoli
 	}
 }
 
-func (a *AggMetric) getChunk(pos int) *chunk.Chunk {
-	if pos < 0 || pos >= len(a.Chunks) {
-		panic(fmt.Sprintf("aggmetric %s queried for chunk %d out of %d chunks", a.Key, pos, len(a.Chunks)))
-	}
-	return a.Chunks[pos]
-}
-
 func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (Result, error) {
 	// no lock needed cause aggregators don't change at runtime
 	for _, a := range a.aggregators {
@@ -219,7 +212,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 		return result, nil
 	}
 
-	newestChunk := a.getChunk(a.CurrentChunkPos)
+	newestChunk := a.Chunks[a.CurrentChunkPos]
 
 	if from >= newestChunk.Series.T0+a.ChunkSpan {
 		// request falls entirely ahead of the data we have
@@ -254,7 +247,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 		oldestPos = 0
 	}
 
-	oldestChunk := a.getChunk(oldestPos)
+	oldestChunk := a.Chunks[oldestPos]
 	if oldestChunk == nil {
 		log.Error(ErrNilChunk.Error())
 		return result, ErrNilChunk
@@ -278,7 +271,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 		if oldestPos >= len(a.Chunks) {
 			oldestPos = 0
 		}
-		oldestChunk = a.getChunk(oldestPos)
+		oldestChunk = a.Chunks[oldestPos]
 		if oldestChunk == nil {
 			result.Oldest = to
 			log.Error(ErrNilChunk.Error())
@@ -298,7 +291,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 		if newestPos < 0 {
 			newestPos += len(a.Chunks)
 		}
-		newestChunk = a.getChunk(newestPos)
+		newestChunk = a.Chunks[newestPos]
 		if newestChunk == nil {
 			result.Oldest = to
 			log.Error(ErrNilChunk.Error())
@@ -308,7 +301,7 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 
 	// now just start at oldestPos and move through the Chunks circular Buffer to newestPos
 	for {
-		c := a.getChunk(oldestPos)
+		c := a.Chunks[oldestPos]
 		result.Iters = append(result.Iters, c.Series.Iter())
 
 		if oldestPos == newestPos {
@@ -471,7 +464,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		return
 	}
 
-	currentChunk := a.getChunk(a.CurrentChunkPos)
+	currentChunk := a.Chunks[a.CurrentChunkPos]
 
 	if t0 == currentChunk.Series.T0 {
 		// last prior data was in same chunk as new point
@@ -558,7 +551,7 @@ func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {
 		return a.lastWrite < chunkMinTs
 	}
 
-	currentChunk := a.getChunk(a.CurrentChunkPos)
+	currentChunk := a.Chunks[a.CurrentChunkPos]
 	return a.lastWrite < chunkMinTs && currentChunk.Series.T0+a.ChunkSpan+15*60 < now
 }
 
@@ -591,7 +584,7 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 		return a.gcAggregators(now, chunkMinTs, metricMinTs)
 	}
 
-	currentChunk := a.getChunk(a.CurrentChunkPos)
+	currentChunk := a.Chunks[a.CurrentChunkPos]
 	if currentChunk == nil {
 		return false
 	}
