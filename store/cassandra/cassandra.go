@@ -433,17 +433,14 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	pre := time.Now()
 
-	start_month := start - (start % Month_sec)       // starting row has to be at, or before, requested start
-	end_month := (end - 1) - ((end - 1) % Month_sec) // ending row has to include the last point we might need (end-1)
-
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because then we will miss some data at
 	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because chunkSpans
 	// may change over time.
 	// we effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
 	// since we make sure that you can only use chunkSpans so that Month_sec % chunkSpan == 0, we know that this previous chunk will always be in the same row
-	// as the one that has start_month.
+	// as startMonth
 
 	// For example:
 	// Month_sec = 60 * 60 * 24 * 28 = 2419200 (28 days)
@@ -463,8 +460,8 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	// let's say query has start 5222000 and end 7555000
 	// so start is somewhere between 4-5, and end between 8-9
-	// start_month = 4838400 (row 1)
-	// end_month = 7257600 (row 2)
+	// startMonth = 5222000 / 2419200 = 2 (row 1)
+	// endMonth = 7554999 / 2419200 = 3 (row 2)
 	// how do we query for all the chunks we need and not many more? knowing that chunkspan is not known?
 	// for end, we can simply search for t0 < 7555000 in row 2, which gives us all chunks we need
 	// for start, the best we can do is search for t0 <= 5222000 in row 1
@@ -472,11 +469,11 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	results := make(chan readResult, 1)
 
-	startMonthNum := start_month / Month_sec
-	endMonthNum := end_month / Month_sec
-	rowKeys := make([]string, endMonthNum-startMonthNum+1)
+	startMonth := start / Month_sec   // starting row has to be at, or before, requested start
+	endMonth := (end - 1) / Month_sec // ending row has to include the last point we might need (end-1)
+	rowKeys := make([]string, endMonth-startMonth+1)
 	i := 0
-	for num := startMonthNum; num <= endMonthNum; num += 1 {
+	for num := startMonth; num <= endMonth; num += 1 {
 		rowKeys[i] = fmt.Sprintf("%s_%d", key, num)
 		i++
 	}

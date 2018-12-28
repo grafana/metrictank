@@ -56,8 +56,8 @@ var (
 	chunkSizeAtLoad = stats.NewMeter32("store.bigtable.chunk_size.at_load", true)
 )
 
-func formatRowKey(key schema.AMKey, ts uint32) string {
-	return fmt.Sprintf("%s_%d", key.MKey.String(), ts/Month_sec)
+func formatRowKey(key schema.AMKey, month uint32) string {
+	return fmt.Sprintf("%s_%d", key.MKey.String(), month)
 }
 
 func formatFamily(ttl uint32) string {
@@ -230,7 +230,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 		rowKeys := make([]string, len(buf))
 		muts := make([]*bigtable.Mutation, len(buf))
 		for i, cwr := range buf {
-			rowKeys[i] = formatRowKey(cwr.Key, cwr.Chunk.Series.T0)
+			rowKeys[i] = formatRowKey(cwr.Key, cwr.Chunk.Series.T0/Month_sec)
 			muts[i], n = mutationFromWriteRequest(cwr)
 			//record how long the chunk waited in the queue before we attempted to save to bigtable
 			btblPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
@@ -352,12 +352,12 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	log.Debug("btStore: acquired a Search slot")
 	btblGetWaitDuration.Value(time.Since(pre))
 
-	startMonth := start - (start % Month_sec)       // starting row has to be at, or before, requested start
-	endMonth := (end - 1) - ((end - 1) % Month_sec) // ending row has to include the last point we might need (end-1)
+	startMonth := start / Month_sec   // starting row has to be at, or before, requested start
+	endMonth := (end - 1) / Month_sec // ending row has to include the last point we might need (end-1)
 
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
-	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because than we will miss some data at
+	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because then we will miss some data at
 	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because ChunkSpans
 	// may change over time.
 	// We effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
@@ -365,10 +365,9 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	// will usually result in more data being fetched then is needed, but that is an acceptable tradeoff.
 	adjustedStart := start - uint32(s.cfg.MaxChunkSpan.Seconds())
 
-	// chunkspans are aligned with Month_sec.  If start is > startMonth then the T0 of the chunk that start is in will also be >= startMonth.
-	if adjustedStart < startMonth {
-		adjustedStart = startMonth
-	}
+	// chunkspans are aligned with Month_sec.  If start is > startMonth*Month_sec then the T0 of the chunk that start is in will also be >= startMonth*Month_sec.
+	adjustedStart = util.Max(adjustedStart, startMonth*Month_sec)
+
 	agg := "raw"
 	var intervalHint uint32
 	if key.Archive > 0 {
@@ -384,7 +383,7 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	)
 
 	firstRow := formatRowKey(key, startMonth)
-	lastRow := formatRowKey(key, endMonth+Month_sec) // bigtable.RowRange is start inclusive, end exclusive
+	lastRow := formatRowKey(key, endMonth+1) // bigtable.RowRange is start inclusive, end exclusive
 	rr := bigtable.NewRange(firstRow, lastRow)
 	var err error
 	rowCount := 0

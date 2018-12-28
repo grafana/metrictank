@@ -292,7 +292,7 @@ func main() {
 			return
 		}
 		if len(metrics) == 0 {
-			fmt.Printf("metric id %v not found", amkey.MKey)
+			fmt.Printf("metric id %s not found", amkey.MKey.String())
 			return
 		}
 		if verbose {
