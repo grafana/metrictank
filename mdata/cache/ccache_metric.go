@@ -186,8 +186,6 @@ func (mc *CCacheMetric) AddRange(prev uint32, itergens []chunk.IterGen) {
 	if sortKeys {
 		sort.Sort(accnt.Uint32Asc(mc.keys))
 	}
-
-	return
 }
 
 // Add adds a chunk to the cache
