@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/../..
@@ -8,7 +9,7 @@ echo
 echo "### docker push grafana/metrictank:$version"
 echo
 
-docker push grafana/metrictank:$version || exit 2
+docker push grafana/metrictank:$version
 
 echo
 echo "### docker push grafana/metrictank:$tag"

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # checks whether vendor directory is healthy
 
