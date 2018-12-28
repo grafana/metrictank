@@ -32,7 +32,7 @@ type AggMetric struct {
 	sync.RWMutex
 	Key             schema.AMKey
 	rob             *ReorderBuffer
-	CurrentChunkPos int    // element in []Chunks that is active. All others are either finished or nil.
+	CurrentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(Chunks) > 0, e.g. when data has been written (excl ROB data)
 	NumChunks       uint32 // max size of the circular buffer
 	ChunkSpan       uint32 // span of individual chunks in seconds
 	Chunks          []*chunk.Chunk
