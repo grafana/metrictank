@@ -1774,7 +1774,7 @@
       "targets": [
         {
           "refId": "A",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request_handle.latency.mean.gauge32), 'total request handle')"
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.request.render.latency.mean.gauge32), 'total request handle')"
         },
         {
           "refId": "B",

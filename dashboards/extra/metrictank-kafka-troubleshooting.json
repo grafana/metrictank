@@ -339,7 +339,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(stats.$environment.timers.metrictank.$host.request_handle_duration.upper_90, 'total request handle')"
+              "target": "alias(metrictank.stats.$environment.$host.api.request.render.latency.p90.gauge32), 'total request handle')"
             },
             {
               "refId": "B",
