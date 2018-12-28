@@ -1,10 +1,15 @@
 #!/bin/bash
 set -x
+set -e
 BASE=$(dirname $0) # points to scripts directory
 CODE_DIR=$(readlink -e "$BASE/../") # project root
 BUILD_ROOT=$CODE_DIR/build # should have all binaries already inside
 BUILD_PKG=$CODE_DIR/build_pkg # will place packages here
 BUILD_TMP=$CODE_DIR/build_tmp # used for temporary data used to construct the packages
+
+# clean any pre-existing cruft
+rm -rf $BUILD_TMP $BUILD_PKG
+
 mkdir $BUILD_TMP
 mkdir $BUILD_PKG
 

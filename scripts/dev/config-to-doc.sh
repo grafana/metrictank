@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # turns the metrictank-sample.ini into a nice markdown document.
 # headers like h3 and h2 are printed as-is, and the lines between them (config items and their comments)
