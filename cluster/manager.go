@@ -407,8 +407,7 @@ func (c *MemberlistManager) SetPartitions(part []int32) {
 	sort.Slice(part, func(i, j int) bool { return part[i] < part[j] })
 	c.Lock()
 	node := c.members[c.nodeName]
-	node.Partitions = part
-	node.Updated = time.Now()
+	node.SetPartitions(part)
 	c.members[c.nodeName] = node
 	c.Unlock()
 	nodePartitions.Set(len(part))
@@ -511,9 +510,8 @@ func (m *SingleNodeManager) Join(peers []string) (int, error) {
 func (m *SingleNodeManager) SetPartitions(part []int32) {
 	sort.Slice(part, func(i, j int) bool { return part[i] < part[j] })
 	m.Lock()
-	defer m.Unlock()
-	m.node.Partitions = part
-	m.node.Updated = time.Now()
+	m.node.SetPartitions(part)
+	m.Unlock()
 	nodePartitions.Set(len(part))
 }
 

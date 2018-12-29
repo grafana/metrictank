@@ -161,6 +161,12 @@ func (n *HTTPNode) SetPrimary(primary bool) bool {
 	return true
 }
 
+// SetPartitions sets the partitions that this node is handling
+func (n *HTTPNode) SetPartitions(part []int32) {
+	n.Partitions = part
+	n.Updated = time.Now()
+}
+
 func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
