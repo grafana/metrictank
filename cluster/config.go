@@ -5,6 +5,8 @@ import (
 	"flag"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/grafana/globalconf"
@@ -19,6 +21,8 @@ var (
 	maxPrio            int
 	httpTimeout        time.Duration
 	minAvailableShards int
+	gcPercent          int
+	gcPercentNotReady  int
 
 	swimUseConfig               = "default-lan"
 	swimAdvertiseAddrStr        string
@@ -46,6 +50,22 @@ var (
 )
 
 func ConfigSetup() {
+
+	// behavior here is same as standard runtime:
+	// unparseable or not set -> 100
+	// "off" -> -1
+	gcPercent = 100
+	gogc := os.Getenv("GOGC")
+	if gogc != "" {
+		if gogc == "off" {
+			gcPercent = -1
+		}
+		val, err := strconv.Atoi(gogc)
+		if err == nil {
+			gcPercent = val
+		}
+	}
+
 	clusterCfg := flag.NewFlagSet("cluster", flag.ExitOnError)
 	clusterCfg.StringVar(&ClusterName, "name", "metrictank", "Unique name of the cluster.")
 	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per shardGroup.")
@@ -54,6 +74,7 @@ func ConfigSetup() {
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
+	clusterCfg.IntVar(&gcPercentNotReady, "gc-percent-not-ready", gcPercent, "GOGC value to use when node is not ready.  Defaults to GOGC")
 	globalconf.Register("cluster", clusterCfg, flag.ExitOnError)
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)

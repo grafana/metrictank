@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/grafana/metrictank/tracing"
@@ -127,6 +128,18 @@ func (n HTTPNode) IsLocal() bool {
 	return n.local
 }
 
+// readyStateGCHandler adjusts the gcPercent value based on the node ready state
+func (n HTTPNode) readyStateGCHandler() {
+	if gcPercent == gcPercentNotReady {
+		return
+	}
+	if n.IsReady() {
+		debug.SetGCPercent(gcPercent)
+	} else {
+		debug.SetGCPercent(gcPercentNotReady)
+	}
+}
+
 // SetState sets the state of the node and returns whether the state changed
 func (n *HTTPNode) SetState(state NodeState) bool {
 	if n.State == state {
@@ -136,6 +149,7 @@ func (n *HTTPNode) SetState(state NodeState) bool {
 	now := time.Now()
 	n.Updated = now
 	n.StateChange = now
+	n.readyStateGCHandler()
 	return true
 }
 
@@ -146,6 +160,7 @@ func (n *HTTPNode) SetPriority(prio int) bool {
 	}
 	n.Priority = prio
 	n.Updated = time.Now()
+	n.readyStateGCHandler()
 	return true
 }
 
