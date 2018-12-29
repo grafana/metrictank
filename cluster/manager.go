@@ -370,14 +370,11 @@ func (c *MemberlistManager) SetReady() {
 // Set the state of this node.
 func (c *MemberlistManager) SetState(state NodeState) {
 	c.Lock()
-	if c.members[c.nodeName].State == state {
+	node := c.members[c.nodeName]
+	if !node.SetState(state) {
 		c.Unlock()
 		return
 	}
-	node := c.members[c.nodeName]
-	node.State = state
-	node.Updated = time.Now()
-	node.StateChange = time.Now()
 	c.members[c.nodeName] = node
 	c.Unlock()
 	nodeReady.Set(state == NodeReady)
@@ -432,13 +429,11 @@ func (c *MemberlistManager) GetPartitions() []int32 {
 // lower values == higher priority
 func (c *MemberlistManager) SetPriority(prio int) {
 	c.Lock()
-	if c.members[c.nodeName].Priority == prio {
+	node := c.members[c.nodeName]
+	if !node.SetPriority(prio) {
 		c.Unlock()
 		return
 	}
-	node := c.members[c.nodeName]
-	node.Priority = prio
-	node.Updated = time.Now()
 	c.members[c.nodeName] = node
 	c.Unlock()
 	nodePriority.Set(prio)
@@ -494,12 +489,8 @@ func (m *SingleNodeManager) SetReady() {
 
 func (m *SingleNodeManager) SetState(state NodeState) {
 	m.Lock()
-	defer m.Unlock()
-	if m.node.State == state {
-		return
-	}
-	m.node.State = state
-	m.node.Updated = time.Now()
+	m.node.SetState(state)
+	m.Unlock()
 	nodeReady.Set(state == NodeReady)
 }
 
@@ -545,12 +536,8 @@ func (m *SingleNodeManager) GetPartitions() []int32 {
 // lower values == higher priority
 func (m *SingleNodeManager) SetPriority(prio int) {
 	m.Lock()
-	defer m.Unlock()
-	if m.node.Priority == prio {
-		return
-	}
-	m.node.Priority = prio
-	m.node.Updated = time.Now()
+	m.node.SetPriority(prio)
+	m.Unlock()
 	nodePriority.Set(prio)
 }
 

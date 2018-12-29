@@ -127,6 +127,28 @@ func (n HTTPNode) IsLocal() bool {
 	return n.local
 }
 
+// SetState sets the state of the node and returns whether the state changed
+func (n *HTTPNode) SetState(state NodeState) bool {
+	if n.State == state {
+		return false
+	}
+	n.State = state
+	now := time.Now()
+	n.Updated = now
+	n.StateChange = now
+	return true
+}
+
+// SetPriority sets the priority of the node and returns whether it changed
+func (n *HTTPNode) SetPriority(prio int) bool {
+	if n.Priority == prio {
+		return false
+	}
+	n.Priority = prio
+	n.Updated = time.Now()
+	return true
+}
+
 func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
