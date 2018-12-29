@@ -149,6 +149,18 @@ func (n *HTTPNode) SetPriority(prio int) bool {
 	return true
 }
 
+// SetPrimary sets the primary state of the node and returns whether it changed
+func (n *HTTPNode) SetPrimary(primary bool) bool {
+	if n.Primary == primary {
+		return false
+	}
+	now := time.Now()
+	n.Primary = primary
+	n.Updated = now
+	n.PrimaryChange = now
+	return true
+}
+
 func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)

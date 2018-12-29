@@ -389,19 +389,16 @@ func (c *MemberlistManager) IsPrimary() bool {
 }
 
 // SetPrimary sets the primary status of this node
-func (c *MemberlistManager) SetPrimary(p bool) {
+func (c *MemberlistManager) SetPrimary(primary bool) {
 	c.Lock()
-	if c.members[c.nodeName].Primary == p {
+	node := c.members[c.nodeName]
+	if !node.SetPrimary(primary) {
 		c.Unlock()
 		return
 	}
-	node := c.members[c.nodeName]
-	node.Primary = p
-	node.PrimaryChange = time.Now()
-	node.Updated = time.Now()
 	c.members[c.nodeName] = node
 	c.Unlock()
-	nodePrimary.Set(p)
+	nodePrimary.Set(primary)
 	c.BroadcastUpdate()
 }
 
@@ -467,13 +464,8 @@ func (m *SingleNodeManager) IsPrimary() bool {
 
 func (m *SingleNodeManager) SetPrimary(primary bool) {
 	m.Lock()
-	defer m.Unlock()
-	if m.node.Primary == primary {
-		return
-	}
-	m.node.Primary = primary
-	m.node.PrimaryChange = time.Now()
-	m.node.Updated = time.Now()
+	m.node.SetPrimary(primary)
+	m.Unlock()
 	nodePrimary.Set(primary)
 }
 
