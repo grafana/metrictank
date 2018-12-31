@@ -351,7 +351,7 @@ func (k *KafkaMdm) Stop() {
 }
 
 func (k *KafkaMdm) trackStats(topic string, partition int32) {
-	ticker := time.NewTicker(time.Second * 5)
+	ticker := time.NewTicker(time.Second)
 	kafkaStats := kafkaStats[partition]
 	for {
 		select {
@@ -375,7 +375,7 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 
 func (k *KafkaMdm) MaintainPriority() {
 	go func() {
-		ticker := time.NewTicker(time.Second * 10)
+		ticker := time.NewTicker(time.Second)
 		for {
 			select {
 			case <-k.shutdown:
