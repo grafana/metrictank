@@ -30,7 +30,8 @@ this will give instant insights in all the performance metrics of Metrictank.
 * `metrictank.stats.$environment.$instance.input.*.metrics_decode_err.counter32`: counter of incoming data that could not be decoded.
 * `metrictank.stats.$environment.$instance.input.*.*.invalid.counter32`: counter of incoming data that could not be decoded.
 * `metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32`: counter of points that are too old and can't be added.
-* `metrictank.stats.$environment.$instance.api.request_handle.latency.*.gauge32`: shows how fast/slow metrictank responds to http queries
+* `metrictank.stats.$environment.$instance.api.request.render.latency.*.gauge32`: shows how fast/slow metrictank responds to http queries
+* `metrictank.stats.$environment.$instance.api.request.render*.status.*.counter32`: counters per status code. make sure most, or all result in http-200's.
 * `metrictank.stats.$environment.$instance.store.cassandra.error.*`: shows erroring queries.  Queries that result in errors (or timeouts) will result in missing data in your charts.
 * `perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)`: Points dropped due to chunks being closed. Need to tune the chunk-max-stale setting or fix your data stream to not send old points so late.
 * `metrictank.stats.$environment.$instance.recovered_errors.*.*.*` : any internal errors that were recovered from automatically (should be 0. If not, please create an issue)
@@ -38,7 +39,7 @@ this will give instant insights in all the performance metrics of Metrictank.
 If you expect consistent or predictable load, you may also want to monitor:
 
 * `metrictank.stats.$environment.$instance.store.cassandra.chunk_operations.save_ok.counter32`: number of saved chunks (based on your chunkspan settings)
-* `metrictank.stats.$environment.$instance.api.request_handle.values.rate32` : rate per second of render requests
+* `metrictank.stats.$environment.$instance.api.request.render.values.rate32`: rate per second of render requests
 * `metrictank.stats.$environment.$instance.input.*.*.received.counter32`: input counter (derive with perSecond)
 * `metrictank.stats.$environment.$instance.cache.accounting.queue.size.used.max.gauge32`: accounting queue size, if this queue fills up, it will slow down requests (compare to size.max)
 
