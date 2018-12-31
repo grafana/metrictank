@@ -33,8 +33,7 @@ type KafkaMdm struct {
 	lagMonitor *LagMonitor
 	wg         sync.WaitGroup
 
-	// signal to PartitionConsumers to shutdown
-	stopConsuming chan struct{}
+	shutdown chan struct{}
 	// signal to caller that it should shutdown
 	cancel context.CancelFunc
 }
@@ -186,10 +185,10 @@ func New() *KafkaMdm {
 	}
 	log.Info("kafkamdm: consumer created without error")
 	k := KafkaMdm{
-		consumer:      consumer,
-		client:        client,
-		lagMonitor:    NewLagMonitor(10, partitions),
-		stopConsuming: make(chan struct{}),
+		consumer:   consumer,
+		client:     client,
+		lagMonitor: NewLagMonitor(10, partitions),
+		shutdown:   make(chan struct{}),
 	}
 
 	return &k
@@ -256,7 +255,7 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 	return val, err
 }
 
-// this will continually consume from the topic until k.stopConsuming is triggered.
+// this will continually consume from the topic until k.shutdown is triggered.
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	defer k.wg.Done()
 
@@ -322,7 +321,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 				partitionLagMetric.Set(lag)
 				k.lagMonitor.StoreLag(partition, lag)
 			}
-		case <-k.stopConsuming:
+		case <-k.shutdown:
 			pc.Close()
 			log.Infof("kafkamdm: consumer for %s:%d ended.", topic, partition)
 			return
@@ -358,7 +357,7 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 // and block until it stopped.
 func (k *KafkaMdm) Stop() {
 	// closes notifications and messages channels, amongst others
-	close(k.stopConsuming)
+	close(k.shutdown)
 	k.wg.Wait()
 	k.client.Close()
 }
@@ -368,7 +367,7 @@ func (k *KafkaMdm) MaintainPriority() {
 		ticker := time.NewTicker(time.Second * 10)
 		for {
 			select {
-			case <-k.stopConsuming:
+			case <-k.shutdown:
 				return
 			case <-ticker.C:
 				cluster.Manager.SetPriority(k.lagMonitor.Metric())
