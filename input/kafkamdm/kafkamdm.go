@@ -60,9 +60,7 @@ var consumerMaxWaitTime time.Duration
 var consumerMaxProcessingTime time.Duration
 var netMaxOpenRequests int
 var offsetDuration time.Duration
-var partitionOffset map[int32]*stats.Gauge64
-var partitionLogSize map[int32]*stats.Gauge64
-var partitionLag map[int32]*stats.Gauge64
+var kafkaStats map[int32]*KafkaStats
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -161,17 +159,24 @@ func ConfigProcess(instance string) {
 	}
 
 	// initialize our offset metrics
-	partitionOffset = make(map[int32]*stats.Gauge64)
-	partitionLogSize = make(map[int32]*stats.Gauge64)
-	partitionLag = make(map[int32]*stats.Gauge64)
+	kafkaStats = make(map[int32]*KafkaStats)
 	for _, part := range partitions {
-		// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
-		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.offset", part))
-		// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
-		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.log_size", part))
-		// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
-		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.lag", part))
+		kafkaStats[part] = &KafkaStats{
+			// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
+			offset: *stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.offset", part)),
+			// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
+			logSize: *stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.log_size", part)),
+			// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
+			lag: *stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.lag", part)),
+		}
 	}
+}
+
+// KafkaStats is a set of per-partition stats to track the health of our consumer
+type KafkaStats struct {
+	offset  stats.Gauge64
+	logSize stats.Gauge64
+	lag     stats.Gauge64
 }
 
 func New() *KafkaMdm {
@@ -259,9 +264,7 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	defer k.wg.Done()
 
-	partitionOffsetMetric := partitionOffset[partition]
-	partitionLogSizeMetric := partitionLogSize[partition]
-	partitionLagMetric := partitionLag[partition]
+	kafkaStats := kafkaStats[partition]
 
 	// determine the pos of the topic and the initial offset of our consumer
 	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
@@ -281,9 +284,9 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		}
 	}
 
-	partitionOffsetMetric.Set(int(currentOffset))
-	partitionLogSizeMetric.Set(int(newest))
-	partitionLagMetric.Set(int(newest - currentOffset))
+	kafkaStats.offset.Set(int(currentOffset))
+	kafkaStats.logSize.Set(int(newest))
+	kafkaStats.lag.Set(int(newest - currentOffset))
 
 	log.Infof("kafkamdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
@@ -312,13 +315,13 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			if err != nil {
 				log.Errorf("kafkamdm: %s", err.Error())
 			} else {
-				partitionLogSizeMetric.Set(int(newest))
+				kafkaStats.logSize.Set(int(newest))
 			}
 
-			partitionOffsetMetric.Set(int(currentOffset))
+			kafkaStats.offset.Set(int(currentOffset))
 			if err == nil {
 				lag := int(newest - currentOffset)
-				partitionLagMetric.Set(lag)
+				kafkaStats.lag.Set(lag)
 				k.lagMonitor.StoreLag(partition, lag)
 			}
 		case <-k.shutdown:
