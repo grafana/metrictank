@@ -356,6 +356,7 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 	for {
 		select {
 		case <-k.shutdown:
+			ticker.Stop()
 			return
 		case ts := <-ticker.C:
 			currentOffset := int64(kafkaStats.offset.Peek())
@@ -379,6 +380,7 @@ func (k *KafkaMdm) MaintainPriority() {
 		for {
 			select {
 			case <-k.shutdown:
+				ticker.Stop()
 				return
 			case <-ticker.C:
 				cluster.Manager.SetPriority(k.lagMonitor.Metric())
