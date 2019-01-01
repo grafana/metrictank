@@ -17,4 +17,5 @@ done
 echo "updating docs/config.md"
 ./scripts/dev/config-to-doc.sh > docs/config.md
 
-# metrics2docs .> docs/metrics.md this doesn't work very well yet
+go get github.com/Dieterbe/metrics2docs
+metrics2docs . > docs/metrics.md
