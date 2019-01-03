@@ -105,25 +105,65 @@ func TestRateLoggerSmallIncrements(t *testing.T) {
 	})
 }
 
+// TestLagMonitor tests LagMonitor priorities based on various scenarios.
+// the overall priority is obviously simply the max priority of any of the partitions,
+// so for simplicity we can focus on simulating 1 partition.
 func TestLagMonitor(t *testing.T) {
-	mon := NewLagMonitor(10, []int32{0, 1, 2, 3})
-	Convey("with 0 measurements", t, func() {
+	start := time.Now()
+	mon := NewLagMonitor(2, []int32{0})
+
+	// advance records a state change (newest and current offsets) for the given timestamp
+	advance := func(sec int, newest, offset int64) {
+		ts := start.Add(time.Second * time.Duration(sec))
+		mon.StoreLag(0, int(newest-offset))
+		mon.StoreOffset(0, offset, ts)
+	}
+
+	Convey("with 0 measurements, priority should be 10k", t, func() {
 		So(mon.Metric(), ShouldEqual, 10000)
-	})
-	Convey("with lots of measurements", t, func() {
-		now := time.Now()
-		for part := range mon.lag {
+		Reset(func() { mon = NewLagMonitor(2, []int32{0}) })
+		Convey("with 100 measurements, not consuming and lag just growing", func() {
 			for i := 0; i < 100; i++ {
-				mon.StoreLag(part, i)
-				mon.StoreOffset(part, int64(i), now.Add(time.Second*time.Duration(i)))
+				advance(i, int64(i), 0)
 			}
-		}
-		So(mon.Metric(), ShouldEqual, 90)
-	})
-	Convey("metric should be worst partition", t, func() {
-		for part := range mon.lag {
-			mon.StoreLag(part, 10+int(part))
-		}
-		So(mon.Metric(), ShouldEqual, 13)
+			So(mon.Metric(), ShouldEqual, 98) // min-lag(98) / rate (0) = 98
+		})
+		Convey("with 100 measurements, each advancing 1 offset per second, and lag growing by 1 each second (e.g. real rate is 2/s)", func() {
+			for i := 0; i < 100; i++ {
+				advance(i, int64(i*2), int64(i))
+			}
+			So(mon.Metric(), ShouldEqual, 98) // min-lag(98) / rate (1) = 98
+		})
+		Convey("rate of production is 100k and lag is 1000", func() {
+			advance(1, 100000, 99000)
+			advance(2, 200000, 199000)
+			So(mon.Metric(), ShouldEqual, 0) // 1000 / 100k = 0
+			Convey("rate of production goes up to 200k but lag stays consistent at 1000", func() {
+				advance(3, 400000, 399000)
+				advance(4, 600000, 599000)
+				So(mon.Metric(), ShouldEqual, 0) // 1000 / 200k = 0
+			})
+			Convey("rate of production goes down to 1000 but lag stays consistent at 1000", func() {
+				advance(3, 201000, 200000)
+				advance(4, 202000, 201000)
+				So(mon.Metric(), ShouldEqual, 1) // 1000 / 1000 = 1
+			})
+			Convey("rate of production goes up to 200k but we can only keep up with the rate of 100k so lag starts growing", func() {
+				advance(3, 400000, 299000)
+				advance(4, 600000, 399000)
+				So(mon.Metric(), ShouldEqual, 1) // (400000-299000)/100000 = 1
+				advance(5, 800000, 499000)       // note: we're now where the producer was at +- t=3.5, so 1.5s behind
+				So(mon.Metric(), ShouldEqual, 2) // (600000-399000)/100000 = 2
+				advance(6, 1000000, 599000)      // note: we're now at where the producer was at +- t=4, so 2 seconds behind
+				So(mon.Metric(), ShouldEqual, 3) // (800000-499000)/100000 = 3
+			})
+			Convey("a GC pause is causing us to not be able to consume during a few seconds", func() {
+				advance(3, 300000, 199000)
+				advance(4, 400000, 199000)
+				// TODO: this punishes really hard for short GC pauses
+				So(mon.Metric(), ShouldEqual, 101000) // ~(300000-199000)/0 -> 101000
+				// TODO: test what happens during recovery
+			})
+		})
 	})
 }
