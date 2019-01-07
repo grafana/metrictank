@@ -1,3 +1,21 @@
+# unreleased/master
+
+## api
+
+* Improve performance of SetTags #1158
+* speed up cross series aggregators by being more cache friendly #1164
+* Fix summarize crash #1170
+* groupByTags Performance improvements + fix setting consolidator per group + fix alias functions name tag setting #1165
+
+## docs
+
+* document startup procedure #1186
+
+## monitoring
+
+* fix render latency queries + remove old dashboards #1192
+
+
 # v0.11.0 Bigtable, chunk formats, fixes and breaking changes. Dec 19, 2018
 
 ### Important changes that require your attention:

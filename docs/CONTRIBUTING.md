@@ -51,7 +51,10 @@ see the [Makefile](../Makefile) for more targets
 
 # Release process
 
-During normal development, maintain CHANGELOG.md, and mark interesting -to users- changes under "unreleased" version.
+During normal development, maintain CHANGELOG.md, and mark interesting - to users and operators - changes under "unreleased" version.
+* Include: external API changes, performance improvements, features, anything affecting operations, etc.
+* Exclude: internal API changes, code refactorings/clean-ups, changes to the build process, etc. People interested in these have the git history.
+
 Grafana Labs regularly deploys the latest code from `master`, but cannot possibly do extensive testing of all functionality in production, so users are encouraged to run master also, and report any issues they hit.
 When significant changes have been merged to master, and they have had a chance to be tested or run in production for a while, we tag a release, as follows:
 
