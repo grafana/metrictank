@@ -228,6 +228,8 @@ the number of bytes currently obtained from the system by the process.  This is 
 a gauge of currently allocated (within the runtime) memory.
 * `memory.gc.cpu_fraction`:  
 how much cpu is consumed by the GC across process lifetime, in pro-mille
+* `memory.gc.gogc`:  
+the current GOGC value (derived from the GOGC environment variable)
 * `memory.gc.heap_objects`:  
 how many objects are allocated on the heap, it's a key indicator for GC workload
 * `memory.gc.last_duration`:  

@@ -9,7 +9,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"runtime/debug"
+	"strconv"
 	"time"
 
 	"github.com/grafana/metrictank/tracing"
@@ -133,10 +135,22 @@ func (n HTTPNode) readyStateGCHandler() {
 	if gcPercent == gcPercentNotReady {
 		return
 	}
+	var err error
 	if n.IsReady() {
-		debug.SetGCPercent(gcPercent)
+		prev := debug.SetGCPercent(gcPercent)
+		if prev != gcPercent {
+			log.Infof("CLU: node is ready. changing GOGC from %d to %d", prev, gcPercent)
+			err = os.Setenv("GOGC", strconv.Itoa(gcPercent))
+		}
 	} else {
-		debug.SetGCPercent(gcPercentNotReady)
+		prev := debug.SetGCPercent(gcPercentNotReady)
+		if prev != gcPercentNotReady {
+			log.Infof("CLU: node is not ready. changing GOGC from %d to %d", prev, gcPercentNotReady)
+			err = os.Setenv("GOGC", strconv.Itoa(gcPercentNotReady))
+		}
+	}
+	if err != nil {
+		log.Warnf("CLU: could not set GOGC environment variable. gcPercent metric will be incorrect. %s", err.Error())
 	}
 }
 
