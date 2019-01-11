@@ -35,8 +35,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 1,
-  "id": null,
-  "iteration": 1535648268402,
+  "id": 21,
+  "iteration": 1547213827205,
   "links": [],
   "panels": [
     {
@@ -176,6 +176,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "metrics in",
       "tooltip": {
@@ -300,6 +301,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "ringbuffer: Metrics & points",
       "tooltip": {
@@ -419,6 +421,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "cluster status",
       "tooltip": {
@@ -499,6 +502,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "metrics active",
       "tooltip": {
@@ -838,6 +842,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "memory",
       "tooltip": {
@@ -894,7 +899,7 @@
       "fill": 0,
       "grid": {},
       "gridPos": {
-        "h": 4,
+        "h": 9,
         "w": 8,
         "x": 8,
         "y": 9
@@ -946,6 +951,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "CPU",
       "tooltip": {
@@ -1065,6 +1071,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "render request duration (all steps)",
       "tooltip": {
@@ -1104,99 +1111,197 @@
       }
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "$datasource",
-      "editable": true,
-      "error": false,
-      "fill": 1,
-      "grid": {},
+      "collapsed": true,
       "gridPos": {
-        "h": 5,
-        "w": 8,
-        "x": 8,
-        "y": 13
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
       },
-      "id": 13,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": false,
-      "linewidth": 2,
-      "links": [],
-      "nullPointMode": "null",
-      "percentage": false,
-      "pointradius": 1,
-      "points": true,
-      "renderer": "flot",
-      "seriesOverrides": [
+      "id": 52,
+      "panels": [
         {
-          "alias": "duration",
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "editable": true,
+          "error": false,
+          "fill": 1,
+          "grid": {},
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 0,
+            "y": 25
+          },
+          "id": 13,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
           "lines": false,
+          "linewidth": 2,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
           "pointradius": 1,
           "points": true,
-          "yaxis": 2
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "refId": "A",
-          "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
+          "renderer": "flot",
+          "seriesOverrides": [
+            {
+              "alias": "duration",
+              "lines": false,
+              "pointradius": 1,
+              "points": true,
+              "yaxis": 2
+            }
+          ],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
+            },
+            {
+              "refId": "B",
+              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Golang GC",
+          "tooltip": {
+            "msResolution": false,
+            "shared": true,
+            "sort": 0,
+            "value_type": "cumulative"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "hertz",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "ns",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         },
         {
-          "refId": "B",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
+          "aliasColors": {
+            "gogc": "#ba43a9"
+          },
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "fill": 0,
+          "gridPos": {
+            "h": 5,
+            "w": 8,
+            "x": 8,
+            "y": 25
+          },
+          "id": 54,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 3,
+          "links": [],
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": true,
+          "targets": [
+            {
+              "refId": "A",
+              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.gogc.sgauge32, 'gogc')"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "GOGC",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "Golang GC",
-      "tooltip": {
-        "msResolution": false,
-        "shared": true,
-        "sort": 0,
-        "value_type": "cumulative"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "hertz",
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "ns",
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
+      "title": "runtime",
+      "type": "row"
     },
     {
       "collapsed": false,
@@ -1204,7 +1309,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 19
       },
       "id": 40,
       "panels": [],
@@ -1223,7 +1328,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 20
       },
       "id": 35,
       "legend": {
@@ -1263,6 +1368,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "Series Per Request",
       "tooltip": {
@@ -1312,7 +1418,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 20
       },
       "id": 33,
       "legend": {
@@ -1364,6 +1470,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "Points Per Request",
       "tooltip": {
@@ -1413,7 +1520,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 20
       },
       "id": 34,
       "legend": {
@@ -1449,6 +1556,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "Response Status per path",
       "tooltip": {
@@ -1493,7 +1601,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 27
       },
       "id": 41,
       "panels": [],
@@ -1524,7 +1632,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 27
+        "y": 28
       },
       "id": 4,
       "legend": {
@@ -1592,6 +1700,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "requests span",
       "tooltip": {
@@ -1652,7 +1761,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 27
+        "y": 28
       },
       "id": 10,
       "legend": {
@@ -1690,6 +1799,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "series requests rate",
       "tooltip": {
@@ -1729,10 +1839,10 @@
     },
     {
       "aliasColors": {
+        "mem to iter": "#EAB839",
         "store get": "#052B51",
         "store get chunks": "#70DBED",
         "store to iter": "#1F78C1",
-        "mem to iter": "#EAB839",
         "total request handle": "#890F02"
       },
       "bars": false,
@@ -1747,7 +1857,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 27
+        "y": 28
       },
       "id": 16,
       "legend": {
@@ -1808,6 +1918,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "render request duration per step",
       "tooltip": {
@@ -1852,7 +1963,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 34
       },
       "id": 42,
       "panels": [],
@@ -1877,7 +1988,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 34
+        "y": 35
       },
       "id": 14,
       "legend": {
@@ -1941,6 +2052,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "write workers & queues",
       "tooltip": {
@@ -1995,7 +2107,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 34
+        "y": 35
       },
       "id": 18,
       "legend": {
@@ -2060,6 +2172,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "metricpersist",
       "tooltip": {
@@ -2124,7 +2237,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 34
+        "y": 35
       },
       "id": 21,
       "legend": {
@@ -2176,6 +2289,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "store queue wait durations",
       "tooltip": {
@@ -2219,7 +2333,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 42
       },
       "id": 43,
       "panels": [],
@@ -2248,7 +2362,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 42
+        "y": 43
       },
       "id": 6,
       "legend": {
@@ -2300,6 +2414,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "chunk sizes",
       "tooltip": {
@@ -2359,7 +2474,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 42
+        "y": 43
       },
       "id": 3,
       "legend": {
@@ -2395,6 +2510,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "store req/s",
       "tooltip": {
@@ -2456,7 +2572,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 42
+        "y": 43
       },
       "id": 11,
       "legend": {
@@ -2500,6 +2616,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "store query durations",
       "tooltip": {
@@ -2543,7 +2660,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 50
       },
       "id": 44,
       "panels": [],
@@ -2572,7 +2689,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 50
+        "y": 51
       },
       "id": 7,
       "legend": {
@@ -2635,6 +2752,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "store responses",
       "tooltip": {
@@ -2693,7 +2811,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 50
+        "y": 51
       },
       "id": 23,
       "legend": {
@@ -2729,6 +2847,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "store errors",
       "tooltip": {
@@ -2786,7 +2905,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 50
+        "y": 51
       },
       "id": 8,
       "legend": {
@@ -2818,6 +2937,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "chunk operations",
       "tooltip": {
@@ -2861,7 +2981,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 58
       },
       "id": 45,
       "panels": [],
@@ -2880,7 +3000,7 @@
         "h": 7,
         "w": 2,
         "x": 0,
-        "y": 58
+        "y": 59
       },
       "id": 30,
       "legend": {
@@ -2913,6 +3033,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "num metrics",
       "tooltip": {
@@ -2971,7 +3092,7 @@
         "h": 7,
         "w": 10,
         "x": 2,
-        "y": 58
+        "y": 59
       },
       "id": 12,
       "legend": {
@@ -3027,6 +3148,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "op durations",
       "tooltip": {
@@ -3096,7 +3218,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 58
+        "y": 59
       },
       "id": 20,
       "legend": {
@@ -3154,6 +3276,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "backend status",
       "tooltip": {
@@ -3214,7 +3337,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 58
+        "y": 59
       },
       "id": 22,
       "legend": {
@@ -3254,6 +3377,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "idx errors",
       "tooltip": {
@@ -3299,7 +3423,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 66
       },
       "id": 46,
       "panels": [],
@@ -3321,7 +3445,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 66
+        "y": 67
       },
       "id": 24,
       "legend": {
@@ -3353,6 +3477,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "message size",
       "tooltip": {
@@ -3409,7 +3534,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 66
+        "y": 67
       },
       "id": 25,
       "legend": {
@@ -3456,6 +3581,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "conn to graphite",
       "tooltip": {
@@ -3512,7 +3638,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 66
+        "y": 67
       },
       "id": 26,
       "legend": {
@@ -3548,6 +3674,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "queue to graphite",
       "tooltip": {
@@ -3593,7 +3720,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 73
+        "y": 74
       },
       "id": 47,
       "panels": [],
@@ -3618,7 +3745,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 74
+        "y": 75
       },
       "id": 27,
       "legend": {
@@ -3690,6 +3817,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "size",
       "tooltip": {
@@ -3748,7 +3876,7 @@
         "h": 6,
         "w": 7,
         "x": 8,
-        "y": 74
+        "y": 75
       },
       "id": 50,
       "legend": {
@@ -3822,6 +3950,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "accounting",
       "tooltip": {
@@ -3883,7 +4012,7 @@
         "h": 6,
         "w": 9,
         "x": 15,
-        "y": 74
+        "y": 75
       },
       "id": 28,
       "legend": {
@@ -3948,6 +4077,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "operations",
       "tooltip": {
@@ -3993,7 +4123,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 80
+        "y": 81
       },
       "id": 48,
       "panels": [],
@@ -4020,7 +4150,7 @@
         "h": 7,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 82
       },
       "id": 32,
       "legend": {
@@ -4093,6 +4223,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "gossip events and state",
       "tooltip": {
@@ -4142,7 +4273,7 @@
         "h": 7,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 82
       },
       "id": 15,
       "legend": {
@@ -4174,6 +4305,7 @@
       ],
       "thresholds": [],
       "timeFrom": null,
+      "timeRegions": [],
       "timeShift": null,
       "title": "gossip decode errors",
       "tooltip": {
@@ -4234,6 +4366,7 @@
         "query": "graphite",
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
         "type": "datasource"
       },
       {
@@ -4241,6 +4374,7 @@
         "allValue": null,
         "current": {},
         "datasource": "$datasource",
+        "definition": "",
         "hide": 0,
         "includeAll": false,
         "label": null,
@@ -4252,6 +4386,7 @@
         "refresh": 1,
         "refresh_on_load": false,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
         "tags": [],
@@ -4262,8 +4397,12 @@
       {
         "allFormat": "glob",
         "allValue": null,
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": "$datasource",
+        "definition": "",
         "hide": 0,
         "includeAll": true,
         "label": null,
@@ -4275,6 +4414,7 @@
         "refresh": 1,
         "refresh_on_load": false,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 0,
         "tagValuesQuery": "",
         "tags": [],
