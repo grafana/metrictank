@@ -34,3 +34,13 @@ func WriteUint64(buf, prefix, key []byte, val uint64, now time.Time) []byte {
 	buf = strconv.AppendInt(buf, now.Unix(), 10)
 	return append(buf, '\n')
 }
+
+func WriteInt32(buf, prefix, key []byte, val int32, now time.Time) []byte {
+	buf = append(buf, prefix...)
+	buf = append(buf, key...)
+	buf = append(buf, ' ')
+	buf = strconv.AppendInt(buf, int64(val), 10)
+	buf = append(buf, ' ')
+	buf = strconv.AppendInt(buf, now.Unix(), 10)
+	return append(buf, '\n')
+}
