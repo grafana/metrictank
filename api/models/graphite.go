@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
-	"gopkg.in/macaron.v1"
+	macaron "gopkg.in/macaron.v1"
 )
 
 //go:generate msgp
@@ -149,6 +149,11 @@ type GraphiteFind struct {
 	Query  string `json:"query" form:"query" binding:"Required"`
 	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle)"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
+}
+
+type MetaTagRecord struct {
+	MetaTags   []string
+	TagQueries []string
 }
 
 type MetricsDelete struct {

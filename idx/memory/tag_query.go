@@ -43,19 +43,39 @@ type expression struct {
 	operator match
 }
 
+func (e *expression) String() string {
+	switch e.operator {
+	case EQUAL:
+		return e.key + "=" + e.value
+	case NOT_EQUAL:
+		return e.key + "!=" + e.value
+	case MATCH:
+		return e.key + "=~" + e.value
+	case MATCH_TAG:
+		return "__tag=~" + e.value
+	case NOT_MATCH:
+		return e.key + "!=~" + e.value
+	case PREFIX:
+		return e.key + "^=" + e.value
+	case PREFIX_TAG:
+		return "__tag^=" + e.value
+	}
+	return ""
+}
+
 // a key / value combo used to represent a tag expression like "key=value"
-// the cost is an estimate how expensive this query is compared to others
-// with the same operator
 type kv struct {
-	cost  uint // cost of evaluating expression, compared to other kv objects
 	key   string
 	value string
+}
+
+func (k *kv) String() string {
+	return k.key + "=" + k.value
 }
 
 // kv expressions that rely on regular expressions will get converted to kvRe in
 // NewTagQuery() to accommodate the additional requirements of regex based queries.
 type kvRe struct {
-	cost           uint // cost of evaluating expression, compared to other kvRe objects
 	key            string
 	value          *regexp.Regexp // the regexp pattern to evaluate, nil means everything should match
 	matchCache     *sync.Map      // needs to be reference so kvRe can be copied, caches regex matches
@@ -63,18 +83,6 @@ type kvRe struct {
 	missCache      *sync.Map      // needs to be reference so kvRe can be copied, caches regex misses
 	missCacheSize  int32          // sync.Map does not have a way to get the length
 }
-
-type KvByCost []kv
-
-func (a KvByCost) Len() int           { return len(a) }
-func (a KvByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KvByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
-
-type KvReByCost []kvRe
-
-func (a KvReByCost) Len() int           { return len(a) }
-func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 
 // TagQuery runs a set of pattern or string matches on tag keys and values against
 // the index. It is executed via:
@@ -751,26 +759,27 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 // this is to reduce the result set cheaply and only apply expensive tests to an
 // already reduced set of results
 func (q *TagQuery) sortByCost() {
-	for i, kv := range q.equal {
-		q.equal[i].cost = uint(len(q.index[kv.key][kv.value]))
-	}
-
 	// for prefix and match clauses we can't determine the actual cost
 	// without actually evaluating them, so we estimate based on
 	// cardinality of the key
-	for i, kv := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[kv.key]))
+	kvSortingFunc := func(slice []kv) func(int, int) bool {
+		return func(i, j int) bool {
+			return len(q.index[slice[i].key]) < len(q.index[slice[j].key])
+		}
 	}
 
-	for i, kvRe := range q.match {
-		q.match[i].cost = uint(len(q.index[kvRe.key]))
+	sort.Slice(q.equal, kvSortingFunc(q.equal))
+	sort.Slice(q.notEqual, kvSortingFunc(q.notEqual))
+	sort.Slice(q.prefix, kvSortingFunc(q.prefix))
+
+	kvReSortingFunc := func(slice []kvRe) func(int, int) bool {
+		return func(i, j int) bool {
+			return len(q.index[slice[i].key]) < len(q.index[slice[j].key])
+		}
 	}
 
-	sort.Sort(KvByCost(q.equal))
-	sort.Sort(KvByCost(q.notEqual))
-	sort.Sort(KvByCost(q.prefix))
-	sort.Sort(KvReByCost(q.match))
-	sort.Sort(KvReByCost(q.notMatch))
+	sort.Slice(q.match, kvReSortingFunc(q.match))
+	sort.Slice(q.notMatch, kvReSortingFunc(q.notMatch))
 }
 
 // Run executes the tag query on the given index and returns a list of ids

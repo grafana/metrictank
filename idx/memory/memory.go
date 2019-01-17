@@ -201,26 +201,6 @@ func (n *Node) String() string {
 	return fmt.Sprintf("branch - %s", n.Path)
 }
 
-type keyValue struct {
-	key   string
-	value string
-}
-
-type extTagMetaRecord struct {
-	extTags []keyValue
-
-	// should these be a full tag query expressions? (f.e. "key1=~abc[0-9]"?)
-	intTags []keyValue
-}
-
-// list of meta records keyed by random unique identifier
-// key needs to be somehow generated, could be a completely random number
-type extTagMetaRecords map[uint32]extTagMetaRecord
-
-// index structure keyed by key -> value -> meta record
-type extTagValue map[string]uint32
-type extTagIndex map[string]extTagValue
-
 // Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
@@ -233,10 +213,10 @@ type MemoryIdx struct {
 	tree map[uint32]*Tree // by orgId
 
 	// used by tag index
-	defByTagSet       defByTagSet
-	tags              map[uint32]TagIndex          // by orgId
-	extTagMetaRecords map[uint32]extTagMetaRecords // by orgId
-	extTags           map[uint32]extTagIndex       // by orgId
+	defByTagSet    defByTagSet
+	tags           map[uint32]TagIndex       // by orgId
+	metaTags       map[uint32]metaTagIndex   // by orgId
+	metaTagRecords map[uint32]metaTagRecords // by orgId
 }
 
 func New() *MemoryIdx {

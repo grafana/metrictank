@@ -1098,3 +1098,7 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 		response.Write(ctx, response.NewError(http.StatusBadRequest, "Unsupported response format requested: "+request.Format))
 	}
 }
+
+func (s *Server) metaTagAddOrUpdate(ctx *middleware.Context, metaTagRecord models.MetaTagRecord) {
+	s.MetricIndex.MetaTagAddOrUpdate(metaTagRecord)
+}

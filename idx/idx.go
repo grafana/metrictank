@@ -128,4 +128,9 @@ type MetricIndex interface {
 	// DeleteTagged deletes the specified series from the tag index and also the
 	// DefById index.
 	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
+
+	// MetaTagRecordUpsert takes the definition of a meta tag record rule as slices of
+	// strings and parses and applies it. If there were any errors during this process it
+	// returns an error message, otherwise it returns nil.
+	//MetaTagRecordUpsert(orgId uint32, metaTags []string, metricTagQueryExpressions []string) (bool, error)
 }
