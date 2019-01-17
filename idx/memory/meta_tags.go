@@ -80,7 +80,7 @@ func (m *metaTagRecord) hashMetaTagRecord() uint32 {
 
 	// use jump hash for better distribution
 	// we want distribution to avoid collisions and to find the next
-	// free slot faster in case there was a collision
+	// free ID faster in case there was a collision
 	return uint32(jump.Hash(uint64(metaTagHash)<<32|uint64(queryHash), math.MaxUint32))
 }
 
@@ -175,7 +175,7 @@ func (m *metaTagRecords) metaTagRecordUpsert(metaTags []string, metricTagQueryEx
 				}
 
 				// verify that the two records have the same queries and there was no hash collision
-				if reflect.DeepEqual(record.hashQueries(), existingRecord.hashQueries()) {
+				if reflect.DeepEqual(record.queries, existingRecord.queries) {
 					// we will have to update this record's meta tags
 					updateRecordID = i
 					break
@@ -188,8 +188,7 @@ func (m *metaTagRecords) metaTagRecordUpsert(metaTags []string, metricTagQueryEx
 		if updateRecordID == 0 {
 			// keep increasing until we find the next free ID where we don't collide
 			// with an already existing record
-			for _, ok := m.records[hash]; ok; _, ok = m.records[hash] {
-				hash++
+			for _, ok := m.records[hash]; ok; hash++ {
 			}
 		}
 
@@ -211,12 +210,14 @@ func (m *metaTagRecords) metaTagRecordUpsert(metaTags []string, metricTagQueryEx
 			// of the new record, and also that this record still exists
 			if existingRecord, ok := m.records[updateRecordID]; ok {
 				if !reflect.DeepEqual(record.hashQueries(), existingRecord.hashQueries()) {
-					// the tag expressions at the given ID does not match the ones of
+					// the tag expressions at the given ID do not match the ones of
 					// the new record anymore, start over again
 					m.Unlock()
 					continue
 				}
 
+				// delete record at this ID, its replacement will be inserted with a new ID
+				delete(m.records, updateRecordID)
 				updatedRecord = &existingRecord
 			} else {
 				// there is no record at the given ID anymore, start over again
@@ -226,7 +227,6 @@ func (m *metaTagRecords) metaTagRecordUpsert(metaTags []string, metricTagQueryEx
 		}
 
 		m.records[hash] = record
-		delete(m.records, updateRecordID)
 		m.Unlock()
 		break
 	}
