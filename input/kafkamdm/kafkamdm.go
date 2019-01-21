@@ -33,8 +33,7 @@ type KafkaMdm struct {
 	lagMonitor *LagMonitor
 	wg         sync.WaitGroup
 
-	// signal to PartitionConsumers to shutdown
-	stopConsuming chan struct{}
+	shutdown chan struct{}
 	// signal to caller that it should shutdown
 	cancel context.CancelFunc
 }
@@ -61,9 +60,7 @@ var consumerMaxWaitTime time.Duration
 var consumerMaxProcessingTime time.Duration
 var netMaxOpenRequests int
 var offsetDuration time.Duration
-var partitionOffset map[int32]*stats.Gauge64
-var partitionLogSize map[int32]*stats.Gauge64
-var partitionLag map[int32]*stats.Gauge64
+var kafkaStats stats.Kafka
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -161,18 +158,13 @@ func ConfigProcess(instance string) {
 		cluster.Manager.SetPartitions(partitions)
 	}
 
-	// initialize our offset metrics
-	partitionOffset = make(map[int32]*stats.Gauge64)
-	partitionLogSize = make(map[int32]*stats.Gauge64)
-	partitionLag = make(map[int32]*stats.Gauge64)
-	for _, part := range partitions {
-		// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
-		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.offset", part))
-		// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
-		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.log_size", part))
-		// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
-		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("input.kafka-mdm.partition.%d.lag", part))
-	}
+	// the extra empty newlines are because metrics2docs doesn't recognize the comments properly otherwise
+	// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
+
+	// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
+
+	// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
+	kafkaStats = stats.NewKafka("input.kafka-mdm", partitions)
 }
 
 func New() *KafkaMdm {
@@ -186,10 +178,10 @@ func New() *KafkaMdm {
 	}
 	log.Info("kafkamdm: consumer created without error")
 	k := KafkaMdm{
-		consumer:      consumer,
-		client:        client,
-		lagMonitor:    NewLagMonitor(10, partitions),
-		stopConsuming: make(chan struct{}),
+		consumer:   consumer,
+		client:     client,
+		lagMonitor: NewLagMonitor(10, partitions),
+		shutdown:   make(chan struct{}),
 	}
 
 	return &k
@@ -256,13 +248,9 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 	return val, err
 }
 
-// this will continually consume from the topic until k.stopConsuming is triggered.
+// consumePartition consumes from the topic until k.shutdown is triggered.
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	defer k.wg.Done()
-
-	partitionOffsetMetric := partitionOffset[partition]
-	partitionLogSizeMetric := partitionLogSize[partition]
-	partitionLagMetric := partitionLag[partition]
 
 	// determine the pos of the topic and the initial offset of our consumer
 	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
@@ -282,9 +270,11 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		}
 	}
 
-	partitionOffsetMetric.Set(int(currentOffset))
-	partitionLogSizeMetric.Set(int(newest))
-	partitionLagMetric.Set(int(newest - currentOffset))
+	kafkaStats := kafkaStats[partition]
+	kafkaStats.Offset.Set(int(currentOffset))
+	kafkaStats.LogSize.Set(int(newest))
+	kafkaStats.Lag.Set(int(newest - currentOffset))
+	go k.trackStats(topic, partition)
 
 	log.Infof("kafkamdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
 	pc, err := k.consumer.ConsumePartition(topic, partition, currentOffset)
@@ -294,7 +284,6 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		return
 	}
 	messages := pc.Messages()
-	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case msg, ok := <-messages:
@@ -306,23 +295,8 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			}
 			log.Debugf("kafkamdm: received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			k.handleMsg(msg.Value, partition)
-			currentOffset = msg.Offset
-		case ts := <-ticker.C:
-			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
-			newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 1, 0)
-			if err != nil {
-				log.Errorf("kafkamdm: %s", err.Error())
-			} else {
-				partitionLogSizeMetric.Set(int(newest))
-			}
-
-			partitionOffsetMetric.Set(int(currentOffset))
-			if err == nil {
-				lag := int(newest - currentOffset)
-				partitionLagMetric.Set(lag)
-				k.lagMonitor.StoreLag(partition, lag)
-			}
-		case <-k.stopConsuming:
+			kafkaStats.Offset.Set(int(msg.Offset))
+		case <-k.shutdown:
 			pc.Close()
 			log.Infof("kafkamdm: consumer for %s:%d ended.", topic, partition)
 			return
@@ -358,17 +332,42 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 // and block until it stopped.
 func (k *KafkaMdm) Stop() {
 	// closes notifications and messages channels, amongst others
-	close(k.stopConsuming)
+	close(k.shutdown)
 	k.wg.Wait()
 	k.client.Close()
 }
 
+func (k *KafkaMdm) trackStats(topic string, partition int32) {
+	ticker := time.NewTicker(time.Second)
+	kafkaStats := kafkaStats[partition]
+	for {
+		select {
+		case <-k.shutdown:
+			ticker.Stop()
+			return
+		case ts := <-ticker.C:
+			currentOffset := int64(kafkaStats.Offset.Peek())
+			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
+			newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 1, 0)
+			if err != nil {
+				log.Errorf("kafkamdm: %s", err.Error())
+				continue
+			}
+			kafkaStats.LogSize.Set(int(newest))
+			lag := int(newest - currentOffset)
+			kafkaStats.Lag.Set(lag)
+			k.lagMonitor.StoreLag(partition, lag)
+		}
+	}
+}
+
 func (k *KafkaMdm) MaintainPriority() {
 	go func() {
-		ticker := time.NewTicker(time.Second * 10)
+		ticker := time.NewTicker(time.Second)
 		for {
 			select {
-			case <-k.stopConsuming:
+			case <-k.shutdown:
+				ticker.Stop()
 				return
 			case <-ticker.C:
 				cluster.Manager.SetPriority(k.lagMonitor.Metric())
