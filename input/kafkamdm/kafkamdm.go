@@ -260,7 +260,7 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 	return val, err
 }
 
-// this will continually consume from the topic until k.shutdown is triggered.
+// consumePartition consumes from the topic until k.shutdown is triggered.
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	defer k.wg.Done()
 
