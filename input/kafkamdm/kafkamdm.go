@@ -252,8 +252,6 @@ func (k *KafkaMdm) tryGetOffset(topic string, partition int32, offset int64, att
 func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset int64) {
 	defer k.wg.Done()
 
-	kafkaStats := kafkaStats[partition]
-
 	// determine the pos of the topic and the initial offset of our consumer
 	newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 7, time.Second*10)
 	if err != nil {
@@ -272,6 +270,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		}
 	}
 
+	kafkaStats := kafkaStats[partition]
 	kafkaStats.Offset.Set(int(currentOffset))
 	kafkaStats.LogSize.Set(int(newest))
 	kafkaStats.Lag.Set(int(newest - currentOffset))
