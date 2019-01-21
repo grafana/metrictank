@@ -12,10 +12,6 @@ func NewGauge64(name string) *Gauge64 {
 	return registry.getOrAdd(name, &u).(*Gauge64)
 }
 
-func NewGauge64Existing(name string, g *Gauge64) *Gauge64 {
-	return registry.getOrAdd(name, g).(*Gauge64)
-}
-
 func (g *Gauge64) Inc() {
 	atomic.AddUint64((*uint64)(g), 1)
 }

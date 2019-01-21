@@ -60,7 +60,7 @@ var consumerMaxWaitTime time.Duration
 var consumerMaxProcessingTime time.Duration
 var netMaxOpenRequests int
 var offsetDuration time.Duration
-var kafkaStats map[int32]*KafkaStats
+var kafkaStats stats.Kafka
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -158,25 +158,13 @@ func ConfigProcess(instance string) {
 		cluster.Manager.SetPartitions(partitions)
 	}
 
-	// initialize our offset metrics
-	kafkaStats = make(map[int32]*KafkaStats)
-	for _, part := range partitions {
-		ks := KafkaStats{}
-		// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
-		stats.NewGauge64Existing(fmt.Sprintf("input.kafka-mdm.partition.%d.offset", part), &ks.offset)
-		// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
-		stats.NewGauge64Existing(fmt.Sprintf("input.kafka-mdm.partition.%d.log_size", part), &ks.logSize)
-		// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
-		stats.NewGauge64Existing(fmt.Sprintf("input.kafka-mdm.partition.%d.lag", part), &ks.lag)
-		kafkaStats[part] = &ks
-	}
-}
+	// the extra empty newlines are because metrics2docs doesn't recognize the comments properly otherwise
+	// metric input.kafka-mdm.partition.%d.offset is the current offset for the partition (%d) that we have consumed.
 
-// KafkaStats is a set of per-partition stats to track the health of our consumer
-type KafkaStats struct {
-	offset  stats.Gauge64
-	logSize stats.Gauge64
-	lag     stats.Gauge64
+	// metric input.kafka-mdm.partition.%d.log_size is the current size of the kafka partition (%d), aka the newest available offset.
+
+	// metric input.kafka-mdm.partition.%d.lag is how many messages (metrics) there are in the kafka partition (%d) that we have not yet consumed.
+	kafkaStats = stats.NewKafka("input.kafka-mdm", partitions)
 }
 
 func New() *KafkaMdm {
@@ -284,9 +272,9 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 		}
 	}
 
-	kafkaStats.offset.Set(int(currentOffset))
-	kafkaStats.logSize.Set(int(newest))
-	kafkaStats.lag.Set(int(newest - currentOffset))
+	kafkaStats.Offset.Set(int(currentOffset))
+	kafkaStats.LogSize.Set(int(newest))
+	kafkaStats.Lag.Set(int(newest - currentOffset))
 	go k.trackStats(topic, partition)
 
 	log.Infof("kafkamdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
@@ -308,7 +296,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 			}
 			log.Debugf("kafkamdm: received message: Topic %s, Partition: %d, Offset: %d, Key: %x", msg.Topic, msg.Partition, msg.Offset, msg.Key)
 			k.handleMsg(msg.Value, partition)
-			kafkaStats.offset.Set(int(msg.Offset))
+			kafkaStats.Offset.Set(int(msg.Offset))
 		case <-k.shutdown:
 			pc.Close()
 			log.Infof("kafkamdm: consumer for %s:%d ended.", topic, partition)
@@ -359,16 +347,16 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 			ticker.Stop()
 			return
 		case ts := <-ticker.C:
-			currentOffset := int64(kafkaStats.offset.Peek())
+			currentOffset := int64(kafkaStats.Offset.Peek())
 			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
 			newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 1, 0)
 			if err != nil {
 				log.Errorf("kafkamdm: %s", err.Error())
 				continue
 			}
-			kafkaStats.logSize.Set(int(newest))
+			kafkaStats.LogSize.Set(int(newest))
 			lag := int(newest - currentOffset)
-			kafkaStats.lag.Set(lag)
+			kafkaStats.Lag.Set(lag)
 			k.lagMonitor.StoreLag(partition, lag)
 		}
 	}
