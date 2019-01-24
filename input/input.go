@@ -78,7 +78,7 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 		return
 	}
 
-	m := in.metrics.GetOrCreate(point.MKey, archive.SchemaId, archive.AggId)
+	m := in.metrics.GetOrCreate(point.MKey, archive.SchemaId, archive.AggId, uint32(archive.Interval))
 	m.Add(point.Time, point.Value)
 }
 
@@ -113,6 +113,6 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 
 	archive, _, _ := in.metricIndex.AddOrUpdate(mkey, md, partition)
 
-	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId)
+	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId, uint32(md.Interval))
 	m.Add(uint32(md.Time), md.Value)
 }

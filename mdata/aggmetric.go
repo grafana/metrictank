@@ -48,7 +48,7 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
@@ -67,7 +67,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		lastWrite: uint32(time.Now().Unix()),
 	}
 	if reorderWindow != 0 {
-		m.rob = NewReorderBuffer(reorderWindow, ret.SecondsPerPoint)
+		m.rob = NewReorderBuffer(reorderWindow, interval)
 	}
 
 	for _, ret := range retentions[1:] {

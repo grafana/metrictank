@@ -95,7 +95,7 @@ func (dn DefaultNotifierHandler) Handle(data []byte) {
 				log.Debugf("notifier: skipping metric with MKey %s as it is not in the index", amkey.MKey)
 				continue
 			}
-			agg := dn.metrics.GetOrCreate(amkey.MKey, def.SchemaId, def.AggId)
+			agg := dn.metrics.GetOrCreate(amkey.MKey, def.SchemaId, def.AggId, uint32(def.Interval))
 			if amkey.Archive != 0 {
 				consolidator := consolidation.FromArchive(amkey.Archive.Method())
 				aggSpan := amkey.Archive.Span()

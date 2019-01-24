@@ -18,9 +18,9 @@ type ReorderBuffer struct {
 	buf      []schema.Point // the actual buffer holding the data
 }
 
-func NewReorderBuffer(reorderWindow uint32, interval int) *ReorderBuffer {
+func NewReorderBuffer(reorderWindow, interval uint32) *ReorderBuffer {
 	return &ReorderBuffer{
-		interval: uint32(interval),
+		interval: interval,
 		buf:      make([]schema.Point, reorderWindow),
 	}
 }
