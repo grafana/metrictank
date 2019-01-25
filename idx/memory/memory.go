@@ -20,7 +20,6 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
-	goi "github.com/robert-milan/go-object-interning"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -220,21 +219,14 @@ type MemoryIdx struct {
 	// used by tag index
 	defByTagSet defByTagSet
 	tags        map[uint32]TagIndex // by orgId
-
-	// used to intern objects used by the index to reduce memory overhead
-	// currently it is only used by the tag index
-	objIntern *goi.ObjectIntern
 }
 
 func New() *MemoryIdx {
-	oiCnf := goi.NewConfig()
-	oiCnf.CompressionType = goi.NOCPRSN
 	return &MemoryIdx{
 		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
-		objIntern:   goi.NewObjectIntern(oiCnf),
 	}
 }
 
@@ -345,7 +337,7 @@ func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
 // return a string with data pointed to the interned data
 // this assumes that no compression is used in the store
 func (m *MemoryIdx) internAcquire(sz string) (string, error) {
-	objPtr, err := m.objIntern.AddOrGet([]byte(sz))
+	objPtr, err := idx.IdxIntern.AddOrGet([]byte(sz))
 	if err != nil {
 		return sz, err
 	}
@@ -365,7 +357,7 @@ func (m *MemoryIdx) internAcquire(sz string) (string, error) {
 // calling this on a string that was not interned won't have any negative effects
 // aside from wasting cycles
 func (m *MemoryIdx) internRelease(sz string) error {
-	_, err := m.objIntern.DeleteByValSz(sz)
+	_, err := idx.IdxIntern.DeleteByValSzNoCprsn(sz)
 	return err
 }
 
