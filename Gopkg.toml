@@ -41,13 +41,9 @@ unused-packages = true
   # carbon-relay-ng needs this version. and tsdbgw includes both metrictank and carbon-relay-ng
   revision = "08e90462da344fbb3880e8e47a0ddacc37508579"
 
-[[override]]
-  name = "github.com/willf/bitset"
-  revision = "3fb80c4041d4fce1c027ff1c416cca3e0dccd97e"
-
 [[constraint]]
+  branch = "master"
   name = "github.com/robert-milan/go-object-interning"
-  revision = "dc44449f293d44c252ce6e731f7e293ee05ae753"
 
 [[constraint]]
   name = "github.com/alyu/configparser"
