@@ -119,6 +119,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:3db74f0cf75d9759d2bdfb6cb55f7d7d372c01f847c5e1ab2fe03773dc2bf024"
+  name = "github.com/dgryski/go-jump"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "e1f439676b570800a863c37b78d1f868f51a85fc"
+
+[[projects]]
+  branch = "master"
   digest = "1:07e80adc1161a63d37f382328ebabbf4f50e027cfaadf718515c3f39a65eb18f"
   name = "github.com/dgryski/go-linlog"
   packages = ["."]
@@ -723,6 +731,21 @@
   revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
+  branch = "master"
+  digest = "1:373404bee28e1c51d6c07def622c9c0d080d649ee06fc123df11e93f40d37dca"
+  name = "github.com/replay/go-generic-object-store"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "eea77cc9090e8a9bb816f7f0cf08494fc9ce3092"
+
+[[projects]]
+  digest = "1:91cca32f05a281a6b8f714f2be24bf844f3136f47708e7b701d5b70deb679ec7"
+  name = "github.com/robert-milan/go-object-interning"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "dc44449f293d44c252ce6e731f7e293ee05ae753"
+
+[[projects]]
   digest = "1:c5741d3d03a06220bcca801547f28de803103249b739eb5537e54b77e89f435a"
   name = "github.com/rs/cors"
   packages = ["."]
@@ -794,6 +817,14 @@
   version = "v1.1.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:a62c8b826167e33e30b613271688b7ce0bd63e500040cb3b710ce845b2f64da4"
+  name = "github.com/tmthrgd/shoco"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "9d48cea723d956736cddbeb2b82d3f8c19f1cb73"
+
+[[projects]]
   digest = "1:4e11e08e1d82b2c2adee55dac1e3ce963864951b618c6679307f4663b5aa553e"
   name = "github.com/uber/jaeger-client-go"
   packages = [
@@ -828,6 +859,13 @@
   revision = "0e30338a695636fe5bcf7301e8030ce8dd2a8530"
   source = "https://github.com/jaegertracing/jaeger-lib.git"
   version = "v2.0.0"
+
+[[projects]]
+  digest = "1:0f4299df39f2e222cdd1b802126a7ae9cadcb4f11f65d657adb48a4e07c9bfb7"
+  name = "github.com/willf/bitset"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "3fb80c4041d4fce1c027ff1c416cca3e0dccd97e"
 
 [[projects]]
   digest = "1:d04de18a0e0bf8fcdb79e8dc755c9b15dbe7f1b2ea3f8fbf11e55ea2d26ac182"
@@ -1175,6 +1213,7 @@
     "github.com/raintank/met/helper",
     "github.com/raintank/schema",
     "github.com/raintank/schema/msg",
+    "github.com/robert-milan/go-object-interning",
     "github.com/rs/cors",
     "github.com/sergi/go-diff/diffmatchpatch",
     "github.com/sirupsen/logrus",
