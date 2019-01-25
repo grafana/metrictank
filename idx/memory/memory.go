@@ -165,7 +165,7 @@ func (t *TagIndex) addTagId(name, value string, id schema.MKey) {
 	ti[name][value][id] = struct{}{}
 }
 
-func (t *TagIndex) delTagId(name, value string, id schema.MKey, m *MemoryIdx) {
+func (t *TagIndex) delTagId(name, value string, id schema.MKey, m *UnpartitionedMemoryIdx) {
 	ti := *t
 
 	delete(ti[name][value], id)
@@ -551,8 +551,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 // get or add an object in the interning store
 // return a string with data pointed to the interned data
 // this assumes that no compression is used in the store
-func (m *MemoryIdx) internAcquire(sz string) (string, error) {
-	objPtr, err := m.objIntern.AddOrGet([]byte(sz))
+func (m *UnpartitionedMemoryIdx) internAcquire(sz string) (string, error) {
+	objPtr, err := idx.IdxIntern.AddOrGet([]byte(sz))
 	if err != nil {
 		return sz, err
 	}
@@ -571,8 +571,8 @@ func (m *MemoryIdx) internAcquire(sz string) (string, error) {
 // release a previously acquired string from the interning store
 // calling this on a string that was not interned won't have any negative effects
 // aside from wasting cycles
-func (m *MemoryIdx) internRelease(sz string) error {
-	_, err := m.objIntern.DeleteByValSz(sz)
+func (m *UnpartitionedMemoryIdx) internRelease(sz string) error {
+	_, err := idx.IdxIntern.DeleteByValSzNoCprsn(sz)
 	return err
 }
 

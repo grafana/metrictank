@@ -8,9 +8,14 @@ import (
 
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/raintank/schema"
+	goi "github.com/robert-milan/go-object-interning"
 )
 
 var OrgIdPublic = uint32(0)
+
+// Object Interning for the index
+// Default config uses NOCPRSN
+var IdxIntern = goi.NewObjectIntern(nil)
 
 //go:generate msgp
 
