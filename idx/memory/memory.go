@@ -172,12 +172,10 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey, m *MemoryIdx) {
 
 	if len(ti[name][value]) == 0 {
 		delete(ti[name], value)
-		vPtr, _ := m.objIntern.GetNoRefCnt([]byte(value))
-		m.internReleasePtr(vPtr)
+		m.internRelease(value)
 		if len(ti[name]) == 0 {
 			delete(ti, name)
-			nPtr, _ := m.objIntern.GetNoRefCnt([]byte(name))
-			m.internReleasePtr(nPtr)
+			m.internRelease(name)
 		}
 	}
 }
@@ -574,15 +572,7 @@ func (m *MemoryIdx) internAcquire(sz string) (string, error) {
 // calling this on a string that was not interned won't have any negative effects
 // aside from wasting cycles
 func (m *MemoryIdx) internRelease(sz string) error {
-	_, err := m.objIntern.Delete((*(*reflect.StringHeader)(unsafe.Pointer(&sz))).Data)
-	return err
-}
-
-func (m *MemoryIdx) internReleasePtr(ptr uintptr) error {
-	if ptr == 0 {
-		return nil
-	}
-	_, err := m.objIntern.Delete(ptr)
+	_, err := m.objIntern.DeleteByValSz(sz)
 	return err
 }
 
