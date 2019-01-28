@@ -108,6 +108,12 @@ func TestLagMonitor(t *testing.T) {
 	Convey("with 0 measurements, priority should be 10k", t, func() {
 		So(mon.Metric(), ShouldEqual, 10000)
 		Reset(func() { mon = NewLagMonitor(2, []int32{0}) })
+		Convey("sub-second polling should work", func() {
+			mon.StoreOffsets(0, 1000, 1000, start)
+			ts := start.Add(time.Duration(float64(time.Second.Nanoseconds()) * float64(0.1)))
+			mon.StoreOffsets(0, 5000, 5000, ts)
+			So(mon.Metric(), ShouldEqual, 0)
+		})
 		Convey("with 100 measurements, not consuming and lag just growing", func() {
 			for i := 0; i < 100; i++ {
 				advance(i, int64(i), 0)
