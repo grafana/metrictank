@@ -98,10 +98,10 @@ func (l *lagLogger) Rate() int64 {
 		high = math.MaxInt64
 	}
 
-	totalGrowth := high - low
-	totalDuration := latestLag.ts.UnixNano() - earliestLag.ts.UnixNano()
+	totalGrowth := float64(high - low)
+	totalDurationSec := float64(latestLag.ts.UnixNano()-earliestLag.ts.UnixNano()) / float64(time.Second.Nanoseconds())
 
-	return totalGrowth / (totalDuration / time.Second.Nanoseconds())
+	return int64(totalGrowth / totalDurationSec)
 }
 
 // LagMonitor determines how upToDate this node is.
