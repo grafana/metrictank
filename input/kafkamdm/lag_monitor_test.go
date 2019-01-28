@@ -118,7 +118,7 @@ func TestLagMonitor(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				advance(i, int64(i*2), int64(i))
 			}
-			So(mon.Metric(), ShouldEqual, 98) // min-lag(98) / rate (1) = 98
+			So(mon.Metric(), ShouldEqual, 49) // min-lag(98) / input rate (2) = 49
 		})
 		Convey("rate of production is 100k and lag is 1000", func() {
 			advance(1, 100000, 99000)
@@ -137,35 +137,23 @@ func TestLagMonitor(t *testing.T) {
 			Convey("rate of production goes up to 200k but we can only keep up with the rate of 100k so lag starts growing", func() {
 				advance(3, 400000, 299000)
 				advance(4, 600000, 399000)
-				So(mon.Metric(), ShouldEqual, 1) // (400000-299000)/100000 = 1
+				So(mon.Metric(), ShouldEqual, 0) // (400000-299000)/200000 = 0
 				advance(5, 800000, 499000)       // note: we're now where the producer was at +- t=3.5, so 1.5s behind
-				So(mon.Metric(), ShouldEqual, 2) // (600000-399000)/100000 = 2
+				So(mon.Metric(), ShouldEqual, 1) // (600000-399000)/200000 = 1
 				advance(6, 1000000, 599000)      // note: we're now at where the producer was at +- t=4, so 2 seconds behind
-				So(mon.Metric(), ShouldEqual, 3) // (800000-499000)/100000 = 3
+				So(mon.Metric(), ShouldEqual, 1) // (800000-499000)/200000 = 1
+				advance(15, 2800000, 1499000)
+				advance(16, 3000000, 1599000)    // Jump forward 10 seconds, where the producer was at +- t=9, so 7 seconds behind
+				So(mon.Metric(), ShouldEqual, 6) // (2800000-1499000)/200000 = 6
 			})
 			Convey("a GC pause is causing us to not be able to consume during a few seconds", func() {
 				advance(3, 300000, 199000)
 				advance(4, 400000, 199000)
-				// TODO: this punishes really hard for short GC pauses
-				So(mon.Metric(), ShouldEqual, 101000) // ~(300000-199000)/0 -> 101000
-				// TODO: test what happens during recovery
+				So(mon.Metric(), ShouldEqual, 1) // ~(300000-199000)/100000 = 1
+				// test what happens during recovery
+				advance(5, 500000, 499000)
+				So(mon.Metric(), ShouldEqual, 0) // ~(500000-499000)/100000 = 0
 			})
 		})
-	})
-	Convey("with lots of measurements", t, func() {
-		now := time.Now()
-		for part := range mon.monitors {
-			for i := 0; i < 100; i++ {
-				mon.StoreOffsets(part, int64(i), int64(2*i), now.Add(time.Second*time.Duration(i)))
-			}
-		}
-		So(mon.Metric(), ShouldEqual, 45)
-	})
-	Convey("metric should be worst partition", t, func() {
-		now := time.Now()
-		for part := range mon.monitors {
-			mon.StoreOffsets(part, int64(part+200), int64(2*part+210), now.Add(time.Second*time.Duration(part+100)))
-		}
-		So(mon.Metric(), ShouldEqual, 6)
 	})
 }
