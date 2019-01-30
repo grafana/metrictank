@@ -402,16 +402,6 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 	def := idx.MetricDefinitionFromMetricDataWithMkey(mkey, data)
 	def.Partition = partition
 
-	//re-check that it wasn't added while switching locks
-	existing, ok = m.defById[mkey]
-	if ok {
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("memory-idx: metricDef with id %s already in the index", mkey)
-		}
-		oldPart := updateExisting(existing, partition, data.Time, pre)
-		return CloneArchive(existing), oldPart, ok
-	}
-
 	archive := createArchive(def)
 	if m.writeQueue == nil {
 		// writeQueue not enabled, so acquire a wlock and immediately add to the index.

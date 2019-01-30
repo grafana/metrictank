@@ -124,9 +124,11 @@ type MetricDefinition struct {
 func (md *MetricDefinition) NameWithTags() string {
 	bld := strings.Builder{}
 
-	bld.WriteString("name=")
-	bld.WriteString(md.Name.string(&bld))
+	md.Name.string(&bld)
 	for _, tag := range md.Tags {
+		if tag.Key == "name" {
+			continue
+		}
 		bld.WriteString(";")
 		bld.WriteString(tag.String())
 	}
