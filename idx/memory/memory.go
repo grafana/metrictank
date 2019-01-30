@@ -4,14 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
@@ -180,27 +178,27 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey, m *Unpartitioned
 	}
 }
 
-// org id -> nameWithTags -> Set of references to schema.MetricDefinition
+// org id -> nameWithTags -> Set of references to idx.MetricDefinition
 // nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
-type defByTagSet map[uint32]map[string]map[*schema.MetricDefinition]struct{}
+type defByTagSet map[uint32]map[string]map[*idx.MetricDefinition]struct{}
 
-func (defs defByTagSet) add(def *schema.MetricDefinition) {
-	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+func (defs defByTagSet) add(def *idx.MetricDefinition) {
+	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
 	var ok bool
 	if orgDefs, ok = defs[def.OrgId]; !ok {
-		orgDefs = make(map[string]map[*schema.MetricDefinition]struct{})
+		orgDefs = make(map[string]map[*idx.MetricDefinition]struct{})
 		defs[def.OrgId] = orgDefs
 	}
 
 	fullName := def.NameWithTags()
 	if _, ok = orgDefs[fullName]; !ok {
-		orgDefs[fullName] = make(map[*schema.MetricDefinition]struct{}, 1)
+		orgDefs[fullName] = make(map[*idx.MetricDefinition]struct{}, 1)
 	}
 	orgDefs[fullName][def] = struct{}{}
 }
 
-func (defs defByTagSet) del(def *schema.MetricDefinition) {
-	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+func (defs defByTagSet) del(def *idx.MetricDefinition) {
+	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
 	var ok bool
 	if orgDefs, ok = defs[def.OrgId]; !ok {
 		return
@@ -218,8 +216,8 @@ func (defs defByTagSet) del(def *schema.MetricDefinition) {
 	}
 }
 
-func (defs defByTagSet) defs(id uint32, fullName string) map[*schema.MetricDefinition]struct{} {
-	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
+func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefinition]struct{} {
+	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
 	var ok bool
 	if orgDefs, ok = defs[id]; !ok {
 		return nil
@@ -284,8 +282,8 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tags:           make(map[uint32]TagIndex),
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
-		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
-		objIntern:   goi.NewObjectIntern(oiCnf),
+		findCache:      NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
+		objIntern:      goi.NewObjectIntern(oiCnf),
 	}
 	return m
 }
@@ -400,12 +398,8 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		oldPart := updateExisting(existing, partition, data.Time, pre)
 		return CloneArchive(existing), oldPart, ok
 	}
-	
 
-	def, err := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
-	if err != nil {
-		return idx.Archive{}, 0, false
-	}
+	def := idx.MetricDefinitionFromMetricDataWithMkey(mkey, data)
 	def.Partition = partition
 
 	//re-check that it wasn't added while switching locks
@@ -418,8 +412,6 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		return CloneArchive(existing), oldPart, ok
 	}
 
-	def := schema.MetricDefinitionFromMetricData(data)
-	def.Partition = partition
 	archive := createArchive(def)
 	if m.writeQueue == nil {
 		// writeQueue not enabled, so acquire a wlock and immediately add to the index.
@@ -557,15 +549,7 @@ func (m *UnpartitionedMemoryIdx) internAcquire(sz string) (string, error) {
 		return sz, err
 	}
 
-	// create a new string to avoid any unwanted side effects
-	// of accidentally calling this method and passing in a string
-	// that is stored in a slice, or something similar.
-	var internedSz string
-	szHeader := (*reflect.StringHeader)(unsafe.Pointer(&internedSz))
-	szHeader.Data = objPtr
-	szHeader.Len = len(sz)
-
-	return internedSz, nil
+	return acquired, nil
 }
 
 // release a previously acquired string from the interning store
@@ -579,7 +563,7 @@ func (m *UnpartitionedMemoryIdx) internRelease(sz string) error {
 // indexTags reads the tags of a given metric definition and creates the
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
-func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
+func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 	tags, ok := m.tags[def.OrgId]
 	if !ok {
 		tags = make(TagIndex)
@@ -587,26 +571,15 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	}
 
 	for _, tag := range def.Tags {
-		tagSplits := strings.SplitN(tag, "=", 2)
-		if len(tagSplits) < 2 {
-			// should never happen because every tag in the index
-			// must have a valid format
-			invalidTag.Inc()
-			log.Errorf("memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
-			continue
-		}
-
-		tagName := tagSplits[0]
-		tagValue := tagSplits[1]
-
 		// we don't care if an error is returned for now
 		// because the original string will be returned
 		// and at least the process can still continue
-		tagName, _ = m.internAcquire(tagName)
-		tagValue, _ = m.internAcquire(tagValue)
+		tagName, _ := m.internAcquire(tag.Key)
+		tagValue, _ := m.internAcquire(tag.Value)
 		tags.addTagId(tagName, tagValue, def.Id)
 	}
-	tags.addTagId("name", def.NameSanitizedAsTagValue(), def.Id)
+	// TODO: add special case to handle name and intern the entire thing
+	tags.addTagId("name", schema.SanitizeNameAsTagValue(def.Name.String()), def.Id)
 
 	m.defByTagSet.add(def)
 }
@@ -616,23 +589,12 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 // a return value of "false" means there was an error and the deindexing was
 // unsuccessful, "true" means the indexing was at least partially or completely
 // successful
-func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
+func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefinition) bool {
 	for _, tag := range def.Tags {
-		tagSplits := strings.SplitN(tag, "=", 2)
-		if len(tagSplits) < 2 {
-			// should never happen because every tag in the index
-			// must have a valid format
-			invalidTag.Inc()
-			log.Errorf("memory-idx: Tag %q of id %q has an invalid format", tag, def.Id)
-			continue
-		}
-
-		tagName := tagSplits[0]
-		tagValue := tagSplits[1]
-		tags.delTagId(tagName, tagValue, def.Id, m)
+		tags.delTagId(tag.Key, tag.Value, def.Id, m)
 	}
 
-	tags.delTagId("name", def.NameSanitizedAsTagValue(), def.Id, m)
+	tags.delTagId("name", schema.SanitizeNameAsTagValue(def.Name.String()), def.Id, m)
 
 	m.defByTagSet.del(def)
 
@@ -640,13 +602,13 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions for a specific paritition.
-func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) int {
+func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinition) int {
 	// UnpartitionedMemoryIdx isnt partitioned, so just ignore the partition passed and call Load()
 	return m.Load(defs)
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
+func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 	m.Lock()
 	defer m.Unlock()
 	var pre time.Time
@@ -672,7 +634,7 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 	return num
 }
 
-func createArchive(def *schema.MetricDefinition) *idx.Archive {
+func createArchive(def *idx.MetricDefinition) *idx.Archive {
 	path := def.NameWithTags()
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
@@ -1017,7 +979,6 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 	ids := queryCtx.Run(tags, m.defById)
 	valueMap := make(map[string]struct{})
-	tagPrefix := tag + "=" + prefix
 	for id := range ids {
 		var ok bool
 		var def *idx.Archive
@@ -1031,22 +992,14 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 		// special case if the tag to complete values for is "name"
 		if tag == "name" {
-			valueMap[def.NameSanitizedAsTagValue()] = struct{}{}
+			valueMap[schema.SanitizeNameAsTagValue(def.Name.String())] = struct{}{}
 		} else {
-			for _, tag := range def.Tags {
-				if !strings.HasPrefix(tag, tagPrefix) {
+			for _, t := range def.Tags {
+				if t.Key != tag {
 					continue
 				}
 
-				tagValue := strings.SplitN(tag, "=", 2)
-				if len(tagValue) < 2 {
-					// should never happen because invalid tags should get rejected at ingestion
-					corruptIndex.Inc()
-					log.Errorf("memory-idx: tag \"%s\" is invalid because it has no \"=\"", tag)
-					continue
-				}
-
-				valueMap[tagValue[1]] = struct{}{}
+				valueMap[t.Value] = struct{}{}
 			}
 		}
 	}
@@ -1256,7 +1209,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 					}
 					if log.IsLevelEnabled(log.DebugLevel) {
 						lastSave := atomic.LoadUint32(&def.LastSave)
-						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
+						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name.String(), def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
 					}
 					idxNode.Defs = append(idxNode.Defs, CloneArchive(def))
 				}
@@ -1610,7 +1563,7 @@ DEFS:
 				continue DEFS
 			}
 
-			n, ok := tree.Items[def.Name]
+			n, ok := tree.Items[def.Name.String()]
 			if !ok || !n.Leaf() {
 				continue DEFS
 			}

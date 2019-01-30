@@ -49,7 +49,7 @@ var (
 )
 
 type writeReq struct {
-	def      *schema.MetricDefinition
+	def      *idx.MetricDefinition
 	recvTime time.Time
 }
 
@@ -312,7 +312,7 @@ func (b *BigtableIdx) rebuildIndex() {
 	pre := time.Now()
 
 	num := 0
-	var defs []schema.MetricDefinition
+	var defs []idx.MetricDefinition
 	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = b.LoadPartition(partition, defs[:0], pre)
 		num += b.MemoryIndex.LoadPartition(partition, defs)
@@ -321,13 +321,13 @@ func (b *BigtableIdx) rebuildIndex() {
 	log.Infof("bigtable-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
+func (b *BigtableIdx) LoadPartition(partition int32, defs []idx.MetricDefinition, now time.Time) []idx.MetricDefinition {
 	ctx := context.Background()
 	rr := bigtable.PrefixRange(fmt.Sprintf("%d_", partition))
-	defsByNames := make(map[string][]schema.MetricDefinition)
+	defsByNames := make(map[string][]idx.MetricDefinition)
 	var marshalErr error
 	err := b.tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
-		def := schema.MetricDefinition{}
+		def := idx.MetricDefinition{}
 		marshalErr = RowToSchema(r, &def)
 		if marshalErr != nil {
 			return false
@@ -477,7 +477,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	return defs, err
 }
 
-func (b *BigtableIdx) deleteDef(def *schema.MetricDefinition) error {
+func (b *BigtableIdx) deleteDef(def *idx.MetricDefinition) error {
 	return b.deleteRow(FormatRowKey(def.Id, def.Partition))
 }
 
