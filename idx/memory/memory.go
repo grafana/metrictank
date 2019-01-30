@@ -301,17 +301,6 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 	m.Lock()
 	defer m.Unlock()
 
-	//re-check that it wasn't added while switching locks
-	existing, ok = m.defById[mkey]
-	if ok {
-		log.Debugf("memory-idx: metricDef with id %s already in index.", mkey)
-		bumpLastUpdate(&existing.LastUpdate, data.Time)
-		oldPart := atomic.SwapInt32(&existing.Partition, partition)
-		statUpdate.Inc()
-		statUpdateDuration.Value(time.Since(pre))
-		return *existing, oldPart, ok
-	}
-
 	archive := m.add(def)
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
