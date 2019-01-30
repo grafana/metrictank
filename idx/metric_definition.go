@@ -28,7 +28,16 @@ const (
 // MetricName stores uintptrs to strings interned in an object store
 type MetricName struct {
 	nodes []uintptr
-	name  string // used for marshaling and umarshaling with msgp
+}
+
+func (mn *MetricName) setMetricName(name string) {
+	nodes := strings.Split(name, ".")
+	mn.nodes = make([]uintptr, len(nodes))
+	for i, node := range nodes {
+		// TODO: add error checking? Fail somehow
+		nodePtr, _ := IdxIntern.AddOrGet([]byte(node))
+		mn.nodes[i] = nodePtr
+	}
 }
 
 func (mn *MetricName) String() string {
@@ -55,7 +64,7 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 	bld.WriteString(first)
 	for idx, nodePtr := range mn.nodes[1:] {
 		szHeader.Data = nodePtr
-		szHeader.Len = lns[idx]
+		szHeader.Len = lns[idx+1]
 		bld.WriteString(".")
 		bld.WriteString(tmpSz)
 	}
@@ -77,7 +86,7 @@ func (mn *MetricName) MarshalBinaryTo(b []byte) error {
 }
 
 func (mn *MetricName) UnmarshalBinary(b []byte) error {
-	mn.name = string(b)
+	mn.setMetricName(string(b))
 	return nil
 }
 

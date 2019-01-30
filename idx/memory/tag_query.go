@@ -440,7 +440,10 @@ EXPRS:
 		}
 
 		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag.Value, e.Value) {
+			if e.key != tag.Key {
+				continue
+			}
+			if !strings.HasPrefix(tag.Value, e.value) {
 				continue
 			}
 			continue EXPRS
@@ -457,7 +460,7 @@ func (q *TagQueryContext) testByTagPrefix(def *idx.Archive) bool {
 	}
 
 	for _, tag := range def.Tags {
-		if strings.HasPrefix(tag.Key, q.tagPrefix) {
+		if strings.HasPrefix(tag.String(), q.tagPrefix) {
 			return true
 		}
 	}
