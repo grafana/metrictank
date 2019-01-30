@@ -11,8 +11,8 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
-func TestMarshalUnmarshalArchive(t *testing.T) {
-	v := Archive{}
+func TestMarshalUnmarshalMetricDefinition(t *testing.T) {
+	v := MetricDefinition{}
 	bts, err := v.MarshalMsg(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -34,8 +34,8 @@ func TestMarshalUnmarshalArchive(t *testing.T) {
 	}
 }
 
-func BenchmarkMarshalMsgArchive(b *testing.B) {
-	v := Archive{}
+func BenchmarkMarshalMsgMetricDefinition(b *testing.B) {
+	v := MetricDefinition{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -43,8 +43,8 @@ func BenchmarkMarshalMsgArchive(b *testing.B) {
 	}
 }
 
-func BenchmarkAppendMsgArchive(b *testing.B) {
-	v := Archive{}
+func BenchmarkAppendMsgMetricDefinition(b *testing.B) {
+	v := MetricDefinition{}
 	bts := make([]byte, 0, v.Msgsize())
 	bts, _ = v.MarshalMsg(bts[0:0])
 	b.SetBytes(int64(len(bts)))
@@ -55,8 +55,8 @@ func BenchmarkAppendMsgArchive(b *testing.B) {
 	}
 }
 
-func BenchmarkUnmarshalArchive(b *testing.B) {
-	v := Archive{}
+func BenchmarkUnmarshalMetricDefinition(b *testing.B) {
+	v := MetricDefinition{}
 	bts, _ := v.MarshalMsg(nil)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(bts)))
@@ -69,8 +69,8 @@ func BenchmarkUnmarshalArchive(b *testing.B) {
 	}
 }
 
-func TestEncodeDecodeArchive(t *testing.T) {
-	v := Archive{}
+func TestEncodeDecodeMetricDefinition(t *testing.T) {
+	v := MetricDefinition{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 
@@ -79,7 +79,7 @@ func TestEncodeDecodeArchive(t *testing.T) {
 		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
-	vn := Archive{}
+	vn := MetricDefinition{}
 	err := msgp.Decode(&buf, &vn)
 	if err != nil {
 		t.Error(err)
@@ -93,8 +93,8 @@ func TestEncodeDecodeArchive(t *testing.T) {
 	}
 }
 
-func BenchmarkEncodeArchive(b *testing.B) {
-	v := Archive{}
+func BenchmarkEncodeMetricDefinition(b *testing.B) {
+	v := MetricDefinition{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))
@@ -107,8 +107,8 @@ func BenchmarkEncodeArchive(b *testing.B) {
 	en.Flush()
 }
 
-func BenchmarkDecodeArchive(b *testing.B) {
-	v := Archive{}
+func BenchmarkDecodeMetricDefinition(b *testing.B) {
+	v := MetricDefinition{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))
@@ -124,8 +124,8 @@ func BenchmarkDecodeArchive(b *testing.B) {
 	}
 }
 
-func TestMarshalUnmarshalNode(t *testing.T) {
-	v := Node{}
+func TestMarshalUnmarshalTagKeyValue(t *testing.T) {
+	v := TagKeyValue{}
 	bts, err := v.MarshalMsg(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -147,8 +147,8 @@ func TestMarshalUnmarshalNode(t *testing.T) {
 	}
 }
 
-func BenchmarkMarshalMsgNode(b *testing.B) {
-	v := Node{}
+func BenchmarkMarshalMsgTagKeyValue(b *testing.B) {
+	v := TagKeyValue{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -156,8 +156,8 @@ func BenchmarkMarshalMsgNode(b *testing.B) {
 	}
 }
 
-func BenchmarkAppendMsgNode(b *testing.B) {
-	v := Node{}
+func BenchmarkAppendMsgTagKeyValue(b *testing.B) {
+	v := TagKeyValue{}
 	bts := make([]byte, 0, v.Msgsize())
 	bts, _ = v.MarshalMsg(bts[0:0])
 	b.SetBytes(int64(len(bts)))
@@ -168,8 +168,8 @@ func BenchmarkAppendMsgNode(b *testing.B) {
 	}
 }
 
-func BenchmarkUnmarshalNode(b *testing.B) {
-	v := Node{}
+func BenchmarkUnmarshalTagKeyValue(b *testing.B) {
+	v := TagKeyValue{}
 	bts, _ := v.MarshalMsg(nil)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(bts)))
@@ -182,8 +182,8 @@ func BenchmarkUnmarshalNode(b *testing.B) {
 	}
 }
 
-func TestEncodeDecodeNode(t *testing.T) {
-	v := Node{}
+func TestEncodeDecodeTagKeyValue(t *testing.T) {
+	v := TagKeyValue{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 
@@ -192,7 +192,7 @@ func TestEncodeDecodeNode(t *testing.T) {
 		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
-	vn := Node{}
+	vn := TagKeyValue{}
 	err := msgp.Decode(&buf, &vn)
 	if err != nil {
 		t.Error(err)
@@ -206,8 +206,8 @@ func TestEncodeDecodeNode(t *testing.T) {
 	}
 }
 
-func BenchmarkEncodeNode(b *testing.B) {
-	v := Node{}
+func BenchmarkEncodeTagKeyValue(b *testing.B) {
+	v := TagKeyValue{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))
@@ -220,8 +220,121 @@ func BenchmarkEncodeNode(b *testing.B) {
 	en.Flush()
 }
 
-func BenchmarkDecodeNode(b *testing.B) {
-	v := Node{}
+func BenchmarkDecodeTagKeyValue(b *testing.B) {
+	v := TagKeyValue{}
+	var buf bytes.Buffer
+	msgp.Encode(&buf, &v)
+	b.SetBytes(int64(buf.Len()))
+	rd := msgp.NewEndlessReader(buf.Bytes(), b)
+	dc := msgp.NewReader(rd)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := v.DecodeMsg(dc)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func TestMarshalUnmarshalTagKeyValues(t *testing.T) {
+	v := TagKeyValues{}
+	bts, err := v.MarshalMsg(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	left, err := v.UnmarshalMsg(bts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) > 0 {
+		t.Errorf("%d bytes left over after UnmarshalMsg(): %q", len(left), left)
+	}
+
+	left, err = msgp.Skip(bts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) > 0 {
+		t.Errorf("%d bytes left over after Skip(): %q", len(left), left)
+	}
+}
+
+func BenchmarkMarshalMsgTagKeyValues(b *testing.B) {
+	v := TagKeyValues{}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v.MarshalMsg(nil)
+	}
+}
+
+func BenchmarkAppendMsgTagKeyValues(b *testing.B) {
+	v := TagKeyValues{}
+	bts := make([]byte, 0, v.Msgsize())
+	bts, _ = v.MarshalMsg(bts[0:0])
+	b.SetBytes(int64(len(bts)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bts, _ = v.MarshalMsg(bts[0:0])
+	}
+}
+
+func BenchmarkUnmarshalTagKeyValues(b *testing.B) {
+	v := TagKeyValues{}
+	bts, _ := v.MarshalMsg(nil)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(bts)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := v.UnmarshalMsg(bts)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func TestEncodeDecodeTagKeyValues(t *testing.T) {
+	v := TagKeyValues{}
+	var buf bytes.Buffer
+	msgp.Encode(&buf, &v)
+
+	m := v.Msgsize()
+	if buf.Len() > m {
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+	}
+
+	vn := TagKeyValues{}
+	err := msgp.Decode(&buf, &vn)
+	if err != nil {
+		t.Error(err)
+	}
+
+	buf.Reset()
+	msgp.Encode(&buf, &v)
+	err = msgp.NewReader(&buf).Skip()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func BenchmarkEncodeTagKeyValues(b *testing.B) {
+	v := TagKeyValues{}
+	var buf bytes.Buffer
+	msgp.Encode(&buf, &v)
+	b.SetBytes(int64(buf.Len()))
+	en := msgp.NewWriter(msgp.Nowhere)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v.EncodeMsg(en)
+	}
+	en.Flush()
+}
+
+func BenchmarkDecodeTagKeyValues(b *testing.B) {
+	v := TagKeyValues{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))

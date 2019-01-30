@@ -9,9 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/raintank/schema"
-
 	"github.com/grafana/metrictank/idx"
+	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -540,7 +539,7 @@ func (q *TagQuery) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
 EXPRS:
 	for _, e := range exprs {
 		if e.key == "name" {
-			if e.value == nil || e.value.MatchString(def.Name) {
+			if e.value == nil || e.value.MatchString(def.Name.String()) {
 				if not {
 					return false
 				} else {
@@ -555,21 +554,18 @@ EXPRS:
 			}
 		}
 
-		prefix := e.key + "="
 		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag, prefix) {
+			if tag.Key != e.key {
 				continue
 			}
 
-			value := tag[len(e.key)+1:]
-
 			// reduce regex matching by looking up cached non-matches
-			if _, ok := e.missCache.Load(value); ok {
+			if _, ok := e.missCache.Load(tag.Value); ok {
 				continue
 			}
 
 			// reduce regex matching by looking up cached matches
-			if _, ok := e.matchCache.Load(value); ok {
+			if _, ok := e.matchCache.Load(tag.Value); ok {
 				if not {
 					return false
 				}
@@ -578,9 +574,9 @@ EXPRS:
 
 			// value == nil means that this expression can be short cut
 			// by not evaluating it
-			if e.value == nil || e.value.MatchString(value) {
+			if e.value == nil || e.value.MatchString(tag.Value) {
 				if atomic.LoadInt32(&e.matchCacheSize) < int32(matchCacheSize) {
-					e.matchCache.Store(value, struct{}{})
+					e.matchCache.Store(tag.Value, struct{}{})
 					atomic.AddInt32(&e.matchCacheSize, 1)
 				}
 				if not {
@@ -589,7 +585,7 @@ EXPRS:
 				continue EXPRS
 			} else {
 				if atomic.LoadInt32(&e.missCacheSize) < int32(matchCacheSize) {
-					e.missCache.Store(value, struct{}{})
+					e.missCache.Store(tag.Value, struct{}{})
 					atomic.AddInt32(&e.missCacheSize, 1)
 				}
 			}
@@ -623,29 +619,21 @@ func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
 	}
 
 	for _, tag := range def.Tags {
-		equal := strings.Index(tag, "=")
-		if equal < 0 {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", def.Id, tag)
-			continue
-		}
-		key := tag[:equal]
-
-		if _, ok := q.tagMatch.missCache.Load(key); ok {
+		if _, ok := q.tagMatch.missCache.Load(tag.Key); ok {
 			continue
 		}
 
-		if _, ok := q.tagMatch.matchCache.Load(key); ok || q.tagMatch.value.MatchString(key) {
+		if _, ok := q.tagMatch.matchCache.Load(tag.Key); ok || q.tagMatch.value.MatchString(tag.Key) {
 			if !ok {
 				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
-					q.tagMatch.matchCache.Store(key, struct{}{})
+					q.tagMatch.matchCache.Store(tag.Key, struct{}{})
 					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
 				}
 			}
 			return true
 		} else {
 			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
-				q.tagMatch.missCache.Store(key, struct{}{})
+				q.tagMatch.missCache.Store(tag.Key, struct{}{})
 				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
 			}
 			continue
@@ -665,13 +653,12 @@ func (q *TagQuery) testByFrom(def *idx.Archive) bool {
 func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
-		if e.key == "name" && strings.HasPrefix(def.Name, e.value) {
+		if e.key == "name" && strings.HasPrefix(def.Name.String(), e.value) {
 			continue EXPRS
 		}
 
-		prefix := e.key + "=" + e.value
 		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag, prefix) {
+			if !strings.HasPrefix(tag.Value, e.value) {
 				continue
 			}
 			continue EXPRS
@@ -688,7 +675,7 @@ func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
 	}
 
 	for _, tag := range def.Tags {
-		if strings.HasPrefix(tag, q.tagPrefix) {
+		if strings.HasPrefix(tag.Key, q.tagPrefix) {
 			return true
 		}
 	}
@@ -860,32 +847,24 @@ IDS:
 		// tag filter condition
 		metricTags := make(map[string]struct{}, 0)
 		for _, tag := range def.Tags {
-			equal := strings.Index(tag, "=")
-			if equal < 0 {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", id, tag)
-				continue
-			}
-
-			key := tag[:equal]
 			// this tag has already been pushed into tagCh, so we can stop evaluating
-			if _, ok := resultsCache[key]; ok {
+			if _, ok := resultsCache[tag.Key]; ok {
 				continue
 			}
 
 			if q.tagClause == PREFIX_TAG {
-				if !strings.HasPrefix(key, q.tagPrefix) {
+				if !strings.HasPrefix(tag.Key, q.tagPrefix) {
 					continue
 				}
 			} else if q.tagClause == MATCH_TAG {
-				if _, ok := q.tagMatch.missCache.Load(key); ok || !q.tagMatch.value.MatchString(tag) {
+				if _, ok := q.tagMatch.missCache.Load(tag.Key); ok || !q.tagMatch.value.MatchString(tag.Key) {
 					if !ok {
-						q.tagMatch.missCache.Store(key, struct{}{})
+						q.tagMatch.missCache.Store(tag.Key, struct{}{})
 					}
 					continue
 				}
 			}
-			metricTags[key] = struct{}{}
+			metricTags[tag.Key] = struct{}{}
 		}
 
 		// if we don't filter tags, then we can assume that "name" should always be part of the result set

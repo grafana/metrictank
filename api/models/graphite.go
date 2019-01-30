@@ -163,10 +163,11 @@ func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	names := make([]string, 0, len(defs))
 
 	for i := 0; i < len(defs); i++ {
-		_, ok := seen[defs[i].Name]
+		name := defs[i].Name.String()
+		_, ok := seen[name]
 		if !ok {
-			names = append(names, defs[i].Name)
-			seen[defs[i].Name] = struct{}{}
+			names = append(names, name)
+			seen[name] = struct{}{}
 		}
 	}
 	sort.Strings(names)
