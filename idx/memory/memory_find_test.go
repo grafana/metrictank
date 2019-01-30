@@ -14,6 +14,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -491,21 +492,27 @@ func testTagSorting(t *testing.T) {
 		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
 	}
 
-	md2 := []schema.MetricDefinition{
+	md2 := []idx.MetricDefinition{
 		{
-			Name:       "name2",
-			Tags:       []string{},
+			Id:         mkey,
+			Tags:       idx.TagKeyValues{},
 			Interval:   10,
 			OrgId:      1,
 			LastUpdate: int64(123),
 		},
 	}
-	md2[0].SetId()
+	md2[0].SetMetricName("name2")
 
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
-	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
-	index.LoadPartition(getPartitionFromName("name2"), md2)
+	md2[0].Tags = idx.TagKeyValues{
+		idx.TagKeyValue{Key: "5", Value: "a"},
+		idx.TagKeyValue{Key: "1", Value: "a"},
+		idx.TagKeyValue{Key: "2", Value: "a"},
+		idx.TagKeyValue{Key: "4", Value: "a"},
+		idx.TagKeyValue{Key: "3", Value: "a"},
+	}
+	index.Load(md2)
 
 	query, err = tagquery.NewQueryFromStrings([]string{"3=a"}, 0)
 	if err != nil {

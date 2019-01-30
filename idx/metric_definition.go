@@ -23,8 +23,12 @@ const (
 )
 
 //go:generate msgp
+//msgppppp:shim MetricName as:string using:MetricName.String/MetricDefinition.SetMetricName
+
+// MetricName stores uintptrs to strings interned in an object store
 type MetricName struct {
 	nodes []uintptr
+	name  string // used for marshaling and umarshaling with msgp
 }
 
 func (mn *MetricName) String() string {
@@ -37,7 +41,7 @@ func (mn *MetricName) String() string {
 }
 
 func (mn *MetricName) string(bld *strings.Builder) string {
-	// get []int of the lengths of all of the mn.nodes
+	// get []int of the lengths of all of the mn.Nodes
 	lns, ok := IdxIntern.LenNoCprsn(mn.nodes)
 	if !ok {
 		// this should never happen, do what now?
@@ -57,6 +61,24 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 	}
 
 	return bld.String()
+}
+
+func (mn *MetricName) ExtensionType() int8 {
+	return 95
+}
+
+func (mn *MetricName) Len() int {
+	return len(mn.String())
+}
+
+func (mn *MetricName) MarshalBinaryTo(b []byte) error {
+	copy(b, []byte(mn.String()))
+	return nil
+}
+
+func (mn *MetricName) UnmarshalBinary(b []byte) error {
+	mn.name = string(b)
+	return nil
 }
 
 // TagKeyValue holds interned versions of the Tag Key And Value
@@ -88,20 +110,15 @@ func (t TagKeyValues) Strings() []string {
 }
 
 type MetricDefinition struct {
-	Id       schema.MKey `json:"mkey"`
-	OrgId    uint32      `json:"org_id"`
-	Name     MetricName  `json:"name"`
-	Interval int         `json:"interval"`
-	Unit     string      `json:"unit"`
-	mtype    mType       `json:"mtype"`
-
-	// some users of MetricDefinition (f.e. MetricTank) might add a "name" tag
-	// to this slice which allows querying by name as a tag. this special tag
-	// should not be stored or transmitted over the network, otherwise it may
-	// just get overwritten by the receiver.
-	Tags       TagKeyValues `json:"tags"`
-	LastUpdate int64        `json:"lastUpdate"` // unix timestamp
-	Partition  int32        `json:"partition"`
+	Id         schema.MKey
+	OrgId      uint32
+	Name       MetricName `msg:"name,extension"`
+	Interval   int
+	Unit       string
+	mtype      mType
+	Tags       TagKeyValues
+	LastUpdate int64
+	Partition  int32
 }
 
 func (md *MetricDefinition) NameWithTags() string {
