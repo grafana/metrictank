@@ -11,6 +11,7 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
 	"github.com/grafana/metrictank/conf"
+	indx "github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/logger"
@@ -169,7 +170,7 @@ func main() {
 		}
 	}
 
-	var show func(d schema.MetricDefinition)
+	var show func(d indx.MetricDefinition)
 
 	switch format {
 	case "dump":
@@ -237,7 +238,7 @@ func main() {
 		}
 	}
 
-	var defs []schema.MetricDefinition
+	var defs []indx.MetricDefinition
 	if len(partitions) == 0 {
 		defs = idx.Load(nil, time.Now())
 	} else {
@@ -251,13 +252,13 @@ func main() {
 	for _, d := range defs {
 		// note that prefix and substr can be "", meaning filter disabled.
 		// the conditions handle this fine as well.
-		if !strings.HasPrefix(d.Name, prefix) {
+		if !strings.HasPrefix(d.Name.String(), prefix) {
 			continue
 		}
-		if !strings.HasSuffix(d.Name, suffix) {
+		if !strings.HasSuffix(d.Name.String(), suffix) {
 			continue
 		}
-		if !strings.Contains(d.Name, substr) {
+		if !strings.Contains(d.Name.String(), substr) {
 			continue
 		}
 		if tags == "none" && len(d.Tags) != 0 {
@@ -266,11 +267,11 @@ func main() {
 		if tags == "some" && len(d.Tags) == 0 {
 			continue
 		}
-		if regex != nil && !regex.MatchString(d.Name) {
+		if regex != nil && !regex.MatchString(d.Name.String()) {
 			continue
 		}
 		if tags == "valid" || tags == "invalid" {
-			valid := schema.ValidateTags(d.Tags)
+			valid := schema.ValidateTags(d.Tags.Strings())
 
 			// skip the metric if the validation result is not what we want
 			if valid != (tags == "valid") {
