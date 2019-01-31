@@ -399,7 +399,9 @@ func (m *MemoryIdx) Load(defs []idx.MetricDefinition) int {
 		m.add(def)
 
 		if TagSupport {
-			m.indexTags(def)
+			// create new nDef to avoid holding open the backing array of defs which is passed up from cassandra / bigtable
+			nDef := *def
+			m.indexTags(&nDef)
 		}
 
 		// as we are loading the metricDefs from a persistent store, set the lastSave
