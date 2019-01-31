@@ -126,10 +126,8 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey, m *MemoryIdx) {
 
 	if len(ti[name][value]) == 0 {
 		delete(ti[name], value)
-		m.internRelease(value)
 		if len(ti[name]) == 0 {
 			delete(ti, name)
-			m.internRelease(name)
 		}
 	}
 }
@@ -334,14 +332,6 @@ func (m *MemoryIdx) internAcquire(sz string) (string, error) {
 	return acquired, nil
 }
 
-// release a previously acquired string from the interning store
-// calling this on a string that was not interned won't have any negative effects
-// aside from wasting cycles
-func (m *MemoryIdx) internRelease(sz string) error {
-	_, err := idx.IdxIntern.DeleteByValSzNoCprsn(sz)
-	return err
-}
-
 // indexTags reads the tags of a given metric definition and creates the
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
@@ -399,7 +389,7 @@ func (m *MemoryIdx) Load(defs []idx.MetricDefinition) int {
 		m.add(def)
 
 		if TagSupport {
-			// create new nDef to avoid holding open the backing array of defs which is passed up from cassandra / bigtable
+			// create new def to avoid holding open the backing array of defs which is passed up from the persistent index
 			nDef := *def
 			m.indexTags(&nDef)
 		}

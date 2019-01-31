@@ -32,6 +32,12 @@ type MetricName struct {
 	nodes []uintptr
 }
 
+// Nodes returns the slice of object addresses stored
+// in the MetricName
+func (mn *MetricName) Nodes() []uintptr {
+	return mn.nodes
+}
+
 func (mn *MetricName) setMetricName(name string) {
 	nodes := strings.Split(name, ".")
 	mn.nodes = make([]uintptr, len(nodes))

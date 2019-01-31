@@ -12,6 +12,7 @@ import (
 var OrgIdPublic = uint32(0)
 
 // Object Interning for the index
+//
 // Default config uses NOCPRSN
 var IdxIntern = goi.NewObjectIntern(nil)
 
@@ -128,4 +129,20 @@ type MetricIndex interface {
 	// DeleteTagged deletes the specified series from the tag index and also the
 	// DefById index.
 	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
+}
+
+// InternReleaseMetricDefinition releases all previously acquired strings
+// into the interning layer so that their reference count can be
+// decreased by 1 and they can eventually be deleted
+func InternReleaseMetricDefinition(md MetricDefinition) {
+	for _, tag := range md.Tags {
+		IdxIntern.DeleteByValSzNoCprsn(tag.Key)
+		IdxIntern.DeleteByValSzNoCprsn(tag.Value)
+	}
+
+	for _, id := range md.Name.Nodes() {
+		IdxIntern.Delete(id)
+	}
+
+	IdxIntern.DeleteByValSzNoCprsn(md.Unit)
 }
