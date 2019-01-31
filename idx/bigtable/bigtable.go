@@ -474,6 +474,13 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 		}
 	}
 	statDeleteDuration.Value(time.Since(pre))
+
+	// there is nothing higher up in the call path that uses MetricDefinitions
+	// so this is the safest place to release the objects in MetricDefinition
+	// that have been interned
+	for _, arc := range defs {
+		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
+	}
 	return defs, err
 }
 
