@@ -170,10 +170,8 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey, m *Unpartitioned
 
 	if len(ti[name][value]) == 0 {
 		delete(ti[name], value)
-		m.internRelease(value)
 		if len(ti[name]) == 0 {
 			delete(ti, name)
-			m.internRelease(name)
 		}
 	}
 }
@@ -613,7 +611,7 @@ func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 		m.add(createArchive(def))
 
 		if TagSupport {
-			// create new nDef to avoid holding open the backing array of defs which is passed up from cassandra / bigtable
+			// create new def to avoid holding open the backing array of defs which is passed up from the persistent index
 			nDef := *def
 			m.indexTags(&nDef)
 		}
