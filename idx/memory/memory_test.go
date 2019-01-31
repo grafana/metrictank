@@ -1307,12 +1307,14 @@ func testMatchSchemaWithTags(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &idx.MetricDefinition{
-			Name:      name,
 			OrgId:     1,
 			Interval:  1,
-			Tags:      []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"},
 			Partition: getPartitionFromName(name),
 		}
+		tags := []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"}
+		data[i].SetTags(tags)
+		data[i].SetMetricName(name)
+
 		data[i].SetId()
 		archives[i] = createArchive(data[i])
 		ix.add(archives[i])
