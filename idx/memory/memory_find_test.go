@@ -425,7 +425,6 @@ func TestTagSorting(t *testing.T) {
 
 	md2 := []idx.MetricDefinition{
 		{
-			Id:         mkey,
 			Tags:       idx.TagKeyValues{},
 			Interval:   10,
 			OrgId:      1,
@@ -433,6 +432,7 @@ func TestTagSorting(t *testing.T) {
 		},
 	}
 	md2[0].SetMetricName("name2")
+	md2[0].SetId()
 
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags

@@ -682,7 +682,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		name:       "met1",
 		interval:   3,
 		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one will expire
-		tags:       []string{"tag1=val1;foo=bar"},
+		tags:       []string{"tag1=val1", "foo=bar"},
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(4).String(),
@@ -691,7 +691,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 		name:       "met1",
 		interval:   4,
 		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one won't because it doesn't match the tag
-		tags:       []string{"tag1=val1;foo=baz"},
+		tags:       []string{"tag1=val1", "foo=baz"},
 	})
 
 	idx := &CasIdx{}
