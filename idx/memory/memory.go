@@ -612,6 +612,12 @@ func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 
 		m.add(createArchive(def))
 
+		if TagSupport {
+			// create new nDef to avoid holding open the backing array of defs which is passed up from cassandra / bigtable
+			nDef := *def
+			m.indexTags(&nDef)
+		}
+
 		// as we are loading the metricDefs from a persistent store, set the lastSave
 		// to the lastUpdate timestamp.  This won't exactly match the true lastSave Timstamp,
 		// but it will be close enough and it will always be true that the lastSave was at
