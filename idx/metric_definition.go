@@ -1,6 +1,8 @@
 package idx
 
 import (
+	"bytes"
+	"crypto/md5"
 	"fmt"
 	"reflect"
 	"sort"
@@ -134,6 +136,7 @@ func (md *MetricDefinition) NameWithTags() string {
 	bld := strings.Builder{}
 
 	md.Name.string(&bld)
+	sort.Sort(TagKeyValues(md.Tags))
 	for _, tag := range md.Tags {
 		if tag.Key == "name" {
 			continue
@@ -225,6 +228,35 @@ func (md *MetricDefinition) SetTags(tags []string) {
 		}
 	}
 }
+
+func (mn *MetricDefinition) SetId() {
+	sort.Sort(TagKeyValues(mn.Tags))
+	buffer := bytes.NewBufferString(mn.Name.String())
+	buffer.WriteByte(0)
+	buffer.WriteString(mn.Unit)
+	buffer.WriteByte(0)
+	buffer.WriteString(mn.Mtype())
+	buffer.WriteByte(0)
+	fmt.Fprintf(buffer, "%d", mn.Interval)
+
+	for _, t := range mn.Tags {
+		if t.Key == "name" {
+			continue
+		}
+
+		buffer.WriteByte(0)
+		buffer.WriteString(t.String())
+	}
+
+	mn.Id = schema.MKey{
+		md5.Sum(buffer.Bytes()),
+		uint32(mn.OrgId),
+	}
+}
+
+func (t TagKeyValues) Len() int           { return len(t) }
+func (t TagKeyValues) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
+func (t TagKeyValues) Less(i, j int) bool { return t[i].Key < t[j].Key }
 
 func MetricDefinitionFromMetricDataWithMkey(mkey schema.MKey, d *schema.MetricData) *MetricDefinition {
 	md := &MetricDefinition{
