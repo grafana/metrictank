@@ -1117,7 +1117,14 @@ func (m *MemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, e
 
 	m.Lock()
 	defer m.Unlock()
-	return m.deleteTaggedByIdSet(orgId, ids), nil
+	deleted := m.deleteTaggedByIdSet(orgId, ids)
+
+	// this is a special case where the MetricDefinitions need to be
+	// released outside of the normal Delete() path.
+	for _, arc := range deleted {
+		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
+	}
+	return deleted, nil
 }
 
 // deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds

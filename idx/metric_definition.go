@@ -25,7 +25,6 @@ const (
 )
 
 //go:generate msgp
-//msgppppp:shim MetricName as:string using:MetricName.String/MetricDefinition.SetMetricName
 
 // MetricName stores uintptrs to strings interned in an object store
 type MetricName struct {
@@ -33,11 +32,14 @@ type MetricName struct {
 }
 
 // Nodes returns the slice of object addresses stored
-// in the MetricName
+// for the MetricName
 func (mn *MetricName) Nodes() []uintptr {
 	return mn.nodes
 }
 
+// setMetricName interns the MetricName in an
+// object store and stores the addresses of those strings
+// in MetricName.nodes
 func (mn *MetricName) setMetricName(name string) {
 	nodes := strings.Split(name, ".")
 	mn.nodes = make([]uintptr, len(nodes))
@@ -48,6 +50,8 @@ func (mn *MetricName) setMetricName(name string) {
 	}
 }
 
+// String returns the full MetricName as a string
+// using data interned in the object store
 func (mn *MetricName) String() string {
 	if len(mn.nodes) == 0 {
 		return ""
@@ -127,8 +131,10 @@ func (t TagKeyValues) Strings() []string {
 }
 
 type MetricDefinition struct {
-	Id         schema.MKey
-	OrgId      uint32
+	Id    schema.MKey
+	OrgId uint32
+	// using custom marshalling for MetricName
+	// if there is another way we should explore that
 	Name       MetricName `msg:"name,extension"`
 	Interval   int
 	Unit       string
