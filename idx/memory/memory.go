@@ -87,6 +87,7 @@ func ConfigProcess() {
 	}
 }
 
+// Tree is the top level struct in the hierarchical index for a given OrgID
 type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
