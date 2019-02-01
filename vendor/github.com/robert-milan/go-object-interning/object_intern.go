@@ -134,15 +134,6 @@ func (oi *ObjectIntern) AddOrGet(obj []byte) (uintptr, error) {
 		return addr, nil
 	}
 
-	// check if object was added before we re-acquired the lock
-	addr, ok = oi.ObjIndex[objSz]
-	if ok {
-		// increment reference count by 1
-		(*(*uint32)(unsafe.Pointer(addr + uintptr(len(objComp)))))++
-		oi.Unlock()
-		return addr, nil
-	}
-
 	// The object is not in the index therefore it is not in the store.
 	// We need to set its initial reference count to 1 before adding it
 	objComp = append(objComp, []byte{0x1, 0x0, 0x0, 0x0}...)
