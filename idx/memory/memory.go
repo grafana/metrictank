@@ -1340,7 +1340,14 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 
 	m.Lock()
 	defer m.Unlock()
-	return m.deleteTaggedByIdSet(orgId, ids)
+	deleted := m.deleteTaggedByIdSet(orgId, ids)
+
+	// this is a special case where the MetricDefinitions need to be
+	// released outside of the normal Delete() path.
+	for _, arc := range deleted {
+		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
+	}
+	return deleted
 }
 
 // deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
