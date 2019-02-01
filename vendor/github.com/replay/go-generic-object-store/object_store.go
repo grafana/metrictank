@@ -292,14 +292,35 @@ func (o *ObjectStore) Get(obj ObjAddr) ([]byte, error) {
 // Delete deletes an object by object address
 // On success it returns nil, otherwise it returns an error message
 func (o *ObjectStore) Delete(obj ObjAddr) error {
-	slabAddr, err := o.getSlabAddress(obj)
+	var err error
+	var deleted bool
+	var slabAddr uintptr
+
+	slabAddr, err = o.getSlabAddress(obj)
 	if err != nil {
 		return err
 	}
 
-	err = o.slabPools[slabFromSlabAddr(slabAddr).objSize].delete(obj, slabAddr)
+	size := slabFromSlabAddr(slabAddr).objSize
+	deleted, err = o.slabPools[size].delete(obj, slabAddr)
 	if err != nil {
 		return err
+	}
+	if deleted {
+		// remove entry from slabPools
+		if len(o.slabPools[size].slabs) < 1 {
+			delete(o.slabPools, size)
+		}
+
+		// remove entry from lookupTable
+		idx := sort.Search(len(o.lookupTable), func(i int) bool { return o.lookupTable[i] <= slabAddr })
+		ok := idx < len(o.lookupTable) && idx >= 0 && o.lookupTable[idx] == slabAddr
+		if !ok {
+			return fmt.Errorf("ObjectStore: Delete failed to remove slab from lookupTable. Index out of bounds or slab address mismatch. IDX: %d, Target Slab Address: %d, Found Slab Address: %d", idx, slabAddr, o.lookupTable[idx])
+		}
+		copy(o.lookupTable[idx:], o.lookupTable[idx+1:])
+		o.lookupTable[len(o.lookupTable)-1] = 0
+		o.lookupTable = o.lookupTable[:len(o.lookupTable)-1]
 	}
 
 	return nil

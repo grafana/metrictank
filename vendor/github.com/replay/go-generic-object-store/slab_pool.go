@@ -145,8 +145,10 @@ func (s *slabPool) add(obj []byte) (ObjAddr, SlabAddr, error) {
 // delete takes an ObjAddr and a SlabAddr, it will delete the according
 // object from the slab at the given address and update all the related
 // properties.
-// On error it returns an error, otherwise nil
-func (s *slabPool) delete(obj ObjAddr, slabAddr SlabAddr) error {
+// On success it returns true and nil if the slab was also deleted.
+// On success it returns false and nil if the slab was not also deleted.
+// On error it returns false and an error.
+func (s *slabPool) delete(obj ObjAddr, slabAddr SlabAddr) (bool, error) {
 	empty := slabFromSlabAddr(slabAddr).delete(obj)
 
 	if empty {
@@ -159,7 +161,7 @@ func (s *slabPool) delete(obj ObjAddr, slabAddr SlabAddr) error {
 		s.freeSlabs.Clear(uint(slabIdx))
 	}
 
-	return nil
+	return false, nil
 }
 
 // findSlabByObjAddr takes an object address or slab address and then
@@ -196,8 +198,9 @@ func (s *slabPool) addSlab() (int, error) {
 }
 
 // deleteSlab deletes the slab at the given slab index
-// on success it returns nil, otherwise it returns an error
-func (s *slabPool) deleteSlab(slabAddr SlabAddr) error {
+// on failure it returns false and an error
+// on success it returns true and nil
+func (s *slabPool) deleteSlab(slabAddr SlabAddr) (bool, error) {
 	slabIdx := s.findSlabByAddr(uintptr(slabAddr))
 
 	currentSlab := s.slabs[slabIdx]
@@ -220,12 +223,12 @@ func (s *slabPool) deleteSlab(slabAddr SlabAddr) error {
 
 	err := syscall.Munmap(toDelete)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	s.freeSlabs.DeleteAt(uint(slabIdx))
 
-	return nil
+	return true, nil
 }
 
 // search searches for a byte slice with the length of
