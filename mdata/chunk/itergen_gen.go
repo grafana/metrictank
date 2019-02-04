@@ -13,33 +13,39 @@ func (z *IterGen) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "T0":
 			z.T0, err = dc.ReadUint32()
 			if err != nil {
+				err = msgp.WrapError(err, "T0")
 				return
 			}
 		case "IntervalHint":
 			z.IntervalHint, err = dc.ReadUint32()
 			if err != nil {
+				err = msgp.WrapError(err, "IntervalHint")
 				return
 			}
 		case "B":
 			z.B, err = dc.ReadBytes(z.B)
 			if err != nil {
+				err = msgp.WrapError(err, "B")
 				return
 			}
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -57,6 +63,7 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint32(z.T0)
 	if err != nil {
+		err = msgp.WrapError(err, "T0")
 		return
 	}
 	// write "IntervalHint"
@@ -66,6 +73,7 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint32(z.IntervalHint)
 	if err != nil {
+		err = msgp.WrapError(err, "IntervalHint")
 		return
 	}
 	// write "B"
@@ -75,6 +83,7 @@ func (z *IterGen) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteBytes(z.B)
 	if err != nil {
+		err = msgp.WrapError(err, "B")
 		return
 	}
 	return
@@ -103,33 +112,39 @@ func (z *IterGen) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "T0":
 			z.T0, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "T0")
 				return
 			}
 		case "IntervalHint":
 			z.IntervalHint, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "IntervalHint")
 				return
 			}
 		case "B":
 			z.B, bts, err = msgp.ReadBytesBytes(bts, z.B)
 			if err != nil {
+				err = msgp.WrapError(err, "B")
 				return
 			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}

@@ -13,12 +13,14 @@ func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
@@ -26,6 +28,7 @@ func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 			var zb0002 uint32
 			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
+				err = msgp.WrapError(err, "Paths")
 				return
 			}
 			if cap(z.Paths) >= int(zb0002) {
@@ -36,17 +39,20 @@ func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 			for za0001 := range z.Paths {
 				z.Paths[za0001], err = dc.ReadString()
 				if err != nil {
+					err = msgp.WrapError(err, "Paths", za0001)
 					return
 				}
 			}
 		case "Propagate":
 			z.Propagate, err = dc.ReadBool()
 			if err != nil {
+				err = msgp.WrapError(err, "Propagate")
 				return
 			}
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -64,11 +70,13 @@ func (z *GraphiteTagDelSeries) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Paths)))
 	if err != nil {
+		err = msgp.WrapError(err, "Paths")
 		return
 	}
 	for za0001 := range z.Paths {
 		err = en.WriteString(z.Paths[za0001])
 		if err != nil {
+			err = msgp.WrapError(err, "Paths", za0001)
 			return
 		}
 	}
@@ -79,6 +87,7 @@ func (z *GraphiteTagDelSeries) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteBool(z.Propagate)
 	if err != nil {
+		err = msgp.WrapError(err, "Propagate")
 		return
 	}
 	return
@@ -107,12 +116,14 @@ func (z *GraphiteTagDelSeries) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
@@ -120,6 +131,7 @@ func (z *GraphiteTagDelSeries) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			var zb0002 uint32
 			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Paths")
 				return
 			}
 			if cap(z.Paths) >= int(zb0002) {
@@ -130,17 +142,20 @@ func (z *GraphiteTagDelSeries) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			for za0001 := range z.Paths {
 				z.Paths[za0001], bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Paths", za0001)
 					return
 				}
 			}
 		case "Propagate":
 			z.Propagate, bts, err = msgp.ReadBoolBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Propagate")
 				return
 			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -166,24 +181,28 @@ func (z *GraphiteTagDelSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "Count":
 			z.Count, err = dc.ReadInt()
 			if err != nil {
+				err = msgp.WrapError(err, "Count")
 				return
 			}
 		case "Peers":
 			var zb0002 uint32
 			zb0002, err = dc.ReadMapHeader()
 			if err != nil {
+				err = msgp.WrapError(err, "Peers")
 				return
 			}
 			if z.Peers == nil {
@@ -199,10 +218,12 @@ func (z *GraphiteTagDelSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 				var za0002 int
 				za0001, err = dc.ReadString()
 				if err != nil {
+					err = msgp.WrapError(err, "Peers")
 					return
 				}
 				za0002, err = dc.ReadInt()
 				if err != nil {
+					err = msgp.WrapError(err, "Peers", za0001)
 					return
 				}
 				z.Peers[za0001] = za0002
@@ -210,6 +231,7 @@ func (z *GraphiteTagDelSeriesResp) DecodeMsg(dc *msgp.Reader) (err error) {
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -227,6 +249,7 @@ func (z *GraphiteTagDelSeriesResp) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteInt(z.Count)
 	if err != nil {
+		err = msgp.WrapError(err, "Count")
 		return
 	}
 	// write "Peers"
@@ -236,15 +259,18 @@ func (z *GraphiteTagDelSeriesResp) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteMapHeader(uint32(len(z.Peers)))
 	if err != nil {
+		err = msgp.WrapError(err, "Peers")
 		return
 	}
 	for za0001, za0002 := range z.Peers {
 		err = en.WriteString(za0001)
 		if err != nil {
+			err = msgp.WrapError(err, "Peers")
 			return
 		}
 		err = en.WriteInt(za0002)
 		if err != nil {
+			err = msgp.WrapError(err, "Peers", za0001)
 			return
 		}
 	}
@@ -275,24 +301,28 @@ func (z *GraphiteTagDelSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "Count":
 			z.Count, bts, err = msgp.ReadIntBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Count")
 				return
 			}
 		case "Peers":
 			var zb0002 uint32
 			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Peers")
 				return
 			}
 			if z.Peers == nil {
@@ -308,10 +338,12 @@ func (z *GraphiteTagDelSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error
 				zb0002--
 				za0001, bts, err = msgp.ReadStringBytes(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Peers")
 					return
 				}
 				za0002, bts, err = msgp.ReadIntBytes(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Peers", za0001)
 					return
 				}
 				z.Peers[za0001] = za0002
@@ -319,6 +351,7 @@ func (z *GraphiteTagDelSeriesResp) UnmarshalMsg(bts []byte) (o []byte, err error
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -344,6 +377,7 @@ func (z *SeriesPickle) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0002 uint32
 	zb0002, err = dc.ReadArrayHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	if cap((*z)) >= int(zb0002) {
@@ -354,6 +388,7 @@ func (z *SeriesPickle) DecodeMsg(dc *msgp.Reader) (err error) {
 	for zb0001 := range *z {
 		err = (*z)[zb0001].DecodeMsg(dc)
 		if err != nil {
+			err = msgp.WrapError(err, zb0001)
 			return
 		}
 	}
@@ -364,11 +399,13 @@ func (z *SeriesPickle) DecodeMsg(dc *msgp.Reader) (err error) {
 func (z SeriesPickle) EncodeMsg(en *msgp.Writer) (err error) {
 	err = en.WriteArrayHeader(uint32(len(z)))
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0003 := range z {
 		err = z[zb0003].EncodeMsg(en)
 		if err != nil {
+			err = msgp.WrapError(err, zb0003)
 			return
 		}
 	}
@@ -382,6 +419,7 @@ func (z SeriesPickle) MarshalMsg(b []byte) (o []byte, err error) {
 	for zb0003 := range z {
 		o, err = z[zb0003].MarshalMsg(o)
 		if err != nil {
+			err = msgp.WrapError(err, zb0003)
 			return
 		}
 	}
@@ -393,6 +431,7 @@ func (z *SeriesPickle) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0002 uint32
 	zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	if cap((*z)) >= int(zb0002) {
@@ -403,6 +442,7 @@ func (z *SeriesPickle) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	for zb0001 := range *z {
 		bts, err = (*z)[zb0001].UnmarshalMsg(bts)
 		if err != nil {
+			err = msgp.WrapError(err, zb0001)
 			return
 		}
 	}
@@ -426,29 +466,34 @@ func (z *SeriesPickleItem) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "path":
 			z.Path, err = dc.ReadString()
 			if err != nil {
+				err = msgp.WrapError(err, "Path")
 				return
 			}
 		case "isLeaf":
 			z.IsLeaf, err = dc.ReadBool()
 			if err != nil {
+				err = msgp.WrapError(err, "IsLeaf")
 				return
 			}
 		case "intervals":
 			var zb0002 uint32
 			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
+				err = msgp.WrapError(err, "Intervals")
 				return
 			}
 			if cap(z.Intervals) >= int(zb0002) {
@@ -460,6 +505,7 @@ func (z *SeriesPickleItem) DecodeMsg(dc *msgp.Reader) (err error) {
 				var zb0003 uint32
 				zb0003, err = dc.ReadArrayHeader()
 				if err != nil {
+					err = msgp.WrapError(err, "Intervals", za0001)
 					return
 				}
 				if cap(z.Intervals[za0001]) >= int(zb0003) {
@@ -470,6 +516,7 @@ func (z *SeriesPickleItem) DecodeMsg(dc *msgp.Reader) (err error) {
 				for za0002 := range z.Intervals[za0001] {
 					z.Intervals[za0001][za0002], err = dc.ReadInt64()
 					if err != nil {
+						err = msgp.WrapError(err, "Intervals", za0001, za0002)
 						return
 					}
 				}
@@ -477,6 +524,7 @@ func (z *SeriesPickleItem) DecodeMsg(dc *msgp.Reader) (err error) {
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -494,6 +542,7 @@ func (z *SeriesPickleItem) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteString(z.Path)
 	if err != nil {
+		err = msgp.WrapError(err, "Path")
 		return
 	}
 	// write "isLeaf"
@@ -503,6 +552,7 @@ func (z *SeriesPickleItem) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteBool(z.IsLeaf)
 	if err != nil {
+		err = msgp.WrapError(err, "IsLeaf")
 		return
 	}
 	// write "intervals"
@@ -512,16 +562,19 @@ func (z *SeriesPickleItem) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Intervals)))
 	if err != nil {
+		err = msgp.WrapError(err, "Intervals")
 		return
 	}
 	for za0001 := range z.Intervals {
 		err = en.WriteArrayHeader(uint32(len(z.Intervals[za0001])))
 		if err != nil {
+			err = msgp.WrapError(err, "Intervals", za0001)
 			return
 		}
 		for za0002 := range z.Intervals[za0001] {
 			err = en.WriteInt64(z.Intervals[za0001][za0002])
 			if err != nil {
+				err = msgp.WrapError(err, "Intervals", za0001, za0002)
 				return
 			}
 		}
@@ -558,29 +611,34 @@ func (z *SeriesPickleItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "path":
 			z.Path, bts, err = msgp.ReadStringBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Path")
 				return
 			}
 		case "isLeaf":
 			z.IsLeaf, bts, err = msgp.ReadBoolBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "IsLeaf")
 				return
 			}
 		case "intervals":
 			var zb0002 uint32
 			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Intervals")
 				return
 			}
 			if cap(z.Intervals) >= int(zb0002) {
@@ -592,6 +650,7 @@ func (z *SeriesPickleItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				var zb0003 uint32
 				zb0003, bts, err = msgp.ReadArrayHeaderBytes(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Intervals", za0001)
 					return
 				}
 				if cap(z.Intervals[za0001]) >= int(zb0003) {
@@ -602,6 +661,7 @@ func (z *SeriesPickleItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				for za0002 := range z.Intervals[za0001] {
 					z.Intervals[za0001][za0002], bts, err = msgp.ReadInt64Bytes(bts)
 					if err != nil {
+						err = msgp.WrapError(err, "Intervals", za0001, za0002)
 						return
 					}
 				}
@@ -609,6 +669,7 @@ func (z *SeriesPickleItem) UnmarshalMsg(bts []byte) (o []byte, err error) {
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
