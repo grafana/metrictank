@@ -10,22 +10,21 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-var defs []*MetricDefinition
-var tags []string
 var metName = "metric.names.can.be.a.bit.longer.than.normal.sometimes"
 var metNameRepeating = "metric.metric.metric.metric.metric.metric.metric.metric"
 var testSz string
 
 func genTags(num int) []string {
 	szs := make([]string, num)
-	for i := 0; i < len(szs); i++ {
+	for i := 0; i < num; i++ {
 		szs[i] = fmt.Sprintf("key%d=val%d", i, i)
 	}
 	return szs
 }
 
-func genMetricDefinitionsWithSameName(num int, defs []*MetricDefinition) {
-	for i := 0; i < len(defs); i++ {
+func genMetricDefinitionsWithSameName(num int) []*MetricDefinition {
+	defs := make([]*MetricDefinition, num)
+	for i := 0; i < num; i++ {
 		defs[i] = &MetricDefinition{
 			OrgId:      1,
 			Interval:   10,
@@ -38,10 +37,12 @@ func genMetricDefinitionsWithSameName(num int, defs []*MetricDefinition) {
 		defs[i].SetUnit("test")
 		defs[i].SetId()
 	}
+	return defs
 }
 
-func genMetricDefinitionsWithoutTags(num int, defs []*MetricDefinition) {
-	for i := 0; i < len(defs); i++ {
+func genMetricDefinitionsWithoutTags(num int) []*MetricDefinition {
+	defs := make([]*MetricDefinition, num)
+	for i := 0; i < num; i++ {
 		defs[i] = &MetricDefinition{
 			OrgId:      1,
 			Interval:   10,
@@ -53,6 +54,7 @@ func genMetricDefinitionsWithoutTags(num int, defs []*MetricDefinition) {
 		defs[i].SetUnit("test")
 		defs[i].SetId()
 	}
+	return defs
 }
 
 func TestCreateDeleteMetricDefinition10(t *testing.T) {
@@ -65,10 +67,8 @@ func TestCreateDeleteMetricDefinition1000(t *testing.T) {
 
 func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 	IdxIntern = goi.NewObjectIntern(nil)
-	defs = make([]*MetricDefinition, num)
+	defs := genMetricDefinitionsWithSameName(num)
 	name := "anotheryetlonger.short.metric.name"
-
-	genMetricDefinitionsWithSameName(num, defs)
 
 	originalNameAddress := defs[0].Name.Nodes()[0]
 
@@ -117,12 +117,10 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 			So(cnt, ShouldEqual, 0)
 		})
 		Convey("After adding more metricdefinitions with the same name as before we should have a new object address for their names", func() {
-			defs = nil
-			defs = make([]*MetricDefinition, num)
 			// create this to use the first memory offset of the new slab in a fresh slabPool in case
 			// MMap decides to use the same memory chunk. The string is the same length as what should be in slot 0.
 			IdxIntern.AddOrGetSzNoCprsn([]byte("bopuifszfumpohfs"))
-			genMetricDefinitionsWithSameName(num, defs)
+			defs := genMetricDefinitionsWithSameName(num)
 			So(originalNameAddress, ShouldNotEqual, defs[0].Name.Nodes()[0])
 		})
 	})
@@ -130,7 +128,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 
 func TestMetricNameAndTagAddresses(t *testing.T) {
 	IdxIntern = goi.NewObjectIntern(nil)
-	defs = make([]*MetricDefinition, 5)
+	defs := make([]*MetricDefinition, 5)
 	for i := 0; i < len(defs); i++ {
 		defs[i] = &MetricDefinition{
 			OrgId:      uint32(i),
@@ -178,9 +176,8 @@ func TestMetricNameAndTagAddresses(t *testing.T) {
 
 func TestTagKeyValuesAndNameWithTags(t *testing.T) {
 	IdxIntern = goi.NewObjectIntern(nil)
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithSameName(1, defs)
-	tags = genTags(5)
+	defs := genMetricDefinitionsWithSameName(1)
+	tags := genTags(5)
 	defs[0].SetTags(tags)
 
 	Convey("After adding tags to a MetricDefinition", t, func() {
@@ -208,9 +205,8 @@ func BenchmarkSetTags1000(b *testing.B) {
 }
 
 func benchmarkSetTags(b *testing.B, num int) {
-	tags = genTags(num)
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithoutTags(1, defs)
+	tags := genTags(num)
+	defs := genMetricDefinitionsWithoutTags(1)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -220,8 +216,7 @@ func benchmarkSetTags(b *testing.B, num int) {
 }
 
 func BenchmarkSetMetricName(b *testing.B) {
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithoutTags(1, defs)
+	defs := genMetricDefinitionsWithoutTags(1)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -231,8 +226,7 @@ func BenchmarkSetMetricName(b *testing.B) {
 }
 
 func BenchmarkSetMetricNameRepeatingWords(b *testing.B) {
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithoutTags(1, defs)
+	defs := genMetricDefinitionsWithoutTags(1)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -242,8 +236,7 @@ func BenchmarkSetMetricNameRepeatingWords(b *testing.B) {
 }
 
 func BenchmarkGetMetricName(b *testing.B) {
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithoutTags(1, defs)
+	defs := genMetricDefinitionsWithoutTags(1)
 	defs[0].SetMetricName(metName)
 
 	b.ReportAllocs()
@@ -254,8 +247,7 @@ func BenchmarkGetMetricName(b *testing.B) {
 }
 
 func BenchmarkGetNameWithTags(b *testing.B) {
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithSameName(1, defs)
+	defs := genMetricDefinitionsWithSameName(1)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -265,12 +257,15 @@ func BenchmarkGetNameWithTags(b *testing.B) {
 }
 
 func BenchmarkGetTags(b *testing.B) {
-	defs = make([]*MetricDefinition, 1)
-	genMetricDefinitionsWithSameName(1, defs)
+	defs := genMetricDefinitionsWithSameName(1)
+	var tags []string
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tags = defs[0].Tags.Strings()
+	}
+	if len(tags) != 5 {
+		panic("incorrect number of tags returned")
 	}
 }
