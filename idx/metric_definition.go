@@ -332,9 +332,9 @@ func MetricDefinitionFromMetricDataWithMkey(mkey schema.MKey, d *schema.MetricDa
 	}
 
 	md.SetMetricName(d.Name)
+	md.SetUnit(d.Unit)
 	md.SetMType(d.Mtype)
 	md.SetTags(d.Tags)
-	md.SetUnit(d.Unit)
 
 	return md
 }
