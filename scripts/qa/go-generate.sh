@@ -23,6 +23,8 @@ cd $gopath/src/github.com/tinylib/msgp
 git checkout v1.0-beta
 go install
 
+cd -
+
 go generate ./...
 out=$(git status --short)
 [ -z "$out" ] && echo "all good" && exit 0
