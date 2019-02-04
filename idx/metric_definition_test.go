@@ -119,7 +119,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		Convey("After adding more metricdefinitions with the same name as before we should have a new object address for their names", func() {
 			// create this to use the first memory offset of the new slab in a fresh slabPool in case
 			// MMap decides to use the same memory chunk. The string is the same length as what should be in slot 0.
-			IdxIntern.AddOrGetSzNoCprsn([]byte("bopuifszfumpohfs"))
+			IdxIntern.AddOrGetString([]byte("bopuifszfumpohfs"))
 			defs := genMetricDefinitionsWithSameName(num)
 			So(originalNameAddress, ShouldNotEqual, defs[0].Name.Nodes()[0])
 		})

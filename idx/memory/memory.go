@@ -325,7 +325,7 @@ func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
 // return a string with data pointed to the interned data
 // this assumes that no compression is used in the store
 func (m *MemoryIdx) internAcquire(sz string) (string, error) {
-	acquired, err := idx.IdxIntern.AddOrGetSzNoCprsn([]byte(sz))
+	acquired, err := idx.IdxIntern.AddOrGetString([]byte(sz))
 	if err != nil {
 		return sz, err
 	}

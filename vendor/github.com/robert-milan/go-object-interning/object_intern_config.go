@@ -1,10 +1,12 @@
 package goi
 
+type Compression uint8
+
 // Types of compression
 const (
-	NOCPRSN = iota
-	SHOCO
-	SHOCODICT
+	None Compression = iota
+	Shoco
+	ShocoDict
 )
 
 // Config provides a configuration with default settings
@@ -13,20 +15,20 @@ var Config = NewConfig()
 // ObjectInternConfig holds a configuration to use when creating a new ObjectIntern.
 // Currently, Index and MaxIndexSize don't do anything.
 type ObjectInternConfig struct {
-	CompressionType uint8
-	Index           bool
-	MaxIndexSize    uint32
+	Compression  Compression
+	Index        bool
+	MaxIndexSize uint32
 }
 
 // NewConfig returns a new configuration with default settings
 //
-// CompressType: SHOCO,
+// Compress: Shoco,
 // Cache: true,
 // MasCacheSize: 157286400,
 func NewConfig() *ObjectInternConfig {
 	return &ObjectInternConfig{
-		CompressionType: NOCPRSN,
-		Index:           true,
-		MaxIndexSize:    157286400, // 150 MB
+		Compression:  None,
+		Index:        true,
+		MaxIndexSize: 157286400, // 150 MB
 	}
 }

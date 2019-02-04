@@ -136,13 +136,13 @@ type MetricIndex interface {
 // decreased by 1 and they can eventually be deleted
 func InternReleaseMetricDefinition(md MetricDefinition) {
 	for _, tag := range md.Tags {
-		IdxIntern.DeleteByValSzNoCprsn(tag.Key)
-		IdxIntern.DeleteByValSzNoCprsn(tag.Value)
+		IdxIntern.DeleteByValString(tag.Key)
+		IdxIntern.DeleteByValString(tag.Value)
 	}
 
 	for _, id := range md.Name.Nodes() {
 		IdxIntern.Delete(id)
 	}
 
-	IdxIntern.DeleteByValSzNoCprsn(md.Unit)
+	IdxIntern.DeleteByValString(md.Unit)
 }
