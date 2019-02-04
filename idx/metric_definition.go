@@ -53,13 +53,13 @@ func (mn *MetricName) String() string {
 
 func (mn *MetricName) string(bld *strings.Builder) string {
 	// get []int of the lengths of all of the mn.Nodes
-	lns, ok := IdxIntern.LenNoCprsn(mn.nodes)
+	lns, ok := IdxIntern.Len(mn.nodes)
 	if !ok {
 		// this should never happen, do what now?
 		return ""
 	}
 
-	// should be faster than calling IdxIntern.SetStringNoCprsn in a tight loop
+	// should be faster than calling IdxIntern.SetString in a tight loop
 	var tmpSz string
 	szHeader := (*reflect.StringHeader)(unsafe.Pointer(&tmpSz))
 	first, _ := IdxIntern.ObjString(mn.nodes[0])
@@ -228,7 +228,7 @@ func (md *MetricDefinition) Mtype() string {
 // SetUnit takes a string, interns it in an object store
 // and then uses it to store the unit.
 func (md *MetricDefinition) SetUnit(unit string) {
-	sz, err := IdxIntern.AddOrGetSzNoCprsn([]byte(unit))
+	sz, err := IdxIntern.AddOrGetString([]byte(unit))
 	if err != nil {
 		log.Errorf("idx: Failed to intern Unit %v. %v", unit, err)
 		md.Unit = unit
@@ -275,7 +275,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
 			continue
 		}
-		keySz, err := IdxIntern.AddOrGetSzNoCprsn([]byte(splits[0]))
+		keySz, err := IdxIntern.AddOrGetString([]byte(splits[0]))
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 			keyTmpSz := splits[0]
@@ -284,7 +284,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			md.Tags[i].Key = keySz
 		}
 
-		valueSz, err := IdxIntern.AddOrGetSzNoCprsn([]byte(splits[1]))
+		valueSz, err := IdxIntern.AddOrGetString([]byte(splits[1]))
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 			valueTmpSz := splits[1]
