@@ -127,7 +127,8 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/tinylib/msgp"
-  version = "1.0.0-beta"
+# WARNING: if you change this, please also change scripts/qa/go-generate.sh
+  version = "v1.1.0"
 
 [[constraint]]
   name = "github.com/uber/jaeger-client-go"

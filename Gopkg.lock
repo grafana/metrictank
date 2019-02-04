@@ -744,12 +744,12 @@
   revision = "ef6db91d284a0e7badaa1f0c404c30aa7dee3aed"
 
 [[projects]]
-  digest = "1:5f9202ad4fbceea76631df26de47b4960861ae7bc3889aece44d6aa8e5171dac"
+  digest = "1:c97e8a5e5c435c3287f581cdb4441ba34577ec6ead8422bfedafa6269af7abf6"
   name = "github.com/tinylib/msgp"
   packages = ["msgp"]
   pruneopts = "NUT"
-  revision = "0cea1fa86e8403be1284013014f87ab942056de8"
-  version = "v1.0-beta"
+  revision = "af6442a0fcf6e2a1b824f70dd0c734f01e817751"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:87dee780f88f86f300bbd90116e933347cf4a3c65c1960072d412597a8896d50"
