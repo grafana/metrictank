@@ -559,6 +559,99 @@ func TestExpressionParsing(t *testing.T) {
 	}
 }
 
+func TestSpecialCharactersInTags(t *testing.T) {
+	type testCase struct {
+		id         schema.MKey
+		lastUpdate int64
+		tags       []string
+	}
+
+	ids = []schema.MKey{
+		test.GetMKey(0),
+		test.GetMKey(1),
+		test.GetMKey(2),
+		test.GetMKey(3),
+		test.GetMKey(4),
+		test.GetMKey(5),
+		test.GetMKey(6),
+		test.GetMKey(7),
+	}
+
+	data := []testCase{
+		{ids[0], 1, []string{"key1=你好", "tiếng chào=value2"}},
+		{ids[1], 2, []string{"key1=مرحبا", "123해답=value3"}},
+		{ids[2], 3, []string{"key1=value a", "key4=$", "key5=   "}},
+		{ids[3], 4, []string{"key1=^", "abc=[]", "key4={}", "parenthesis=()()", "key3=#!"}},
+		{ids[4], 5, []string{"key2=<>", "key5====", "key3=_-_"}},
+		{ids[5], 6, []string{"key2=?^", "aaa=|\\/|", "abc=+,", "key4=%&", "key3=@@@"}},
+		{ids[6], 7, []string{"key3=*", "aaa=`~", "key4=:::", "punctuation=,?.:"}},
+		{ids[7], 8, []string{"key3=$a$", "dots=...", "quotes='\"'\"'"}},
+	}
+
+	tagIdx := make(TagIndex)
+	byId := make(map[schema.MKey]*idx.Archive)
+
+	for i, d := range data {
+		byId[d.id] = &idx.Archive{}
+		byId[d.id].Name = fmt.Sprintf("metric%d", i)
+		byId[d.id].Tags = d.tags
+		byId[d.id].LastUpdate = d.lastUpdate
+		for _, tag := range d.tags {
+			tagSplits := strings.SplitN(tag, "=", 2)
+			tagIdx.addTagId(tagSplits[0], tagSplits[1], d.id)
+		}
+		tagIdx.addTagId("name", byId[d.id].Name, d.id)
+	}
+
+	queryAndCompare := func(query []string, id int) {
+		q, _ := NewTagQuery(query, 0)
+		expect := make(IdSet)
+		expect[ids[id]] = struct{}{}
+
+		res := q.Run(tagIdx, byId)
+
+		if !reflect.DeepEqual(expect, res) {
+			t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", expect, res)
+		}
+	}
+
+	queryAndCompare([]string{"key1=~.*好$"}, 0)
+	queryAndCompare([]string{"tiếng chào!="}, 0)
+	queryAndCompare([]string{"123해답=~val.*"}, 1)
+	queryAndCompare([]string{"key1=مرحبا"}, 1)
+	queryAndCompare([]string{"key5=   "}, 2)
+	queryAndCompare([]string{"key4=$"}, 2)
+	queryAndCompare([]string{"key1=value a"}, 2)
+	queryAndCompare([]string{"key1=^"}, 3)
+	queryAndCompare([]string{"key1=~.*\\^.*"}, 3)
+	queryAndCompare([]string{"abc=[]"}, 3)
+	queryAndCompare([]string{"key4={}"}, 3)
+	queryAndCompare([]string{"key3=#!"}, 3)
+	queryAndCompare([]string{"key2=<>"}, 4)
+	queryAndCompare([]string{"key3=_-_"}, 4)
+	queryAndCompare([]string{"parenthesis=~^([\\(\\)]{4})$"}, 3)
+	queryAndCompare([]string{"key5===="}, 4)
+	queryAndCompare([]string{"key2=?^"}, 5)
+	queryAndCompare([]string{"aaa=|\\/|"}, 5)
+	// first escape \ to capture it as \ in the string, then escape it again to treat it as \ in the regex
+	queryAndCompare([]string{"aaa=~.*\\\\.*"}, 5)
+	queryAndCompare([]string{"abc=+,"}, 5)
+	queryAndCompare([]string{"key4=%&"}, 5)
+	queryAndCompare([]string{"key3=@@@"}, 5)
+	queryAndCompare([]string{"key3=*"}, 6)
+	queryAndCompare([]string{"key3=~\\*"}, 6)
+	queryAndCompare([]string{"aaa=~^`.*"}, 6)
+	queryAndCompare([]string{"punctuation=,?.:"}, 6)
+	queryAndCompare([]string{"key3!=", "punctuation!=,?.", "key4=~.*:.*"}, 6)
+	queryAndCompare([]string{"key3=*", "punctuation!=?.:"}, 6)
+	queryAndCompare([]string{"punctuation=~.*\\?\\..*"}, 6)
+	queryAndCompare([]string{"key4=~^([\\:]{3})$"}, 6)
+	queryAndCompare([]string{"key3=~^\\$.*\\$$"}, 7)
+	queryAndCompare([]string{"dots=..."}, 7)
+	queryAndCompare([]string{"quotes=~^(['\"]{5})$"}, 7)
+
+}
+
 func BenchmarkExpressionParsing(b *testing.B) {
 	expressions := [][]string{
 		{"key=value", "key!=value"},
