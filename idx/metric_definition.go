@@ -55,7 +55,8 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 	// get []int of the lengths of all of the mn.Nodes
 	lns, ok := IdxIntern.Len(mn.nodes)
 	if !ok {
-		// this should never happen, do what now?
+		internError.Inc()
+		log.Error("idx: Failed to retrieve length of strings from interning library")
 		return ""
 	}
 
@@ -269,25 +270,25 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
 			continue
 		}
-		splits := strings.Split(tag, "=")
-		if len(splits) < 2 {
+		eqPos := strings.Index(tag, "=")
+		if eqPos < 0 || strings.Count("=", tag) > 1 {
 			invalidTag.Inc()
 			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
 			continue
 		}
-		keySz, err := IdxIntern.AddOrGetString([]byte(splits[0]))
+		keySz, err := IdxIntern.AddOrGetString([]byte(tag[:eqPos]))
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
-			keyTmpSz := splits[0]
+			keyTmpSz := string(tag[:eqPos])
 			md.Tags[i].Key = keyTmpSz
 		} else {
 			md.Tags[i].Key = keySz
 		}
 
-		valueSz, err := IdxIntern.AddOrGetString([]byte(splits[1]))
+		valueSz, err := IdxIntern.AddOrGetString([]byte(tag[eqPos+1:]))
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
-			valueTmpSz := splits[1]
+			valueTmpSz := string(tag[eqPos+1:])
 			md.Tags[i].Value = valueTmpSz
 		} else {
 			md.Tags[i].Value = valueSz
@@ -321,9 +322,9 @@ func (md *MetricDefinition) SetId() {
 	}
 }
 
-// MetricDefinitionFromMetricDataWithMkey takes an MKey and MetricData and returns a MetricDefinition
+// MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition
 // based on them.
-func MetricDefinitionFromMetricDataWithMkey(mkey schema.MKey, d *schema.MetricData) *MetricDefinition {
+func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricData) *MetricDefinition {
 	md := &MetricDefinition{
 		Id:         mkey,
 		OrgId:      uint32(d.OrgId),
@@ -347,5 +348,5 @@ func MetricDefinitionFromMetricData(d *schema.MetricData) (*MetricDefinition, er
 		return nil, fmt.Errorf("idx: Error parsing ID: %s", err)
 	}
 
-	return MetricDefinitionFromMetricDataWithMkey(mkey, d), nil
+	return MetricDefinitionFromMetricDataWithMKey(mkey, d), nil
 }
