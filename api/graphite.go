@@ -11,9 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/schema"
-	macaron "gopkg.in/macaron.v1"
-
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
@@ -28,7 +25,9 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/dur"
+	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
+	macaron "gopkg.in/macaron.v1"
 )
 
 var MissingOrgHeaderErr = errors.New("orgId not set in headers")
@@ -545,8 +544,8 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 }
 
 func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
-	defs, err := s.MetricIndex.Delete(orgId, query)
-	return len(defs), err
+	deleted, err := s.MetricIndex.Delete(orgId, query)
+	return deleted, err
 }
 
 func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query string, peer cluster.Node) (int, error) {

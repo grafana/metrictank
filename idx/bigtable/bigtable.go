@@ -457,11 +457,11 @@ LOOP:
 	b.wg.Done()
 }
 
-func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 	pre := time.Now()
-	defs, err := b.MemoryIdx.Delete(orgId, pattern)
+	defs, err := b.MemoryIdx.DeletePersistent(orgId, pattern)
 	if err != nil {
-		return defs, err
+		return len(defs), err
 	}
 	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
@@ -481,7 +481,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	for _, arc := range defs {
 		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
 	}
-	return defs, err
+	return len(defs), err
 }
 
 func (b *BigtableIdx) deleteDef(def *idx.MetricDefinition) error {

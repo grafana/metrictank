@@ -74,8 +74,8 @@ type MetricIndex interface {
 	// If the pattern matches a branch node, then
 	// all leaf nodes on that branch are deleted. So if the pattern is
 	// "*", all items in the index are deleted.
-	// It returns a copy of all of the Archives deleted.
-	Delete(orgId uint32, pattern string) ([]Archive, error)
+	// It returns the number of Archives that were deleted.
+	Delete(orgId uint32, pattern string) (int, error)
 
 	// Find searches the index for matching nodes.
 	// * orgId describes the org to search in (public data in orgIdPublic is automatically included)

@@ -294,7 +294,7 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 
 	m.RUnlock()
 
-	def := idx.MetricDefinitionFromMetricDataWithMkey(mkey, data)
+	def := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
 	def.Partition = partition
 
 	m.Lock()
@@ -1158,7 +1158,7 @@ func (m *MemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
 	return deletedDefs
 }
 
-func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (m *MemoryIdx) DeletePersistent(orgId uint32, pattern string) ([]idx.Archive, error) {
 	var deletedDefs []idx.Archive
 	pre := time.Now()
 	m.Lock()
@@ -1177,6 +1177,11 @@ func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) 
 	statDeleteDuration.Value(time.Since(pre))
 
 	return deletedDefs, nil
+}
+
+func (m *MemoryIdx) Delete(orgId uint32, pattern string) (int, error) {
+	arcs, err := m.DeletePersistent(orgId, pattern)
+	return len(arcs), err
 }
 
 func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
