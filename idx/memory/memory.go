@@ -398,7 +398,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		return CloneArchive(existing), oldPart, ok
 	}
 
-	def := idx.MetricDefinitionFromMetricDataWithMkey(mkey, data)
+	def := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
 	def.Partition = partition
 
 	archive := createArchive(def)
@@ -1381,7 +1381,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 	return deletedDefs
 }
 
-func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (m *UnpartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([]idx.Archive, error) {
 	var deletedDefs []idx.Archive
 	pre := time.Now()
 	m.Lock()
@@ -1421,6 +1421,11 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	statDeleteDuration.Value(time.Since(pre))
 
 	return deletedDefs, nil
+}
+
+func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) (int, error) {
+	arcs, err := m.DeletePersistent(orgId, pattern)
+	return len(arcs), err
 }
 
 func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {

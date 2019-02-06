@@ -516,7 +516,7 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 
 	Convey("when deleting 100k series", t, func() {
 		type resp struct {
-			defs []idx.Archive
+			defs int
 			err  error
 		}
 		done := make(chan *resp)
@@ -533,7 +533,7 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 			t.Fatal("deleting series took more then 10seconds.")
 		case response := <-done:
 			So(response.err, ShouldBeNil)
-			So(response.defs, ShouldHaveLength, 100000)
+			So(response.defs, ShouldEqual, 100000)
 		}
 	})
 }
@@ -648,7 +648,7 @@ func testMixedBranchLeafDelete(t *testing.T) {
 	}
 
 	Convey("when deleting mixed leaf/branch", t, func() {
-		defs, err := ix.Delete(1, "a.b.c")
+		defs, err := ix.DeletePersistent(1, "a.b.c")
 		So(err, ShouldBeNil)
 		So(defs, ShouldHaveLength, 2)
 		deletedIds := make([]schema.MKey, len(defs))
@@ -671,7 +671,7 @@ func testMixedBranchLeafDelete(t *testing.T) {
 		})
 	})
 	Convey("when deleting from branch", t, func() {
-		defs, err := ix.Delete(1, "a.b.c2.d.*")
+		defs, err := ix.DeletePersistent(1, "a.b.c2.d.*")
 		So(err, ShouldBeNil)
 		So(defs, ShouldHaveLength, 1)
 		if defs[0].Id != mkeys[3] {

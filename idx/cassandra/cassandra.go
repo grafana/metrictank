@@ -557,7 +557,7 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
+func (c *CasIdx) addDefToArchive(def idx.MetricDefinition) error {
 	insertQry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.ArchiveTable)
 	maxAttempts := 5
 	now := time.Now().UTC().Unix()
@@ -598,11 +598,11 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 	return err
 }
 
-func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (c *CasIdx) Delete(orgId uint32, pattern string) (int, error) {
 	pre := time.Now()
-	defs, err := c.MemoryIndex.Delete(orgId, pattern)
+	defs, err := c.MemoryIndex.DeletePersistent(orgId, pattern)
 	if err != nil {
-		return defs, err
+		return len(defs), err
 	}
 	if c.Config.updateCassIdx {
 		for _, def := range defs {
@@ -620,7 +620,7 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	for _, arc := range defs {
 		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
 	}
-	return defs, err
+	return len(defs), err
 }
 
 func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {

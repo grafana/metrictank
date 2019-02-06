@@ -73,9 +73,6 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 	originalNameAddress := defs[0].Name.Nodes()[0]
 
 	Convey("When creating MetricDefinitions", t, func() {
-		Convey(fmt.Sprintf("number of definitions should be %d", num), func() {
-			So(defs, ShouldHaveLength, num)
-		})
 		Convey(fmt.Sprintf("reference counts should be at %d", num), func() {
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
