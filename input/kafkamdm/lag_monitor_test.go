@@ -100,7 +100,7 @@ func TestLagMonitor(t *testing.T) {
 	mon := NewLagMonitor(2, []int32{0})
 
 	// advance records a state change (newest and current offsets) for the given timestamp
-	advance := func(sec int, newest, offset int64) {
+	advance := func(offset, newest int64, sec int) {
 		ts := start.Add(time.Second * time.Duration(sec))
 		mon.StoreOffsets(0, offset, newest, ts)
 	}
@@ -116,48 +116,48 @@ func TestLagMonitor(t *testing.T) {
 		})
 		Convey("with 100 measurements, not consuming and lag just growing", func() {
 			for i := 0; i < 100; i++ {
-				advance(i, int64(i), 0)
+				advance(0, int64(i), i)
 			}
 			So(mon.Metric(), ShouldEqual, 98) // min-lag(98) / rate (0) = 98
 		})
 		Convey("with 100 measurements, each advancing 1 offset per second, and lag growing by 1 each second (e.g. real rate is 2/s)", func() {
 			for i := 0; i < 100; i++ {
-				advance(i, int64(i*2), int64(i))
+				advance(int64(i), int64(i*2), i)
 			}
 			So(mon.Metric(), ShouldEqual, 49) // min-lag(98) / input rate (2) = 49
 		})
 		Convey("rate of production is 100k and lag is 1000", func() {
-			advance(1, 100000, 99000)
-			advance(2, 200000, 199000)
+			advance(99000, 100000, 1)
+			advance(199000, 200000, 2)
 			So(mon.Metric(), ShouldEqual, 0) // 1000 / 100k = 0
 			Convey("rate of production goes up to 200k but lag stays consistent at 1000", func() {
-				advance(3, 400000, 399000)
-				advance(4, 600000, 599000)
+				advance(399000, 400000, 3)
+				advance(599000, 600000, 4)
 				So(mon.Metric(), ShouldEqual, 0) // 1000 / 200k = 0
 			})
 			Convey("rate of production goes down to 1000 but lag stays consistent at 1000", func() {
-				advance(3, 201000, 200000)
-				advance(4, 202000, 201000)
+				advance(200000, 201000, 3)
+				advance(201000, 202000, 4)
 				So(mon.Metric(), ShouldEqual, 1) // 1000 / 1000 = 1
 			})
 			Convey("rate of production goes up to 200k but we can only keep up with the rate of 100k so lag starts growing", func() {
-				advance(3, 400000, 299000)
-				advance(4, 600000, 399000)
+				advance(299000, 400000, 3)
+				advance(399000, 600000, 4)
 				So(mon.Metric(), ShouldEqual, 0) // (400000-299000)/200000 = 0
-				advance(5, 800000, 499000)       // note: we're now where the producer was at +- t=3.5, so 1.5s behind
+				advance(499000, 800000, 5)       // note: we're now where the producer was at +- t=3.5, so 1.5s behind
 				So(mon.Metric(), ShouldEqual, 1) // (600000-399000)/200000 = 1
-				advance(6, 1000000, 599000)      // note: we're now at where the producer was at +- t=4, so 2 seconds behind
+				advance(599000, 1000000, 6)      // note: we're now at where the producer was at +- t=4, so 2 seconds behind
 				So(mon.Metric(), ShouldEqual, 1) // (800000-499000)/200000 = 1
-				advance(15, 2800000, 1499000)
-				advance(16, 3000000, 1599000)    // Jump forward 10 seconds, where the producer was at +- t=9, so 7 seconds behind
+				advance(1499000, 2800000, 15)
+				advance(1599000, 3000000, 16)    // Jump forward 10 seconds, where the producer was at +- t=9, so 7 seconds behind
 				So(mon.Metric(), ShouldEqual, 6) // (2800000-1499000)/200000 = 6
 			})
 			Convey("a GC pause is causing us to not be able to consume during a few seconds", func() {
-				advance(3, 300000, 199000)
-				advance(4, 400000, 199000)
+				advance(199000, 300000, 3)
+				advance(199000, 400000, 4)
 				So(mon.Metric(), ShouldEqual, 1) // ~(300000-199000)/100000 = 1
 				// test what happens during recovery
-				advance(5, 500000, 499000)
+				advance(499000, 500000, 5)
 				So(mon.Metric(), ShouldEqual, 0) // ~(500000-499000)/100000 = 0
 			})
 		})
