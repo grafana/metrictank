@@ -7,4 +7,9 @@ var (
 	// a corruption has been detected in one of the internal index structures
 	// each time this happens, an error is logged with more details.
 	corruptIndex = stats.NewCounter32("recovered_errors.idx.memory.corrupt-index")
+
+	// metric recovered_errors.idx.memory.intern-error is how many times
+	// an error is encountered while attempting to intern a string.
+	// each time this happens, an error is logged with more details.
+	internError = stats.NewCounter32("recovered_errors.idx.memory.intern-error")
 )

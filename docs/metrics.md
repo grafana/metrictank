@@ -258,6 +258,10 @@ with an incorrect consolidator specified
 how many times
 a corruption has been detected in one of the internal index structures
 each time this happens, an error is logged with more details.
+* `recovered_errors.idx.memory.intern-error`:  
+how many times
+an error is encountered while attempting to intern a string.
+each time this happens, an error is logged with more details.
 * `recovered_errors.idx.memory.invalid-tag`:  
 how many times
 an invalid tag for a metric is encountered.

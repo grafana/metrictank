@@ -85,7 +85,8 @@ func (mn *MetricName) setMetricName(name string) {
 		// TODO: add error checking? Fail somehow
 		nodePtr, err := IdxIntern.AddOrGet([]byte(node))
 		if err != nil {
-			log.Error(err)
+			log.Error("idx: Failed to acquire interned string for node name: ", err)
+			internError.Inc()
 		}
 		mn.nodes[i] = nodePtr
 	}
@@ -99,8 +100,17 @@ func (mn *MetricName) ExtensionType() int8 {
 
 // Len is required to use custom marshaling as an extension
 // with msgp
-func (mn *MetricName) Len() int {
-	return len(mn.String())
+func (mn *MetricName) Len() (ln int) {
+	lengths, ok := IdxIntern.Len(mn.nodes)
+	if !ok {
+		log.Error("idx: Failed to retrieve length of strings from interning library")
+		internError.Inc()
+		return 0
+	}
+	for _, i := range lengths {
+		ln += i
+	}
+	return
 }
 
 // MarshalBinaryTo is required to use custom marshaling as an extension
@@ -170,7 +180,7 @@ type MetricDefinition struct {
 }
 
 // NameWithTags returns a string version of the MetricDefinition's name with
-// all of its tagsin the form of 'name;key1=value1;key2=value2;key3=value3'
+// all of its tags in the form of 'name;key1=value1;key2=value2;key3=value3'
 func (md *MetricDefinition) NameWithTags() string {
 	bld := strings.Builder{}
 
@@ -232,7 +242,9 @@ func (md *MetricDefinition) SetUnit(unit string) {
 	sz, err := IdxIntern.AddOrGetString([]byte(unit))
 	if err != nil {
 		log.Errorf("idx: Failed to intern Unit %v. %v", unit, err)
+		internError.Inc()
 		md.Unit = unit
+		return
 	}
 	md.Unit = sz
 }
@@ -266,21 +278,21 @@ func (md *MetricDefinition) SetTags(tags []string) {
 	sort.Strings(tags)
 	for i, tag := range tags {
 		if strings.Contains(tag, ";") {
-			invalidTag.Inc()
 			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+			invalidTag.Inc()
 			continue
 		}
 		eqPos := strings.Index(tag, "=")
-		if eqPos < 0 || strings.Count("=", tag) > 1 {
-			invalidTag.Inc()
+		if eqPos < 0 {
 			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+			invalidTag.Inc()
 			continue
 		}
 		keySz, err := IdxIntern.AddOrGetString([]byte(tag[:eqPos]))
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
-			keyTmpSz := string(tag[:eqPos])
-			md.Tags[i].Key = keyTmpSz
+			internError.Inc()
+			md.Tags[i].Key = string(tag[:eqPos])
 		} else {
 			md.Tags[i].Key = keySz
 		}
@@ -288,8 +300,8 @@ func (md *MetricDefinition) SetTags(tags []string) {
 		valueSz, err := IdxIntern.AddOrGetString([]byte(tag[eqPos+1:]))
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
-			valueTmpSz := string(tag[eqPos+1:])
-			md.Tags[i].Value = valueTmpSz
+			internError.Inc()
+			md.Tags[i].Value = string(tag[eqPos+1:])
 		} else {
 			md.Tags[i].Value = valueSz
 		}
