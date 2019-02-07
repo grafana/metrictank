@@ -347,7 +347,6 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 			return
 		case ts := <-ticker.C:
 			currentOffset := int64(kafkaStats.Offset.Peek())
-			k.lagMonitor.StoreOffset(partition, currentOffset, ts)
 			newest, err := k.tryGetOffset(topic, partition, sarama.OffsetNewest, 1, 0)
 			if err != nil {
 				log.Errorf("kafkamdm: %s", err.Error())
@@ -356,7 +355,7 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 			kafkaStats.LogSize.Set(int(newest))
 			lag := int(newest - currentOffset)
 			kafkaStats.Lag.Set(lag)
-			k.lagMonitor.StoreLag(partition, lag)
+			k.lagMonitor.StoreOffsets(partition, currentOffset, newest, ts)
 		}
 	}
 }
