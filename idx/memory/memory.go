@@ -562,10 +562,20 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 	for _, tag := range def.Tags {
 		// we don't care if an error is returned for now
 		// because the original string will be returned
-		// and at least the process can still continue
-		tagName, _ := m.internAcquire(tag.Key)
-		tagValue, _ := m.internAcquire(tag.Value)
-		tags.addTagId(tagName, tagValue, def.Id)
+		// and at least the process can still continue.
+		// if later a tag that was not interned is attempted
+		// to be released it won't have any negative impact
+		tagKey, err := m.internAcquire(tag.Key)
+		if err != nil {
+			log.Error("memory-idx: Failed to acquire interned string for tag key: ", err)
+			internError.Inc()
+		}
+		tagValue, err := m.internAcquire(tag.Value)
+		if err != nil {
+			log.Error("memory-idx: Failed to acquire interned string for tag value: ", err)
+			internError.Inc()
+		}
+		tags.addTagId(tagKey, tagValue, def.Id)
 	}
 	// TODO: add special case to handle name and intern the entire thing
 	tags.addTagId("name", schema.SanitizeNameAsTagValue(def.Name.String()), def.Id)

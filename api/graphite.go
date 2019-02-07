@@ -603,8 +603,7 @@ func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
 		return 0, nil
 	}
 
-	deleted, err := s.MetricIndex.Delete(orgId, query)
-	return deleted, err
+	return s.MetricIndex.Delete(orgId, query)
 }
 
 func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query string, peer cluster.Node) (int, error) {
