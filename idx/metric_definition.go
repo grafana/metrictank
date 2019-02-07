@@ -100,17 +100,8 @@ func (mn *MetricName) ExtensionType() int8 {
 
 // Len is required to use custom marshaling as an extension
 // with msgp
-func (mn *MetricName) Len() (ln int) {
-	lengths, ok := IdxIntern.Len(mn.nodes)
-	if !ok {
-		log.Error("idx: Failed to retrieve length of strings from interning library")
-		internError.Inc()
-		return 0
-	}
-	for _, i := range lengths {
-		ln += i
-	}
-	return
+func (mn *MetricName) Len() int {
+	return len(mn.String())
 }
 
 // MarshalBinaryTo is required to use custom marshaling as an extension
