@@ -582,12 +582,12 @@ func TestSpecialCharactersInTags(t *testing.T) {
 		data = append(data, testCase{ids[i], 1, []string{}})
 	}
 
-	blackList := []int{
-		59,  // ; not allowed in values
-		126, // ~ can't query values starting with ~ because =~ looks like a regular expression query
+	blackList := []rune{
+		';', // not allowed in values
+		'~', // can't query values starting with ~ because =~ looks like a regular expression query
 	}
 
-	isBlacklisted := func(char int) bool {
+	isBlacklisted := func(char rune) bool {
 		for i := 0; i < len(blackList); i++ {
 			if char == blackList[i] {
 				return true
@@ -598,7 +598,7 @@ func TestSpecialCharactersInTags(t *testing.T) {
 
 	for i := 0; i < 128; i++ {
 		firstChar := i
-		for isBlacklisted(firstChar) {
+		for isBlacklisted(rune(firstChar)) {
 			firstChar = (firstChar + 1) % 128
 			i++
 			if i >= 127 {
@@ -606,11 +606,11 @@ func TestSpecialCharactersInTags(t *testing.T) {
 			}
 		}
 		secondChar := (firstChar + 1) % 128
-		for isBlacklisted(secondChar) {
+		for isBlacklisted(rune(secondChar)) {
 			secondChar = (secondChar + 1) % 128
 		}
 		thirdChar := (secondChar + 1) % 128
-		for isBlacklisted(thirdChar) {
+		for isBlacklisted(rune(thirdChar)) {
 			thirdChar = (thirdChar + 1) % 128
 		}
 
