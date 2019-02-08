@@ -574,19 +574,51 @@ func TestSpecialCharactersInTags(t *testing.T) {
 		test.GetMKey(4),
 		test.GetMKey(5),
 		test.GetMKey(6),
-		test.GetMKey(7),
 	}
 
-	data := []testCase{
-		{ids[0], 1, []string{"key1=你好", "tiếng chào=value2"}},
-		{ids[1], 2, []string{"key1=مرحبا", "123해답=value3"}},
-		{ids[2], 3, []string{"key1=value a", "key4=$", "key5=   "}},
-		{ids[3], 4, []string{"key1=^", "abc=[]", "key4={}", "parenthesis=()()", "key3=#!"}},
-		{ids[4], 5, []string{"key2=<>", "key5====", "key3=_-_"}},
-		{ids[5], 6, []string{"key2=?^", "aaa=|\\/|", "abc=+,", "key4=%&", "key3=@@@"}},
-		{ids[6], 7, []string{"key3=*", "aaa=`~", "key4=:::", "punctuation=,?.:"}},
-		{ids[7], 8, []string{"key3=$a$", "dots=...", "quotes='\"'\"'"}},
+	data := []testCase{}
+
+	for i := 0; i < 6; i++ {
+		data = append(data, testCase{ids[i], 1, []string{}})
 	}
+
+	blackList := []int{
+		59,  // ; not allowed in values
+		126, // ~ can't query values starting with ~ because =~ looks like a regular expression query
+	}
+
+	isBlacklisted := func(char int) bool {
+		for i := 0; i < len(blackList); i++ {
+			if char == blackList[i] {
+				return true
+			}
+		}
+		return false
+	}
+
+	for i := 0; i < 128; i++ {
+		firstChar := i
+		for isBlacklisted(firstChar) {
+			firstChar = (firstChar + 1) % 128
+			i++
+			if i >= 127 {
+				break
+			}
+		}
+		secondChar := (firstChar + 1) % 128
+		for isBlacklisted(secondChar) {
+			secondChar = (secondChar + 1) % 128
+		}
+		thirdChar := (secondChar + 1) % 128
+		for isBlacklisted(thirdChar) {
+			thirdChar = (thirdChar + 1) % 128
+		}
+
+		tagValue := string(firstChar) + string(secondChar) + string(thirdChar)
+		data[i%6].tags = append(data[i%6].tags, fmt.Sprintf("testTag%d=%s", i, tagValue))
+	}
+
+	data = append(data, testCase{ids[6], 1, []string{"key1=你好", "tiếng chào=value2", "key1=مرحبا", "123해답=value3"}})
 
 	tagIdx := make(TagIndex)
 	byId := make(map[schema.MKey]*idx.Archive)
@@ -608,6 +640,8 @@ func TestSpecialCharactersInTags(t *testing.T) {
 		expect := make(IdSet)
 		expect[ids[id]] = struct{}{}
 
+		// uncomment to get details about queries
+		// fmt.Println(fmt.Sprintf("querying for tag value %d %d %d", int(query[0][len(query[0])-3]), int(query[0][len(query[0])-2]), int(query[0][len(query[0])-1])))
 		res := q.Run(tagIdx, byId)
 
 		if !reflect.DeepEqual(expect, res) {
@@ -615,41 +649,16 @@ func TestSpecialCharactersInTags(t *testing.T) {
 		}
 	}
 
-	queryAndCompare([]string{"key1=~.*好$"}, 0)
-	queryAndCompare([]string{"tiếng chào!="}, 0)
-	queryAndCompare([]string{"123해답=~val.*"}, 1)
-	queryAndCompare([]string{"key1=مرحبا"}, 1)
-	queryAndCompare([]string{"key5=   "}, 2)
-	queryAndCompare([]string{"key4=$"}, 2)
-	queryAndCompare([]string{"key1=value a"}, 2)
-	queryAndCompare([]string{"key1=^"}, 3)
-	queryAndCompare([]string{"key1=~.*\\^.*"}, 3)
-	queryAndCompare([]string{"abc=[]"}, 3)
-	queryAndCompare([]string{"key4={}"}, 3)
-	queryAndCompare([]string{"key3=#!"}, 3)
-	queryAndCompare([]string{"key2=<>"}, 4)
-	queryAndCompare([]string{"key3=_-_"}, 4)
-	queryAndCompare([]string{"parenthesis=~^([\\(\\)]{4})$"}, 3)
-	queryAndCompare([]string{"key5===="}, 4)
-	queryAndCompare([]string{"key2=?^"}, 5)
-	queryAndCompare([]string{"aaa=|\\/|"}, 5)
-	// first escape \ to capture it as \ in the string, then escape it again to treat it as \ in the regex
-	queryAndCompare([]string{"aaa=~.*\\\\.*"}, 5)
-	queryAndCompare([]string{"abc=+,"}, 5)
-	queryAndCompare([]string{"key4=%&"}, 5)
-	queryAndCompare([]string{"key3=@@@"}, 5)
-	queryAndCompare([]string{"key3=*"}, 6)
-	queryAndCompare([]string{"key3=~\\*"}, 6)
-	queryAndCompare([]string{"aaa=~^`.*"}, 6)
-	queryAndCompare([]string{"punctuation=,?.:"}, 6)
-	queryAndCompare([]string{"key3!=", "punctuation!=,?.", "key4=~.*:.*"}, 6)
-	queryAndCompare([]string{"key3=*", "punctuation!=?.:"}, 6)
-	queryAndCompare([]string{"punctuation=~.*\\?\\..*"}, 6)
-	queryAndCompare([]string{"key4=~^([\\:]{3})$"}, 6)
-	queryAndCompare([]string{"key3=~^\\$.*\\$$"}, 7)
-	queryAndCompare([]string{"dots=..."}, 7)
-	queryAndCompare([]string{"quotes=~^(['\"]{5})$"}, 7)
+	for i := 0; i < 6; i++ {
+		for tag := 0; tag < len(data[i].tags); tag++ {
+			queryAndCompare([]string{data[i].tags[tag]}, i)
+		}
+	}
 
+	queryAndCompare([]string{"key1=~.*好$"}, 6)
+	queryAndCompare([]string{"tiếng chào!="}, 6)
+	queryAndCompare([]string{"123해답=~val.*"}, 6)
+	queryAndCompare([]string{"key1=مرحبا"}, 6)
 }
 
 func BenchmarkExpressionParsing(b *testing.B) {
