@@ -4459,7 +4459,7 @@
     ],
     "type": "timepicker"
   },
-  "timezone": "browser",
+  "timezone": "utc",
   "title": "Metrictank",
   "uid": "tQW3QShiz",
   "version": 5
