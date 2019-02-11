@@ -1,5 +1,15 @@
 # unreleased/master
 
+* Improve performance of SetTags #1158
+* speed up cross series aggregators by being more cache friendly #1164
+* Fix summarize crash #1170
+* groupByTags Performance improvements + fix setting consolidator per group #1165
+* document startup procedure #1186
+* fix dashboard render latency queries + remove old dashboards #1192
+* Dynamic GOGC based on ready state #1194
+* improve kafka-mdm stats/priority tracking #1200
+* tweak cluster priority calculation to be resilient against GC pauses #1022, #1218
+
 ## api
 
 * Improve performance of SetTags #1158
@@ -88,7 +98,7 @@
 * input: prevent integer values overflowing our index datatypes, which fixes index saves blocking #1143
 * fix ccache memory leak #1078 
 * update jaeger-client to 2.15.0 #1093 
-* upgrade Sarama to v1.19 #1127
+* upgrade Sarama to v1.19, adding compatibility with Kafka v2.0 #1127
 * fix panic caused by multiple closes of pluginFatal channel #1107
 * correctly return error from NewCassandraStore() #1111
 * clean way of skipping expensive and integration tests. #1155, #1156
