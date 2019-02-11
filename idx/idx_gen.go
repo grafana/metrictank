@@ -13,43 +13,51 @@ func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "MetricDefinition":
 			err = z.MetricDefinition.DecodeMsg(dc)
 			if err != nil {
+				err = msgp.WrapError(err, "MetricDefinition")
 				return
 			}
 		case "SchemaId":
 			z.SchemaId, err = dc.ReadUint16()
 			if err != nil {
+				err = msgp.WrapError(err, "SchemaId")
 				return
 			}
 		case "AggId":
 			z.AggId, err = dc.ReadUint16()
 			if err != nil {
+				err = msgp.WrapError(err, "AggId")
 				return
 			}
 		case "IrId":
 			z.IrId, err = dc.ReadUint16()
 			if err != nil {
+				err = msgp.WrapError(err, "IrId")
 				return
 			}
 		case "LastSave":
 			z.LastSave, err = dc.ReadUint32()
 			if err != nil {
+				err = msgp.WrapError(err, "LastSave")
 				return
 			}
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -67,6 +75,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = z.MetricDefinition.EncodeMsg(en)
 	if err != nil {
+		err = msgp.WrapError(err, "MetricDefinition")
 		return
 	}
 	// write "SchemaId"
@@ -76,6 +85,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint16(z.SchemaId)
 	if err != nil {
+		err = msgp.WrapError(err, "SchemaId")
 		return
 	}
 	// write "AggId"
@@ -85,6 +95,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint16(z.AggId)
 	if err != nil {
+		err = msgp.WrapError(err, "AggId")
 		return
 	}
 	// write "IrId"
@@ -94,6 +105,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint16(z.IrId)
 	if err != nil {
+		err = msgp.WrapError(err, "IrId")
 		return
 	}
 	// write "LastSave"
@@ -103,6 +115,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint32(z.LastSave)
 	if err != nil {
+		err = msgp.WrapError(err, "LastSave")
 		return
 	}
 	return
@@ -116,6 +129,7 @@ func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 	o = append(o, 0x85, 0xb0, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e)
 	o, err = z.MetricDefinition.MarshalMsg(o)
 	if err != nil {
+		err = msgp.WrapError(err, "MetricDefinition")
 		return
 	}
 	// string "SchemaId"
@@ -140,43 +154,51 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "MetricDefinition":
 			bts, err = z.MetricDefinition.UnmarshalMsg(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "MetricDefinition")
 				return
 			}
 		case "SchemaId":
 			z.SchemaId, bts, err = msgp.ReadUint16Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "SchemaId")
 				return
 			}
 		case "AggId":
 			z.AggId, bts, err = msgp.ReadUint16Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "AggId")
 				return
 			}
 		case "IrId":
 			z.IrId, bts, err = msgp.ReadUint16Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "IrId")
 				return
 			}
 		case "LastSave":
 			z.LastSave, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "LastSave")
 				return
 			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -198,29 +220,34 @@ func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "Path":
 			z.Path, err = dc.ReadString()
 			if err != nil {
+				err = msgp.WrapError(err, "Path")
 				return
 			}
 		case "Leaf":
 			z.Leaf, err = dc.ReadBool()
 			if err != nil {
+				err = msgp.WrapError(err, "Leaf")
 				return
 			}
 		case "Defs":
 			var zb0002 uint32
 			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
+				err = msgp.WrapError(err, "Defs")
 				return
 			}
 			if cap(z.Defs) >= int(zb0002) {
@@ -231,17 +258,20 @@ func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
 			for za0001 := range z.Defs {
 				err = z.Defs[za0001].DecodeMsg(dc)
 				if err != nil {
+					err = msgp.WrapError(err, "Defs", za0001)
 					return
 				}
 			}
 		case "HasChildren":
 			z.HasChildren, err = dc.ReadBool()
 			if err != nil {
+				err = msgp.WrapError(err, "HasChildren")
 				return
 			}
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -259,6 +289,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteString(z.Path)
 	if err != nil {
+		err = msgp.WrapError(err, "Path")
 		return
 	}
 	// write "Leaf"
@@ -268,6 +299,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteBool(z.Leaf)
 	if err != nil {
+		err = msgp.WrapError(err, "Leaf")
 		return
 	}
 	// write "Defs"
@@ -277,11 +309,13 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Defs)))
 	if err != nil {
+		err = msgp.WrapError(err, "Defs")
 		return
 	}
 	for za0001 := range z.Defs {
 		err = z.Defs[za0001].EncodeMsg(en)
 		if err != nil {
+			err = msgp.WrapError(err, "Defs", za0001)
 			return
 		}
 	}
@@ -292,6 +326,7 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteBool(z.HasChildren)
 	if err != nil {
+		err = msgp.WrapError(err, "HasChildren")
 		return
 	}
 	return
@@ -313,6 +348,7 @@ func (z *Node) MarshalMsg(b []byte) (o []byte, err error) {
 	for za0001 := range z.Defs {
 		o, err = z.Defs[za0001].MarshalMsg(o)
 		if err != nil {
+			err = msgp.WrapError(err, "Defs", za0001)
 			return
 		}
 	}
@@ -329,29 +365,34 @@ func (z *Node) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "Path":
 			z.Path, bts, err = msgp.ReadStringBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Path")
 				return
 			}
 		case "Leaf":
 			z.Leaf, bts, err = msgp.ReadBoolBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Leaf")
 				return
 			}
 		case "Defs":
 			var zb0002 uint32
 			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Defs")
 				return
 			}
 			if cap(z.Defs) >= int(zb0002) {
@@ -362,17 +403,20 @@ func (z *Node) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			for za0001 := range z.Defs {
 				bts, err = z.Defs[za0001].UnmarshalMsg(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Defs", za0001)
 					return
 				}
 			}
 		case "HasChildren":
 			z.HasChildren, bts, err = msgp.ReadBoolBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "HasChildren")
 				return
 			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}

@@ -397,7 +397,7 @@ func (mw *Writer) WriteUint64(u uint64) error {
 	}
 }
 
-// WriteByte is analagous to WriteUint8
+// WriteByte is analogous to WriteUint8
 func (mw *Writer) WriteByte(u byte) error { return mw.WriteUint8(uint8(u)) }
 
 // WriteUint8 writes a uint8 to the writer
@@ -586,7 +586,7 @@ func (mw *Writer) WriteMapStrIntf(mp map[string]interface{}) (err error) {
 // elapsed since "zero" Unix time, followed by 4 bytes
 // for a big-endian 32-bit signed integer denoting
 // the nanosecond offset of the time. This encoding
-// is intended to ease portability accross languages.
+// is intended to ease portability across languages.
 // (Note that this is *not* the standard time.Time
 // binary encoding, because its implementation relies
 // heavily on the internal representation used by the
@@ -685,11 +685,11 @@ func (mw *Writer) WriteIntf(v interface{}) error {
 	case reflect.Map:
 		return mw.writeMap(val)
 	}
-	return &ErrUnsupportedType{val.Type()}
+	return &ErrUnsupportedType{T: val.Type()}
 }
 
 func (mw *Writer) writeMap(v reflect.Value) (err error) {
-	if v.Elem().Kind() != reflect.String {
+	if v.Type().Key().Kind() != reflect.String {
 		return errors.New("msgp: map keys must be strings")
 	}
 	ks := v.MapKeys()

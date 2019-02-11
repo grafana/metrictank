@@ -111,7 +111,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/raintank/schema"
-  version = "^2"
+  revision = "dc8d31b5117ed606334858ae45319b022d233806"
 
 [[constraint]]
   name = "github.com/rs/cors"
@@ -127,7 +127,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/tinylib/msgp"
-  version = "1.0.0-beta"
+  version = "v1.1.0"
 
 [[constraint]]
   name = "github.com/uber/jaeger-client-go"

@@ -12,6 +12,7 @@ func (z *Consolidator) DecodeMsg(dc *msgp.Reader) (err error) {
 		var zb0001 int
 		zb0001, err = dc.ReadInt()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		(*z) = Consolidator(zb0001)
@@ -23,6 +24,7 @@ func (z *Consolidator) DecodeMsg(dc *msgp.Reader) (err error) {
 func (z Consolidator) EncodeMsg(en *msgp.Writer) (err error) {
 	err = en.WriteInt(int(z))
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	return
@@ -41,6 +43,7 @@ func (z *Consolidator) UnmarshalMsg(bts []byte) (o []byte, err error) {
 		var zb0001 int
 		zb0001, bts, err = msgp.ReadIntBytes(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		(*z) = Consolidator(zb0001)

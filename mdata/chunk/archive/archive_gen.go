@@ -14,34 +14,40 @@ func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "RowKey":
 			z.RowKey, err = dc.ReadString()
 			if err != nil {
+				err = msgp.WrapError(err, "RowKey")
 				return
 			}
 		case "SecondsPerPoint":
 			z.SecondsPerPoint, err = dc.ReadUint32()
 			if err != nil {
+				err = msgp.WrapError(err, "SecondsPerPoint")
 				return
 			}
 		case "Points":
 			z.Points, err = dc.ReadUint32()
 			if err != nil {
+				err = msgp.WrapError(err, "Points")
 				return
 			}
 		case "Chunks":
 			var zb0002 uint32
 			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
+				err = msgp.WrapError(err, "Chunks")
 				return
 			}
 			if cap(z.Chunks) >= int(zb0002) {
@@ -52,12 +58,14 @@ func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 			for za0001 := range z.Chunks {
 				err = z.Chunks[za0001].DecodeMsg(dc)
 				if err != nil {
+					err = msgp.WrapError(err, "Chunks", za0001)
 					return
 				}
 			}
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -75,6 +83,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteString(z.RowKey)
 	if err != nil {
+		err = msgp.WrapError(err, "RowKey")
 		return
 	}
 	// write "SecondsPerPoint"
@@ -84,6 +93,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint32(z.SecondsPerPoint)
 	if err != nil {
+		err = msgp.WrapError(err, "SecondsPerPoint")
 		return
 	}
 	// write "Points"
@@ -93,6 +103,7 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint32(z.Points)
 	if err != nil {
+		err = msgp.WrapError(err, "Points")
 		return
 	}
 	// write "Chunks"
@@ -102,11 +113,13 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Chunks)))
 	if err != nil {
+		err = msgp.WrapError(err, "Chunks")
 		return
 	}
 	for za0001 := range z.Chunks {
 		err = z.Chunks[za0001].EncodeMsg(en)
 		if err != nil {
+			err = msgp.WrapError(err, "Chunks", za0001)
 			return
 		}
 	}
@@ -132,6 +145,7 @@ func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 	for za0001 := range z.Chunks {
 		o, err = z.Chunks[za0001].MarshalMsg(o)
 		if err != nil {
+			err = msgp.WrapError(err, "Chunks", za0001)
 			return
 		}
 	}
@@ -145,34 +159,40 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "RowKey":
 			z.RowKey, bts, err = msgp.ReadStringBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "RowKey")
 				return
 			}
 		case "SecondsPerPoint":
 			z.SecondsPerPoint, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "SecondsPerPoint")
 				return
 			}
 		case "Points":
 			z.Points, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Points")
 				return
 			}
 		case "Chunks":
 			var zb0002 uint32
 			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Chunks")
 				return
 			}
 			if cap(z.Chunks) >= int(zb0002) {
@@ -183,12 +203,14 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			for za0001 := range z.Chunks {
 				bts, err = z.Chunks[za0001].UnmarshalMsg(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Chunks", za0001)
 					return
 				}
 			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -213,29 +235,34 @@ func (z *Metric) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0001 uint32
 	zb0001, err = dc.ReadMapHeader()
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, err = dc.ReadMapKeyPtr()
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "MetricData":
 			err = z.MetricData.DecodeMsg(dc)
 			if err != nil {
+				err = msgp.WrapError(err, "MetricData")
 				return
 			}
 		case "AggregationMethod":
 			z.AggregationMethod, err = dc.ReadUint32()
 			if err != nil {
+				err = msgp.WrapError(err, "AggregationMethod")
 				return
 			}
 		case "Archives":
 			var zb0002 uint32
 			zb0002, err = dc.ReadArrayHeader()
 			if err != nil {
+				err = msgp.WrapError(err, "Archives")
 				return
 			}
 			if cap(z.Archives) >= int(zb0002) {
@@ -246,12 +273,14 @@ func (z *Metric) DecodeMsg(dc *msgp.Reader) (err error) {
 			for za0001 := range z.Archives {
 				err = z.Archives[za0001].DecodeMsg(dc)
 				if err != nil {
+					err = msgp.WrapError(err, "Archives", za0001)
 					return
 				}
 			}
 		default:
 			err = dc.Skip()
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
@@ -269,6 +298,7 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = z.MetricData.EncodeMsg(en)
 	if err != nil {
+		err = msgp.WrapError(err, "MetricData")
 		return
 	}
 	// write "AggregationMethod"
@@ -278,6 +308,7 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteUint32(z.AggregationMethod)
 	if err != nil {
+		err = msgp.WrapError(err, "AggregationMethod")
 		return
 	}
 	// write "Archives"
@@ -287,11 +318,13 @@ func (z *Metric) EncodeMsg(en *msgp.Writer) (err error) {
 	}
 	err = en.WriteArrayHeader(uint32(len(z.Archives)))
 	if err != nil {
+		err = msgp.WrapError(err, "Archives")
 		return
 	}
 	for za0001 := range z.Archives {
 		err = z.Archives[za0001].EncodeMsg(en)
 		if err != nil {
+			err = msgp.WrapError(err, "Archives", za0001)
 			return
 		}
 	}
@@ -306,6 +339,7 @@ func (z *Metric) MarshalMsg(b []byte) (o []byte, err error) {
 	o = append(o, 0x83, 0xaa, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x61, 0x74, 0x61)
 	o, err = z.MetricData.MarshalMsg(o)
 	if err != nil {
+		err = msgp.WrapError(err, "MetricData")
 		return
 	}
 	// string "AggregationMethod"
@@ -317,6 +351,7 @@ func (z *Metric) MarshalMsg(b []byte) (o []byte, err error) {
 	for za0001 := range z.Archives {
 		o, err = z.Archives[za0001].MarshalMsg(o)
 		if err != nil {
+			err = msgp.WrapError(err, "Archives", za0001)
 			return
 		}
 	}
@@ -330,29 +365,34 @@ func (z *Metric) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var zb0001 uint32
 	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
 	if err != nil {
+		err = msgp.WrapError(err)
 		return
 	}
 	for zb0001 > 0 {
 		zb0001--
 		field, bts, err = msgp.ReadMapKeyZC(bts)
 		if err != nil {
+			err = msgp.WrapError(err)
 			return
 		}
 		switch msgp.UnsafeString(field) {
 		case "MetricData":
 			bts, err = z.MetricData.UnmarshalMsg(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "MetricData")
 				return
 			}
 		case "AggregationMethod":
 			z.AggregationMethod, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "AggregationMethod")
 				return
 			}
 		case "Archives":
 			var zb0002 uint32
 			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
+				err = msgp.WrapError(err, "Archives")
 				return
 			}
 			if cap(z.Archives) >= int(zb0002) {
@@ -363,12 +403,14 @@ func (z *Metric) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			for za0001 := range z.Archives {
 				bts, err = z.Archives[za0001].UnmarshalMsg(bts)
 				if err != nil {
+					err = msgp.WrapError(err, "Archives", za0001)
 					return
 				}
 			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
+				err = msgp.WrapError(err)
 				return
 			}
 		}
