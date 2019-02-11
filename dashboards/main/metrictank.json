@@ -1907,7 +1907,7 @@
         },
         {
           "refId": "F",
-          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.api.mem.to_iter.latency.mean.gauge32), 'mem to iter')",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.mem.to_iter.latency.mean.gauge32), 'mem to iter')",
           "textEditor": false
         },
         {
