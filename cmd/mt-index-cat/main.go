@@ -261,10 +261,10 @@ func main() {
 		if !strings.Contains(d.Name.String(), substr) {
 			continue
 		}
-		if tags == "none" && len(d.Tags) != 0 {
+		if tags == "none" && len(d.Tags.KeyValues) != 0 {
 			continue
 		}
-		if tags == "some" && len(d.Tags) == 0 {
+		if tags == "some" && len(d.Tags.KeyValues) == 0 {
 			continue
 		}
 		if regex != nil && !regex.MatchString(d.Name.String()) {

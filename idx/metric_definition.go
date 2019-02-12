@@ -124,6 +124,8 @@ func (mn *MetricName) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
+//msgp:shim TagKeyValue as:string using:TagKeyValue.createTagKeyValue/parseTagKeyValue
+
 // TagKeyValue stores a Key/Value pair. The strings
 // are interned in an object store before they are assigned.
 type TagKeyValue struct {
@@ -154,6 +156,58 @@ func (t *TagKeyValue) String() string {
 	return bld.String()
 }
 
+func (t TagKeyValue) createTagKeyValue() string {
+	bld := strings.Builder{}
+
+	key, err := IdxIntern.GetNoRefCntString(t.Key)
+	if err != nil {
+		log.Error("idx: Failed to retrieve interned tag key: ", err)
+		internError.Inc()
+	}
+	val, err := IdxIntern.GetNoRefCntString(t.Value)
+	if err != nil {
+		log.Error("idx: Failed to retrieve interned tag value: ", err)
+		internError.Inc()
+	}
+
+	bld.WriteString(key)
+	bld.WriteString("=")
+	bld.WriteString(val)
+
+	return bld.String()
+}
+
+func parseTagKeyValue(tag string) TagKeyValue {
+	var tkv TagKeyValue
+	if strings.Contains(tag, ";") {
+		log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+		invalidTag.Inc()
+		return TagKeyValue{}
+	}
+	eqPos := strings.Index(tag, "=")
+	if eqPos < 0 {
+		log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+		invalidTag.Inc()
+		return TagKeyValue{}
+	}
+	key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]))
+	if err != nil {
+		log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
+		internError.Inc()
+		return TagKeyValue{}
+	}
+	tkv.Key = key
+
+	value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]))
+	if err != nil {
+		log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
+		internError.Inc()
+		return TagKeyValue{}
+	}
+	tkv.Value = value
+	return tkv
+}
+
 // TagKeyValues stores a slice of all of the Tag Key/Value pair combinations for a MetricDefinition
 type TagKeyValues struct {
 	KeyValues []TagKeyValue
@@ -182,9 +236,12 @@ func (t *TagKeyValues) Len() int {
 }
 
 func (t *TagKeyValues) MarshalBinaryTo(b []byte) error {
-	for idx, kv := range t.Strings() {
-		b = append(b, []byte(kv)...)
-		b = append(b, ';')
+	var total int
+	for _, kv := range t.Strings() {
+		copy(b[total:], kv)
+		total += len(kv)
+		copy(b[total:], ";")
+		total++
 	}
 	return nil
 }
@@ -247,8 +304,10 @@ func (md *MetricDefinition) NameWithTags() string {
 	bld := strings.Builder{}
 
 	md.Name.string(&bld)
-	sort.Slice(md.Tags, func(i, j int) bool {
-		return md.Tags.KeyValues[i].Key > md.Tags.KeyValues[j].Key
+	sort.Slice(md.Tags.KeyValues, func(i, j int) bool {
+		k1, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[i].Key)
+		k2, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[j].Key)
+		return k1 < k2
 	})
 	for _, tag := range md.Tags.KeyValues {
 		key, err := IdxIntern.GetNoRefCntString(tag.Key)
@@ -380,8 +439,10 @@ func (md *MetricDefinition) SetTags(tags []string) {
 
 // SetId creates and sets the MKey which identifies a metric
 func (md *MetricDefinition) SetId() {
-	sort.Slice(md.Tags, func(i, j int) bool {
-		return md.Tags.KeyValues[i].Key > md.Tags.KeyValues[j].Key
+	sort.Slice(md.Tags.KeyValues, func(i, j int) bool {
+		k1, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[i].Key)
+		k2, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[j].Key)
+		return k1 < k2
 	})
 	buffer := bytes.NewBufferString(md.Name.String())
 	buffer.WriteByte(0)
