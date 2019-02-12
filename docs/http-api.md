@@ -15,8 +15,8 @@ POST /
 
 returns:
 
-* `200 OK` if the node is primary or a warmed up secondary (`warmupPeriod` has elapsed)
-* `503 Service not ready` if the node is secondary and not yet warmed up.
+* `200 OK` if the node is [ready](clustering.md#priority-and-ready-state)
+* `503 Service not ready` otherwise.
 
 #### Example
 
@@ -132,7 +132,7 @@ returns a json document with the following fields:
 * "primary": whether the node is a primary node or not
 * "primaryChange": timestamp of when the primary state last changed
 * "version": metrictank version
-* "state": whether the node is ready to handle requests or not
+* "state": whether the node is [ready](clustering.md#priority-and-ready-state) to handle requests or not
 * "stateChange": timestamp of when the state last changed
 * "started": timestamp of when the node started up
 
