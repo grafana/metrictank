@@ -97,7 +97,7 @@ When the input plugin is not sure, or not started yet priority is 10k (2.8 hours
 
 * the priority value is gossipped to all peers in a sharding cluster
 * To satisfy queries from users, requests are fanned out across the cluster across all ready instances (see below), favoring lower priority instances.
-* Can be analyzed via http endpoints like `/cluster`, `/priority`, `/node` or via the dashboard/metrics.
+* The priority can be inspected via http endpoints like `/cluster`, `/priority`, `/node` or via the dashboard/metrics.
 
 Readyness or "ready state":
 
