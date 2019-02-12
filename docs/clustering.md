@@ -85,7 +85,7 @@ Hence, this is currently **not supported**.
 
 ## Priority and ready state
 
-Priority is a measure of how in-sync a metrictank process, expressed in seconds.
+Priority is a measure of how in-sync a metrictank process is, expressed in seconds.
 
 | input plugin  | priority                 |
 | ------------- | ------------------------ |
