@@ -175,9 +175,9 @@ type MetricIndex interface {
 // into the interning layer so that their reference count can be
 // decreased by 1 and they can eventually be deleted
 func InternReleaseMetricDefinition(md MetricDefinition) {
-	for _, tag := range md.Tags {
-		IdxIntern.DeleteByValString(tag.Key)
-		IdxIntern.DeleteByValString(tag.Value)
+	for _, tag := range md.Tags.KeyValues {
+		IdxIntern.Delete(tag.Key)
+		IdxIntern.Delete(tag.Value)
 	}
 
 	for _, id := range md.Name.Nodes() {
