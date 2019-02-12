@@ -2,9 +2,7 @@ package idx
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
-	"unsafe"
 
 	goi "github.com/robert-milan/go-object-interning"
 	. "github.com/smartystreets/goconvey/convey"
@@ -156,16 +154,6 @@ func TestMetricNameAndTagAddresses(t *testing.T) {
 					So(cnt, ShouldEqual, 5)
 				}
 
-			}
-		})
-		Convey("tags should be using the same object addresses", func() {
-			for idx, tag := range defs[0].Tags {
-				keyData := (*reflect.StringHeader)(unsafe.Pointer(&tag.Key)).Data
-				valData := (*reflect.StringHeader)(unsafe.Pointer(&tag.Value)).Data
-				for i := 1; i < len(defs); i++ {
-					So(keyData, ShouldEqual, (*reflect.StringHeader)(unsafe.Pointer(&defs[i].Tags[idx].Key)).Data)
-					So(valData, ShouldEqual, (*reflect.StringHeader)(unsafe.Pointer(&defs[i].Tags[idx].Value)).Data)
-				}
 			}
 		})
 	})

@@ -63,9 +63,13 @@ func getTestIndex(t *testing.T) (TagIndex, map[schema.MKey]*idx.Archive) {
 		byId[d.id].LastUpdate = d.lastUpdate
 		for _, tag := range d.tags {
 			tagSplits := strings.Split(tag, "=")
-			tagIdx.addTagId(tagSplits[0], tagSplits[1], d.id)
+			k, _ := idx.IdxIntern.AddOrGet([]byte(tagSplits[0]))
+			v, _ := idx.IdxIntern.AddOrGet([]byte(tagSplits[1]))
+			tagIdx.addTagId(k, v, d.id)
 		}
-		tagIdx.addTagId("name", byId[d.id].Name.String(), d.id)
+		k, _ := idx.IdxIntern.AddOrGet([]byte("name"))
+		v, _ := idx.IdxIntern.AddOrGet([]byte(byId[d.id].Name.String()))
+		tagIdx.addTagId(k, v, d.id)
 	}
 
 	return tagIdx, byId
