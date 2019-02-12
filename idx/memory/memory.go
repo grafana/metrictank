@@ -343,7 +343,7 @@ func (m *MemoryIdx) indexTags(def *idx.MetricDefinition) {
 		m.tags[def.OrgId] = tags
 	}
 
-	for _, tag := range def.Tags {
+	for _, tag := range def.Tags.KeyValues {
 		// we don't care if an error is returned for now
 		// because the original string will be returned
 		// and at least the process can still continue.
