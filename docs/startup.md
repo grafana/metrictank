@@ -22,11 +22,12 @@ The full startup procedure has many details, but here we cover the main steps if
 | init Index              | creates session, keyspace, tables, write queues, etc and loads in-memory index from persisted data | reasonable RAM and CPU increase                    |
 | create cluster notifier | optional: connects to Kafka, starts backfilling persistence message and waits until done or timeout| if backfilling: above-normal CPU, normal RAM usage |
 | start input plugin(s)   | starts backfill (kafka) or listening (carbon, prometheus) and maintain priority based on input lag | if backfilling: above-normal CPU and RAM usage     |
-| mark ready state        | immediately (primary) or after warmup period (secondary) (combined with priority for clustering)   | no                                                 |
+| mark ready state        | immediately (primary) / after warmup (secondary) [details](clustering.md#priority-and-ready-state) | no                                                 |
 
 We recommend provisioning a cluster such that it can backfill a 7 hour backlog in half on hour or less. This means:
 * The CPU increase during the kafka backfilling is very significant: typically a 14x cpu increase compared to normal usage.
-* The RAM usage during the input data backfilling is typically about 1.5x to 2x normal.
+* The RAM usage during the input data backfilling is typically about 1.5x to 2x normal,
+  though the `cluster.gc-percent-not-ready` setting lets you trade cpu for memory usage during startup.
 
 Backfilling will go as fast as it can until it reaches a bottleneck (kafka brokers, cpu constraints, etc), so your numbers may vary.
 
