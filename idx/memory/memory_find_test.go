@@ -505,13 +505,23 @@ func testTagSorting(t *testing.T) {
 
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
-	md2[0].Tags = idx.TagKeyValues{
-		idx.TagKeyValue{Key: "5", Value: "a"},
-		idx.TagKeyValue{Key: "1", Value: "a"},
-		idx.TagKeyValue{Key: "2", Value: "a"},
-		idx.TagKeyValue{Key: "4", Value: "a"},
-		idx.TagKeyValue{Key: "3", Value: "a"},
-	}
+	var k, v uintptr
+	md2[0].Tags = idx.TagKeyValues{}
+	k, _ = idx.IdxIntern.AddOrGet([]byte("5"))
+	v, _ = idx.IdxIntern.AddOrGet([]byte("a"))
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
+	k, _ = idx.IdxIntern.AddOrGet([]byte("1"))
+	v, _ = idx.IdxIntern.AddOrGet([]byte("a"))
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
+	k, _ = idx.IdxIntern.AddOrGet([]byte("2"))
+	v, _ = idx.IdxIntern.AddOrGet([]byte("a"))
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
+	k, _ = idx.IdxIntern.AddOrGet([]byte("4"))
+	v, _ = idx.IdxIntern.AddOrGet([]byte("a"))
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
+	k, _ = idx.IdxIntern.AddOrGet([]byte("3"))
+	v, _ = idx.IdxIntern.AddOrGet([]byte("a"))
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
 	index.Load(md2)
 
 	query, err = tagquery.NewQueryFromStrings([]string{"3=a"}, 0)

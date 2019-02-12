@@ -93,7 +93,7 @@ func RowToSchema(row bigtable.Row, def *idx.MetricDefinition) error {
 			def.SetMType(string(col.Value))
 		case "Tags":
 			if len(col.Value) == 0 {
-				def.Tags = nil
+				def.Tags.KeyValues = nil
 			} else {
 				def.SetTags(strings.Split(string(col.Value), ";"))
 			}
