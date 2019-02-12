@@ -342,6 +342,28 @@ func (oi *ObjectIntern) GetNoRefCntCompressed(obj []byte) (uintptr, error) {
 	return 0, fmt.Errorf("Could not find object in store")
 }
 
+// GetNoRefCntString returns an interned version of a string stored at objAddr
+// Upon failure it returns an empty string and an error
+//
+// This method does not increase the reference count of the interned object
+func (oi *ObjectIntern) GetNoRefCntString(objAddr uintptr) (string, error) {
+	oi.RLock()
+	defer oi.RUnlock()
+
+	b, err := oi.Store.Get(objAddr)
+	if err != nil {
+		return "", err
+	}
+
+	var tmpString string
+	StringHeader := (*reflect.StringHeader)(unsafe.Pointer(&tmpString))
+	StringHeader.Data = objAddr
+	// remove 4 trailing bytes for reference count
+	StringHeader.Len = len(b) - 4
+
+	return tmpString, nil
+}
+
 // Delete decrements the reference count of an object identified by its address.
 // Possible return values are as follows:
 //
