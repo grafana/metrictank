@@ -208,9 +208,19 @@ func parseTagKeyValue(tag string) TagKeyValue {
 	return tkv
 }
 
+type KeyValuesSlice []TagKeyValue
+
+func (kvs KeyValuesSlice) Len() int      { return len(kvs) }
+func (kvs KeyValuesSlice) Swap(i, j int) { kvs[i], kvs[j] = kvs[j], kvs[i] }
+func (kvs KeyValuesSlice) Less(i, j int) bool {
+	k1, _ := IdxIntern.GetNoRefCntString(kvs[i].Key)
+	k2, _ := IdxIntern.GetNoRefCntString(kvs[j].Key)
+	return k1 < k2
+}
+
 // TagKeyValues stores a slice of all of the Tag Key/Value pair combinations for a MetricDefinition
 type TagKeyValues struct {
-	KeyValues []TagKeyValue
+	KeyValues KeyValuesSlice
 }
 
 // Strings returns a slice containing all of the Tag Key/Value pair combinations for a MetricDefinition.
@@ -230,6 +240,12 @@ func (t *TagKeyValues) ExtensionType() int8 {
 func (t *TagKeyValues) Len() int {
 	var total int
 	for _, kv := range t.Strings() {
+		if strings.HasPrefix(kv, "name") {
+			continue
+		}
+		if kv == "=" || kv == "" {
+			continue
+		}
 		total += len(kv) + 1
 	}
 	return total
@@ -238,6 +254,12 @@ func (t *TagKeyValues) Len() int {
 func (t *TagKeyValues) MarshalBinaryTo(b []byte) error {
 	var total int
 	for _, kv := range t.Strings() {
+		if strings.HasPrefix(kv, "name") {
+			continue
+		}
+		if kv == "=" || kv == "" {
+			continue
+		}
 		copy(b[total:], kv)
 		total += len(kv)
 		copy(b[total:], ";")
@@ -247,10 +269,21 @@ func (t *TagKeyValues) MarshalBinaryTo(b []byte) error {
 }
 
 func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
-	tags := strings.Split(string(b), ";")
+	if len(b) < 3 {
+		return nil
+	}
+	tags := strings.Split(string(b[:len(b)-1]), ";")
 	tmp := make([]TagKeyValue, len(tags))
 	t.KeyValues = tmp
 	for i, tag := range tags {
+		if strings.HasPrefix(tag, "name") {
+			continue
+		}
+		if tag == "=" || tag == "" {
+			log.Error("idx: Empty tag, ignoring: ", tag)
+			invalidTag.Inc()
+			continue
+		}
 		if strings.Contains(tag, ";") {
 			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
@@ -304,11 +337,7 @@ func (md *MetricDefinition) NameWithTags() string {
 	bld := strings.Builder{}
 
 	md.Name.string(&bld)
-	sort.Slice(md.Tags.KeyValues, func(i, j int) bool {
-		k1, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[i].Key)
-		k2, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[j].Key)
-		return k1 < k2
-	})
+	sort.Sort(md.Tags.KeyValues)
 	for _, tag := range md.Tags.KeyValues {
 		key, err := IdxIntern.GetNoRefCntString(tag.Key)
 		if err != nil {
@@ -406,20 +435,25 @@ func (md *MetricDefinition) SetTags(tags []string) {
 	md.Tags.KeyValues = make([]TagKeyValue, len(tags))
 	sort.Strings(tags)
 	for i, tag := range tags {
+		if tag == "=" || tag == "" {
+			log.Error("idx: SetTags: Empty tag, ignoring: ", tag)
+			invalidTag.Inc()
+			continue
+		}
 		if strings.Contains(tag, ";") {
-			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+			log.Errorf("idx: SetTags: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
 			continue
 		}
 		eqPos := strings.Index(tag, "=")
 		if eqPos < 0 {
-			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+			log.Errorf("idx: SetTags: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
 			continue
 		}
 		key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]))
 		if err != nil {
-			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
+			log.Errorf("idx: SetTags: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
 			continue
 		} else {
@@ -428,7 +462,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 
 		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]))
 		if err != nil {
-			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
+			log.Errorf("idx: SetTags: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
 			continue
 		} else {
@@ -439,11 +473,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 
 // SetId creates and sets the MKey which identifies a metric
 func (md *MetricDefinition) SetId() {
-	sort.Slice(md.Tags.KeyValues, func(i, j int) bool {
-		k1, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[i].Key)
-		k2, _ := IdxIntern.GetNoRefCntString(md.Tags.KeyValues[j].Key)
-		return k1 < k2
-	})
+	sort.Sort(md.Tags.KeyValues)
 	buffer := bytes.NewBufferString(md.Name.String())
 	buffer.WriteByte(0)
 	buffer.WriteString(md.Unit)
