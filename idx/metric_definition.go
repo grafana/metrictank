@@ -62,7 +62,7 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 	lns, ok := IdxIntern.Len(mn.nodes)
 	if !ok {
 		internError.Inc()
-		log.Error("idx: Failed to retrieve length of strings from interning library")
+		log.Error("idx: Failed to retrieve length of strings from interning library for MetricName")
 		return ""
 	}
 
@@ -354,6 +354,11 @@ func (md *MetricDefinition) NameWithTags() string {
 	return bld.String()
 }
 
+func (md *MetricDefinition) NameWithTagsHash() string {
+	buffer := bytes.NewBufferString(md.NameWithTags())
+	return fmt.Sprintf("%x", md5.Sum(buffer.Bytes()))
+}
+
 // SetMType translates a string into a uint8 which is used to store
 // the actual metric type. Valid values are 'gauge', 'rate', 'count',
 // 'counter', and 'timestamp'.
@@ -418,6 +423,7 @@ func (md *MetricDefinition) SetMetricName(name string) {
 		nodePtr, err := IdxIntern.AddOrGet([]byte(node))
 		if err != nil {
 			log.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
+			internError.Inc()
 		}
 		md.Name.nodes[i] = nodePtr
 	}
