@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"bytes"
+	"crypto/md5"
 	"flag"
 	"fmt"
 	"os"
@@ -189,7 +191,7 @@ func (defs defByTagSet) add(def *idx.MetricDefinition) {
 		defs[def.OrgId] = orgDefs
 	}
 
-	fullName := def.NameWithTags()
+	fullName := def.NameWithTagsHash()
 	if _, ok = orgDefs[fullName]; !ok {
 		orgDefs[fullName] = make(map[*idx.MetricDefinition]struct{}, 1)
 	}
@@ -203,7 +205,7 @@ func (defs defByTagSet) del(def *idx.MetricDefinition) {
 		return
 	}
 
-	fullName := def.NameWithTags()
+	fullName := def.NameWithTagsHash()
 	delete(orgDefs[fullName], def)
 
 	if len(orgDefs[fullName]) == 0 {
@@ -222,7 +224,10 @@ func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefiniti
 		return nil
 	}
 
-	return orgDefs[fullName]
+	buffer := bytes.NewBufferString(fullName)
+	hashedName := fmt.Sprintf("%x", md5.Sum(buffer.Bytes()))
+
+	return orgDefs[hashedName]
 }
 
 type Node struct {
