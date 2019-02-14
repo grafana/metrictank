@@ -180,13 +180,6 @@ func (q *TagQuery) Run() IdSet {
 	return result
 }
 
-func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagIndex, mti metaTagIndex, mtr metaTagRecords) {
-	q.index = idx
-	q.byId = defById
-	q.metaIndex = mti
-	q.metaRecords = mtr
-}
-
 func (q *TagQuery) run() chan schema.MKey {
 	q.sortByCost()
 
@@ -218,6 +211,29 @@ func (q *TagQuery) run() chan schema.MKey {
 	}()
 
 	return results
+}
+
+func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagIndex, mti metaTagIndex, mtr metaTagRecords) {
+	q.index = idx
+	q.byId = defById
+	q.metaIndex = mti
+	q.metaRecords = mtr
+}
+
+func (q *TagQuery) subQueryFromExpressions(expressions []expression) (*TagQuery, error) {
+	query, err := tagQueryFromExpressions(expressions, q.from, true)
+	if err != nil {
+		// this means we've stored a meta record containing invalid queries
+		corruptIndex.Inc()
+		return nil, err
+	}
+
+	query.index = q.index
+	query.byId = q.byId
+	query.metaIndex = q.metaIndex
+	query.metaRecords = q.metaRecords
+
+	return query, nil
 }
 
 // getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
@@ -279,14 +295,11 @@ func (q *TagQuery) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struc
 						return
 					}
 
-					query, err := tagQueryFromExpressions(record.queries, q.from, true)
+					query, err := q.subQueryFromExpressions(record.queries)
 					if err != nil {
-						// this means we've stored a meta record containing invalid queries
-						corruptIndex.Inc()
 						return
 					}
 
-					query.initForIndex(q.byId, q.index, q.metaIndex, q.metaRecords)
 					resCh := query.run()
 					for id := range resCh {
 						idCh <- id
@@ -358,17 +371,10 @@ func (q *TagQuery) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) 
 					return
 				}
 
-				query, err := tagQueryFromExpressions(record.queries, q.from, true)
+				query, err := q.subQueryFromExpressions(record.queries)
 				if err != nil {
-					// this means we've stored a meta record containing invalid queries
-					corruptIndex.Inc()
 					return
 				}
-
-				query.index = q.index
-				query.metaIndex = q.metaIndex
-				query.metaRecords = q.metaRecords
-				query.byId = q.byId
 
 				resCh := query.run()
 				for id := range resCh {
