@@ -391,7 +391,8 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 		m.add(def)
 
 		if TagSupport {
-			m.indexTags(def)
+			nDef := *def
+			m.indexTags(&nDef)
 		}
 
 		// as we are loading the metricDefs from a persistent store, set the lastSave
