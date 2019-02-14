@@ -82,3 +82,7 @@ func (e *expressionPrefix) getMetaRecords(mti metaTagIndex) []uint32 {
 	}
 	return res
 }
+
+func (e *expressionPrefix) getMetaRecordFilter(evaluators []metaRecordEvaluator) tagFilter {
+	return e.expressionCommon.getMetaRecordFilterWithDecision(evaluators, pass)
+}

@@ -52,3 +52,7 @@ func (e *expressionNotHasTag) stringIntoBuilder(builder *strings.Builder) {
 func (e *expressionNotHasTag) getMetaRecords(mti metaTagIndex) []uint32 {
 	return nil
 }
+
+func (e *expressionNotHasTag) getMetaRecordFilter(evaluators []metaRecordEvaluator) tagFilter {
+	return e.expressionCommon.getMetaRecordFilterWithDecision(evaluators, none)
+}

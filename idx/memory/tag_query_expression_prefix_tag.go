@@ -69,3 +69,7 @@ func (e *expressionPrefixTag) getMetaRecords(mti metaTagIndex) []uint32 {
 	}
 	return res
 }
+
+func (e *expressionPrefixTag) getMetaRecordFilter(evaluators []metaRecordEvaluator) tagFilter {
+	return e.expressionCommon.getMetaRecordFilterWithDecision(evaluators, pass)
+}

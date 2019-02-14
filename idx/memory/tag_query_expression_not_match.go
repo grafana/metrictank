@@ -119,3 +119,7 @@ func (e *expressionNotMatch) getMetaRecords(mti metaTagIndex) []uint32 {
 	}
 	return res
 }
+
+func (e *expressionNotMatch) getMetaRecordFilter(evaluators []metaRecordEvaluator) tagFilter {
+	return e.expressionCommon.getMetaRecordFilterWithDecision(evaluators, none)
+}

@@ -56,3 +56,7 @@ func (e *expressionNotEqual) stringIntoBuilder(builder *strings.Builder) {
 func (e *expressionNotEqual) matchesTag() bool {
 	return false
 }
+
+func (e *expressionNotEqual) getMetaRecordFilter(evaluators []metaRecordEvaluator) tagFilter {
+	return e.expressionCommon.getMetaRecordFilterWithDecision(evaluators, none)
+}

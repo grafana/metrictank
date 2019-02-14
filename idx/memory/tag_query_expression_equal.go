@@ -69,12 +69,14 @@ func (e *expressionEqual) stringIntoBuilder(builder *strings.Builder) {
 
 func (e *expressionEqual) getMetaRecords(mti metaTagIndex) []uint32 {
 	if values, ok := mti[e.key]; ok {
-		for value, ids := range values {
-			if value == e.value {
-				return ids
-			}
+		if ids, ok := values[e.value]; ok {
+			return ids
 		}
 	}
 
 	return nil
+}
+
+func (e *expressionEqual) getMetaRecordFilter(evaluators []metaRecordEvaluator) tagFilter {
+	return e.expressionCommon.getMetaRecordFilterWithDecision(evaluators, pass)
 }

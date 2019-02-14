@@ -2,6 +2,7 @@ package memory
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"regexp"
 	"sort"
@@ -228,10 +229,7 @@ func (q *TagQuery) subQueryFromExpressions(expressions []expression) (*TagQuery,
 		return nil, err
 	}
 
-	query.index = q.index
-	query.byId = q.byId
-	query.metaIndex = q.metaIndex
-	query.metaRecords = q.metaRecords
+	query.initForIndex(q.byId, q.index, q.metaIndex, q.metaRecords)
 
 	return query, nil
 }
@@ -400,19 +398,35 @@ func (q *TagQuery) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTa
 		return false
 	}
 
+	var res filterDecision
+	var recordIds []uint32
+	var records []metaTagRecord
+	var evaluators []metaRecordEvaluator
 	for _, filter := range q.filters {
-		if res := filter.test(def); res == pass {
+		if res = filter.test(def); res == pass {
 			continue
-		} else if res == fail {
+		}
+		if res == fail {
 			return false
 		}
 
-		metaRecords := q.getMetaRecords(filter.expr)
+		recordIds = filter.expr.getMetaRecords(q.metaIndex)
+		records = q.metaRecords.getRecords(recordIds)
+		if len(records) < len(recordIds) {
+			corruptIndex.Inc()
+			return false
+		}
+		evaluators = evaluators[:0]
+		for _, record := range records {
+			evaluators = append(evaluators, record.getEvaluator())
+		}
 
-		for _, record := range metaRecords {
-			if record.testByQueries(def) {
-				return true
-			}
+		res = filter.expr.getMetaRecordFilter(evaluators)(def)
+		if res == pass {
+			continue
+		}
+		if res == fail {
+			return false
 		}
 
 		if filter.defaultDecision != pass {
@@ -423,19 +437,19 @@ func (q *TagQuery) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTa
 	return true
 }
 
-func (q *TagQuery) getMetaRecords(expr expression) []metaTagRecord {
+func (q *TagQuery) getMetaRecords(expr expression) ([]metaTagRecord, error) {
 	ids := expr.getMetaRecords(q.metaIndex)
 	res := make([]metaTagRecord, 0, len(ids))
 	for _, id := range ids {
 		if record, ok := q.metaRecords[id]; !ok {
 			corruptIndex.Inc()
-			continue
+			return nil, fmt.Errorf("GetMetaRecords: record id %d exists in metaTagIndex but not in metaTagRecords", record)
 		} else {
 			res = append(res, record)
 		}
 	}
 
-	return res
+	return res, nil
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -462,7 +476,6 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 			continue
 		}
 
-		// we always omit tag filters because Run() does not support filtering by tags
 		if q.testByAllExpressions(id, def, false) {
 			resCh <- id
 		}
