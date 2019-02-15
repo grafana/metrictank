@@ -81,6 +81,7 @@ type KvReByCost []kvRe
 func (a KvReByCost) Len() int           { return len(a) }
 func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
+
 type filter struct {
 	expr            expression
 	test            tagFilter
@@ -200,6 +201,13 @@ KEYS:
 	}
 
 	close(idCh)
+}
+
+func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagIndex, mti metaTagIndex, mtr metaTagRecords) {
+	q.index = idx
+	q.byId = defById
+	q.metaIndex = mti
+	q.metaRecords = mtr
 }
 
 // getInitialByPrefix generates the initial resultset by executing the given prefix match expression
