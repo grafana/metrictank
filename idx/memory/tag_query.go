@@ -228,13 +228,37 @@ FIND_OPERATOR:
 	return res, nil
 }
 
-func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
-	q := TagQuery{from: from, wg: &sync.WaitGroup{}}
+func tagQueryFromExpressions(expressions []expression, from int64, subQuery bool) (*TagQuery, error) {
+	q := TagQuery{from: from, wg: &sync.WaitGroup{}, subQuery: subQuery}
 
-	if len(expressions) == 0 {
-		return q, errInvalidQuery
+	// every set of expressions must have at least one positive operator (=, =~, ^=, <tag>!=<empty>, __tag^=, __tag=~)
+	foundPositiveOperator := false
+	for _, e := range expressions {
+
+		if !foundPositiveOperator && e.isPositiveOperator() {
+			foundPositiveOperator = true
+		}
+
+		q.mixedExpressions = append(q.mixedExpressions, e)
 	}
 
+	if !foundPositiveOperator {
+		return nil, errInvalidQuery
+	}
+
+	return &q, nil
+}
+
+// NewTagQuery initializes a new tag query from the given expressions and the
+// from timestamp. It assigns all expressions to the expression group for
+// metric tags, later when sortByCost is called it will move those out which
+// are keyed by a tag that doesn't exist in the metric index.
+func NewTagQuery(expressions []string, from int64) (*TagQuery, error) {
+	if len(expressions) == 0 {
+		return nil, errInvalidQuery
+	}
+
+	parsed := make([]expression, 0, len(expressions))
 	sort.Strings(expressions)
 	for i, expr := range expressions {
 		// skip duplicate expression
@@ -244,105 +268,18 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 
 		e, err := parseExpression(expr)
 		if err != nil {
-			return q, err
+			return nil, err
 		}
 
-		// special case of empty value
-		if len(e.value) == 0 {
-			expression := kvRe{
-				key:        e.key,
-				value:      nil,
-				matchCache: &sync.Map{},
-				missCache:  &sync.Map{},
-			}
-			if e.operator == EQUAL || e.operator == MATCH {
-				q.notMatch = append(q.notMatch, expression)
-			} else {
-				q.match = append(q.match, expression)
-			}
-		} else {
-			// always anchor all regular expressions at the beginning if they do not start with ^
-			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != '^' {
-				e.value = "^(?:" + e.value + ")"
-			}
-
-			switch e.operator {
-			case EQUAL:
-				q.equal = append(q.equal, e.kv)
-			case NOT_EQUAL:
-				q.notEqual = append(q.notEqual, e.kv)
-			case MATCH:
-				re, err := compileRe(e.value)
-				if err != nil {
-					return q, errInvalidQuery
-				}
-				q.match = append(q.match, kvRe{
-					key:        e.key,
-					value:      re,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				})
-			case NOT_MATCH:
-				re, err := compileRe(e.value)
-				if err != nil {
-					return q, errInvalidQuery
-				}
-				q.notMatch = append(q.notMatch, kvRe{
-					key:        e.key,
-					value:      re,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				})
-			case PREFIX:
-				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
-			case MATCH_TAG:
-				// we only allow one query by tag
-				if q.tagClause != 0 {
-					return q, errInvalidQuery
-				}
-
-				re, err := compileRe(e.value)
-				if err != nil {
-					return q, errInvalidQuery
-				}
-
-				q.tagMatch = kvRe{
-					value:      re,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				}
-
-				q.tagClause = MATCH_TAG
-			case PREFIX_TAG:
-				// we only allow one query by tag
-				if q.tagClause != 0 {
-					return q, errInvalidQuery
-				}
-
-				q.tagPrefix = e.value
-				q.tagClause = PREFIX_TAG
-			}
-		}
+		parsed = append(parsed, e)
 	}
 
-	// the cheapest operator to minimize the result set should have precedence
-	if len(q.equal) > 0 {
-		q.startWith = EQUAL
-	} else if len(q.prefix) > 0 {
-		q.startWith = PREFIX
-	} else if len(q.match) > 0 {
-		q.startWith = MATCH
-	} else if q.tagClause == PREFIX_TAG {
-		// starting with a tag based query can be very expensive because they
-		// have the potential to result in a huge initial result set
-		q.startWith = PREFIX_TAG
-	} else if q.tagClause == MATCH_TAG {
-		q.startWith = MATCH_TAG
-	} else {
-		return q, errInvalidQuery
+	query, err := tagQueryFromExpressions(parsed, from, false)
+	if err != nil {
+		return nil, err
 	}
 
-	return q, nil
+	return query, nil
 }
 
 // getInitialByEqual generates the initial resultset by executing the given equal expression
