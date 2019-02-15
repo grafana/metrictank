@@ -518,14 +518,16 @@ func (p *PartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	return p.Partition[def.Partition].add(def)
 }
 
-func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
+func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query *TagQuery) IdSet {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([]IdSet, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
 		g.Go(func() error {
-			found := m.idsByTagQuery(orgId, query)
+			// the query has a context associated with it, so it needs to be copied
+			queryCopy := *query
+			found := m.idsByTagQuery(orgId, &queryCopy)
 			result[pos] = found
 			return nil
 		})
@@ -580,4 +582,27 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.M
 	}
 
 	return record, created, nil
+}
+
+func (p *PartitionedMemoryIdx) EnrichWithMetaTags(orgId uint32, tags map[string]string) map[string]string {
+	g, _ := errgroup.WithContext(context.Background())
+	results := make([]map[string]string, len(p.Partition))
+	var i int
+	for _, m := range p.Partition {
+		g.Go(func() error {
+			results[i] = m.EnrichWithMetaTags(orgId, tags)
+			return nil
+		})
+		i++
+	}
+
+	result := make(map[string]string)
+	g.Wait()
+	for _, partitionResult := range results {
+		for k, v := range partitionResult {
+			result[k] = v
+		}
+	}
+
+	return result
 }

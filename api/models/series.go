@@ -17,6 +17,7 @@ type Series struct {
 	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Datapoints   []schema.Point
 	Tags         map[string]string // Must be set initially via call to `SetTags()`
+	MetaTags     map[string]string
 	Interval     uint32
 	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
 	QueryFrom    uint32                     // to tie series back to request it came from
@@ -30,10 +31,16 @@ func (s *Series) SetTags() {
 
 	if s.Tags == nil {
 		// +1 for the name tag
-		s.Tags = make(map[string]string, numTags+1)
+		s.Tags = make(map[string]string, numTags+1+len(s.MetaTags))
 	} else {
 		for k := range s.Tags {
 			delete(s.Tags, k)
+		}
+	}
+
+	for tag, value := range s.MetaTags {
+		if _, ok := s.Tags[tag]; !ok {
+			s.Tags[tag] = value
 		}
 	}
 
@@ -88,6 +95,15 @@ func (s Series) Copy(emptyDatapoints []schema.Point) Series {
 	}
 
 	return newSeries
+}
+
+func (s Series) AddTags(tags map[string]string) {
+	for tag, value := range tags {
+		// intrinsic tags have preference
+		if _, ok := s.Tags[tag]; !ok {
+			s.Tags[tag] = value
+		}
+	}
 }
 
 type SeriesByTarget []Series

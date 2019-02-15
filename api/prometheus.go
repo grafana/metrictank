@@ -300,7 +300,7 @@ func parseDuration(s string) (time.Duration, error) {
 func SeriesToSeriesSet(out []models.Series) (*models.PrometheusSeriesSet, error) {
 	series := []storage.Series{}
 	for _, metric := range out {
-		series = append(series, models.NewPrometheusSeries(buildTagSet(metric.Target), dataPointsToPrometheusSamplePairs(metric.Datapoints)))
+		series = append(series, models.NewPrometheusSeries(metric.Tags, dataPointsToPrometheusSamplePairs(metric.Datapoints)))
 	}
 	return models.NewPrometheusSeriesSet(series), nil
 }

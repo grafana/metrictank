@@ -6,7 +6,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/raintank/gziper"
-	"gopkg.in/macaron.v1"
+	macaron "gopkg.in/macaron.v1"
 )
 
 func (s *Server) RegisterRoutes() {

@@ -2,8 +2,8 @@ package memory
 
 import (
 	"errors"
+	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -12,6 +12,7 @@ import (
 	"github.com/raintank/schema"
 
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/idx/memory/tagQueryExpression"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,53 +27,8 @@ var (
 // some of the following operators are non-standard and are only used
 // internally to implement certain functionalities requiring them
 
-type match uint16
-
-const (
-	EQUAL      match = iota // =
-	NOT_EQUAL               // !=
-	MATCH                   // =~        regular expression
-	MATCH_TAG               // __tag=~   relies on special key __tag. non-standard, required for `/metrics/tags` requests with "filter"
-	NOT_MATCH               // !=~
-	PREFIX                  // ^=        exact prefix, not regex. non-standard, required for auto complete of tag values
-	PREFIX_TAG              // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
-)
-
-func (m match) stringIntoBuilder(builder *strings.Builder) {
-	switch m {
-	case EQUAL:
-		builder.WriteString("=")
-	case NOT_EQUAL:
-		builder.WriteString("!=")
-	case MATCH:
-		builder.WriteString("=~")
-	case MATCH_TAG:
-		builder.WriteString("=~")
-	case NOT_MATCH:
-		builder.WriteString("!=~")
-	case PREFIX:
-		builder.WriteString("^=")
-	case PREFIX_TAG:
-		builder.WriteString("^=")
-	}
-}
-
-type expression struct {
-	kv
-	operator match
-}
-
-func (e *expression) stringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	e.operator.stringIntoBuilder(builder)
-	builder.WriteString(e.value)
-}
-
 // a key / value combo used to represent a tag expression like "key=value"
-// the cost is an estimate how expensive this query is compared to others
-// with the same operator
 type kv struct {
-	cost  uint // cost of evaluating expression, compared to other kv objects
 	key   string
 	value string
 }
@@ -83,29 +39,25 @@ func (k *kv) stringIntoBuilder(builder *strings.Builder) {
 	builder.WriteString(k.value)
 }
 
-// kv expressions that rely on regular expressions will get converted to kvRe in
-// NewTagQuery() to accommodate the additional requirements of regex based queries.
-type kvRe struct {
-	cost           uint // cost of evaluating expression, compared to other kvRe objects
-	key            string
-	value          *regexp.Regexp // the regexp pattern to evaluate, nil means everything should match
-	matchCache     *sync.Map      // needs to be reference so kvRe can be copied, caches regex matches
-	matchCacheSize int32          // sync.Map does not have a way to get the length
-	missCache      *sync.Map      // needs to be reference so kvRe can be copied, caches regex misses
-	missCacheSize  int32          // sync.Map does not have a way to get the length
+type filter struct {
+	// expr is the expression based on which this filter has been generated
+	expr tagQueryExpression.Expression
+
+	// test is a filter function which takes a MetricDefinition and returns a
+	// tagQueryExpression.FilterDecision type indicating whether the MD
+	// satisfies this expression or not
+	test tagQueryExpression.MetricDefinitionFilter
+
+	// testByMetaTags is a filter function which has been generated from the
+	// meta records that match this filter's expression. It accepts a set of
+	// tags and returns true if the given set of tags should pass this filter
+	// due to matching meta records, otherwise false
+	testByMetaTags func(map[string]string) bool
+
+	// indicates whether the meta tag index should be taken into account for
+	// this filter
+	meta bool
 }
-
-type KvByCost []kv
-
-func (a KvByCost) Len() int           { return len(a) }
-func (a KvByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KvByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
-
-type KvReByCost []kvRe
-
-func (a KvReByCost) Len() int           { return len(a) }
-func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 
 // TagQuery runs a set of pattern or string matches on tag keys and values against
 // the index. It is executed via:
@@ -113,148 +65,84 @@ func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 // RunGetTags() which returns a list of tags of the matching metrics
 type TagQuery struct {
 	// clause that operates on LastUpdate field
-	from int64
+	from    int64
+	filters []filter
 
-	// clauses that operate on values. from expressions like tag<operator>value
-	equal    []kv   // EQUAL
-	match    []kvRe // MATCH
-	notEqual []kv   // NOT_EQUAL
-	notMatch []kvRe // NOT_MATCH
-	prefix   []kv   // PREFIX
+	metricExpressions        []tagQueryExpression.Expression
+	mixedExpressions         []tagQueryExpression.Expression
+	tagQuery                 tagQueryExpression.Expression
+	initialExpression        tagQueryExpression.Expression
+	initialExpressionUseMeta bool
 
-	// clause that operate on tags (keys)
-	// we only need to support 1 condition for now: a prefix or match
-	tagClause match  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
-	tagPrefix string // only used for auto complete of tags to match exact prefix
+	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	metaIndex   metaTagIndex
+	metaRecords metaTagRecords
 
-	startWith match // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
-
-	index TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId  map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-
-	wg *sync.WaitGroup
+	// indicates whether this query is a subQuery or not
+	// f.e. if it has been created to evaluate the query expressions attached to
+	//  a meta record which has been matched by the original query, then it's
+	// considered a sub-query.
+	// sub queries should never take the meta tag index into account
+	// to prevent loops.
+	subQuery bool
 }
 
-func compileRe(pattern string) (*regexp.Regexp, error) {
-	// shortcut, we don't need to compile that pattern, if re == nil we'll
-	// simply check if there is any value and save a regex match
-	if pattern == "^.+" {
-		return nil, nil
+func tagMapFromStrings(tags []string) (map[string]string, error) {
+	res := make(map[string]string, len(tags))
+	var err error
+	for _, tag := range tags {
+		equal := strings.Index(tag, "=")
+		if equal < 0 {
+			err = fmt.Errorf("invalid tag string")
+			continue
+		}
+		res[tag[:equal]] = tag[equal:]
 	}
-
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil, err
-	}
-
-	return re, nil
+	return res, err
 }
 
-// parseExpression returns an expression that's been generated from the given
-// string, in case of error the operator will be PARSING_ERROR.
-func parseExpression(expr string) (expression, error) {
-	var pos int
-	prefix, regex, not := false, false, false
-	res := expression{}
+func tagQueryFromExpressions(expressions []tagQueryExpression.Expression, from int64, subQuery bool) (*TagQuery, error) {
+	q := TagQuery{from: from, subQuery: subQuery}
 
-	// scan up to operator to get key
-FIND_OPERATOR:
-	for ; pos < len(expr); pos++ {
-		switch expr[pos] {
-		case '=':
-			break FIND_OPERATOR
-		case '!':
-			not = true
-			break FIND_OPERATOR
-		case '^':
-			prefix = true
-			break FIND_OPERATOR
-		case ';':
-			return res, errInvalidQuery
-		}
-	}
+	// every set of expressions must have at least one positive operator (=, =~, ^=, <tag>!=<empty>, __tag^=, __tag=~)
+	foundPositiveOperator := false
 
-	// key must not be empty
-	if pos == 0 {
-		return res, errInvalidQuery
-	}
+	// there can never be more than one tag query
+	foundTagQuery := false
+	for _, e := range expressions {
 
-	res.key = expr[:pos]
-
-	// shift over the !/^ characters
-	if not || prefix {
-		pos++
-	}
-
-	if len(expr) <= pos || expr[pos] != '=' {
-		return res, errInvalidQuery
-	}
-	pos++
-
-	if len(expr) > pos && expr[pos] == '~' {
-		// ^=~ is not a valid operator
-		if prefix {
-			return res, errInvalidQuery
-		}
-		regex = true
-		pos++
-	}
-
-	valuePos := pos
-	for ; pos < len(expr); pos++ {
-		// disallow ; in value
-		if expr[pos] == 59 {
-			return res, errInvalidQuery
-		}
-	}
-	res.value = expr[valuePos:]
-
-	// special key to match on tag instead of a value
-	if res.key == "__tag" {
-		// currently ! (not) queries on tags are not supported
-		// and unlike normal queries a value must be set
-		if not || len(res.value) == 0 {
-			return res, errInvalidQuery
+		if !foundPositiveOperator && e.IsPositiveOperator() {
+			foundPositiveOperator = true
 		}
 
-		if regex {
-			res.operator = MATCH_TAG
-		} else if prefix {
-			res.operator = PREFIX_TAG
-		} else {
-			// currently only match & prefix operator are supported on tag
-			return res, errInvalidQuery
+		if e.IsTagOperator() {
+			if foundTagQuery {
+				return nil, errInvalidQuery
+			}
+			foundTagQuery = true
 		}
 
-		return res, nil
+		q.mixedExpressions = append(q.mixedExpressions, e)
 	}
 
-	if not {
-		if regex {
-			res.operator = NOT_MATCH
-		} else {
-			res.operator = NOT_EQUAL
-		}
-	} else {
-		if regex {
-			res.operator = MATCH
-		} else if prefix {
-			res.operator = PREFIX
-		} else {
-			res.operator = EQUAL
-		}
+	if !foundPositiveOperator {
+		return nil, errInvalidQuery
 	}
-	return res, nil
+
+	return &q, nil
 }
 
-func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
-	q := TagQuery{from: from, wg: &sync.WaitGroup{}}
-
+// NewTagQuery initializes a new tag query from the given expressions and the
+// from timestamp. It assigns all expressions to the expression group for
+// metric tags, later when sortByCost is called it will move those out which
+// are keyed by a tag that doesn't exist in the metric index.
+func NewTagQuery(expressions []string, from int64) (*TagQuery, error) {
 	if len(expressions) == 0 {
-		return q, errInvalidQuery
+		return nil, errInvalidQuery
 	}
 
+	parsed := make([]tagQueryExpression.Expression, 0, len(expressions))
 	sort.Strings(expressions)
 	for i, expr := range expressions {
 		// skip duplicate expression
@@ -262,220 +150,196 @@ func NewTagQuery(expressions []string, from int64) (TagQuery, error) {
 			continue
 		}
 
-		e, err := parseExpression(expr)
+		e, err := tagQueryExpression.ParseExpression(expr)
 		if err != nil {
-			return q, err
+			return nil, err
 		}
 
-		// special case of empty value
-		if len(e.value) == 0 {
-			expression := kvRe{
-				key:        e.key,
-				value:      nil,
-				matchCache: &sync.Map{},
-				missCache:  &sync.Map{},
-			}
-			if e.operator == EQUAL || e.operator == MATCH {
-				q.notMatch = append(q.notMatch, expression)
-			} else {
-				q.match = append(q.match, expression)
-			}
-		} else {
-			// always anchor all regular expressions at the beginning if they do not start with ^
-			if (e.operator == MATCH || e.operator == NOT_MATCH || e.operator == MATCH_TAG) && e.value[0] != '^' {
-				e.value = "^(?:" + e.value + ")"
-			}
-
-			switch e.operator {
-			case EQUAL:
-				q.equal = append(q.equal, e.kv)
-			case NOT_EQUAL:
-				q.notEqual = append(q.notEqual, e.kv)
-			case MATCH:
-				re, err := compileRe(e.value)
-				if err != nil {
-					return q, errInvalidQuery
-				}
-				q.match = append(q.match, kvRe{
-					key:        e.key,
-					value:      re,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				})
-			case NOT_MATCH:
-				re, err := compileRe(e.value)
-				if err != nil {
-					return q, errInvalidQuery
-				}
-				q.notMatch = append(q.notMatch, kvRe{
-					key:        e.key,
-					value:      re,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				})
-			case PREFIX:
-				q.prefix = append(q.prefix, kv{key: e.key, value: e.value})
-			case MATCH_TAG:
-				// we only allow one query by tag
-				if q.tagClause != 0 {
-					return q, errInvalidQuery
-				}
-
-				re, err := compileRe(e.value)
-				if err != nil {
-					return q, errInvalidQuery
-				}
-
-				q.tagMatch = kvRe{
-					value:      re,
-					matchCache: &sync.Map{},
-					missCache:  &sync.Map{},
-				}
-
-				q.tagClause = MATCH_TAG
-			case PREFIX_TAG:
-				// we only allow one query by tag
-				if q.tagClause != 0 {
-					return q, errInvalidQuery
-				}
-
-				q.tagPrefix = e.value
-				q.tagClause = PREFIX_TAG
-			}
-		}
+		parsed = append(parsed, e)
 	}
 
-	// the cheapest operator to minimize the result set should have precedence
-	if len(q.equal) > 0 {
-		q.startWith = EQUAL
-	} else if len(q.prefix) > 0 {
-		q.startWith = PREFIX
-	} else if len(q.match) > 0 {
-		q.startWith = MATCH
-	} else if q.tagClause == PREFIX_TAG {
-		// starting with a tag based query can be very expensive because they
-		// have the potential to result in a huge initial result set
-		q.startWith = PREFIX_TAG
-	} else if q.tagClause == MATCH_TAG {
-		q.startWith = MATCH_TAG
+	query, err := tagQueryFromExpressions(parsed, from, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return query, nil
+}
+
+// Run executes the tag query on the given index and returns a list of ids
+func (q *TagQuery) Run() IdSet {
+	res := q.run()
+
+	result := make(IdSet)
+	for id := range res {
+		result[id] = struct{}{}
+	}
+
+	return result
+}
+
+func (q *TagQuery) run() chan schema.MKey {
+	q.sortByCost()
+
+	prepareFiltersWg := sync.WaitGroup{}
+	prepareFiltersWg.Add(1)
+	go func() {
+		defer prepareFiltersWg.Done()
+		q.prepareFilters()
+	}()
+
+	initialIds := make(chan schema.MKey, 1000)
+	workersWg := sync.WaitGroup{}
+	q.getInitialIds(&workersWg, initialIds)
+
+	workersWg.Add(TagQueryWorkers)
+	results := make(chan schema.MKey, 10000)
+	prepareFiltersWg.Wait()
+
+	// start the tag query workers. they'll consume the ids on the channel
+	// initialIds and evaluate for each of them whether it satisfies all the
+	// conditions defined in the query expressions. those that satisfy all
+	// conditions will be pushed into the results channel
+	for i := 0; i < TagQueryWorkers; i++ {
+		go q.filterIdsFromChan(&workersWg, initialIds, results)
+	}
+
+	go func() {
+		workersWg.Wait()
+		close(results)
+	}()
+
+	return results
+}
+
+// initForIndex takes all the index-datastructures and assigns them to this tag query
+// if this tag query has been instantiated from a query given by the user, it will
+// simply get these structs assigned from idx.UnpartitionedMemoryIndex, if it has been
+// instantiated as a sub query to evaluate a meta tag then it gets the data structures
+// copied from the parent query
+func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagIndex, mti metaTagIndex, mtr metaTagRecords) {
+	q.index = idx
+	q.byId = defById
+	q.metaIndex = mti
+	q.metaRecords = mtr
+}
+
+// subQueryFromExpressions is used to evaluate a meta tag. when a meta tag needs to
+// be evaluated we take its associated query expressions and instantiate a sub-query
+// from them
+func (q *TagQuery) subQueryFromExpressions(expressions []tagQueryExpression.Expression) (*TagQuery, error) {
+	query, err := tagQueryFromExpressions(expressions, q.from, true)
+	if err != nil {
+		// this means we've stored a meta record containing invalid queries
+		corruptIndex.Inc()
+		return nil, err
+	}
+
+	query.initForIndex(q.byId, q.index, q.metaIndex, q.metaRecords)
+
+	return query, nil
+}
+
+// getInitialIds asynchronously collects all IDs of the initial result set.
+// It returns a stop channel, which when closed, will cause it to abort the background worker.
+func (q *TagQuery) getInitialIds(wg *sync.WaitGroup, idCh chan schema.MKey) chan struct{} {
+	stopCh := make(chan struct{})
+	wg.Add(1)
+
+	if q.initialExpression.MatchesTag() {
+		go q.getInitialByTag(wg, idCh, stopCh)
 	} else {
-		return q, errInvalidQuery
+		go q.getInitialByTagValue(wg, idCh, stopCh)
 	}
 
-	return q, nil
+	return stopCh
 }
 
-// getInitialByEqual generates the initial resultset by executing the given equal expression
-func (q *TagQuery) getInitialByEqual(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
+// getInitialByTagValue generates an initial ID set which is later filtered down
+// it only handles those expressions which involve matching a tag value:
+// f.e. key=value but not key!=
+func (q *TagQuery) getInitialByTagValue(wg *sync.WaitGroup, idCh chan schema.MKey, stopCh chan struct{}) {
+	key := q.initialExpression.GetKey()
+	match := q.initialExpression.GetMatcher()
+	initialIdsWg := sync.WaitGroup{}
+	initialIdsWg.Add(1)
 
-KEYS:
-	for k := range q.index[expr.key][expr.value] {
-		select {
-		case <-stopCh:
-			break KEYS
-		case idCh <- k:
-		}
-	}
-
-	close(idCh)
-}
-
-// getInitialByPrefix generates the initial resultset by executing the given prefix match expression
-func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
-
-VALUES:
-	for v, ids := range q.index[expr.key] {
-		if !strings.HasPrefix(v, expr.value) {
-			continue
-		}
-
-		for id := range ids {
-			select {
-			case <-stopCh:
-				break VALUES
-			case idCh <- id:
+	go func() {
+		defer initialIdsWg.Done()
+	IDS:
+		for v, ids := range q.index[key] {
+			if !match(v) {
+				continue
 			}
-		}
-	}
 
-	close(idCh)
-}
-
-// getInitialByMatch generates the initial resultset by executing the given match expression
-func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
-
-	// shortcut if value == nil.
-	// this will simply match any value, like ^.+. since we know that every value
-	// in the index must not be empty, we can skip the matching.
-	if expr.value == nil {
-	VALUES1:
-		for _, ids := range q.index[expr.key] {
 			for id := range ids {
 				select {
 				case <-stopCh:
-					break VALUES1
+					break IDS
 				case idCh <- id:
 				}
 			}
 		}
-		close(idCh)
-		return
-	}
+	}()
 
-VALUES2:
-	for v, ids := range q.index[expr.key] {
-		if !expr.value.MatchString(v) {
-			continue
-		}
-
-		for id := range ids {
-			select {
-			case <-stopCh:
-				break VALUES2
-			case idCh <- id:
+	// sortByCost() will usually try to not choose an expression that involves
+	// meta tags as the initial expression, but if necessary we need to
+	// evaluate those too
+	// if this is a sub query we want to ignore the meta index to prevent loops
+	if !q.subQuery && q.initialExpressionUseMeta {
+		for v, records := range q.metaIndex[key] {
+			if !match(v) {
+				continue
 			}
-		}
-	}
 
-	close(idCh)
-}
-
-// getInitialByTagPrefix generates the initial resultset by creating a list of
-// metric IDs of which at least one tag starts with the defined prefix
-func (q *TagQuery) getInitialByTagPrefix(idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
-
-TAGS:
-	for tag, values := range q.index {
-		if !strings.HasPrefix(tag, q.tagPrefix) {
-			continue
-		}
-
-		for _, ids := range values {
-			for id := range ids {
-				select {
-				case <-stopCh:
-					break TAGS
-				case idCh <- id:
+			for _, metaRecordId := range records {
+				record, ok := q.metaRecords[metaRecordId]
+				if !ok {
+					corruptIndex.Inc()
+					continue
 				}
+
+				initialIdsWg.Add(1)
+				go func() {
+					defer initialIdsWg.Done()
+
+					query, err := q.subQueryFromExpressions(record.queries)
+					if err != nil {
+						return
+					}
+
+					resCh := query.run()
+					for id := range resCh {
+						idCh <- id
+					}
+				}()
 			}
 		}
 	}
 
-	close(idCh)
+	go func() {
+		defer close(idCh)
+		defer wg.Done()
+		initialIdsWg.Wait()
+	}()
 }
 
-// getInitialByTagMatch generates the initial resultset by creating a list of
-// metric IDs of which at least one tag matches the defined regex
-func (q *TagQuery) getInitialByTagMatch(idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
+// getInitialByTag generates an initial ID set which is later filtered down
+// it only handles those expressions which do not involve matching a tag value:
+// f.e. key!= but not key=value
+func (q *TagQuery) getInitialByTag(wg *sync.WaitGroup, idCh chan schema.MKey, stopCh chan struct{}) {
+	match := q.initialExpression.GetMatcher()
+	initialIdsWg := sync.WaitGroup{}
+	initialIdsWg.Add(1)
 
-TAGS:
-	for tag, values := range q.index {
-		if q.tagMatch.value.MatchString(tag) {
+	go func() {
+		defer initialIdsWg.Done()
+	TAGS:
+		for tag, values := range q.index {
+			if !match(tag) {
+				continue
+			}
+
 			for _, ids := range values {
 				for id := range ids {
 					select {
@@ -486,39 +350,50 @@ TAGS:
 				}
 			}
 		}
+	}()
+
+	// sortByCost() will usually try to not choose an expression that involves
+	// meta tags as the initial expression, but if necessary we need to
+	// evaluate those too
+	// if this is a sub query we want to ignore the meta index to prevent loops
+	if !q.subQuery && q.initialExpressionUseMeta {
+		for tag, values := range q.metaIndex {
+			if !match(tag) {
+				continue
+			}
+
+			for _, records := range values {
+				for _, metaRecordId := range records {
+					record, ok := q.metaRecords[metaRecordId]
+					if !ok {
+						corruptIndex.Inc()
+						continue
+					}
+
+					initialIdsWg.Add(1)
+					go func() {
+						defer initialIdsWg.Done()
+
+						query, err := q.subQueryFromExpressions(record.queries)
+						if err != nil {
+							return
+						}
+
+						resCh := query.run()
+						for id := range resCh {
+							idCh <- id
+						}
+					}()
+				}
+			}
+		}
 	}
 
-	close(idCh)
-}
-
-// getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
-// a channel through which the IDs of the initial result set will be sent
-// a stop channel, which when closed, will cause it to abort the background worker.
-func (q *TagQuery) getInitialIds() (chan schema.MKey, chan struct{}) {
-	idCh := make(chan schema.MKey, 1000)
-	stopCh := make(chan struct{})
-	q.wg.Add(1)
-
-	switch q.startWith {
-	case EQUAL:
-		query := q.equal[0]
-		q.equal = q.equal[1:]
-		go q.getInitialByEqual(query, idCh, stopCh)
-	case PREFIX:
-		query := q.prefix[0]
-		q.prefix = q.prefix[1:]
-		go q.getInitialByPrefix(query, idCh, stopCh)
-	case MATCH:
-		query := q.match[0]
-		q.match = q.match[1:]
-		go q.getInitialByMatch(query, idCh, stopCh)
-	case PREFIX_TAG:
-		go q.getInitialByTagPrefix(idCh, stopCh)
-	case MATCH_TAG:
-		go q.getInitialByTagMatch(idCh, stopCh)
-	}
-
-	return idCh, stopCh
+	go func() {
+		defer close(idCh)
+		defer wg.Done()
+		initialIdsWg.Wait()
+	}()
 }
 
 // testByAllExpressions takes and id and a MetricDefinition and runs it through
@@ -530,160 +405,40 @@ func (q *TagQuery) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTa
 		return false
 	}
 
-	if len(q.equal) > 0 && !q.testByEqual(id, q.equal, false) {
-		return false
-	}
-
-	if len(q.notEqual) > 0 && !q.testByEqual(id, q.notEqual, true) {
-		return false
-	}
-
-	if q.tagClause == PREFIX_TAG && !omitTagFilters && q.startWith != PREFIX_TAG {
-		if !q.testByTagPrefix(def) {
+	var res tagQueryExpression.FilterDecision
+	for _, filter := range q.filters {
+		res = filter.test(def)
+		if res == tagQueryExpression.Pass {
+			continue
+		}
+		if res == tagQueryExpression.Fail {
 			return false
 		}
-	}
 
-	if !q.testByPrefix(def, q.prefix) {
-		return false
-	}
-
-	if q.tagClause == MATCH_TAG && !omitTagFilters && q.startWith != MATCH_TAG {
-		if !q.testByTagMatch(def) {
-			return false
-		}
-	}
-
-	if len(q.match) > 0 && !q.testByMatch(def, q.match, false) {
-		return false
-	}
-
-	if len(q.notMatch) > 0 && !q.testByMatch(def, q.notMatch, true) {
-		return false
-	}
-
-	return true
-}
-
-// testByMatch filters a given metric by matching a regular expression against
-// the values of specific associated tags
-func (q *TagQuery) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
-EXPRS:
-	for _, e := range exprs {
-		if e.key == "name" {
-			if e.value == nil || e.value.MatchString(def.Name) {
-				if not {
-					return false
-				} else {
-					continue EXPRS
-				}
-			} else {
-				if !not {
-					return false
-				} else {
-					continue EXPRS
-				}
-			}
-		}
-
-		prefix := e.key + "="
-		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag, prefix) {
+		// if the meta tag index should not be taken into account for this
+		// filter we decide based on the expression's default decision
+		if !filter.meta {
+			if filter.expr.GetDefaultDecision() == tagQueryExpression.Pass {
 				continue
 			}
-
-			value := tag[len(e.key)+1:]
-
-			// reduce regex matching by looking up cached non-matches
-			if _, ok := e.missCache.Load(value); ok {
-				continue
-			}
-
-			// reduce regex matching by looking up cached matches
-			if _, ok := e.matchCache.Load(value); ok {
-				if not {
-					return false
-				}
-				continue EXPRS
-			}
-
-			// value == nil means that this expression can be short cut
-			// by not evaluating it
-			if e.value == nil || e.value.MatchString(value) {
-				if atomic.LoadInt32(&e.matchCacheSize) < int32(matchCacheSize) {
-					e.matchCache.Store(value, struct{}{})
-					atomic.AddInt32(&e.matchCacheSize, 1)
-				}
-				if not {
-					return false
-				}
-				continue EXPRS
-			} else {
-				if atomic.LoadInt32(&e.missCacheSize) < int32(matchCacheSize) {
-					e.missCache.Store(value, struct{}{})
-					atomic.AddInt32(&e.missCacheSize, 1)
-				}
-			}
-		}
-		if !not {
 			return false
 		}
-	}
-	return true
-}
 
-// testByTagMatch filters a given metric by matching a regular expression against
-// the associated tags
-func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
-	// special case for tag "name"
-	if _, ok := q.tagMatch.missCache.Load("name"); !ok {
-		if _, ok := q.tagMatch.matchCache.Load("name"); ok || q.tagMatch.value.MatchString("name") {
-			if !ok {
-				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
-					q.tagMatch.matchCache.Store("name", struct{}{})
-					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
-				}
-			}
-			return true
-		} else {
-			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
-				q.tagMatch.missCache.Store("name", struct{}{})
-				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
-			}
-		}
-	}
-
-	for _, tag := range def.Tags {
-		equal := strings.Index(tag, "=")
-		if equal < 0 {
+		// if no decision has been made based on the metric tag index, then we
+		// evaluate via the meta tag index
+		tags, err := tagMapFromStrings(def.Tags)
+		if err != nil {
 			corruptIndex.Inc()
-			log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", def.Id, tag)
-			continue
+			return false
 		}
-		key := tag[:equal]
+		tags["name"] = def.Name
 
-		if _, ok := q.tagMatch.missCache.Load(key); ok {
-			continue
-		}
-
-		if _, ok := q.tagMatch.matchCache.Load(key); ok || q.tagMatch.value.MatchString(key) {
-			if !ok {
-				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
-					q.tagMatch.matchCache.Store(key, struct{}{})
-					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
-				}
-			}
-			return true
-		} else {
-			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
-				q.tagMatch.missCache.Store(key, struct{}{})
-				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
-			}
-			continue
+		if !filter.testByMetaTags(tags) {
+			return false
 		}
 	}
 
-	return false
+	return true
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -691,71 +446,13 @@ func (q *TagQuery) testByFrom(def *idx.Archive) bool {
 	return q.from <= atomic.LoadInt64(&def.LastUpdate)
 }
 
-// testByPrefix filters a given metric by matching prefixes against the values
-// of a specific tag
-func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
-EXPRS:
-	for _, e := range exprs {
-		if e.key == "name" && strings.HasPrefix(def.Name, e.value) {
-			continue EXPRS
-		}
-
-		prefix := e.key + "=" + e.value
-		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag, prefix) {
-				continue
-			}
-			continue EXPRS
-		}
-		return false
-	}
-	return true
-}
-
-// testByTagPrefix filters a given metric by matching prefixes against its tags
-func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
-	if strings.HasPrefix("name", q.tagPrefix) {
-		return true
-	}
-
-	for _, tag := range def.Tags {
-		if strings.HasPrefix(tag, q.tagPrefix) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// testByEqual filters a given metric by the defined "=" expressions
-func (q *TagQuery) testByEqual(id schema.MKey, exprs []kv, not bool) bool {
-	for _, e := range exprs {
-		indexIds := q.index[e.key][e.value]
-
-		// shortcut if key=value combo does not exist at all
-		if len(indexIds) == 0 {
-			return not
-		}
-
-		if _, ok := indexIds[id]; ok {
-			if not {
-				return false
-			}
-		} else {
-			if !not {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
 // filterIdsFromChan takes a channel of metric ids and runs them through the
 // required tests to decide whether a metric should be part of the final
 // result set or not
 // it returns the final result set via the given resCh parameter
-func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
+func (q *TagQuery) filterIdsFromChan(wg *sync.WaitGroup, idCh, resCh chan schema.MKey) {
+	defer wg.Done()
+
 	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
@@ -768,98 +465,191 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 			continue
 		}
 
-		// we always omit tag filters because Run() does not support filtering by tags
 		if q.testByAllExpressions(id, def, false) {
 			resCh <- id
 		}
 	}
-
-	q.wg.Done()
 }
 
-// sortByCost tries to estimate the cost of different expressions and sort them
-// in increasing order
-// this is to reduce the result set cheaply and only apply expensive tests to an
-// already reduced set of results
+func (q *TagQuery) prepareFilters() {
+	appendTagQuery := false
+	if q.tagQuery != nil && q.tagQuery != q.initialExpression {
+		appendTagQuery = true
+		q.filters = make([]filter, len(q.metricExpressions)+len(q.mixedExpressions)+1)
+	} else {
+		q.filters = make([]filter, len(q.metricExpressions)+len(q.mixedExpressions))
+	}
+
+	i := 0
+	for _, expr := range q.metricExpressions {
+		q.filters[i] = filter{
+			expr: expr,
+			test: expr.GetMetricDefinitionFilter(),
+			meta: false,
+		}
+		i++
+	}
+	for _, expr := range q.mixedExpressions {
+		q.filters[i] = filter{
+			expr:           expr,
+			test:           expr.GetMetricDefinitionFilter(),
+			testByMetaTags: q.getMetaTagFilter(expr),
+			meta:           true,
+		}
+		i++
+	}
+	if appendTagQuery {
+		q.filters[i] = filter{
+			expr:           q.tagQuery,
+			test:           q.tagQuery.GetMetricDefinitionFilter(),
+			testByMetaTags: q.getMetaTagFilter(q.tagQuery),
+			meta:           true,
+		}
+	}
+}
+
+// getMetaTagFilter returns a filter function to which a set of tags/values can
+// be passed, the filter function is based on the given expression.
+// The filter function returns true if the tags/values pass the filter according
+// to the meta tag index or false if they don't.
+func (q *TagQuery) getMetaTagFilter(expression tagQueryExpression.Expression) func(map[string]string) bool {
+	metaRecordIds := q.metaIndex.getMetaRecordIdsByExpression(expression)
+	metaTagRecords := q.metaRecords.getRecords(metaRecordIds)
+
+	// in case of positive expression operators, we want to return true if
+	// any meta tag record matches the given tag set
+	// otherwise, in case of negative ones, we want to return false on match
+	resultOnMatch := expression.IsPositiveOperator()
+
+	return func(tags map[string]string) bool {
+		for _, record := range metaTagRecords {
+			if record.matchesTags(tags) {
+				return resultOnMatch
+			}
+		}
+		return !resultOnMatch
+	}
+}
+
+func (q *TagQuery) sortByCostWithMeta() {
+	for i, e := range q.mixedExpressions {
+		if e.IsTagOperator() {
+			// there can only be one expression using a tag operator per query
+			q.tagQuery = e
+
+			q.mixedExpressions = append(q.mixedExpressions[:i], q.mixedExpressions[i+1:]...)
+			continue
+		}
+
+		// separate all the ones that don't involve the meta index into their
+		// own slice, because they should be executed first
+		if _, ok := q.metaIndex[e.GetKey()]; !ok {
+			q.metricExpressions = append(q.metricExpressions, e)
+			q.mixedExpressions = append(q.mixedExpressions[:i], q.mixedExpressions[i+1:]...)
+		}
+	}
+
+	sort.Slice(q.metricExpressions, func(i, j int) bool {
+		costI := len(q.index[q.metricExpressions[i].GetKey()])
+		if q.metricExpressions[i].HasRe() {
+			costI *= 10
+		}
+
+		costJ := len(q.index[q.metricExpressions[j].GetKey()])
+		if q.metricExpressions[j].HasRe() {
+			costJ *= 10
+		}
+
+		return costI < costJ
+	})
+
+	sort.Slice(q.mixedExpressions, func(i, j int) bool {
+		keyI := q.mixedExpressions[i].GetKey()
+		costI := len(q.index[keyI])
+		costI += len(q.metaIndex[keyI])
+		if q.metricExpressions[i].HasRe() {
+			costI *= 10
+		}
+
+		keyJ := q.mixedExpressions[j].GetKey()
+		costJ := len(q.index[keyJ])
+		costJ += len(q.metaIndex[keyJ])
+		if q.mixedExpressions[j].HasRe() {
+			costJ *= 10
+		}
+
+		return costI < costJ
+	})
+}
+
+func (q *TagQuery) sortByCostWithoutMeta() {
+	q.metricExpressions = append(q.metricExpressions, q.mixedExpressions...)
+	q.mixedExpressions = nil
+
+	// extract tag query if there is one
+	for i, e := range q.metricExpressions {
+		if e.IsTagOperator() {
+			// there can only be one expression using a tag operator per query
+			q.tagQuery = e
+			q.metricExpressions = append(q.metricExpressions[:i], q.metricExpressions[i+1:]...)
+			continue
+		}
+	}
+
+	sort.Slice(q.metricExpressions, func(i, j int) bool {
+		costI := len(q.index[q.metricExpressions[i].GetKey()])
+		if q.metricExpressions[i].HasRe() {
+			costI *= 10
+		}
+
+		costJ := len(q.index[q.metricExpressions[j].GetKey()])
+		if q.metricExpressions[j].HasRe() {
+			costJ *= 10
+		}
+
+		return costI < costJ
+	})
+}
+
 func (q *TagQuery) sortByCost() {
-	for i, kv := range q.equal {
-		q.equal[i].cost = uint(len(q.index[kv.key][kv.value]))
+	if q.subQuery {
+		// if this is a sub query we never want to take the meta tags into account to prevent loops
+		q.sortByCostWithoutMeta()
+	} else {
+		q.sortByCostWithMeta()
 	}
 
-	// for prefix and match clauses we can't determine the actual cost
-	// without actually evaluating them, so we estimate based on
-	// cardinality of the key
-	for i, kv := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[kv.key]))
+	for i, expr := range q.metricExpressions {
+		if expr.IsPositiveOperator() {
+			q.initialExpression = q.metricExpressions[i]
+			q.metricExpressions = append(q.metricExpressions[:i], q.metricExpressions[i+1:]...)
+			return
+		}
 	}
-
-	for i, kvRe := range q.match {
-		q.match[i].cost = uint(len(q.index[kvRe.key]))
+	for i, expr := range q.mixedExpressions {
+		if expr.IsPositiveOperator() {
+			q.initialExpression = q.mixedExpressions[i]
+			q.mixedExpressions = append(q.mixedExpressions[:i], q.mixedExpressions[i+1:]...)
+			q.initialExpressionUseMeta = true
+			return
+		}
 	}
-
-	sort.Sort(KvByCost(q.equal))
-	sort.Sort(KvByCost(q.notEqual))
-	sort.Sort(KvByCost(q.prefix))
-	sort.Sort(KvReByCost(q.match))
-	sort.Sort(KvReByCost(q.notMatch))
-}
-
-// Run executes the tag query on the given index and returns a list of ids
-func (q *TagQuery) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
-	q.index = index
-	q.byId = byId
-
-	q.sortByCost()
-
-	idCh, _ := q.getInitialIds()
-	resCh := make(chan schema.MKey)
-
-	// start the tag query workers. they'll consume the ids on the idCh and
-	// evaluate for each of them whether it satisfies all the conditions
-	// defined in the query expressions. those that satisfy all conditions
-	// will be pushed into the resCh
-	q.wg.Add(TagQueryWorkers)
-	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterIdsFromChan(idCh, resCh)
-	}
-
-	go func() {
-		q.wg.Wait()
-		close(resCh)
-	}()
-
-	result := make(IdSet)
-
-	for id := range resCh {
-		result[id] = struct{}{}
-	}
-
-	return result
+	q.initialExpression = q.tagQuery
 }
 
 // getMaxTagCount calculates the maximum number of results (cardinality) a
 // tag query could possibly return
 // this is useful because when running a tag query we can abort it as soon as
 // we know that there can't be more tags discovered and added to the result set
-func (q *TagQuery) getMaxTagCount() int {
-	defer q.wg.Done()
+func (q *TagQuery) getMaxTagCount(wg *sync.WaitGroup) int {
+	defer wg.Done()
 	var maxTagCount int
+	match := q.tagQuery.GetMatcher()
 
-	if q.tagClause == PREFIX_TAG && len(q.tagPrefix) > 0 {
-		for tag := range q.index {
-			if !strings.HasPrefix(tag, q.tagPrefix) {
-				continue
-			}
+	for tag := range q.index {
+		if match(tag) {
 			maxTagCount++
 		}
-	} else if q.tagClause == MATCH_TAG {
-		for tag := range q.index {
-			if q.tagMatch.value.MatchString(tag) {
-				maxTagCount++
-			}
-		}
-	} else {
-		maxTagCount = len(q.index)
 	}
 
 	return maxTagCount
@@ -869,10 +659,17 @@ func (q *TagQuery) getMaxTagCount() int {
 // according to the criteria associated with this query
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
-func (q *TagQuery) filterTagsFromChan(idCh chan schema.MKey, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
+func (q *TagQuery) filterTagsFromChan(wg *sync.WaitGroup, idCh chan schema.MKey, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
+	defer wg.Done()
+
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
+
+	var match tagQueryExpression.TagStringMatcher
+	if q.tagQuery != nil {
+		match = q.tagQuery.GetMatcher()
+	}
 
 IDS:
 	for id := range idCh {
@@ -889,33 +686,28 @@ IDS:
 
 		// generate a set of all tags of the current metric that satisfy the
 		// tag filter condition
-		metricTags := make(map[string]struct{}, 0)
-		for _, tag := range def.Tags {
-			equal := strings.Index(tag, "=")
-			if equal < 0 {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", id, tag)
-				continue
-			}
+		tags, err := tagMapFromStrings(def.Tags)
+		if err != nil {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: ID %q has tags %+v with invalid format", id, def.Tags)
+			continue
+		}
 
-			key := tag[:equal]
+		metricTags := make(map[string]struct{}, 0)
+		for key := range tags {
 			// this tag has already been pushed into tagCh, so we can stop evaluating
 			if _, ok := resultsCache[key]; ok {
 				continue
 			}
 
-			if q.tagClause == PREFIX_TAG {
-				if !strings.HasPrefix(key, q.tagPrefix) {
-					continue
-				}
-			} else if q.tagClause == MATCH_TAG {
-				if _, ok := q.tagMatch.missCache.Load(key); ok || !q.tagMatch.value.MatchString(tag) {
-					if !ok {
-						q.tagMatch.missCache.Store(key, struct{}{})
-					}
+			if match != nil {
+				// the value doesn't match the requirements
+				if !match(key) {
 					continue
 				}
 			}
+
+			// keeping that value as it satisfies all conditions
 			metricTags[key] = struct{}{}
 		}
 
@@ -954,72 +746,55 @@ IDS:
 			}
 		}
 	}
-
-	q.wg.Done()
-}
-
-// determines whether the given tag prefix/tag match will match the special
-// tag "name". if it does, then we can omit some filtering because we know
-// that every metric has a name
-func (q *TagQuery) tagFilterMatchesName() bool {
-	matchName := false
-
-	if q.tagClause == PREFIX_TAG || q.startWith == PREFIX_TAG {
-		if strings.HasPrefix("name", q.tagPrefix) {
-			matchName = true
-		}
-	} else if q.tagClause == MATCH_TAG || q.startWith == MATCH_TAG {
-		if q.tagMatch.value.MatchString("name") {
-			matchName = true
-		}
-	} else {
-		// some tag queries might have no prefix specified yet, in this case
-		// we do not need to filter by the name
-		// f.e. we know that every metric has a name, and we know that the
-		// prefix "" matches the string "name", so we know that every metric
-		// will pass the tag prefix test. hence we can omit the entire test.
-		matchName = true
-	}
-
-	return matchName
 }
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
-	q.index = index
-	q.byId = byId
-
+func (q *TagQuery) RunGetTags() map[string]struct{} {
 	maxTagCount := int32(math.MaxInt32)
-
-	// start a thread to calculate the maximum possible number of tags.
-	// this might not always complete before the query execution, but in most
-	// cases it likely will. when it does end before the execution of the query,
-	// the value of maxTagCount will be used to abort the query execution once
-	// the max number of possible tags has been reached
-	q.wg.Add(1)
-	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
-
+	matchName := true
 	q.sortByCost()
-	idCh, stopCh := q.getInitialIds()
+
+	workersWg := sync.WaitGroup{}
+	if q.tagQuery != nil {
+		workersWg.Add(1)
+		// start a thread to calculate the maximum possible number of tags.
+		// this might not always complete before the query execution, but in most
+		// cases it likely will. when it does end before the execution of the query,
+		// the value of maxTagCount will be used to abort the query execution once
+		// the max number of possible tags has been reached
+		go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount(&workersWg)))
+
+		// we know there can only be 1 tag filter, so if we detect that the given
+		// tag condition matches the special tag "name", we can omit the filtering
+		// because every metric has a name.
+		matchName = q.tagQuery.GetMatcher()("name")
+	}
+
+	prepareFiltersWg := sync.WaitGroup{}
+	prepareFiltersWg.Add(1)
+	go func() {
+		defer prepareFiltersWg.Done()
+		q.prepareFilters()
+	}()
+
+	initialIds := make(chan schema.MKey, 1000)
+	stopCh := q.getInitialIds(&workersWg, initialIds)
 	tagCh := make(chan string)
 
-	// we know there can only be 1 tag filter, so if we detect that the given
-	// tag condition matches the special tag "name", we can omit the filtering
-	// because every metric has a name.
-	matchName := q.tagFilterMatchesName()
+	prepareFiltersWg.Wait()
 
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
 	// defined in the query expressions. then they will extract the tags of
 	// those that satisfy all conditions and push them into tagCh.
-	q.wg.Add(TagQueryWorkers)
+	workersWg.Add(TagQueryWorkers)
 	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterTagsFromChan(idCh, tagCh, stopCh, matchName)
+		go q.filterTagsFromChan(&workersWg, initialIds, tagCh, stopCh, matchName)
 	}
 
 	go func() {
-		q.wg.Wait()
+		workersWg.Wait()
 		close(tagCh)
 	}()
 
@@ -1038,6 +813,6 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive)
 	// abort query execution and wait for all workers to end
 	close(stopCh)
 
-	q.wg.Wait()
+	workersWg.Wait()
 	return result
 }

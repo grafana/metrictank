@@ -111,7 +111,7 @@ type MemoryIndex interface {
 	LoadPartition(int32, []schema.MetricDefinition) int
 	UpdateArchive(idx.Archive)
 	add(*schema.MetricDefinition) idx.Archive
-	idsByTagQuery(uint32, TagQuery) IdSet
+	idsByTagQuery(uint32, *TagQuery) IdSet
 	PurgeFindCache()
 	ForceInvalidationFindCache()
 }
@@ -450,6 +450,16 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRe
 	return res
 }
 
+func (m *UnpartitionedMemoryIdx) EnrichWithMetaTags(orgId uint32, tags map[string]string) map[string]string {
+	m.RLock()
+	defer m.RUnlock()
+	if mtr, ok := m.metaTagRecords[orgId]; !ok {
+		return nil
+	} else {
+		return mtr.enrichTags(tags)
+	}
+}
+
 // indexTags reads the tags of a given metric definition and creates the
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
@@ -777,12 +787,8 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, expressio
 		m.RLock()
 		defer m.RUnlock()
 
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		resMap := query.RunGetTags(tags, m.defById)
+		query.initForIndex(m.defById, m.tags[orgId], m.metaTags[orgId], m.metaTagRecords[orgId])
+		resMap := query.RunGetTags()
 		for tag := range resMap {
 			res = append(res, tag)
 		}
@@ -848,13 +854,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 	if len(expressions) > 0 {
 
 		// add the value prefix into the expressions as an additional condition
-		if len(prefix) > 0 {
-			expressions = append(expressions, tag+"^="+prefix)
-		} else {
-			// if no value prefix has been specified we still require that at
-			// least the given tag must be present
-			expressions = append(expressions, tag+"!=")
-		}
+		expressions = append(expressions, tag+"^="+prefix)
 
 		query, err := NewTagQuery(expressions, from)
 		if err != nil {
@@ -865,12 +865,8 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		m.RLock()
 		defer m.RUnlock()
 
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		ids := query.Run(tags, m.defById)
+		query.initForIndex(m.defById, m.tags[orgId], m.metaTags[orgId], m.metaTagRecords[orgId])
+		ids := query.Run()
 		valueMap := make(map[string]struct{})
 		prefix := tag + "="
 		for id := range ids {
@@ -1055,13 +1051,9 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, expressions []string, f
 	return results, nil
 }
 
-func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil
-	}
-
-	return query.Run(tags, m.defById)
+func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query *TagQuery) IdSet {
+	query.initForIndex(m.defById, m.tags[orgId], m.metaTags[orgId], m.metaTagRecords[orgId])
+	return query.Run()
 }
 
 func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
@@ -1264,7 +1256,7 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]i
 		return nil, nil
 	}
 
-	queries := make([]TagQuery, 0, len(paths))
+	queries := make([]*TagQuery, 0, len(paths))
 	for _, path := range paths {
 		elements := strings.Split(path, ";")
 		if len(elements) < 2 {

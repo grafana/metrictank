@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
-	"gopkg.in/macaron.v1"
+	macaron "gopkg.in/macaron.v1"
 )
 
 //go:generate msgp

@@ -749,12 +749,17 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	}
 
 	// Sort each merged series so that the output of a function is well-defined and repeatable.
-	for k := range data {
-		sort.Sort(models.SeriesByTarget(data[k]))
+	for i := range data {
+		for j := range data[i] {
+			data[i][j].SetTags()
+			data[i][j].MetaTags = s.MetricIndex.EnrichWithMetaTags(orgId, data[i][j].Tags)
+		}
+		sort.Sort(models.SeriesByTarget(data[i]))
 	}
 
 	preRun := time.Now()
 	out, err = plan.Run(data)
+
 	planRunDuration.Value(time.Since(preRun))
 	return out, err
 }
