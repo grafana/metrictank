@@ -97,10 +97,11 @@ type TagQuery struct {
 	from    int64
 	filters []filter
 
-	metricExpressions []expression
-	mixedExpressions  []expression
-	tagQuery          expression
-	initialExpression expression
+	metricExpressions        []expression
+	mixedExpressions         []expression
+	tagQuery                 expression
+	initialExpression        expression
+	initialExpressionUseMeta bool
 
 	// clauses that operate on values. from expressions like tag<operator>value
 	equal    []kv   // EQUAL
@@ -635,31 +636,97 @@ func (q *TagQuery) prepareFilters() {
 	}
 }
 
-// sortByCost tries to estimate the cost of different expressions and sort them
-// in increasing order
-// this is to reduce the result set cheaply and only apply expensive tests to an
-// already reduced set of results
+func (q *TagQuery) sortByCostWithMeta() {
+	var mixedExpressions []expression
+	var metricExpressions []expression
+	for _, e := range q.mixedExpressions {
+		op := e.getOperator()
+
+		// match tag and prefix tag operator expressions always take the meta index
+		// into account, unless using the meta index is disabled for this query
+		if op == opMatchTag || op == opPrefixTag {
+			q.tagQuery = e
+		} else {
+			if _, ok := q.metaIndex[e.getKey()]; ok {
+				mixedExpressions = append(mixedExpressions, e)
+			} else {
+				metricExpressions = append(metricExpressions, e)
+			}
+		}
+	}
+
+	getCostMultiplier := func(expr expression) int {
+		if expr.hasRe() {
+			return 10
+		}
+		return 1
+	}
+
+	sort.Slice(metricExpressions, func(i, j int) bool {
+		return len(q.index[metricExpressions[i].getKey()])*getCostMultiplier(metricExpressions[i]) < len(q.index[metricExpressions[j].getKey()])*getCostMultiplier(metricExpressions[j])
+	})
+
+	sort.Slice(mixedExpressions, func(i, j int) bool {
+		return ((len(q.index[mixedExpressions[i].getKey()]) + len(q.metaIndex[mixedExpressions[i].getKey()])) * getCostMultiplier(mixedExpressions[i])) < ((len(q.index[mixedExpressions[j].getKey()]) + len(q.metaIndex[mixedExpressions[j].getKey()])) * getCostMultiplier(mixedExpressions[j]))
+	})
+
+	q.metricExpressions = metricExpressions
+	q.mixedExpressions = mixedExpressions
+}
+
+func (q *TagQuery) sortByCostWithoutMeta() {
+	q.metricExpressions = append(q.metricExpressions, q.mixedExpressions...)
+	q.mixedExpressions = []expression{}
+
+	// extract tag query if there is one
+	for i, e := range q.metricExpressions {
+		op := e.getOperator()
+
+		if op == opMatchTag || op == opPrefixTag {
+			q.tagQuery = e
+			q.metricExpressions = append(q.metricExpressions[:i], q.metricExpressions[i+1:]...)
+
+			// there should never be more than one tag operator
+			break
+		}
+	}
+
+	// We assume that any operation involving a regular expressions is 10 times more expensive than = / !=
+	getCostMultiplier := func(expr expression) int {
+		if expr.hasRe() {
+			return 10
+		}
+		return 1
+	}
+
+	sort.Slice(q.metricExpressions, func(i, j int) bool {
+		return len(q.index[q.metricExpressions[i].getKey()])*getCostMultiplier(q.metricExpressions[i]) < len(q.index[q.metricExpressions[j].getKey()])*getCostMultiplier(q.metricExpressions[j])
+	})
+}
+
 func (q *TagQuery) sortByCost() {
-	for i, kv := range q.equal {
-		q.equal[i].cost = uint(len(q.index[kv.key][kv.value]))
+	if q.subQuery {
+		q.sortByCostWithoutMeta()
+	} else {
+		q.sortByCostWithMeta()
 	}
 
-	// for prefix and match clauses we can't determine the actual cost
-	// without actually evaluating them, so we estimate based on
-	// cardinality of the key
-	for i, kv := range q.prefix {
-		q.prefix[i].cost = uint(len(q.index[kv.key]))
+	for i, expr := range q.metricExpressions {
+		if expr.isPositiveOperator() {
+			q.initialExpression = q.metricExpressions[i]
+			q.metricExpressions = append(q.metricExpressions[:i], q.metricExpressions[i+1:]...)
+			return
+		}
 	}
-
-	for i, kvRe := range q.match {
-		q.match[i].cost = uint(len(q.index[kvRe.key]))
+	for i, expr := range q.mixedExpressions {
+		if expr.isPositiveOperator() {
+			q.initialExpression = q.mixedExpressions[i]
+			q.mixedExpressions = append(q.mixedExpressions[:i], q.mixedExpressions[i+1:]...)
+			q.initialExpressionUseMeta = true
+			return
+		}
 	}
-
-	sort.Sort(KvByCost(q.equal))
-	sort.Sort(KvByCost(q.notEqual))
-	sort.Sort(KvByCost(q.prefix))
-	sort.Sort(KvReByCost(q.match))
-	sort.Sort(KvReByCost(q.notMatch))
+	q.initialExpression = q.tagQuery
 }
 
 // Run executes the tag query on the given index and returns a list of ids
