@@ -1098,3 +1098,22 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 		response.Write(ctx, response.NewError(http.StatusBadRequest, "Unsupported response format requested: "+request.Format))
 	}
 }
+
+func (s *Server) getMetaTagRecord(ctx *middleware.Context) {
+	metaTagRecords := s.MetricIndex.MetaTagRecordList(ctx.OrgId)
+	response.Write(ctx, response.NewJson(200, metaTagRecords, ""))
+}
+
+func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, metaTagRecord models.MetaTagRecord) {
+	record := idx.MetaTagRecord{
+		MetaTags: metaTagRecord.MetaTags,
+		Queries:  metaTagRecord.TagQueries,
+	}
+
+	result, err := s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+	}
+
+	response.Write(ctx, response.NewJson(200, result, ""))
+}

@@ -26,6 +26,12 @@ type Archive struct {
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
 }
 
+type MetaTagRecord struct {
+	MetaTags []string
+	Queries  []string
+	ID       uint32
+}
+
 // used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
 	return Archive{
@@ -125,4 +131,18 @@ type MetricIndex interface {
 	// DeleteTagged deletes the specified series from the tag index and also the
 	// DefById index.
 	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
+
+	// MetaTagRecordUpsert takes the definition of a meta tag record rule, parses and
+	// applies it.
+	// If the given meta tag record applies to a combination of tag queries for which
+	// there already is a rule, then it updates that existing rule instead of adding
+	// a new one. In this case the first returned value is a pointer to the old rule
+	// before the update, otherwise that value is nil.
+	// If there were any errors during this process it returns an error
+	// message as the second returned value.
+	MetaTagRecordUpsert(orgId uint32, record MetaTagRecord) (*MetaTagRecord, error)
+
+	// MetaTagRecordList takes an org id and returns the list of all meta tag records
+	// of that given org.
+	MetaTagRecordList(orgId uint32) []MetaTagRecord
 }

@@ -213,16 +213,20 @@ type MemoryIdx struct {
 	tree map[uint32]*Tree // by orgId
 
 	// used by tag index
-	defByTagSet defByTagSet
-	tags        map[uint32]TagIndex // by orgId
+	defByTagSet    defByTagSet
+	tags           map[uint32]TagIndex       // by orgId
+	metaTags       map[uint32]metaTagIndex   // by orgId
+	metaTagRecords map[uint32]metaTagRecords // by orgId
 }
 
 func New() *MemoryIdx {
 	return &MemoryIdx{
-		defById:     make(map[schema.MKey]*idx.Archive),
-		defByTagSet: make(defByTagSet),
-		tree:        make(map[uint32]*Tree),
-		tags:        make(map[uint32]TagIndex),
+		defById:        make(map[schema.MKey]*idx.Archive),
+		defByTagSet:    make(defByTagSet),
+		tree:           make(map[uint32]*Tree),
+		tags:           make(map[uint32]TagIndex),
+		metaTags:       make(map[uint32]metaTagIndex),
+		metaTagRecords: make(map[uint32]metaTagRecords),
 	}
 }
 
@@ -316,6 +320,85 @@ func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
 		return
 	}
 	*(m.defById[archive.Id]) = archive
+}
+
+func (m *MemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecord) (*idx.MetaTagRecord, error) {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil, nil
+	}
+
+	var mtr metaTagRecords
+	var mti metaTagIndex
+	var ok bool
+
+	m.Lock()
+	defer m.Unlock()
+
+	if mtr, ok = m.metaTagRecords[orgId]; !ok {
+		mtr = make(metaTagRecords)
+		m.metaTagRecords[orgId] = mtr
+	}
+
+	if mti, ok = m.metaTags[orgId]; !ok {
+		mti = make(metaTagIndex)
+		m.metaTags[orgId] = mti
+	}
+
+	hash, record, oldHash, oldRecord, err := mtr.upsert(rawRecord.MetaTags, rawRecord.Queries)
+	if err != nil {
+		return nil, err
+	}
+
+	// if this upsert has updated a previously existing record, then we remove its entries
+	// from the metaTagIndex before inserting the new ones
+	if oldRecord != nil {
+		for _, keyValue := range oldRecord.metaTags {
+			mti.deleteRecord(keyValue, oldHash)
+		}
+
+		for _, keyValue := range record.metaTags {
+			mti.insertRecord(keyValue, hash)
+		}
+
+		// if a record has been updated then we want return information about the
+		// record that has been updated in order to respond with what has changed
+		builder := strings.Builder{}
+		return &idx.MetaTagRecord{
+			ID:       oldHash,
+			MetaTags: oldRecord.metaTagStrings(&builder),
+			Queries:  oldRecord.queryStrings(&builder),
+		}, nil
+	} else {
+		for _, keyValue := range record.metaTags {
+			mti.insertRecord(keyValue, hash)
+		}
+
+		return nil, nil
+	}
+}
+
+func (m *MemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
+	builder := strings.Builder{}
+	res := make([]idx.MetaTagRecord, 0, len(m.metaTagRecords))
+
+	m.RLock()
+	defer m.RUnlock()
+
+	metaTagRecords, ok := m.metaTagRecords[orgId]
+	if !ok {
+		return res
+	}
+
+	for i, record := range metaTagRecords {
+		res = append(res, idx.MetaTagRecord{
+			ID:       i,
+			MetaTags: record.metaTagStrings(&builder),
+			Queries:  record.queryStrings(&builder),
+		})
+	}
+
+	return res
 }
 
 // indexTags reads the tags of a given metric definition and creates the

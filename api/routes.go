@@ -6,7 +6,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/raintank/gziper"
-	"gopkg.in/macaron.v1"
+	macaron "gopkg.in/macaron.v1"
 )
 
 func (s *Server) RegisterRoutes() {
@@ -70,6 +70,10 @@ func (s *Server) RegisterRoutes() {
 	r.Post("/tags/delSeries", withOrg, ready, bind(models.GraphiteTagDelSeries{}), s.graphiteTagDelSeries)
 	r.Combo("/functions", withOrg).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
 	r.Combo("/functions/:func(.+)", withOrg).Get(s.graphiteFunctions).Post(s.graphiteFunctions)
+
+	// Meta Tags
+	r.Post("/metaTags/add", withOrg, ready, bind(models.MetaTagRecord{}), s.metaTagRecordUpsert)
+	r.Get("/metaTags", withOrg, ready, s.getMetaTagRecord)
 
 	// Prometheus endpoints
 	r.Combo("/prometheus/api/v1/query_range", cBody, withOrg, ready, form(models.PrometheusRangeQuery{})).Get(s.prometheusQueryRange).Post(s.prometheusQueryRange)

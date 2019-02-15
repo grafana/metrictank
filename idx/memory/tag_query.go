@@ -52,6 +52,12 @@ type kv struct {
 	value string
 }
 
+func (k *kv) stringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(k.key)
+	builder.WriteString("=")
+	builder.WriteString(k.value)
+}
+
 // kv expressions that rely on regular expressions will get converted to kvRe in
 // NewTagQuery() to accommodate the additional requirements of regex based queries.
 type kvRe struct {
