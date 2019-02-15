@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -27,28 +26,8 @@ var (
 // some of the following operators are non-standard and are only used
 // internally to implement certain functionalities requiring them
 
-type match uint16
-
-const (
-	EQUAL      match = iota // =
-	NOT_EQUAL               // !=
-	MATCH                   // =~        regular expression
-	MATCH_TAG               // __tag=~   relies on special key __tag. non-standard, required for `/metrics/tags` requests with "filter"
-	NOT_MATCH               // !=~
-	PREFIX                  // ^=        exact prefix, not regex. non-standard, required for auto complete of tag values
-	PREFIX_TAG              // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
-)
-
-type expression struct {
-	kv
-	operator match
-}
-
 // a key / value combo used to represent a tag expression like "key=value"
-// the cost is an estimate how expensive this query is compared to others
-// with the same operator
 type kv struct {
-	cost  uint // cost of evaluating expression, compared to other kv objects
 	key   string
 	value string
 }
@@ -58,30 +37,6 @@ func (k *kv) stringIntoBuilder(builder *strings.Builder) {
 	builder.WriteString("=")
 	builder.WriteString(k.value)
 }
-
-// kv expressions that rely on regular expressions will get converted to kvRe in
-// NewTagQuery() to accommodate the additional requirements of regex based queries.
-type kvRe struct {
-	cost           uint // cost of evaluating expression, compared to other kvRe objects
-	key            string
-	value          *regexp.Regexp // the regexp pattern to evaluate, nil means everything should match
-	matchCache     *sync.Map      // needs to be reference so kvRe can be copied, caches regex matches
-	matchCacheSize int32          // sync.Map does not have a way to get the length
-	missCache      *sync.Map      // needs to be reference so kvRe can be copied, caches regex misses
-	missCacheSize  int32          // sync.Map does not have a way to get the length
-}
-
-type KvByCost []kv
-
-func (a KvByCost) Len() int           { return len(a) }
-func (a KvByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KvByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
-
-type KvReByCost []kvRe
-
-func (a KvReByCost) Len() int           { return len(a) }
-func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 
 type filter struct {
 	expr            expression
