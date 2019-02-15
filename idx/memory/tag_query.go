@@ -90,6 +90,11 @@ type TagQuery struct {
 	// clause that operates on LastUpdate field
 	from int64
 
+	metricExpressions []expression
+	mixedExpressions  []expression
+	tagQuery          expression
+	initialExpression expression
+
 	// clauses that operate on values. from expressions like tag<operator>value
 	equal    []kv   // EQUAL
 	match    []kvRe // MATCH
