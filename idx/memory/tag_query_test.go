@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -33,7 +34,7 @@ func getTestIDs(t *testing.T) []schema.MKey {
 	return ids
 }
 
-func getTestIndex(t *testing.T) (TagIndex, map[schema.MKey]*idx.Archive) {
+func getTestIndex(t *testing.T) (map[schema.MKey]*idx.Archive, TagIndex, metaTagIndex, metaTagRecords) {
 	type testCase struct {
 		id         schema.MKey
 		lastUpdate int64
@@ -68,28 +69,107 @@ func getTestIndex(t *testing.T) (TagIndex, map[schema.MKey]*idx.Archive) {
 		tagIdx.addTagId("name", byId[d.id].Name, d.id)
 	}
 
-	return tagIdx, byId
+	return byId, tagIdx, make(metaTagIndex), make(metaTagRecords)
 }
 
-func queryAndCompareTagResults(t *testing.T, q TagQuery, expectedData map[string]struct{}) {
-	t.Helper()
-	tagIdx, byId := getTestIndex(t)
+func getTestIndexWithMetaRecords(t *testing.T) (map[schema.MKey]*idx.Archive, TagIndex, metaTagIndex, metaTagRecords) {
+	byId, tagIdx, mti, mtr := getTestIndex(t)
 
-	res := q.RunGetTags(tagIdx, byId)
+	mti = metaTagIndex{
+		"mymeta1": metaTagValue{
+			"value1": []uint32{
+				123,
+			},
+			"value2": []uint32{
+				124,
+			},
+		},
+	}
+
+	mtr = metaTagRecords{
+		123: metaTagRecord{
+			metaTags: []kv{
+				kv{
+					key:   "mymeta1",
+					value: "value1",
+				},
+			},
+			queries: []expression{
+				&expressionEqual{
+					expressionCommon{
+						key:      "key2",
+						value:    "value2",
+						operator: opEqual,
+					},
+				},
+			},
+		},
+		124: metaTagRecord{
+			metaTags: []kv{
+				kv{
+					key:   "mymeta1",
+					value: "value2",
+				},
+			},
+			queries: []expression{
+				&expressionEqual{
+					expressionCommon{
+						key:      "key2",
+						value:    "value2",
+						operator: opEqual,
+					},
+				},
+				&expressionMatch{
+					expressionCommon: expressionCommon{
+						key:      "key3",
+						value:    ".*abc$",
+						operator: opMatch,
+					},
+					valueRe: regexp.MustCompile(".*abc$"),
+				},
+			},
+		},
+	}
+
+	return byId, tagIdx, mti, mtr
+}
+
+func queryAndCompareTagResults(t *testing.T, q *TagQuery, expectedData map[string]struct{}) {
+	t.Helper()
+	q.initForIndex(getTestIndex(t))
+	res := q.RunGetTags()
 	if !reflect.DeepEqual(expectedData, res) {
 		t.Fatalf("Expected: %+v\nGot: %+v", expectedData, res)
 	}
 }
 
-func queryAndCompareResults(t *testing.T, q TagQuery, expectedData IdSet) {
+func queryAndCompareResults(t *testing.T, q *TagQuery, expectedData IdSet) {
 	t.Helper()
-	tagIdx, byId := getTestIndex(t)
-
-	res := q.Run(tagIdx, byId)
-
+	res := q.Run()
 	if !reflect.DeepEqual(expectedData, res) {
 		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", expectedData, res)
 	}
+}
+
+func TestQueryByMetaTag(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"mymeta1=value1"}, 0)
+	expect := make(IdSet)
+	expect[ids[0]] = struct{}{}
+	expect[ids[5]] = struct{}{}
+
+	q.initForIndex(getTestIndexWithMetaRecords(t))
+	queryAndCompareResults(t, q, expect)
+}
+
+func TestQueryByMetaTagWithMixedOperators(t *testing.T) {
+	ids := getTestIDs(t)
+	q, _ := NewTagQuery([]string{"mymeta1=value2"}, 0)
+	expect := make(IdSet)
+	expect[ids[5]] = struct{}{}
+
+	q.initForIndex(getTestIndexWithMetaRecords(t))
+	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagSimpleEqual(t *testing.T) {
@@ -98,6 +178,8 @@ func TestQueryByTagSimpleEqual(t *testing.T) {
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -110,6 +192,8 @@ func TestQueryByTagSimplePrefix(t *testing.T) {
 	expect[ids[4]] = struct{}{}
 	expect[ids[6]] = struct{}{}
 	expect[ids[7]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -118,6 +202,8 @@ func TestQueryByTagPrefixSpecialCaseName(t *testing.T) {
 	q, _ := NewTagQuery([]string{"key1=value1", "name^=metric2"}, 0)
 	expect := make(IdSet)
 	expect[ids[2]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -127,6 +213,8 @@ func TestQueryByTagFilterByPrefix(t *testing.T) {
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -136,6 +224,8 @@ func TestQueryByTagSimplePattern(t *testing.T) {
 	expect := make(IdSet)
 	expect[ids[6]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -146,6 +236,8 @@ func TestQueryByTagSimpleUnequal(t *testing.T) {
 	expect[ids[0]] = struct{}{}
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -154,6 +246,8 @@ func TestQueryByTagSimpleNotPattern(t *testing.T) {
 	q, _ := NewTagQuery([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"}, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -164,6 +258,8 @@ func TestQueryByTagWithEqualEmpty(t *testing.T) {
 	expect[ids[1]] = struct{}{}
 	expect[ids[2]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -173,6 +269,8 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -181,6 +279,8 @@ func TestQueryByTagNameEquals(t *testing.T) {
 	q, _ := NewTagQuery([]string{"key1=value1", "key3=value3", "name=metric1"}, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
@@ -190,11 +290,16 @@ func TestQueryByTagNameRegex(t *testing.T) {
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagFilterByTagMatch(t *testing.T) {
-	q, _ := NewTagQuery([]string{"__tag=~a{1}"}, 0)
+	q, err := NewTagQuery([]string{"__tag=~a{1}"}, 0)
+	if err != nil {
+		t.Fatalf("Error when initializing new query: %s", err)
+	}
 	expectTags := make(map[string]struct{})
 	expectTags["abc"] = struct{}{}
 	expectTags["aaa"] = struct{}{}
@@ -241,67 +346,56 @@ func TestQueryByTagFilterByTagPrefixSpecialCaseName(t *testing.T) {
 func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) {
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag=~na", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	expect := make(IdSet)
 	expect[ids[0]] = struct{}{}
 	expect[ids[5]] = struct{}{}
+
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
+	byId, tagIdx, mti, mtr := getTestIndex(t)
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag=~a{1}", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 
 	expect := make(IdSet)
 	expect[ids[5]] = struct{}{}
+
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{2}", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{3}", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag=~a{4}", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	delete(expect, ids[5])
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagFilterByTagPrefixWithExpression(t *testing.T) {
+	byId, tagIdx, mti, mtr := getTestIndex(t)
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag^=aa", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 
 	expect := make(IdSet)
 	expect[ids[5]] = struct{}{}
+
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag^=aaa", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag^=aaaa", "key2=value2"}, 0)
-	if q.startWith != EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	delete(expect, ids[5])
 	delete(expect, ids[6])
 	queryAndCompareResults(t, q, expect)
@@ -312,23 +406,28 @@ func TestQueryByTagFilterByTagPrefixWithFrom(t *testing.T) {
 	q, _ := NewTagQuery([]string{"__tag^=aa"}, 7)
 	expect := make(IdSet)
 	expect[ids[6]] = struct{}{}
+	q.initForIndex(getTestIndex(t))
 	queryAndCompareResults(t, q, expect)
 }
 
 func TestQueryByTagFilterByTagPrefixWithDifferentLengths(t *testing.T) {
+	byId, tagIdx, mti, mtr := getTestIndex(t)
 	ids := getTestIDs(t)
 	q, _ := NewTagQuery([]string{"__tag^=a"}, 0)
 	expect := make(IdSet)
 	expect[ids[3]] = struct{}{}
 	expect[ids[5]] = struct{}{}
 	expect[ids[6]] = struct{}{}
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag^=aaa"}, 0)
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	delete(expect, ids[3])
 	queryAndCompareResults(t, q, expect)
 
 	q, _ = NewTagQuery([]string{"__tag^=aaaa"}, 0)
+	q.initForIndex(byId, tagIdx, mti, mtr)
 	delete(expect, ids[5])
 	delete(expect, ids[6])
 	queryAndCompareResults(t, q, expect)
@@ -349,28 +448,32 @@ func TestQueryByTagInvalidQuery(t *testing.T) {
 }
 
 func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
-	tagIdx, byId := getTestIndex(t)
+	byId, tagIdx, mti, mtr := getTestIndex(t)
 
 	q, _ := NewTagQuery([]string{"key1=value1"}, 4)
-	res := q.Run(tagIdx, byId)
+	q.initForIndex(byId, tagIdx, mti, mtr)
+	res := q.Run()
 	if len(res) != 1 {
 		t.Fatalf("Expected %d results, but got %d", 1, len(res))
 	}
 
 	q, _ = NewTagQuery([]string{"key1=value1"}, 3)
-	res = q.Run(tagIdx, byId)
+	q.initForIndex(byId, tagIdx, mti, mtr)
+	res = q.Run()
 	if len(res) != 2 {
 		t.Fatalf("Expected %d results, but got %d", 2, len(res))
 	}
 
 	q, _ = NewTagQuery([]string{"key1=value1"}, 2)
-	res = q.Run(tagIdx, byId)
+	q.initForIndex(byId, tagIdx, mti, mtr)
+	res = q.Run()
 	if len(res) != 3 {
 		t.Fatalf("Expected %d results, but got %d", 3, len(res))
 	}
 
 	q, _ = NewTagQuery([]string{"key1=value1"}, 1)
-	res = q.Run(tagIdx, byId)
+	q.initForIndex(byId, tagIdx, mti, mtr)
+	res = q.Run()
 	if len(res) != 4 {
 		t.Fatalf("Expected %d results, but got %d", 4, len(res))
 	}
@@ -498,37 +601,37 @@ func TestExpressionParsing(t *testing.T) {
 			expression: "key=value",
 			key:        "key",
 			value:      "value",
-			operator:   EQUAL,
+			operator:   opEqual,
 			err:        nil,
 		}, {
 			expression: "key!=",
 			key:        "key",
 			value:      "",
-			operator:   NOT_EQUAL,
+			operator:   opHasTag,
 			err:        nil,
 		}, {
 			expression: "key=",
 			key:        "key",
 			value:      "",
-			operator:   EQUAL,
+			operator:   opNotHasTag,
 			err:        nil,
 		}, {
 			expression: "key=~",
 			key:        "key",
 			value:      "",
-			operator:   MATCH,
+			operator:   opNotHasTag,
 			err:        nil,
 		}, {
 			expression: "key=~v_alue",
 			key:        "key",
-			value:      "v_alue",
-			operator:   MATCH,
+			value:      "^(?:v_alue)",
+			operator:   opMatch,
 			err:        nil,
 		}, {
 			expression: "k!=~v",
 			key:        "k",
-			value:      "v",
-			operator:   NOT_MATCH,
+			value:      "^(?:v)",
+			operator:   opNotMatch,
 			err:        nil,
 		}, {
 			expression: "key!!=value",
@@ -537,13 +640,13 @@ func TestExpressionParsing(t *testing.T) {
 			expression: "key==value",
 			key:        "key",
 			value:      "=value",
-			operator:   EQUAL,
+			operator:   opEqual,
 			err:        nil,
 		}, {
 			expression: "key=~=value",
 			key:        "key",
-			value:      "=value",
-			operator:   MATCH,
+			value:      "^(?:=value)",
+			operator:   opMatch,
 			err:        nil,
 		}, {
 			expression: "key",
@@ -553,8 +656,8 @@ func TestExpressionParsing(t *testing.T) {
 
 	for _, tc := range testCases {
 		expression, err := parseExpression(tc.expression)
-		if err != tc.err || (err == nil && (expression.key != tc.key || expression.value != tc.value || expression.operator != tc.operator)) {
-			t.Fatalf("Expected the values %s, %s, %d, %q, but got %s, %s, %d, %q", tc.key, tc.value, tc.operator, tc.err, expression.key, expression.value, expression.operator, err)
+		if err != tc.err || (err == nil && (expression.getKey() != tc.key || expression.getValue() != tc.value || expression.getOperator() != tc.operator)) {
+			t.Fatalf("Expected the values %s, %s, %d, %q, but got %s, %s, %d, %q", tc.key, tc.value, tc.operator, tc.err, expression.getKey(), expression.getValue(), expression.getOperator(), err)
 		}
 	}
 }
