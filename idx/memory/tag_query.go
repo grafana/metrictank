@@ -81,6 +81,12 @@ type KvReByCost []kvRe
 func (a KvReByCost) Len() int           { return len(a) }
 func (a KvReByCost) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
+type filter struct {
+	expr            expression
+	test            tagFilter
+	defaultDecision filterDecision
+	meta            bool
+}
 
 // TagQuery runs a set of pattern or string matches on tag keys and values against
 // the index. It is executed via:
@@ -88,7 +94,8 @@ func (a KvReByCost) Less(i, j int) bool { return a[i].cost < a[j].cost }
 // RunGetTags() which returns a list of tags of the matching metrics
 type TagQuery struct {
 	// clause that operates on LastUpdate field
-	from int64
+	from    int64
+	filters []filter
 
 	metricExpressions []expression
 	mixedExpressions  []expression
@@ -692,6 +699,37 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	}
 
 	q.wg.Done()
+}
+
+func (q *TagQuery) prepareFilters() {
+	q.filters = make([]filter, len(q.metricExpressions)+len(q.mixedExpressions))
+	i := 0
+	for _, expr := range q.metricExpressions {
+		q.filters[i] = filter{
+			expr:            expr,
+			test:            expr.getFilter(),
+			defaultDecision: expr.getDefaultDecision(),
+			meta:            false,
+		}
+		i++
+	}
+	for _, expr := range q.mixedExpressions {
+		q.filters[i] = filter{
+			expr:            expr,
+			test:            expr.getFilter(),
+			defaultDecision: expr.getDefaultDecision(),
+			meta:            true,
+		}
+		i++
+	}
+	if q.tagQuery != nil && q.tagQuery != q.initialExpression {
+		q.filters = append(q.filters, filter{
+			expr:            q.tagQuery,
+			test:            q.tagQuery.getFilter(),
+			defaultDecision: q.tagQuery.getDefaultDecision(),
+			meta:            true,
+		})
+	}
 }
 
 // sortByCost tries to estimate the cost of different expressions and sort them
