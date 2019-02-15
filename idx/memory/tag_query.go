@@ -38,9 +38,34 @@ const (
 	PREFIX_TAG              // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
 )
 
+func (m match) stringIntoBuilder(builder *strings.Builder) {
+	switch m {
+	case EQUAL:
+		builder.WriteString("=")
+	case NOT_EQUAL:
+		builder.WriteString("!=")
+	case MATCH:
+		builder.WriteString("=~")
+	case MATCH_TAG:
+		builder.WriteString("=~")
+	case NOT_MATCH:
+		builder.WriteString("!=~")
+	case PREFIX:
+		builder.WriteString("^=")
+	case PREFIX_TAG:
+		builder.WriteString("^=")
+	}
+}
+
 type expression struct {
 	kv
 	operator match
+}
+
+func (e *expression) stringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	e.operator.stringIntoBuilder(builder)
+	builder.WriteString(e.value)
 }
 
 // a key / value combo used to represent a tag expression like "key=value"
@@ -50,6 +75,12 @@ type kv struct {
 	cost  uint // cost of evaluating expression, compared to other kv objects
 	key   string
 	value string
+}
+
+func (k *kv) stringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(k.key)
+	builder.WriteString("=")
+	builder.WriteString(k.value)
 }
 
 // kv expressions that rely on regular expressions will get converted to kvRe in

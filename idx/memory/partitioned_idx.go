@@ -544,3 +544,39 @@ func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet
 	}
 	return response
 }
+
+func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
+	for _, m := range p.Partition {
+		// all partitions should have all meta records
+		return m.MetaTagRecordList(orgId)
+	}
+	return nil
+}
+
+func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecord) (idx.MetaTagRecord, bool, error) {
+	g, _ := errgroup.WithContext(context.Background())
+
+	var i int
+	var record idx.MetaTagRecord
+	var created bool
+	for _, m := range p.Partition {
+		g.Go(func() error {
+			var err error
+			if i == 0 {
+				record, created, err = m.MetaTagRecordUpsert(orgId, rawRecord)
+			} else {
+				_, _, err = m.MetaTagRecordUpsert(orgId, rawRecord)
+			}
+
+			return err
+		})
+		i++
+	}
+
+	if err := g.Wait(); err != nil {
+		log.Errorf("memory-idx: failed to upsert meta tag record in at least one partition: %s", err)
+		return record, created, err
+	}
+
+	return record, created, nil
+}

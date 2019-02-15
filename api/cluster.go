@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
@@ -314,7 +315,7 @@ type PeerResponse struct {
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, map[string]error) {
 
 	peers := cluster.Manager.MemberList(false, true)
 	log.Debugf("HTTP %s across %d instances", name, len(peers)-1)
@@ -353,14 +354,16 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	}()
 
 	result := make(map[string]PeerResponse)
+	errors := make(map[string]error)
 	for resp := range responses {
 		if resp.err != nil {
-			return nil, resp.err
+			errors[resp.data.peer.GetName()] = resp.err
+		} else {
+			result[resp.data.peer.GetName()] = resp.data
 		}
-		result[resp.data.peer.GetName()] = resp.data
 	}
 
-	return result, nil
+	return result, errors
 }
 
 // peerQuerySpeculative takes a request and the path to request it on, then fans it out
@@ -504,4 +507,29 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 	}()
 
 	return resultChan, errorChan
+}
+
+func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.IndexMetaTagRecordUpsert) {
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{}))
+		return
+	}
+
+	record := idx.MetaTagRecord{
+		MetaTags: req.MetaTags,
+		Queries:  req.Queries,
+	}
+
+	result, created, err := s.MetricIndex.MetaTagRecordUpsert(req.OrgId, record)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{
+		MetaTags: result.MetaTags,
+		Queries:  result.Queries,
+		ID:       result.ID,
+		Created:  created,
+	}))
 }

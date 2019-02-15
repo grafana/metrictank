@@ -214,6 +214,239 @@ func (z *Archive) Msgsize() (s int) {
 }
 
 // DecodeMsg implements msgp.Decodable
+func (z *MetaTagRecord) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "MetaTags":
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
+			if err != nil {
+				err = msgp.WrapError(err, "MetaTags")
+				return
+			}
+			if cap(z.MetaTags) >= int(zb0002) {
+				z.MetaTags = (z.MetaTags)[:zb0002]
+			} else {
+				z.MetaTags = make([]string, zb0002)
+			}
+			for za0001 := range z.MetaTags {
+				z.MetaTags[za0001], err = dc.ReadString()
+				if err != nil {
+					err = msgp.WrapError(err, "MetaTags", za0001)
+					return
+				}
+			}
+		case "Queries":
+			var zb0003 uint32
+			zb0003, err = dc.ReadArrayHeader()
+			if err != nil {
+				err = msgp.WrapError(err, "Queries")
+				return
+			}
+			if cap(z.Queries) >= int(zb0003) {
+				z.Queries = (z.Queries)[:zb0003]
+			} else {
+				z.Queries = make([]string, zb0003)
+			}
+			for za0002 := range z.Queries {
+				z.Queries[za0002], err = dc.ReadString()
+				if err != nil {
+					err = msgp.WrapError(err, "Queries", za0002)
+					return
+				}
+			}
+		case "ID":
+			z.ID, err = dc.ReadUint32()
+			if err != nil {
+				err = msgp.WrapError(err, "ID")
+				return
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z *MetaTagRecord) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 3
+	// write "MetaTags"
+	err = en.Append(0x83, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
+	if err != nil {
+		return
+	}
+	err = en.WriteArrayHeader(uint32(len(z.MetaTags)))
+	if err != nil {
+		err = msgp.WrapError(err, "MetaTags")
+		return
+	}
+	for za0001 := range z.MetaTags {
+		err = en.WriteString(z.MetaTags[za0001])
+		if err != nil {
+			err = msgp.WrapError(err, "MetaTags", za0001)
+			return
+		}
+	}
+	// write "Queries"
+	err = en.Append(0xa7, 0x51, 0x75, 0x65, 0x72, 0x69, 0x65, 0x73)
+	if err != nil {
+		return
+	}
+	err = en.WriteArrayHeader(uint32(len(z.Queries)))
+	if err != nil {
+		err = msgp.WrapError(err, "Queries")
+		return
+	}
+	for za0002 := range z.Queries {
+		err = en.WriteString(z.Queries[za0002])
+		if err != nil {
+			err = msgp.WrapError(err, "Queries", za0002)
+			return
+		}
+	}
+	// write "ID"
+	err = en.Append(0xa2, 0x49, 0x44)
+	if err != nil {
+		return
+	}
+	err = en.WriteUint32(z.ID)
+	if err != nil {
+		err = msgp.WrapError(err, "ID")
+		return
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *MetaTagRecord) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 3
+	// string "MetaTags"
+	o = append(o, 0x83, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.MetaTags)))
+	for za0001 := range z.MetaTags {
+		o = msgp.AppendString(o, z.MetaTags[za0001])
+	}
+	// string "Queries"
+	o = append(o, 0xa7, 0x51, 0x75, 0x65, 0x72, 0x69, 0x65, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Queries)))
+	for za0002 := range z.Queries {
+		o = msgp.AppendString(o, z.Queries[za0002])
+	}
+	// string "ID"
+	o = append(o, 0xa2, 0x49, 0x44)
+	o = msgp.AppendUint32(o, z.ID)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *MetaTagRecord) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "MetaTags":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "MetaTags")
+				return
+			}
+			if cap(z.MetaTags) >= int(zb0002) {
+				z.MetaTags = (z.MetaTags)[:zb0002]
+			} else {
+				z.MetaTags = make([]string, zb0002)
+			}
+			for za0001 := range z.MetaTags {
+				z.MetaTags[za0001], bts, err = msgp.ReadStringBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "MetaTags", za0001)
+					return
+				}
+			}
+		case "Queries":
+			var zb0003 uint32
+			zb0003, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Queries")
+				return
+			}
+			if cap(z.Queries) >= int(zb0003) {
+				z.Queries = (z.Queries)[:zb0003]
+			} else {
+				z.Queries = make([]string, zb0003)
+			}
+			for za0002 := range z.Queries {
+				z.Queries[za0002], bts, err = msgp.ReadStringBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "Queries", za0002)
+					return
+				}
+			}
+		case "ID":
+			z.ID, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "ID")
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *MetaTagRecord) Msgsize() (s int) {
+	s = 1 + 9 + msgp.ArrayHeaderSize
+	for za0001 := range z.MetaTags {
+		s += msgp.StringPrefixSize + len(z.MetaTags[za0001])
+	}
+	s += 8 + msgp.ArrayHeaderSize
+	for za0002 := range z.Queries {
+		s += msgp.StringPrefixSize + len(z.Queries[za0002])
+	}
+	s += 3 + msgp.Uint32Size
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
 func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
