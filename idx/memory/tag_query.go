@@ -103,13 +103,6 @@ type TagQuery struct {
 	initialExpression        expression
 	initialExpressionUseMeta bool
 
-	// clauses that operate on values. from expressions like tag<operator>value
-	equal    []kv   // EQUAL
-	match    []kvRe // MATCH
-	notEqual []kv   // NOT_EQUAL
-	notMatch []kvRe // NOT_MATCH
-	prefix   []kv   // PREFIX
-
 	// clause that operate on tags (keys)
 	// we only need to support 1 condition for now: a prefix or match
 	tagClause match  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
