@@ -791,17 +791,19 @@ func (q *TagQuery) sortByCost() {
 func (q *TagQuery) getMaxTagCount() int {
 	defer q.wg.Done()
 	var maxTagCount int
+	op := q.tagQuery.getOperator()
+	match := q.tagQuery.getMatcher()
 
-	if q.tagClause == PREFIX_TAG && len(q.tagPrefix) > 0 {
+	if op == opPrefixTag {
 		for tag := range q.index {
-			if !strings.HasPrefix(tag, q.tagPrefix) {
+			if !match(tag) {
 				continue
 			}
 			maxTagCount++
 		}
-	} else if q.tagClause == MATCH_TAG {
+	} else if op == opMatchTag {
 		for tag := range q.index {
-			if q.tagMatch.value.MatchString(tag) {
+			if match(tag) {
 				maxTagCount++
 			}
 		}
@@ -817,9 +819,16 @@ func (q *TagQuery) getMaxTagCount() int {
 // those that pass all the tests will have their relevant tags extracted, which
 // are then pushed into the given tag channel
 func (q *TagQuery) filterTagsFromChan(idCh chan schema.MKey, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
+	defer q.wg.Done()
+
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
+
+	var match func(string) bool
+	if q.tagQuery != nil {
+		match = q.tagQuery.getMatcher()
+	}
 
 IDS:
 	for id := range idCh {
@@ -846,23 +855,20 @@ IDS:
 			}
 
 			key := tag[:equal]
+
 			// this tag has already been pushed into tagCh, so we can stop evaluating
 			if _, ok := resultsCache[key]; ok {
 				continue
 			}
 
-			if q.tagClause == PREFIX_TAG {
-				if !strings.HasPrefix(key, q.tagPrefix) {
-					continue
-				}
-			} else if q.tagClause == MATCH_TAG {
-				if _, ok := q.tagMatch.missCache.Load(key); ok || !q.tagMatch.value.MatchString(tag) {
-					if !ok {
-						q.tagMatch.missCache.Store(key, struct{}{})
-					}
+			if match != nil {
+				// the value doesn't match the requirements
+				if !match(key) {
 					continue
 				}
 			}
+
+			// keeping that value as it satisfies all conditions
 			metricTags[key] = struct{}{}
 		}
 
@@ -901,8 +907,6 @@ IDS:
 			}
 		}
 	}
-
-	q.wg.Done()
 }
 
 // determines whether the given tag prefix/tag match will match the special
@@ -910,22 +914,13 @@ IDS:
 // that every metric has a name
 func (q *TagQuery) tagFilterMatchesName() bool {
 	matchName := false
+	op := q.tagQuery.getOperator()
 
-	if q.tagClause == PREFIX_TAG || q.startWith == PREFIX_TAG {
-		if strings.HasPrefix("name", q.tagPrefix) {
+	if op == opPrefixTag || op == opMatchTag {
+		match := q.tagQuery.getMatcher()
+		if match("name") {
 			matchName = true
 		}
-	} else if q.tagClause == MATCH_TAG || q.startWith == MATCH_TAG {
-		if q.tagMatch.value.MatchString("name") {
-			matchName = true
-		}
-	} else {
-		// some tag queries might have no prefix specified yet, in this case
-		// we do not need to filter by the name
-		// f.e. we know that every metric has a name, and we know that the
-		// prefix "" matches the string "name", so we know that every metric
-		// will pass the tag prefix test. hence we can omit the entire test.
-		matchName = true
 	}
 
 	return matchName
