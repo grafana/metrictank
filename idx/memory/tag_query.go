@@ -187,22 +187,6 @@ func NewTagQuery(expressions []string, from int64) (*TagQuery, error) {
 	return query, nil
 }
 
-// getInitialByEqual generates the initial resultset by executing the given equal expression
-func (q *TagQuery) getInitialByEqual(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
-
-KEYS:
-	for k := range q.index[expr.key][expr.value] {
-		select {
-		case <-stopCh:
-			break KEYS
-		case idCh <- k:
-		}
-	}
-
-	close(idCh)
-}
-
 func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagIndex, mti metaTagIndex, mtr metaTagRecords) {
 	q.index = idx
 	q.byId = defById
@@ -210,101 +194,104 @@ func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagInd
 	q.metaRecords = mtr
 }
 
-// getInitialByPrefix generates the initial resultset by executing the given prefix match expression
-func (q *TagQuery) getInitialByPrefix(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
+// getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
+// a channel through which the IDs of the initial result set will be sent
+// a stop channel, which when closed, will cause it to abort the background worker.
+func (q *TagQuery) getInitialIds(idCh chan schema.MKey) chan struct{} {
+	stopCh := make(chan struct{})
+	q.wg.Add(1)
 
-VALUES:
-	for v, ids := range q.index[expr.key] {
-		if !strings.HasPrefix(v, expr.value) {
-			continue
-		}
-
-		for id := range ids {
-			select {
-			case <-stopCh:
-				break VALUES
-			case idCh <- id:
-			}
-		}
+	if q.initialExpression.matchesTag() {
+		go q.getInitialByTag(idCh, stopCh)
+	} else {
+		go q.getInitialByTagValue(idCh, stopCh)
 	}
 
-	close(idCh)
+	return stopCh
 }
 
-// getInitialByMatch generates the initial resultset by executing the given match expression
-func (q *TagQuery) getInitialByMatch(expr kvRe, idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
+func (q *TagQuery) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struct{}) {
+	key := q.initialExpression.getKey()
+	match := q.initialExpression.getMatcher()
+	initialIdsWg := sync.WaitGroup{}
+	initialIdsWg.Add(1)
 
-	// shortcut if value == nil.
-	// this will simply match any value, like ^.+. since we know that every value
-	// in the index must not be empty, we can skip the matching.
-	if expr.value == nil {
-	VALUES1:
-		for _, ids := range q.index[expr.key] {
+	go func() {
+		defer initialIdsWg.Done()
+	IDS:
+		for v, ids := range q.index[key] {
+			if !match(v) {
+				continue
+			}
+
 			for id := range ids {
 				select {
 				case <-stopCh:
-					break VALUES1
+					break IDS
 				case idCh <- id:
 				}
 			}
 		}
-		close(idCh)
-		return
-	}
+	}()
 
-VALUES2:
-	for v, ids := range q.index[expr.key] {
-		if !expr.value.MatchString(v) {
-			continue
-		}
+	if !q.subQuery && q.initialExpressionUseMeta {
+		for v, records := range q.metaIndex[key] {
+			if !match(v) {
+				continue
+			}
 
-		for id := range ids {
-			select {
-			case <-stopCh:
-				break VALUES2
-			case idCh <- id:
+			initialIdsWg.Add(len(records))
+			for _, metaRecordId := range records {
+				recordIdCopy := metaRecordId
+
+				go func() {
+					defer initialIdsWg.Done()
+
+					record, ok := q.metaRecords[recordIdCopy]
+					if !ok {
+						corruptIndex.Inc()
+						return
+					}
+
+					query, err := tagQueryFromExpressions(record.queries, q.from, true)
+					if err != nil {
+						// this means we've stored a meta record containing invalid queries
+						corruptIndex.Inc()
+						return
+					}
+
+					query.initForIndex(q.byId, q.index, q.metaIndex, q.metaRecords)
+					resCh := query.run()
+					for id := range resCh {
+						idCh <- id
+					}
+				}()
 			}
 		}
 	}
 
-	close(idCh)
+	go func() {
+		defer close(idCh)
+		defer q.wg.Done()
+		initialIdsWg.Wait()
+	}()
 }
 
 // getInitialByTagPrefix generates the initial resultset by creating a list of
 // metric IDs of which at least one tag starts with the defined prefix
-func (q *TagQuery) getInitialByTagPrefix(idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
+func (q *TagQuery) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) {
+	match := q.initialExpression.getMatcher()
+	initialIdsWg := sync.WaitGroup{}
+	initialIdsWg.Add(1)
 
-TAGS:
-	for tag, values := range q.index {
-		if !strings.HasPrefix(tag, q.tagPrefix) {
-			continue
-		}
-
-		for _, ids := range values {
-			for id := range ids {
-				select {
-				case <-stopCh:
-					break TAGS
-				case idCh <- id:
-				}
+	go func() {
+		defer initialIdsWg.Done()
+	TAGS:
+		for tag, values := range q.index {
+			if !match(tag) {
+				continue
 			}
-		}
-	}
 
-	close(idCh)
-}
-
-// getInitialByTagMatch generates the initial resultset by creating a list of
-// metric IDs of which at least one tag matches the defined regex
-func (q *TagQuery) getInitialByTagMatch(idCh chan schema.MKey, stopCh chan struct{}) {
-	defer q.wg.Done()
-
-TAGS:
-	for tag, values := range q.index {
-		if q.tagMatch.value.MatchString(tag) {
 			for _, ids := range values {
 				for id := range ids {
 					select {
@@ -315,39 +302,61 @@ TAGS:
 				}
 			}
 		}
+	}()
+
+	if !q.subQuery && q.initialExpressionUseMeta {
+		metaRecordIds := make(map[uint32]struct{})
+
+		for tag, values := range q.metaIndex {
+			if !match(tag) {
+				continue
+			}
+
+			for _, metaRecordIdsByValue := range values {
+				for _, recordId := range metaRecordIdsByValue {
+					metaRecordIds[recordId] = struct{}{}
+				}
+			}
+		}
+
+		initialIdsWg.Add(len(metaRecordIds))
+		for metaRecordId := range metaRecordIds {
+			recordIdCopy := metaRecordId
+
+			go func() {
+				defer initialIdsWg.Done()
+
+				record, ok := q.metaRecords[recordIdCopy]
+				if !ok {
+					corruptIndex.Inc()
+					return
+				}
+
+				query, err := tagQueryFromExpressions(record.queries, q.from, true)
+				if err != nil {
+					// this means we've stored a meta record containing invalid queries
+					corruptIndex.Inc()
+					return
+				}
+
+				query.index = q.index
+				query.metaIndex = q.metaIndex
+				query.metaRecords = q.metaRecords
+				query.byId = q.byId
+
+				resCh := query.run()
+				for id := range resCh {
+					idCh <- id
+				}
+			}()
+		}
 	}
 
-	close(idCh)
-}
-
-// getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
-// a channel through which the IDs of the initial result set will be sent
-// a stop channel, which when closed, will cause it to abort the background worker.
-func (q *TagQuery) getInitialIds() (chan schema.MKey, chan struct{}) {
-	idCh := make(chan schema.MKey, 1000)
-	stopCh := make(chan struct{})
-	q.wg.Add(1)
-
-	switch q.startWith {
-	case EQUAL:
-		query := q.equal[0]
-		q.equal = q.equal[1:]
-		go q.getInitialByEqual(query, idCh, stopCh)
-	case PREFIX:
-		query := q.prefix[0]
-		q.prefix = q.prefix[1:]
-		go q.getInitialByPrefix(query, idCh, stopCh)
-	case MATCH:
-		query := q.match[0]
-		q.match = q.match[1:]
-		go q.getInitialByMatch(query, idCh, stopCh)
-	case PREFIX_TAG:
-		go q.getInitialByTagPrefix(idCh, stopCh)
-	case MATCH_TAG:
-		go q.getInitialByTagMatch(idCh, stopCh)
-	}
-
-	return idCh, stopCh
+	go func() {
+		defer close(idCh)
+		defer q.wg.Done()
+		initialIdsWg.Wait()
+	}()
 }
 
 // testByAllExpressions takes and id and a MetricDefinition and runs it through
@@ -737,7 +746,8 @@ func (q *TagQuery) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet 
 
 	q.sortByCost()
 
-	idCh, _ := q.getInitialIds()
+	initialIds := make(chan schema.MKey, 1000)
+	_ := q.getInitialIds(initialIds)
 	resCh := make(chan schema.MKey)
 
 	// start the tag query workers. they'll consume the ids on the idCh and
@@ -927,7 +937,8 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive)
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
 	q.sortByCost()
-	idCh, stopCh := q.getInitialIds()
+	initialIds := make(chan schema.MKey, 1000)
+	stopCh := q.getInitialIds(initialIds)
 	tagCh := make(chan string)
 
 	// we know there can only be 1 tag filter, so if we detect that the given
