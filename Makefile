@@ -43,7 +43,7 @@ all:
 debug:
 	$(MAKE) bin-debug
 	$(MAKE) docker-debug
-	${MAKE} qa-debug
+	$(MAKE) qa-debug
 
 clean:
 	rm build/*
