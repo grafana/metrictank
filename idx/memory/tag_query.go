@@ -187,11 +187,56 @@ func NewTagQuery(expressions []string, from int64) (*TagQuery, error) {
 	return query, nil
 }
 
+// Run executes the tag query on the given index and returns a list of ids
+func (q *TagQuery) Run() IdSet {
+	res := q.run()
+
+	result := make(IdSet)
+	for id := range res {
+		result[id] = struct{}{}
+	}
+
+	return result
+}
+
 func (q *TagQuery) initForIndex(defById map[schema.MKey]*idx.Archive, idx TagIndex, mti metaTagIndex, mtr metaTagRecords) {
 	q.index = idx
 	q.byId = defById
 	q.metaIndex = mti
 	q.metaRecords = mtr
+}
+
+func (q *TagQuery) run() chan schema.MKey {
+	q.sortByCost()
+
+	prepareFiltersWg := sync.WaitGroup{}
+	prepareFiltersWg.Add(1)
+	go func() {
+		defer prepareFiltersWg.Done()
+		q.prepareFilters()
+	}()
+
+	initialIds := make(chan schema.MKey, 1000)
+	q.getInitialIds(initialIds)
+
+	q.wg.Add(TagQueryWorkers)
+	results := make(chan schema.MKey, 10000)
+	prepareFiltersWg.Wait()
+
+	// start the tag query workers. they'll consume the ids on the idCh and
+	// evaluate for each of them whether it satisfies all the conditions
+	// defined in the query expressions. those that satisfy all conditions
+	// will be pushed into the resCh
+	for i := 0; i < TagQueryWorkers; i++ {
+		go q.filterIdsFromChan(initialIds, results)
+	}
+
+	go func() {
+		q.wg.Wait()
+		close(results)
+	}()
+
+	return results
 }
 
 // getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
@@ -739,40 +784,6 @@ func (q *TagQuery) sortByCost() {
 	q.initialExpression = q.tagQuery
 }
 
-// Run executes the tag query on the given index and returns a list of ids
-func (q *TagQuery) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
-	q.index = index
-	q.byId = byId
-
-	q.sortByCost()
-
-	initialIds := make(chan schema.MKey, 1000)
-	_ := q.getInitialIds(initialIds)
-	resCh := make(chan schema.MKey)
-
-	// start the tag query workers. they'll consume the ids on the idCh and
-	// evaluate for each of them whether it satisfies all the conditions
-	// defined in the query expressions. those that satisfy all conditions
-	// will be pushed into the resCh
-	q.wg.Add(TagQueryWorkers)
-	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterIdsFromChan(idCh, resCh)
-	}
-
-	go func() {
-		q.wg.Wait()
-		close(resCh)
-	}()
-
-	result := make(IdSet)
-
-	for id := range resCh {
-		result[id] = struct{}{}
-	}
-
-	return result
-}
-
 // getMaxTagCount calculates the maximum number of results (cardinality) a
 // tag query could possibly return
 // this is useful because when running a tag query we can abort it as soon as
@@ -922,29 +933,38 @@ func (q *TagQuery) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
-	q.index = index
-	q.byId = byId
-
+func (q *TagQuery) RunGetTags() map[string]struct{} {
 	maxTagCount := int32(math.MaxInt32)
-
-	// start a thread to calculate the maximum possible number of tags.
-	// this might not always complete before the query execution, but in most
-	// cases it likely will. when it does end before the execution of the query,
-	// the value of maxTagCount will be used to abort the query execution once
-	// the max number of possible tags has been reached
-	q.wg.Add(1)
-	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
-
+	matchName := true
 	q.sortByCost()
+
+	if q.tagQuery != nil {
+		q.wg.Add(1)
+		// start a thread to calculate the maximum possible number of tags.
+		// this might not always complete before the query execution, but in most
+		// cases it likely will. when it does end before the execution of the query,
+		// the value of maxTagCount will be used to abort the query execution once
+		// the max number of possible tags has been reached
+		go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
+
+		// we know there can only be 1 tag filter, so if we detect that the given
+		// tag condition matches the special tag "name", we can omit the filtering
+		// because every metric has a name.
+		matchName = q.tagFilterMatchesName()
+	}
+
+	prepareFiltersWg := sync.WaitGroup{}
+	prepareFiltersWg.Add(1)
+	go func() {
+		defer prepareFiltersWg.Done()
+		q.prepareFilters()
+	}()
+
 	initialIds := make(chan schema.MKey, 1000)
 	stopCh := q.getInitialIds(initialIds)
 	tagCh := make(chan string)
 
-	// we know there can only be 1 tag filter, so if we detect that the given
-	// tag condition matches the special tag "name", we can omit the filtering
-	// because every metric has a name.
-	matchName := q.tagFilterMatchesName()
+	prepareFiltersWg.Wait()
 
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
@@ -952,7 +972,7 @@ func (q *TagQuery) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive)
 	// those that satisfy all conditions and push them into tagCh.
 	q.wg.Add(TagQueryWorkers)
 	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterTagsFromChan(idCh, tagCh, stopCh, matchName)
+		go q.filterTagsFromChan(initialIds, tagCh, stopCh, matchName)
 	}
 
 	go func() {
