@@ -394,160 +394,42 @@ func (q *TagQuery) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTa
 		return false
 	}
 
-	if len(q.equal) > 0 && !q.testByEqual(id, q.equal, false) {
-		return false
-	}
-
-	if len(q.notEqual) > 0 && !q.testByEqual(id, q.notEqual, true) {
-		return false
-	}
-
-	if q.tagClause == PREFIX_TAG && !omitTagFilters && q.startWith != PREFIX_TAG {
-		if !q.testByTagPrefix(def) {
+	for _, filter := range q.filters {
+		if res := filter.test(def); res == pass {
+			continue
+		} else if res == fail {
 			return false
 		}
-	}
 
-	if !q.testByPrefix(def, q.prefix) {
-		return false
-	}
+		metaRecords := q.getMetaRecords(filter.expr)
 
-	if q.tagClause == MATCH_TAG && !omitTagFilters && q.startWith != MATCH_TAG {
-		if !q.testByTagMatch(def) {
+		for _, record := range metaRecords {
+			if record.testByQueries(def) {
+				return true
+			}
+		}
+
+		if filter.defaultDecision != pass {
 			return false
 		}
-	}
-
-	if len(q.match) > 0 && !q.testByMatch(def, q.match, false) {
-		return false
-	}
-
-	if len(q.notMatch) > 0 && !q.testByMatch(def, q.notMatch, true) {
-		return false
 	}
 
 	return true
 }
 
-// testByMatch filters a given metric by matching a regular expression against
-// the values of specific associated tags
-func (q *TagQuery) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
-EXPRS:
-	for _, e := range exprs {
-		if e.key == "name" {
-			if e.value == nil || e.value.MatchString(def.Name) {
-				if not {
-					return false
-				} else {
-					continue EXPRS
-				}
-			} else {
-				if !not {
-					return false
-				} else {
-					continue EXPRS
-				}
-			}
-		}
-
-		prefix := e.key + "="
-		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag, prefix) {
-				continue
-			}
-
-			value := tag[len(e.key)+1:]
-
-			// reduce regex matching by looking up cached non-matches
-			if _, ok := e.missCache.Load(value); ok {
-				continue
-			}
-
-			// reduce regex matching by looking up cached matches
-			if _, ok := e.matchCache.Load(value); ok {
-				if not {
-					return false
-				}
-				continue EXPRS
-			}
-
-			// value == nil means that this expression can be short cut
-			// by not evaluating it
-			if e.value == nil || e.value.MatchString(value) {
-				if atomic.LoadInt32(&e.matchCacheSize) < int32(matchCacheSize) {
-					e.matchCache.Store(value, struct{}{})
-					atomic.AddInt32(&e.matchCacheSize, 1)
-				}
-				if not {
-					return false
-				}
-				continue EXPRS
-			} else {
-				if atomic.LoadInt32(&e.missCacheSize) < int32(matchCacheSize) {
-					e.missCache.Store(value, struct{}{})
-					atomic.AddInt32(&e.missCacheSize, 1)
-				}
-			}
-		}
-		if !not {
-			return false
-		}
-	}
-	return true
-}
-
-// testByTagMatch filters a given metric by matching a regular expression against
-// the associated tags
-func (q *TagQuery) testByTagMatch(def *idx.Archive) bool {
-	// special case for tag "name"
-	if _, ok := q.tagMatch.missCache.Load("name"); !ok {
-		if _, ok := q.tagMatch.matchCache.Load("name"); ok || q.tagMatch.value.MatchString("name") {
-			if !ok {
-				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
-					q.tagMatch.matchCache.Store("name", struct{}{})
-					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
-				}
-			}
-			return true
-		} else {
-			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
-				q.tagMatch.missCache.Store("name", struct{}{})
-				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
-			}
-		}
-	}
-
-	for _, tag := range def.Tags {
-		equal := strings.Index(tag, "=")
-		if equal < 0 {
+func (q *TagQuery) getMetaRecords(expr expression) []metaTagRecord {
+	ids := expr.getMetaRecords(q.metaIndex)
+	res := make([]metaTagRecord, 0, len(ids))
+	for _, id := range ids {
+		if record, ok := q.metaRecords[id]; !ok {
 			corruptIndex.Inc()
-			log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", def.Id, tag)
 			continue
-		}
-		key := tag[:equal]
-
-		if _, ok := q.tagMatch.missCache.Load(key); ok {
-			continue
-		}
-
-		if _, ok := q.tagMatch.matchCache.Load(key); ok || q.tagMatch.value.MatchString(key) {
-			if !ok {
-				if atomic.LoadInt32(&q.tagMatch.matchCacheSize) < int32(matchCacheSize) {
-					q.tagMatch.matchCache.Store(key, struct{}{})
-					atomic.AddInt32(&q.tagMatch.matchCacheSize, 1)
-				}
-			}
-			return true
 		} else {
-			if atomic.LoadInt32(&q.tagMatch.missCacheSize) < int32(matchCacheSize) {
-				q.tagMatch.missCache.Store(key, struct{}{})
-				atomic.AddInt32(&q.tagMatch.missCacheSize, 1)
-			}
-			continue
+			res = append(res, record)
 		}
 	}
 
-	return false
+	return res
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -555,71 +437,13 @@ func (q *TagQuery) testByFrom(def *idx.Archive) bool {
 	return q.from <= atomic.LoadInt64(&def.LastUpdate)
 }
 
-// testByPrefix filters a given metric by matching prefixes against the values
-// of a specific tag
-func (q *TagQuery) testByPrefix(def *idx.Archive, exprs []kv) bool {
-EXPRS:
-	for _, e := range exprs {
-		if e.key == "name" && strings.HasPrefix(def.Name, e.value) {
-			continue EXPRS
-		}
-
-		prefix := e.key + "=" + e.value
-		for _, tag := range def.Tags {
-			if !strings.HasPrefix(tag, prefix) {
-				continue
-			}
-			continue EXPRS
-		}
-		return false
-	}
-	return true
-}
-
-// testByTagPrefix filters a given metric by matching prefixes against its tags
-func (q *TagQuery) testByTagPrefix(def *idx.Archive) bool {
-	if strings.HasPrefix("name", q.tagPrefix) {
-		return true
-	}
-
-	for _, tag := range def.Tags {
-		if strings.HasPrefix(tag, q.tagPrefix) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// testByEqual filters a given metric by the defined "=" expressions
-func (q *TagQuery) testByEqual(id schema.MKey, exprs []kv, not bool) bool {
-	for _, e := range exprs {
-		indexIds := q.index[e.key][e.value]
-
-		// shortcut if key=value combo does not exist at all
-		if len(indexIds) == 0 {
-			return not
-		}
-
-		if _, ok := indexIds[id]; ok {
-			if not {
-				return false
-			}
-		} else {
-			if !not {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
 // filterIdsFromChan takes a channel of metric ids and runs them through the
 // required tests to decide whether a metric should be part of the final
 // result set or not
 // it returns the final result set via the given resCh parameter
 func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
+	defer q.wg.Done()
+
 	for id := range idCh {
 		var def *idx.Archive
 		var ok bool
@@ -637,8 +461,6 @@ func (q *TagQuery) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 			resCh <- id
 		}
 	}
-
-	q.wg.Done()
 }
 
 func (q *TagQuery) prepareFilters() {
