@@ -258,6 +258,8 @@ LOOP:
 		}
 		wg.Add(1)
 		go func(req models.Req) {
+			tagEnrichment := s.MetricIndex.EnrichWithMetaTags(req.MKey)
+
 			rCtx, span := tracing.NewSpan(rCtx, s.Tracer, "getTargetsLocal")
 			req.Trace(span)
 			pre := time.Now()
@@ -270,6 +272,7 @@ LOOP:
 				getTargetDuration.Value(time.Now().Sub(pre))
 				responses <- getTargetsResp{[]models.Series{{
 					Target:       req.Target, // always simply the metric name from index
+					Tags:         tagEnrichment.GetTags(),
 					Datapoints:   points,
 					Interval:     interval,
 					QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was

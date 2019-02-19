@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/grafana/metrictank/idx"
 )
@@ -281,4 +282,27 @@ func (m metaTagRecords) getRecords(ids []uint32) []metaTagRecord {
 	}
 
 	return res
+}
+
+func (m metaTagRecords) enrichTags(tags map[string]string) map[string]string {
+	return nil
+}
+
+type tagEnrichment struct {
+	wg            sync.WaitGroup
+	def           idx.Archive
+	resultingTags map[string]string
+}
+
+func (t *tagEnrichment) GetTags() map[string]string {
+	t.wg.Wait()
+	return t.resultingTags
+}
+
+func newTagEnrichment(def *idx.Archive) *tagEnrichment {
+	res := tagEnrichment{
+		def: *def,
+	}
+	res.wg.Add(1)
+	return &res
 }

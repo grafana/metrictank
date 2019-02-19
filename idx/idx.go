@@ -32,6 +32,11 @@ type MetaTagRecord struct {
 	ID       uint32
 }
 
+type TagEnrichment interface {
+	// GetTags waits until the enrichment is done and then returns the result
+	GetTags() map[string]string
+}
+
 // used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
 	return Archive{
@@ -145,4 +150,9 @@ type MetricIndex interface {
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
 	MetaTagRecordList(orgId uint32) []MetaTagRecord
+
+	// EnrichWithMetaTags takes the org, mkey and tags of a metric and starts a job to
+	// enrich it with meta tags according to the meta records. It returns a
+	// TagEnrichment object which is a promise from which the result can be obtained.
+	EnrichWithMetaTags(mkey schema.MKey) TagEnrichment
 }
