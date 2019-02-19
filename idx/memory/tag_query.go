@@ -114,21 +114,6 @@ type TagQuery struct {
 	wg *sync.WaitGroup
 }
 
-func compileRe(pattern string) (*regexp.Regexp, error) {
-	// shortcut, we don't need to compile that pattern, if re == nil we'll
-	// simply check if there is any value and save a regex match
-	if pattern == "^.+" {
-		return nil, nil
-	}
-
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil, err
-	}
-
-	return re, nil
-}
-
 func tagQueryFromExpressions(expressions []expression, from int64, subQuery bool) (*TagQuery, error) {
 	q := TagQuery{from: from, wg: &sync.WaitGroup{}, subQuery: subQuery}
 
