@@ -714,12 +714,8 @@ func (m *MemoryIdx) FindTags(orgId uint32, prefix string, expressions []string, 
 		m.RLock()
 		defer m.RUnlock()
 
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		resMap := query.RunGetTags(tags, m.defById)
+		query.initForIndex(m.defById, m.tags[orgId], m.metaTags[orgId], m.metaTagRecords[orgId])
+		resMap := query.RunGetTags()
 		for tag := range resMap {
 			res = append(res, tag)
 		}
@@ -785,13 +781,7 @@ func (m *MemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions 
 	if len(expressions) > 0 {
 
 		// add the value prefix into the expressions as an additional condition
-		if len(prefix) > 0 {
-			expressions = append(expressions, tag+"^="+prefix)
-		} else {
-			// if no value prefix has been specified we still require that at
-			// least the given tag must be present
-			expressions = append(expressions, tag+"!=")
-		}
+		expressions = append(expressions, tag+"^="+prefix)
 
 		query, err := NewTagQuery(expressions, from)
 		if err != nil {
@@ -802,12 +792,8 @@ func (m *MemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions 
 		m.RLock()
 		defer m.RUnlock()
 
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		ids := query.Run(tags, m.defById)
+		query.initForIndex(m.defById, m.tags[orgId], m.metaTags[orgId], m.metaTagRecords[orgId])
+		ids := query.Run()
 		valueMap := make(map[string]struct{})
 		prefix := tag + "="
 		for id := range ids {
@@ -992,13 +978,9 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 	return results, nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil
-	}
-
-	return query.Run(tags, m.defById)
+func (m *MemoryIdx) idsByTagQuery(orgId uint32, query *TagQuery) IdSet {
+	query.initForIndex(m.defById, m.tags[orgId], m.metaTags[orgId], m.metaTagRecords[orgId])
+	return query.Run()
 }
 
 func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
@@ -1173,7 +1155,7 @@ func (m *MemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, e
 		return nil, nil
 	}
 
-	queries := make([]TagQuery, 0, len(paths))
+	queries := make([]*TagQuery, 0, len(paths))
 	for _, path := range paths {
 		elements := strings.Split(path, ";")
 		if len(elements) < 2 {
