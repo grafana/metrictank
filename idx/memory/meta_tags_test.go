@@ -315,3 +315,54 @@ func TestDeletingMetaRecord(t *testing.T) {
 		})
 	})
 }
+
+func TestDeletingMetaRecordThatIncludesRegex(t *testing.T) {
+	metaTag := []string{"metaTag1=value1"}
+	tagQuery := []string{"metricTag1=~abc[0-9]"}
+	metaTagDelete := []string{}
+	tagQueryDeleteOriginalValue := []string{"metricTag1=~abc[0-9]"}
+	tagQueryDeleteAnchoredValue := []string{"metricTag1=~^(?:abc[0-9])"}
+
+	Convey("When adding a meta record that includes a regex query", t, func() {
+		metaTagRecords := make(metaTagRecords)
+
+		hash, record, oldHash, oldRecord, err := metaTagRecords.upsert(metaTag, tagQuery)
+		So(record.metaTags[0].key, ShouldEqual, "metaTag1")
+		So(record.metaTags[0].value, ShouldEqual, "value1")
+		So(record.queries[0].getKey(), ShouldEqual, "metricTag1")
+		So(record.queries[0].getValue(), ShouldEqual, "^(?:abc[0-9])")
+		So(record.queries[0].getOperator(), ShouldEqual, opMatch)
+		So(oldHash, ShouldBeZeroValue)
+		So(oldRecord, ShouldBeNil)
+		So(err, ShouldBeNil)
+		So(len(metaTagRecords), ShouldEqual, 1)
+		_, ok := metaTagRecords[hash]
+		So(ok, ShouldBeTrue)
+
+		Convey("then we delete the record again by using the query with the original value", func() {
+			hash, record, oldHash, oldRecord, err = metaTagRecords.upsert(metaTagDelete, tagQueryDeleteOriginalValue)
+			So(err, ShouldBeNil)
+			So(len(record.metaTags), ShouldEqual, 0)
+			So(record.queries[0].getKey(), ShouldEqual, "metricTag1")
+			So(record.queries[0].getValue(), ShouldEqual, "^(?:abc[0-9])")
+			So(record.queries[0].getOperator(), ShouldEqual, opMatch)
+			So(oldHash, ShouldEqual, hash)
+			So(len(metaTagRecords), ShouldEqual, 0)
+			_, ok = metaTagRecords[hash]
+			So(ok, ShouldBeFalse)
+		})
+
+		Convey("then we delete the record again by using the query with the anchored value", func() {
+			hash, record, oldHash, oldRecord, err = metaTagRecords.upsert(metaTagDelete, tagQueryDeleteAnchoredValue)
+			So(err, ShouldBeNil)
+			So(len(record.metaTags), ShouldEqual, 0)
+			So(record.queries[0].getKey(), ShouldEqual, "metricTag1")
+			So(record.queries[0].getValue(), ShouldEqual, "^(?:abc[0-9])")
+			So(record.queries[0].getOperator(), ShouldEqual, opMatch)
+			So(oldHash, ShouldEqual, hash)
+			So(len(metaTagRecords), ShouldEqual, 0)
+			_, ok = metaTagRecords[hash]
+			So(ok, ShouldBeFalse)
+		})
+	})
+}
