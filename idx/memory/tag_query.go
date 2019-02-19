@@ -104,16 +104,12 @@ type TagQuery struct {
 	initialExpression        expression
 	initialExpressionUseMeta bool
 
-	// clause that operate on tags (keys)
-	// we only need to support 1 condition for now: a prefix or match
-	tagClause match  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	tagMatch  kvRe   // only used for /metrics/tags with regex in filter param
-	tagPrefix string // only used for auto complete of tags to match exact prefix
+	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	metaIndex   metaTagIndex
+	metaRecords metaTagRecords
 
-	startWith match // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
-
-	index TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId  map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	subQuery bool
 
 	wg *sync.WaitGroup
 }
