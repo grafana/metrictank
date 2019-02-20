@@ -217,6 +217,7 @@ type MemoryIdx struct {
 	tags           map[uint32]TagIndex       // by orgId
 	metaTags       map[uint32]metaTagIndex   // by orgId
 	metaTagRecords map[uint32]metaTagRecords // by orgId
+	tagEnrichmentQ chan *tagEnrichment
 }
 
 func New() *MemoryIdx {
@@ -231,10 +232,12 @@ func New() *MemoryIdx {
 }
 
 func (m *MemoryIdx) Init() error {
+	m.startTagEnrichment()
 	return nil
 }
 
 func (m *MemoryIdx) Stop() {
+	m.stopTagEnrichment()
 	return
 }
 
@@ -401,8 +404,50 @@ func (m *MemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
 	return res
 }
 
-func (m *MemoryIdx) EnrichWithMetaTags(mkey schema.MKey) idx.TagEnrichment {
-	return newTagEnrichment(nil)
+func (m *MemoryIdx) EnrichWithMetaTags(id schema.MKey) idx.TagEnrichment {
+	m.RLock()
+	def, ok := m.defById[id]
+	m.RUnlock()
+	if !ok {
+		return nil
+	}
+
+	enrichmentJob := newTagEnrichment(def)
+	m.tagEnrichmentQ <- enrichmentJob
+	return enrichmentJob
+}
+
+func (m *MemoryIdx) startTagEnrichment() {
+	go m.enrichmentWorker()
+}
+
+func (m *MemoryIdx) stopTagEnrichment() {
+	close(m.tagEnrichmentQ)
+}
+
+func (m *MemoryIdx) enrichmentWorker() {
+	var ok bool
+	var mtr metaTagRecords
+	for job := range m.tagEnrichmentQ {
+		m.RLock()
+		if mtr, ok = m.metaTagRecords[job.def.OrgId]; !ok {
+			m.RUnlock()
+			continue
+		}
+		tags := make(map[string]string, len(job.def.Tags)+1)
+		tags["name"] = job.def.Name
+		for _, tagStr := range job.def.Tags {
+			tagSplits := strings.SplitN(tagStr, "=", 2)
+			if len(tagSplits) < 2 {
+				corruptIndex.Inc()
+				continue
+			}
+			tags[tagSplits[0]] = tagSplits[1]
+		}
+		job.resultingTags = mtr.enrichTags(tags)
+		m.RUnlock()
+		job.wg.Done()
+	}
 }
 
 // indexTags reads the tags of a given metric definition and creates the
