@@ -284,8 +284,28 @@ func (m metaTagRecords) getRecords(ids []uint32) []metaTagRecord {
 	return res
 }
 
-func (m metaTagRecords) enrichTags(tags map[string]string) map[string]string {
-	return nil
+func (m metaTagRecords) enrichTags(def idx.Archive) map[string]string {
+	tags := make(map[string]string, len(def.Tags)+1)
+	for _, tagStr := range def.Tags {
+		tagSplits := strings.SplitN(tagStr, "=", 2)
+		if len(tagSplits) < 2 {
+			corruptIndex.Inc()
+			continue
+		}
+		tags[tagSplits[0]] = tagSplits[1]
+	}
+
+	for _, mtr := range m {
+		if mtr.testByQueries(&def) {
+			for _, kv := range mtr.metaTags {
+				if _, ok := tags[kv.key]; !ok {
+					tags[kv.key] = kv.value
+				}
+			}
+		}
+	}
+
+	return tags
 }
 
 type tagEnrichment struct {

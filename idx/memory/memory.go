@@ -228,6 +228,7 @@ func New() *MemoryIdx {
 		tags:           make(map[uint32]TagIndex),
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
+		tagEnrichmentQ: make(chan *tagEnrichment),
 	}
 }
 
@@ -434,17 +435,7 @@ func (m *MemoryIdx) enrichmentWorker() {
 			m.RUnlock()
 			continue
 		}
-		tags := make(map[string]string, len(job.def.Tags)+1)
-		tags["name"] = job.def.Name
-		for _, tagStr := range job.def.Tags {
-			tagSplits := strings.SplitN(tagStr, "=", 2)
-			if len(tagSplits) < 2 {
-				corruptIndex.Inc()
-				continue
-			}
-			tags[tagSplits[0]] = tagSplits[1]
-		}
-		job.resultingTags = mtr.enrichTags(tags)
+		job.resultingTags = mtr.enrichTags(job.def)
 		m.RUnlock()
 		job.wg.Done()
 	}
