@@ -4,6 +4,8 @@ import (
 	"hash"
 	"testing"
 
+	"github.com/grafana/metrictank/idx"
+
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -361,6 +363,71 @@ func TestDeletingMetaRecordThatIncludesRegex(t *testing.T) {
 			So(len(metaTagRecords.records), ShouldEqual, 0)
 			_, ok = metaTagRecords.records[hash]
 			So(ok, ShouldBeFalse)
+		})
+	})
+}
+
+func TestSwappingMetaTagRecordSets(t *testing.T) {
+	memIdx := New()
+
+	Convey("When adding the first set of meta records", t, func() {
+		memIdx.MetaTagRecordSwap(1, idx.MetaTagRecords{
+			Ts: 123,
+			Records: []idx.MetaTagRecord{
+				{
+					MetaTags: []string{"meta1=value1", "meta2=aaa"},
+					Queries:  []string{"someKey=~toMatch.*"},
+				},
+				{
+					MetaTags: []string{"meta3=ccc"},
+					Queries:  []string{"a=b", "c=d"},
+				},
+			},
+		})
+
+		Convey("Then it should exist in the index", func() {
+			records, ok := memIdx.metaTagRecords[1]
+			So(ok, ShouldBeTrue)
+			So(records.ts, ShouldEqual, 123)
+			So(len(records.records), ShouldEqual, 2)
+			record1, ok := records.records[239291536]
+			So(ok, ShouldBeTrue)
+			So(record1.metaTags, ShouldResemble, []kv{{"meta3", "ccc"}})
+			So(record1.queries[0].getKey(), ShouldEqual, "a")
+			So(record1.queries[0].getValue(), ShouldEqual, "b")
+			So(record1.queries[0].getOperator(), ShouldEqual, opEqual)
+			So(record1.queries[1].getKey(), ShouldEqual, "c")
+			So(record1.queries[1].getValue(), ShouldEqual, "d")
+			So(record1.queries[1].getOperator(), ShouldEqual, opEqual)
+			record2, ok := records.records[3311790517]
+			So(ok, ShouldBeTrue)
+			So(record2.metaTags, ShouldResemble, []kv{{"meta1", "value1"}, {"meta2", "aaa"}})
+			So(record2.queries[0].getKey(), ShouldEqual, "someKey")
+			So(record2.queries[0].getValue(), ShouldEqual, "^(?:toMatch.*)")
+			So(record2.queries[0].getOperator(), ShouldEqual, opMatch)
+		})
+
+		Convey("When swapping the meta tag record set with another one", func() {
+			err := memIdx.MetaTagRecordSwap(1, idx.MetaTagRecords{
+				Ts: 124,
+				Records: []idx.MetaTagRecord{
+					{
+						MetaTags: []string{"meta3=ccc"},
+						Queries:  []string{"a=b"},
+					},
+				},
+			})
+			So(err, ShouldBeNil)
+			records, ok := memIdx.metaTagRecords[1]
+			So(ok, ShouldBeTrue)
+			So(records.ts, ShouldEqual, 124)
+			So(len(records.records), ShouldEqual, 1)
+			record1, ok := records.records[179354739]
+			So(ok, ShouldBeTrue)
+			So(record1.metaTags, ShouldResemble, []kv{{"meta3", "ccc"}})
+			So(record1.queries[0].getKey(), ShouldEqual, "a")
+			So(record1.queries[0].getValue(), ShouldEqual, "b")
+			So(record1.queries[0].getOperator(), ShouldEqual, opEqual)
 		})
 	})
 }
