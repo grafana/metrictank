@@ -31,7 +31,10 @@ type metaTagRecord struct {
 
 // list of meta records keyed by random unique identifier
 // key needs to be somehow generated, could be a completely random number
-type metaTagRecords map[uint32]metaTagRecord
+type metaTagRecords struct {
+	records map[uint32]metaTagRecord
+	ts      uint64
+}
 
 // index structure keyed by key -> value -> meta record
 type metaTagValue map[string][]uint32
@@ -230,7 +233,7 @@ func (m metaTagRecords) upsert(metaTags []string, metricTagQueryExpressions []st
 	// loop over existing records, starting from hash, trying to find one that has
 	// the exact same queries as the one we're inserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		if existingRecord, ok := m[hash+i]; ok {
+		if existingRecord, ok := m.records[hash+i]; ok {
 			if record.matchesQueries(existingRecord) {
 				oldRecord = &existingRecord
 				oldHash = hash + i
@@ -242,15 +245,15 @@ func (m metaTagRecords) upsert(metaTags []string, metricTagQueryExpressions []st
 	// now find the best position to insert the new/updated record, starting from hash
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		// if we find a free slot, then insert the new record there
-		if _, ok := m[hash]; !ok {
+		if _, ok := m.records[hash]; !ok {
 			// add the new record, as long as it has meta tags
 			if record.hasMetaTags() {
-				m[hash] = record
+				m.records[hash] = record
 			}
 
 			// if we're updating a record, then we need to delete the old entry
 			if oldRecord != nil {
-				delete(m, oldHash)
+				delete(m.records, oldHash)
 			}
 
 			return hash, &record, oldHash, oldRecord, nil
@@ -259,10 +262,10 @@ func (m metaTagRecords) upsert(metaTags []string, metricTagQueryExpressions []st
 		// replace existing old record with the new one, at the same hash id
 		if oldRecord != nil && oldHash == hash {
 			if record.hasMetaTags() {
-				m[hash] = record
+				m.records[hash] = record
 			} else {
 				// if the new record has no meta tags, then we simply delete the entry
-				delete(m, hash)
+				delete(m.records, hash)
 			}
 			return hash, &record, oldHash, oldRecord, nil
 		}
@@ -276,7 +279,7 @@ func (m metaTagRecords) getRecords(ids []uint32) []metaTagRecord {
 	res := make([]metaTagRecord, 0, len(ids))
 
 	for _, id := range ids {
-		if record, ok := m[id]; ok {
+		if record, ok := m.records[id]; ok {
 			res = append(res, record)
 		}
 	}
@@ -295,7 +298,7 @@ func (m metaTagRecords) enrichTags(def idx.Archive) map[string]string {
 		tags[tagSplits[0]] = tagSplits[1]
 	}
 
-	for _, mtr := range m {
+	for _, mtr := range m.records {
 		if mtr.testByQueries(&def) {
 			for _, kv := range mtr.metaTags {
 				if _, ok := tags[kv.key]; !ok {

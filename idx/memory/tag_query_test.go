@@ -69,7 +69,7 @@ func getTestIndex(t *testing.T) (map[schema.MKey]*idx.Archive, TagIndex, metaTag
 		tagIdx.addTagId("name", byId[d.id].Name, d.id)
 	}
 
-	return byId, tagIdx, make(metaTagIndex), make(metaTagRecords)
+	return byId, tagIdx, make(metaTagIndex), metaTagRecords{records: make(map[uint32]metaTagRecord)}
 }
 
 func getTestIndexWithMetaRecords(t *testing.T) (map[schema.MKey]*idx.Archive, TagIndex, metaTagIndex, metaTagRecords) {
@@ -87,45 +87,47 @@ func getTestIndexWithMetaRecords(t *testing.T) (map[schema.MKey]*idx.Archive, Ta
 	}
 
 	mtr = metaTagRecords{
-		123: metaTagRecord{
-			metaTags: []kv{
-				kv{
-					key:   "mymeta1",
-					value: "value1",
+		records: map[uint32]metaTagRecord{
+			123: metaTagRecord{
+				metaTags: []kv{
+					kv{
+						key:   "mymeta1",
+						value: "value1",
+					},
 				},
-			},
-			queries: []expression{
-				&expressionEqual{
-					expressionCommon{
-						key:      "key2",
-						value:    "value2",
-						operator: opEqual,
+				queries: []expression{
+					&expressionEqual{
+						expressionCommon{
+							key:      "key2",
+							value:    "value2",
+							operator: opEqual,
+						},
 					},
 				},
 			},
-		},
-		124: metaTagRecord{
-			metaTags: []kv{
-				kv{
-					key:   "mymeta1",
-					value: "value2",
-				},
-			},
-			queries: []expression{
-				&expressionEqual{
-					expressionCommon{
-						key:      "key2",
-						value:    "value2",
-						operator: opEqual,
+			124: metaTagRecord{
+				metaTags: []kv{
+					kv{
+						key:   "mymeta1",
+						value: "value2",
 					},
 				},
-				&expressionMatch{
-					expressionCommon: expressionCommon{
-						key:      "key3",
-						value:    ".*abc$",
-						operator: opMatch,
+				queries: []expression{
+					&expressionEqual{
+						expressionCommon{
+							key:      "key2",
+							value:    "value2",
+							operator: opEqual,
+						},
 					},
-					valueRe: regexp.MustCompile(".*abc$"),
+					&expressionMatch{
+						expressionCommon: expressionCommon{
+							key:      "key3",
+							value:    ".*abc$",
+							operator: opMatch,
+						},
+						valueRe: regexp.MustCompile(".*abc$"),
+					},
 				},
 			},
 		},

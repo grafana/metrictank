@@ -38,6 +38,17 @@ func (k *kv) stringIntoBuilder(builder *strings.Builder) {
 	builder.WriteString(k.value)
 }
 
+func newKvFromString(in string) (kv, error) {
+	res := kv{}
+	splits := strings.SplitN(in, "=", 2)
+	if len(splits) < 2 {
+		return res, fmt.Errorf("newKvFromString: Invalid string given: %s", in)
+	}
+	res.key = splits[0]
+	res.value = splits[1]
+	return res, nil
+}
+
 type filter struct {
 	expr            expression
 	test            tagFilter
@@ -242,7 +253,7 @@ func (q *TagQuery) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struc
 				go func() {
 					defer initialIdsWg.Done()
 
-					record, ok := q.metaRecords[recordIdCopy]
+					record, ok := q.metaRecords.records[recordIdCopy]
 					if !ok {
 						corruptIndex.Inc()
 						return
@@ -318,7 +329,7 @@ func (q *TagQuery) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) 
 			go func() {
 				defer initialIdsWg.Done()
 
-				record, ok := q.metaRecords[recordIdCopy]
+				record, ok := q.metaRecords.records[recordIdCopy]
 				if !ok {
 					corruptIndex.Inc()
 					return
@@ -396,7 +407,7 @@ func (q *TagQuery) getMetaRecords(expr expression) ([]metaTagRecord, error) {
 	ids := expr.getMetaRecords(q.metaIndex)
 	res := make([]metaTagRecord, 0, len(ids))
 	for _, id := range ids {
-		if record, ok := q.metaRecords[id]; !ok {
+		if record, ok := q.metaRecords.records[id]; !ok {
 			corruptIndex.Inc()
 			return nil, fmt.Errorf("GetMetaRecords: record id %d exists in metaTagIndex but not in metaTagRecords", record)
 		} else {

@@ -340,7 +340,7 @@ func (m *MemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecor
 	defer m.Unlock()
 
 	if mtr, ok = m.metaTagRecords[orgId]; !ok {
-		mtr = make(metaTagRecords)
+		mtr = metaTagRecords{records: make(map[uint32]metaTagRecord), ts: uint64(time.Now().Second())}
 		m.metaTagRecords[orgId] = mtr
 	}
 
@@ -382,9 +382,9 @@ func (m *MemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecor
 	}
 }
 
-func (m *MemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
+func (m *MemoryIdx) MetaTagRecords(orgId uint32) idx.MetaTagRecords {
 	builder := strings.Builder{}
-	res := make([]idx.MetaTagRecord, 0, len(m.metaTagRecords))
+	res := idx.MetaTagRecords{}
 
 	m.RLock()
 	defer m.RUnlock()
@@ -394,15 +394,69 @@ func (m *MemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
 		return res
 	}
 
-	for i, record := range metaTagRecords {
-		res = append(res, idx.MetaTagRecord{
+	for i, record := range metaTagRecords.records {
+		res.Records = append(res.Records, idx.MetaTagRecord{
 			ID:       i,
 			MetaTags: record.metaTagStrings(&builder),
 			Queries:  record.queryStrings(&builder),
 		})
 	}
 
+	res.Ts = metaTagRecords.ts
+
 	return res
+}
+
+func (m *MemoryIdx) MetaTagRecordSwap(orgId uint32, recordSet idx.MetaTagRecords) error {
+	m.RLock()
+	existingRecords, ok := m.metaTagRecords[orgId]
+	if ok && existingRecords.ts > recordSet.Ts {
+		m.RUnlock()
+		return fmt.Errorf("MetaTagRecordSwap: Given set of records is older than the existing one")
+	}
+	m.RUnlock()
+
+	newRecords := metaTagRecords{
+		records: make(map[uint32]metaTagRecord, len(recordSet.Records)),
+		ts:      recordSet.Ts,
+	}
+
+	for _, record := range recordSet.Records {
+		newRecord := metaTagRecord{
+			metaTags: make([]kv, len(record.MetaTags)),
+			queries:  make([]expression, len(record.Queries)),
+		}
+
+		for i := range record.MetaTags {
+			newKv, err := newKvFromString(record.MetaTags[i])
+			if err != nil {
+				return err
+			}
+			newRecord.metaTags[i] = newKv
+		}
+
+		for i := range record.Queries {
+			newQuery, err := parseExpression(record.Queries[i])
+			if err != nil {
+				return err
+			}
+			newRecord.queries[i] = newQuery
+		}
+
+		hash := newRecord.hashQueries()
+		newRecords.records[hash] = newRecord
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	if m.metaTagRecords[orgId].ts > recordSet.Ts {
+		return fmt.Errorf("MetaTagRecordSwap: Given set of records is older than the existing one")
+	}
+
+	m.metaTagRecords[orgId] = newRecords
+
+	return nil
 }
 
 func (m *MemoryIdx) EnrichWithMetaTags(id schema.MKey) idx.TagEnrichment {
