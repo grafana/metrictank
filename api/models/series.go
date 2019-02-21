@@ -90,6 +90,15 @@ func (s Series) Copy(emptyDatapoints []schema.Point) Series {
 	return newSeries
 }
 
+func (s Series) AddTags(tags map[string]string) {
+	for tag, value := range tags {
+		// intrinsic tags have preference
+		if _, ok := s.Tags[tag]; !ok {
+			s.Tags[tag] = value
+		}
+	}
+}
+
 type SeriesByTarget []Series
 
 func (g SeriesByTarget) Len() int           { return len(g) }

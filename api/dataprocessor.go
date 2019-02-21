@@ -270,9 +270,8 @@ LOOP:
 				responses <- getTargetsResp{nil, err}
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
-				responses <- getTargetsResp{[]models.Series{{
+				res := models.Series{
 					Target:       req.Target, // always simply the metric name from index
-					Tags:         tagEnrichment.GetTags(),
 					Datapoints:   points,
 					Interval:     interval,
 					QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was
@@ -280,7 +279,10 @@ LOOP:
 					QueryTo:      req.To,
 					QueryCons:    req.ConsReq,
 					Consolidator: req.Consolidator,
-				}}, nil}
+				}
+				res.SetTags()
+				res.AddTags(tagEnrichment.GetTags())
+				responses <- getTargetsResp{[]models.Series{res}, nil}
 			}
 			wg.Done()
 			// pop an item of our limiter so that other requests can be processed.

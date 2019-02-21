@@ -1101,7 +1101,7 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 }
 
 func (s *Server) getMetaTagRecord(ctx *middleware.Context) {
-	metaTagRecords := s.MetricIndex.MetaTagRecordList(ctx.OrgId)
+	metaTagRecords := s.MetricIndex.MetaTagRecords(ctx.OrgId)
 	response.Write(ctx, response.NewJson(200, metaTagRecords, ""))
 }
 
