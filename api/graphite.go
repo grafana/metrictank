@@ -583,6 +583,7 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 // we will collect all the indidividual series from the peer, and then sum here. that could be optimized
 func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) ([]models.Series, error) {
 
+	preExecutePlan := time.Now()
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
 	var reqs []models.Req
@@ -706,6 +707,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	out, err = plan.Run(data)
 	planRunDuration.Value(time.Since(preRun))
 	stats["planRunTime"] = util.MsSince(preRun)
+	stats["executePlanTime"] = util.MsSince(preExecutePlan)
 	for i,_ := range out {
 		out[i].Stats = stats
 	}
