@@ -15,6 +15,7 @@ import (
 
 type Series struct {
 	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
+	Stats 		 map[string]float64 // stats
 	Datapoints   []schema.Point
 	Tags         map[string]string // Must be set initially via call to `SetTags()`
 	Interval     uint32
@@ -113,6 +114,15 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 			// Replace trailing comma with a closing bracket
 			b[len(b)-1] = '}'
 		}
+		b = append(b, `,"stats":{`...)
+		for stat, value := range s.Stats {
+			b = strconv.AppendQuoteToASCII(b, stat)
+			b = append(b, ':')
+			b = strconv.AppendFloat(b, value, 'f', -1, 64)
+			b = append(b, ',')
+		}
+		// Replace trailing comma with a closing bracket
+		b[len(b)-1] = '}'
 		b = append(b, `,"datapoints":[`...)
 		for _, p := range s.Datapoints {
 			b = append(b, '[')

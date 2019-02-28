@@ -1,5 +1,7 @@
 package util
 
+import "time"
+
 func Min(a, b uint32) uint32 {
 	if a < b {
 		return a
@@ -44,4 +46,8 @@ func Lcm(vals []uint32) uint32 {
 
 func IsDigit(r byte) bool {
 	return '0' <= r && r <= '9'
+}
+
+func MsSince(prev time.Time) float64 {
+	return float64(time.Since(prev)) / float64(time.Millisecond)
 }
