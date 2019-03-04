@@ -114,6 +114,7 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 			// Replace trailing comma with a closing bracket
 			b[len(b)-1] = '}'
 		}
+		// 'stats' will not be included if request was proxied to graphite
 		b = append(b, `,"stats":{`...)
 		for stat, value := range s.Stats {
 			b = strconv.AppendQuoteToASCII(b, stat)
