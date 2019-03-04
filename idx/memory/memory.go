@@ -88,7 +88,7 @@ func ConfigProcess() {
 }
 
 type Tree struct {
-	Items map[string]*Node // key is the full path of the node.
+	Root *Node // the tree starts with a root node.
 }
 
 type IdSet map[schema.MKey]struct{} // set of ids
@@ -181,8 +181,9 @@ func (defs defByTagSet) defs(id uint32, fullName string) map[*schema.MetricDefin
 }
 
 type Node struct {
-	Path     string
-	Children []string
+	Name     string
+	Parent   *Node
+	Children map[string]*Node
 	Defs     []schema.MKey
 }
 
@@ -196,9 +197,35 @@ func (n *Node) Leaf() bool {
 
 func (n *Node) String() string {
 	if n.Leaf() {
-		return fmt.Sprintf("leaf - %s", n.Path)
+		return fmt.Sprintf("leaf - %s", n.Path())
 	}
-	return fmt.Sprintf("branch - %s", n.Path)
+	return fmt.Sprintf("branch - %s", n.Path())
+}
+
+func (n *Node) Path() string {
+	if n.Parent == nil {
+		return ""
+	}
+	p := n.Parent.Path()
+	if p == "" {
+		return n.Name
+	}
+	return fmt.Sprintf("%s.%s", p, n.Name)
+}
+
+func (n *Node) Find(path []string) *Node {
+	if len(path) == 0 {
+		return n
+	}
+	if child, ok := n.Children[path[0]]; ok {
+		if len(path) == 1 {
+			return child
+		}
+		return child.Find(path[1:])
+	}
+
+	// path not found.
+	return nil
 }
 
 // Implements the the "MetricIndex" interface
@@ -407,13 +434,31 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	return num
 }
 
+func MetricDefPathSlice(def *schema.MetricDefinition) []string {
+	name := def.Name
+	path := []string{}
+	pos := 0
+	last := 0
+	for pos = strings.Index(name[last:], "."); pos >= 0; pos = strings.Index(name[last:], ".") {
+		path = append(path, name[last:last+pos])
+		last = last + pos + 1
+
+	}
+	if len(def.Tags) > 0 {
+		path = append(path, def.NameWithTags()[last:])
+	} else {
+		path = append(path, name[last:])
+	}
+	return path
+}
+
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	path := def.NameWithTags()
-
+	pathSlice := MetricDefPathSlice(def)
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
 	irId, _ := IndexRules.Match(path)
-	sort.Strings(def.Tags)
+
 	archive := &idx.Archive{
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
@@ -432,70 +477,37 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.tree[def.OrgId]
-	if !ok || len(tree.Items) == 0 {
+	if !ok {
 		log.Debugf("memory-idx: first metricDef seen for orgId %d", def.OrgId)
-		root := &Node{
-			Path:     "",
-			Children: make([]string, 0),
-			Defs:     make([]schema.MKey, 0),
-		}
 		m.tree[def.OrgId] = &Tree{
-			Items: map[string]*Node{"": root},
+			Root: &Node{
+				Name:     "",
+				Parent:   nil,
+				Children: make(map[string]*Node),
+				Defs:     make([]schema.MKey, 0, 1),
+			},
 		}
 		tree = m.tree[def.OrgId]
-	} else {
-		// now see if there is an existing branch or leaf with the same path.
-		// An existing leaf is possible if there are multiple metricDefs for the same path due
-		// to different tags or interval
-		if node, ok := tree.Items[path]; ok {
-			log.Debugf("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
-			node.Defs = append(node.Defs, def.Id)
-			m.defById[def.Id] = archive
-			statAdd.Inc()
-			return *archive
+	}
+
+	current := tree.Root
+
+	for i := range pathSlice {
+		p := pathSlice[i]
+		next, ok := current.Children[p]
+		if !ok {
+			next = &Node{
+				Name:     p,
+				Parent:   current,
+				Children: make(map[string]*Node),
+				Defs:     make([]schema.MKey, 0, 1),
+			}
+			current.Children[p] = next
 		}
+		current = next
 	}
 
-	pos := strings.LastIndex(path, ".")
-
-	// now walk backwards through the node path to find the first branch which exists that
-	// this path extends.
-	prevPos := len(path)
-	for pos != -1 {
-		branch := path[:pos]
-		prevNode := path[pos+1 : prevPos]
-		if n, ok := tree.Items[branch]; ok {
-			log.Debugf("memory-idx: adding %s as child of %s", prevNode, n.Path)
-			n.Children = append(n.Children, prevNode)
-			break
-		}
-
-		log.Debugf("memory-idx: creating branch %s with child %s", branch, prevNode)
-		tree.Items[branch] = &Node{
-			Path:     branch,
-			Children: []string{prevNode},
-			Defs:     make([]schema.MKey, 0),
-		}
-
-		prevPos = pos
-		pos = strings.LastIndex(branch, ".")
-	}
-
-	if pos == -1 {
-		// need to add to the root node.
-		branch := path[:prevPos]
-		log.Debugf("memory-idx: no existing branches found for %s.  Adding to the root node.", branch)
-		n := tree.Items[""]
-		n.Children = append(n.Children, branch)
-	}
-
-	// Add leaf node
-	log.Debugf("memory-idx: creating leaf %s", path)
-	tree.Items[path] = &Node{
-		Path:     path,
-		Children: []string{},
-		Defs:     []schema.MKey{def.Id},
-	}
+	current.Defs = append(current.Defs, def.Id)
 	m.defById[def.Id] = archive
 	statAdd.Inc()
 
@@ -523,7 +535,7 @@ func (m *MemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
 	if !ok {
 		return nil
 	}
-	node := tree.Items[path]
+	node := tree.Root.Find(strings.Split(path, "."))
 	if node == nil {
 		return nil
 	}
@@ -941,9 +953,10 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
 	// path, then the public metricDefs will be excluded.
 	for _, n := range matchedNodes {
-		if _, ok := byPath[n.Path]; !ok {
+		path := n.Path()
+		if _, ok := byPath[path]; !ok {
 			idxNode := idx.Node{
-				Path:        n.Path,
+				Path:        path,
 				Leaf:        n.Leaf(),
 				HasChildren: n.HasChildren(),
 			}
@@ -956,7 +969,7 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 						log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
 						continue
 					}
-					log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, def.LastSave)
+					log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, def.LastSave)
 					idxNode.Defs = append(idxNode.Defs, *def)
 				}
 				if len(idxNode.Defs) == 0 {
@@ -964,9 +977,9 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 				}
 			}
 			results = append(results, idxNode)
-			byPath[n.Path] = struct{}{}
+			byPath[path] = struct{}{}
 		} else {
-			log.Debugf("memory-idx: path %s already seen", n.Path)
+			log.Debugf("memory-idx: path %s already seen", path)
 		}
 	}
 	log.Debugf("memory-idx: %d nodes has %d unique paths.", len(matchedNodes), len(results))
@@ -1004,67 +1017,62 @@ func (m *MemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
 			break
 		}
 	}
-	var branch string
-	if pos != 0 {
-		branch = strings.Join(nodes[:pos], ".")
-	}
-	log.Debugf("memory-idx: starting search at orgId %d, node %q", orgId, branch)
-	startNode, ok := tree.Items[branch]
 
-	if !ok {
-		log.Debugf("memory-idx: branch %q does not exist in the index for orgId %d", branch, orgId)
+	log.Debugf("memory-idx: starting search at orgId %d, node %q", orgId, nodes[:pos])
+	startNode := tree.Root.Find(nodes[:pos])
+
+	if startNode == nil {
+		log.Debugf("memory-idx: branch %q does not exist in the index for orgId %d", nodes[:pos], orgId)
 		return nil, nil
 	}
 
-	if startNode == nil {
-		corruptIndex.Inc()
-		log.Errorf("memory-idx: startNode is nil. org=%d,patt=%q,pos=%d,branch=%q", orgId, pattern, pos, branch)
-		return nil, errors.NewInternal("hit an empty path in the index")
+	if pos == len(nodes) {
+		return []*Node{startNode}, nil
 	}
 
-	children := []*Node{startNode}
+	children := make(map[string][]*Node)
+	for name, n := range startNode.Children {
+		children[name] = []*Node{n}
+	}
+
 	for i := pos; i < len(nodes); i++ {
 		p := nodes[i]
 
 		matcher, err := getMatcher(p)
-
 		if err != nil {
 			return nil, err
 		}
+		children = matcher(children)
 
-		var grandChildren []*Node
-		for _, c := range children {
-			if !c.HasChildren() {
-				log.Debugf("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
-				// expecting a branch
-				continue
-			}
-			log.Debugf("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[i])
-			matches := matcher(c.Children)
-			for _, m := range matches {
-				newBranch := c.Path + "." + m
-				if c.Path == "" {
-					newBranch = m
-				}
-				grandChild := tree.Items[newBranch]
-				if grandChild == nil {
-					corruptIndex.Inc()
-					log.Errorf("memory-idx: grandChild is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q,path=%q", orgId, pattern, i, pos, p, newBranch)
-					return nil, errors.NewInternal("hit an empty path in the index")
-				}
-
-				grandChildren = append(grandChildren, grandChild)
-			}
-		}
-		children = grandChildren
 		if len(children) == 0 {
 			log.Debug("memory-idx: pattern does not match any series.")
 			break
 		}
+		if i == len(nodes)-1 {
+			break
+		}
+		grandChildren := map[string][]*Node{}
+		for _, c := range children {
+			for _, child := range c {
+				for grandChildName, grandChild := range child.Children {
+					_, ok := grandChildren[grandChildName]
+					if !ok {
+						grandChildren[grandChildName] = []*Node{grandChild}
+					} else {
+						grandChildren[grandChildName] = append(grandChildren[grandChildName], grandChild)
+					}
+				}
+			}
+		}
+		children = grandChildren
 	}
 
 	log.Debugf("memory-idx: reached pattern length. %d nodes matched", len(children))
-	return children, nil
+	result := make([]*Node, 0, len(children))
+	for _, n := range children {
+		result = append(result, n...)
+	}
+	return result, nil
 }
 
 func (m *MemoryIdx) List(orgId uint32) []idx.Archive {
@@ -1174,23 +1182,16 @@ func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) 
 }
 
 func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
-	tree := m.tree[orgId]
 	deletedDefs := make([]idx.Archive, 0)
 	if deleteChildren && n.HasChildren() {
-		log.Debugf("memory-idx: deleting branch %s", n.Path)
+		log.Debugf("memory-idx: deleting branch %s", n.Name)
 		// walk up the tree to find all leaf nodes and delete them.
-		for _, child := range n.Children {
-			node, ok := tree.Items[n.Path+"."+child]
-			if !ok {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
-				continue
-			}
-			log.Debugf("memory-idx: deleting child %s from branch %s", node.Path, n.Path)
-			deleted := m.delete(orgId, node, false, true)
+		for name, child := range n.Children {
+			log.Debugf("memory-idx: deleting child %s from branch %s", name, n.Name)
+			deleted := m.delete(orgId, child, false, true)
 			deletedDefs = append(deletedDefs, deleted...)
 		}
-		n.Children = nil
+		n.Children = map[string]*Node{}
 	}
 
 	// delete the metricDefs
@@ -1202,66 +1203,26 @@ func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChil
 
 	n.Defs = nil
 
-	if n.HasChildren() {
+	if !deleteChildren && n.HasChildren() {
 		return deletedDefs
 	}
 
-	// delete the node.
-	delete(tree.Items, n.Path)
+	// de-link the node from the parent
+	delete(n.Parent.Children, n.Name)
 
 	if !deleteEmptyParents {
 		return deletedDefs
 	}
 
-	// delete node from the branches
-	// e.g. for foo.bar.baz
-	// branch "foo.bar" -> node "baz"
-	// branch "foo"     -> node "bar"
-	// branch ""        -> node "foo"
-	nodes := strings.Split(n.Path, ".")
-	for i := len(nodes) - 1; i >= 0; i-- {
-		branch := strings.Join(nodes[:i], ".")
-		log.Debugf("memory-idx: removing %s from branch %s", nodes[i], branch)
-		bNode, ok := tree.Items[branch]
-		if !ok {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: node %s missing. Index is corrupt.", branch)
-			continue
-		}
-		if len(bNode.Children) > 1 {
-			newChildren := make([]string, 0, len(bNode.Children)-1)
-			for _, child := range bNode.Children {
-				if child != nodes[i] {
-					newChildren = append(newChildren, child)
-				} else {
-					log.Debugf("memory-idx: %s removed from children list of branch %s", child, bNode.Path)
-				}
-			}
-			bNode.Children = newChildren
-			log.Debugf("memory-idx: branch %s has other children. Leaving it in place", bNode.Path)
-			// no need to delete any parents as they are needed by this node and its
-			// remaining children
+	// walk up the tree and remove empty nodes.
+	current := n.Parent
+	for current != nil {
+		if current.HasChildren() || current.Leaf() || current.Parent == nil {
 			break
 		}
-
-		if len(bNode.Children) == 0 {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
-			break
-		}
-
-		if bNode.Children[0] != nodes[i] {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
-			break
-		}
-		bNode.Children = nil
-		if bNode.Leaf() {
-			log.Debugf("memory-idx: branch %s is also a leaf node, keeping it.", branch)
-			break
-		}
-		log.Debugf("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
-		delete(tree.Items, branch)
+		// de-link the node from the parent
+		delete(current.Parent.Children, current.Name)
+		current = current.Parent
 	}
 
 	return deletedDefs
@@ -1283,11 +1244,11 @@ func (m *MemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
 	m.RUnlock()
 
 	var pruned []idx.Archive
-	toPruneUntagged := make(map[uint32]map[string]struct{}, len(orgs))
+	toPruneUntagged := make(map[uint32][]*Node, len(orgs))
 	toPruneTagged := make(map[uint32]IdSet, len(orgs))
 	for org := range orgs {
 		toPruneTagged[org] = make(IdSet)
-		toPruneUntagged[org] = make(map[string]struct{})
+		toPruneUntagged[org] = make([]*Node, 0)
 	}
 	pre := time.Now()
 
@@ -1309,8 +1270,9 @@ DEFS:
 				continue DEFS
 			}
 
-			n, ok := tree.Items[def.Name]
-			if !ok || !n.Leaf() {
+			// we should only prune defs if all defs with the same name are old.
+			n := tree.Root.Find(strings.Split(def.Name, "."))
+			if n == nil || !n.Leaf() {
 				continue DEFS
 			}
 
@@ -1320,7 +1282,7 @@ DEFS:
 				}
 			}
 
-			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
+			toPruneUntagged[def.OrgId] = append(toPruneUntagged[def.OrgId], n)
 		} else {
 			defs := m.defByTagSet.defs(def.OrgId, def.NameWithTags())
 			// if any other MetricDef with the same tag set is not expired yet,
@@ -1356,39 +1318,21 @@ DEFS:
 		pruned = append(pruned, defs...)
 	}
 
-ORGS:
-	for org, paths := range toPruneUntagged {
-		if len(paths) == 0 {
+	for org, nodes := range toPruneUntagged {
+		if len(nodes) == 0 {
 			continue
 		}
 
-		for path := range paths {
+		for _, n := range nodes {
 			tl.Wait()
 			lockStart := time.Now()
 			m.Lock()
-			tree, ok := m.tree[org]
 
-			if !ok {
-				m.Unlock()
-				tl.Add(time.Since(lockStart))
-				continue ORGS
-			}
-
-			n, ok := tree.Items[path]
-
-			if !ok {
-				m.Unlock()
-				tl.Add(time.Since(lockStart))
-				log.Debugf("memory-idx: series %s for orgId:%d was identified for pruning but cannot be found.", path, org)
-				continue
-			}
-
-			log.Debugf("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
+			log.Debugf("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path(), org)
 			defs := m.delete(org, n, true, false)
 			m.Unlock()
 			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
-
 		}
 	}
 
@@ -1401,10 +1345,10 @@ ORGS:
 	return pruned, nil
 }
 
-func getMatcher(path string) (func([]string) []string, error) {
+func getMatcher(path string) (func(map[string][]*Node) map[string][]*Node, error) {
 	// Matches everything
 	if path == "*" {
-		return func(children []string) []string {
+		return func(children map[string][]*Node) map[string][]*Node {
 			log.Debug("memory-idx: Matching all children")
 			return children
 		}, nil
@@ -1429,13 +1373,18 @@ func getMatcher(path string) (func([]string) []string, error) {
 			regexes = append(regexes, r)
 		}
 
-		return func(children []string) []string {
-			var matches []string
+		return func(children map[string][]*Node) map[string][]*Node {
+			matches := map[string][]*Node{}
 			for _, r := range regexes {
-				for _, c := range children {
-					if r.MatchString(c) {
-						log.Debugf("memory-idx: %s =~ %s", c, r.String())
-						matches = append(matches, c)
+				for name, n := range children {
+					if r.MatchString(name) {
+						log.Debugf("memory-idx: %s =~ %s", name, r.String())
+						_, ok := matches[name]
+						if !ok {
+							matches[name] = n
+						} else {
+							matches[name] = append(matches[name], n...)
+						}
 					}
 				}
 			}
@@ -1444,15 +1393,12 @@ func getMatcher(path string) (func([]string) []string, error) {
 	}
 
 	// Exact match one or more values
-	return func(children []string) []string {
-		var results []string
+	return func(children map[string][]*Node) map[string][]*Node {
+		results := map[string][]*Node{}
 		for _, p := range patterns {
-			for _, c := range children {
-				if c == p {
-					log.Debugf("memory-idx: %s matches %s", c, p)
-					results = append(results, c)
-					break
-				}
+			if n, ok := children[p]; ok {
+				log.Debugf("memory-idx: %s matches %s", p, n[0].Name)
+				results[n[0].Name] = n
 			}
 		}
 		return results
