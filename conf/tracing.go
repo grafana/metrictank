@@ -11,14 +11,22 @@ import (
 
 // GetTracer returns a jaeger tracer
 // any tags specified will be added as process/tracer-level tags
-func GetTracer(enabled bool, addr string, tags map[string]string) (opentracing.Tracer, io.Closer, error) {
-	// Sample configuration for testing. Use constant sampling to sample every trace
+func GetTracer(enabled bool, addr string, tags map[string]string, sampleRatio float64) (opentracing.Tracer, io.Closer, error) {
+	// Sample configuration for testing. Use sampleRatio >= 1.0 to sample every trace
 	// and enable LogSpan to log every span via configured Logger.
+
+	// Must be between 0 and 1 (inclusive)
+	if sampleRatio < 0.0 {
+		sampleRatio = 0.0
+	} else if sampleRatio > 1.0 {
+		sampleRatio = 1.0
+	}
+
 	cfg := jaegercfg.Configuration{
 		Disabled: !enabled,
 		Sampler: &jaegercfg.SamplerConfig{
-			Type:  jaeger.SamplerTypeConst,
-			Param: 1,
+			Type:  jaeger.SamplerTypeProbabilistic,
+			Param: sampleRatio,
 		},
 		Reporter: &jaegercfg.ReporterConfig{
 			LogSpans:           false,
