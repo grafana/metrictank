@@ -79,6 +79,8 @@ tracing-enabled = false
 tracing-addr = localhost:6831
 # tracer/process-level tags to include, specified as comma-separated key:value pairs
 tracing-add-tags =
+# Ratio of traces to sample between 0 (none) and 1 (all)
+tracing-sample-ratio = 1.0
 ```
 
 ## metric data storage in cassandra ##
