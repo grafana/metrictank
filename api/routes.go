@@ -48,6 +48,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
 	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTagValues{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
 	r.Combo("/index/tags/delSeries", ready, bind(models.IndexTagDelSeries{})).Get(s.indexTagDelSeries).Post(s.indexTagDelSeries)
+	r.Combo("/index/metaTags/swap", withOrg, ready, bind(models.IndexMetaTagRecordSet{}), s.indexMetaTagRecordSwap)
 
 	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
 
@@ -73,6 +74,7 @@ func (s *Server) RegisterRoutes() {
 
 	// Meta Tags
 	r.Post("/metaTags/add", withOrg, ready, bind(models.MetaTagRecord{}), s.metaTagRecordUpsert)
+	r.Post("/metaTags/swap", withOrg, ready, bind(models.MetaTagRecordSet{}), s.metaTagRecordSwap)
 	r.Get("/metaTags", withOrg, ready, s.getMetaTagRecord)
 
 	// Prometheus endpoints

@@ -422,7 +422,7 @@ func TestSwappingMetaTagRecordSets(t *testing.T) {
 			So(ok, ShouldBeTrue)
 			So(records.ts, ShouldEqual, 124)
 			So(len(records.records), ShouldEqual, 1)
-			record1, ok := records.records[179354739]
+			record1, ok := records.records[179354739] // index is the hash of the record
 			So(ok, ShouldBeTrue)
 			So(record1.metaTags, ShouldResemble, []kv{{"meta3", "ccc"}})
 			So(record1.queries[0].getKey(), ShouldEqual, "a")

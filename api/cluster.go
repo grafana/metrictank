@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
@@ -172,6 +173,25 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 	res.Count = len(deleted)
 
 	response.Write(ctx, response.NewMsgp(200, res))
+}
+
+func (s *Server) indexMetaTagRecordSwap(ctx *middleware.Context, request models.IndexMetaTagRecordSet) {
+	set := idx.MetaTagRecordSet{Ts: request.Ts}
+	for _, record := range request.Records {
+		set.Records = append(set.Records, idx.MetaTagRecord{
+			MetaTags: record.MetaTags,
+			Queries:  record.Queries,
+			Id:       record.Id,
+		})
+	}
+
+	err := s.MetricIndex.MetaTagRecordSwap(request.OrgId, set)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	response.Write(ctx, response.NewMsgp(200, nil))
 }
 
 func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {

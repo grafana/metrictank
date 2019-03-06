@@ -1108,13 +1108,39 @@ func (s *Server) getMetaTagRecord(ctx *middleware.Context) {
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, metaTagRecord models.MetaTagRecord) {
 	record := idx.MetaTagRecord{
 		MetaTags: metaTagRecord.MetaTags,
-		Queries:  metaTagRecord.TagQueries,
+		Queries:  metaTagRecord.Queries,
 	}
 
 	result, err := s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
 	}
 
 	response.Write(ctx, response.NewJson(200, result, ""))
+}
+
+func (s *Server) metaTagRecordSwap(ctx *middleware.Context, request models.MetaTagRecordSet) {
+	set := idx.MetaTagRecordSet{Ts: uint64(time.Now().Second())}
+	for _, record := range request.Records {
+		set.Records = append(set.Records, idx.MetaTagRecord{
+			MetaTags: record.MetaTags,
+			Queries:  record.Queries,
+		})
+	}
+
+	err := s.MetricIndex.MetaTagRecordSwap(ctx.OrgId, set)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	data := models.IndexMetaTagRecordSet{OrgId: ctx.OrgId}
+	_, err = s.peerQuery(ctx.Req.Context(), data, "clusterSwapMetaTagRecordSet,", "/index/metaTags/swap", true)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	response.Write(ctx, response.NewJson(200, nil, ""))
 }

@@ -369,7 +369,7 @@ func (m *MemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecor
 		// record that has been updated in order to respond with what has changed
 		builder := strings.Builder{}
 		return &idx.MetaTagRecord{
-			ID:       oldHash,
+			Id:       oldHash,
 			MetaTags: oldRecord.metaTagStrings(&builder),
 			Queries:  oldRecord.queryStrings(&builder),
 		}, nil
@@ -382,9 +382,9 @@ func (m *MemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecor
 	}
 }
 
-func (m *MemoryIdx) MetaTagRecords(orgId uint32) idx.MetaTagRecords {
+func (m *MemoryIdx) MetaTagRecords(orgId uint32) idx.MetaTagRecordSet {
 	builder := strings.Builder{}
-	res := idx.MetaTagRecords{}
+	res := idx.MetaTagRecordSet{}
 
 	m.RLock()
 	defer m.RUnlock()
@@ -396,7 +396,7 @@ func (m *MemoryIdx) MetaTagRecords(orgId uint32) idx.MetaTagRecords {
 
 	for i, record := range metaTagRecords.records {
 		res.Records = append(res.Records, idx.MetaTagRecord{
-			ID:       i,
+			Id:       i,
 			MetaTags: record.metaTagStrings(&builder),
 			Queries:  record.queryStrings(&builder),
 		})
@@ -407,7 +407,7 @@ func (m *MemoryIdx) MetaTagRecords(orgId uint32) idx.MetaTagRecords {
 	return res
 }
 
-func (m *MemoryIdx) MetaTagRecordSwap(orgId uint32, recordSet idx.MetaTagRecords) error {
+func (m *MemoryIdx) MetaTagRecordSwap(orgId uint32, recordSet idx.MetaTagRecordSet) error {
 	m.RLock()
 	existingRecords, ok := m.metaTagRecords[orgId]
 	if ok && existingRecords.ts > recordSet.Ts {

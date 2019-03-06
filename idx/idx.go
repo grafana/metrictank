@@ -30,16 +30,16 @@ type Archive struct {
 type MetaTagRecord struct {
 	MetaTags []string
 	Queries  []string
-	ID       uint32
+	Id       uint32
 }
 
-type MetaTagRecords struct {
+type MetaTagRecordSet struct {
 	Records []MetaTagRecord
 	Ts      uint64
 }
 
-func (m *MetaTagRecords) Sort() {
-	sort.Slice(m.Records, func(i, j int) bool { return m.Records[i].ID < m.Records[j].ID })
+func (m *MetaTagRecordSet) Sort() {
+	sort.Slice(m.Records, func(i, j int) bool { return m.Records[i].Id < m.Records[j].Id })
 }
 
 type TagEnrichment interface {
@@ -159,11 +159,11 @@ type MetricIndex interface {
 
 	// MetaTagRecords takes an org id and returns the list of all meta tag records
 	// of that given org.
-	MetaTagRecords(orgId uint32) MetaTagRecords
+	MetaTagRecords(orgId uint32) MetaTagRecordSet
 
 	// MetaTagRecordSwap takes a set of meta tag records and replaces the current records
 	// with the given one
-	MetaTagRecordSwap(orgId uint32, records MetaTagRecords) error
+	MetaTagRecordSwap(orgId uint32, records MetaTagRecordSet) error
 
 	// EnrichWithMetaTags takes the org, mkey and tags of a metric and starts a job to
 	// enrich it with meta tags according to the meta records. It returns a

@@ -136,6 +136,26 @@ func (t IndexTagDelSeries) Trace(span opentracing.Span) {
 func (i IndexTagDelSeries) TraceDebug(span opentracing.Span) {
 }
 
+type IndexMetaTagRecord struct {
+	MetaTags []string `json:"metaTags" form:"metaTags" binding:"Required"`
+	Queries  []string `json:"queries" form:"queries" binding:"Required"`
+	Id       uint32   `json:"id" form:"id" binding:"Required"`
+}
+
+type IndexMetaTagRecordSet struct {
+	Records []IndexMetaTagRecord
+	Ts      uint64 `json:"ts" binding:"Required"`
+	OrgId   uint32 `json:"orgId" binding:"Required"`
+}
+
+func (i IndexMetaTagRecordSet) Trace(span opentracing.Span) {
+	span.SetTag("org", i.OrgId)
+	span.SetTag("ts", i.Ts)
+}
+
+func (i IndexMetaTagRecordSet) TraceDebug(span opentracing.Span) {
+}
+
 type IndexGet struct {
 	MKey schema.MKey `json:"id" form:"id" binding:"Required"`
 }

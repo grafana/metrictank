@@ -152,8 +152,12 @@ type GraphiteFind struct {
 }
 
 type MetaTagRecord struct {
-	MetaTags   []string
-	TagQueries []string
+	MetaTags []string `json:"metaTags" form:"metaTags" binding:"Required"`
+	Queries  []string `json:"queries" form:"queries" binding:"Required"`
+}
+
+type MetaTagRecordSet struct {
+	Records []MetaTagRecord `json:"records" form:"records" binding:"Required"`
 }
 
 type MetricsDelete struct {
