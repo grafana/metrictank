@@ -117,16 +117,22 @@ func (c *CasIdx) InitBare() error {
 	// read templates
 	schemaKeyspace := util.ReadEntry(c.cfg.schemaFile, "schema_keyspace").(string)
 	schemaTable := util.ReadEntry(c.cfg.schemaFile, "schema_table").(string)
+	schemaArchiveTable := util.ReadEntry(c.cfg.schemaFile, "schema_archive_table").(string)
 
 	// create the keyspace or ensure it exists
 	if c.cfg.createKeyspace {
-		log.Infof("cassandra-idx: ensuring that keyspace %s exist.", c.cfg.keyspace)
+		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.cfg.keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
-		log.Info("cassandra-idx: ensuring that table metric_idx exist.")
+		log.Info("cassandra-idx: ensuring that table metric_idx exists.")
 		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.cfg.keyspace)).Exec()
+		if err != nil {
+			return fmt.Errorf("failed to initialize cassandra table: %s", err)
+		}
+		log.Info("cassandra-idx: ensuring that table metric_idx_archive exists.")
+		err = tmpSession.Query(fmt.Sprintf(schemaArchiveTable, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
@@ -141,7 +147,9 @@ func (c *CasIdx) InitBare() error {
 				log.Warnf("cassandra-idx: cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
 				time.Sleep(5 * time.Second)
 			} else {
-				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
+				_, okIdx := keyspaceMetadata.Tables["metric_idx"]
+				_, okArchive := keyspaceMetadata.Tables["metric_idx_archive"]
+				if okIdx && okArchive {
 					break
 				} else {
 					if attempt >= 5 {
@@ -152,7 +160,6 @@ func (c *CasIdx) InitBare() error {
 				}
 			}
 		}
-
 	}
 
 	tmpSession.Close()
@@ -383,6 +390,22 @@ NAMES:
 	return defs
 }
 
+func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) error {
+	for _, def := range defs {
+		err := c.addDefToArchive(def)
+		if err != nil {
+			return err
+		}
+
+		err = c.deleteDef(def.Id, def.Partition)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (c *CasIdx) processWriteQueue() {
 	var success bool
 	var attempts int
@@ -433,6 +456,45 @@ func (c *CasIdx) processWriteQueue() {
 	}
 	log.Info("cassandra-idx: writeQueue handler ended.")
 	c.wg.Done()
+}
+
+func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
+	insertQry := `INSERT INTO metric_idx_archive (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	attempts := 0
+
+	for attempts < 5 {
+		attempts++
+		err := c.session.Query(
+			insertQry,
+			def.Id.String(),
+			def.OrgId,
+			def.Partition,
+			def.Name,
+			def.Interval,
+			def.Unit,
+			def.Mtype,
+			def.Tags,
+			def.LastUpdate,
+			time.Now().UTC().Unix()).Exec()
+
+		if err == nil {
+			break
+		}
+
+		if attempts >= 5 {
+			return fmt.Errorf("Failed writing to cassandra: %s", err.Error())
+		}
+
+		sleepTime := 100 * attempts
+		if sleepTime > 2000 {
+			sleepTime = 2000
+		}
+		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		attempts++
+
+	}
+
+	return nil
 }
 
 func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
