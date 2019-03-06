@@ -201,7 +201,6 @@ func (n *Node) String() string {
 	return fmt.Sprintf("branch - %s", n.Path)
 }
 
-// Implements the the "MetricIndex" interface
 type MemoryIdx struct {
 	sync.RWMutex
 
@@ -217,7 +216,7 @@ type MemoryIdx struct {
 	tags        map[uint32]TagIndex // by orgId
 }
 
-func New() *MemoryIdx {
+func NewMemoryIdx() *MemoryIdx {
 	return &MemoryIdx{
 		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
@@ -409,11 +408,10 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 
 func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	path := def.NameWithTags()
-
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
 	irId, _ := IndexRules.Match(path)
-	sort.Strings(def.Tags)
+
 	archive := &idx.Archive{
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
