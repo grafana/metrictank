@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"regexp"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
@@ -862,6 +864,47 @@ func TestSingleNodeMetric(t *testing.T) {
 		t.Fatal(err)
 	}
 	ix.AddOrUpdate(mkey, data, 1)
+}
+
+func TestMemoryUsage(t *testing.T) {
+	ix := New()
+	ix.Init()
+	idxSize := 100000
+	defs := make([]schema.MetricDefinition, idxSize)
+	for n := 0; n < idxSize/10; n++ {
+		for j := 1; j <= 10; j++ {
+			def := schema.MetricDefinition{
+				Name:       fmt.Sprintf("some.low-cardinality-%d.metric.high-cardinality-%d.application.foo.bazbarblah.count", j, n),
+				Interval:   10,
+				OrgId:      1,
+				Partition:  1,
+				LastUpdate: time.Now().Unix(),
+			}
+			def.SetId()
+			defs[(n*10)+j-1] = def
+		}
+	}
+	loaded := ix.Load(defs)
+	if loaded != idxSize {
+		t.Errorf("expected defs loaded to match idxSize")
+	}
+	stats := runtime.MemStats{}
+	runtime.ReadMemStats(&stats)
+	t.Logf("totalAlloc: %d\n", stats.TotalAlloc)
+	t.Logf("HeapAlloc: %d\n", stats.HeapAlloc)
+	t.Logf("Sys: %d\n", stats.Sys)
+	t.Logf("heapObjects: %d\n", stats.HeapObjects)
+	runtime.GC()
+	time.Sleep(time.Second * 5)
+	debug.FreeOSMemory()
+	time.Sleep(time.Second * 5)
+	t.Logf("---AFTER GC-----\n")
+	runtime.ReadMemStats(&stats)
+
+	t.Logf("totalAlloc: %d\n", stats.TotalAlloc)
+	t.Logf("HeapAlloc: %d\n", stats.HeapAlloc)
+	t.Logf("Sys: %d\n", stats.Sys)
+	t.Logf("heapObjects: %d\n", stats.HeapObjects)
 }
 
 func BenchmarkIndexing(b *testing.B) {
