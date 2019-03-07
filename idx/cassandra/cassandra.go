@@ -461,6 +461,7 @@ func (c *CasIdx) processWriteQueue() {
 func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 	insertQry := `INSERT INTO metric_idx_archive (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	maxAttempts := 5
+	now := time.Now().UTC().Unix()
 	var err error
 
 	for attempts := 0; attempts < maxAttempts; attempts++ {
@@ -483,7 +484,7 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 			def.Mtype,
 			def.Tags,
 			def.LastUpdate,
-			time.Now().UTC().Unix()).Exec()
+			now).Exec()
 
 		if err == nil {
 			return nil
