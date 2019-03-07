@@ -925,19 +925,19 @@ func testSingleNodeMetric(t *testing.T) {
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 }
 
-// withAndWithoutPartitonedIndex calls a test with the Partitioned setting
+// withAndWithoutPartitonedIndex calls a bench with the Partitioned setting
 // turned on and off. This is to verify that something works as expected
-// no for both the partitioned and non-partitioned index versions.
+// for both the partitioned and non-partitioned index versions.
 func benchWithAndWithoutPartitonedIndex(f func(*testing.B)) func(*testing.B) {
 	return func(b *testing.B) {
 		b.Helper()
 		_partitioned := Partitioned
 		defer func() { Partitioned = _partitioned }()
 
-		Partitioned = false
-		b.Run("unPartitioned", f)
 		Partitioned = true
 		b.Run("partitioned", f)
+		Partitioned = false
+		b.Run("unPartitioned", f)
 	}
 }
 
