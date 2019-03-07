@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
@@ -78,13 +79,21 @@ func (p *PartitionedMemoryIdx) Get(key schema.MKey) (idx.Archive, bool) {
 			return nil
 		})
 	}
-	if err := g.Wait(); err != nil {
-		log.Errorf("memory-idx: failed to get Archive with key %v. %s", key, err)
-		return idx.Archive{}, false
-	}
-	close(resultChan)
+
+	var err atomic.Value
+	go func() {
+		if e := g.Wait(); e != nil {
+			err.Store(e)
+		}
+		close(resultChan)
+	}()
+
 	result, ok := <-resultChan
 	if !ok {
+		e := err.Load()
+		if e != nil {
+			log.Errorf("memory-idx: failed to get Archive with key %v. %s", key, e)
+		}
 		return idx.Archive{}, false
 	}
 
@@ -184,15 +193,16 @@ func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([
 	go func() {
 		for found := range resultChan {
 			for _, node := range found {
-				if _, ok := byPath[node.Path]; !ok {
+				n, ok := byPath[node.Path]
+				if !ok {
 					byPath[node.Path] = &node
 				} else {
 					if node.HasChildren {
-						byPath[node.Path].HasChildren = true
+						n.HasChildren = true
 					}
 					if node.Leaf {
-						byPath[node.Path].Defs = append(byPath[node.Path].Defs, node.Defs...)
-						byPath[node.Path].Leaf = true
+						n.Defs = append(n.Defs, node.Defs...)
+						n.Leaf = true
 					}
 				}
 			}
