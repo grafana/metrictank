@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/grafana/metrictank/util"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -391,16 +393,37 @@ NAMES:
 }
 
 func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) error {
-	for _, def := range defs {
-		err := c.addDefToArchive(def)
-		if err != nil {
-			return err
-		}
+	defChan := make(chan *schema.MetricDefinition, c.cfg.numConns)
+	g, ctx := errgroup.WithContext(context.Background())
+	for i := 0; i < c.cfg.numConns; i++ {
+		g.Go(func() error {
+			for {
+				select {
+				case def, ok := <-defChan:
+					if !ok {
+						return nil
+					}
+					err := c.addDefToArchive(*def)
+					if err != nil {
+						return err
+					}
 
-		err = c.deleteDef(def.Id, def.Partition)
-		if err != nil {
-			return err
-		}
+					err = c.deleteDef(def.Id, def.Partition)
+					if err != nil {
+						return err
+					}
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+	}
+	for i := range defs {
+		defChan <- &defs[i]
+	}
+	close(defChan)
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	return nil
