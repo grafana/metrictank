@@ -14,17 +14,17 @@ import (
 
 // Implements the the "MetricIndex" interface
 type PartitionedMemoryIdx struct {
-	Partition map[int32]*MemoryIdx
+	Partition map[int32]*UnpartitionedMemoryIdx
 }
 
 func NewPartitionedMemoryIdx() *PartitionedMemoryIdx {
 	idx := &PartitionedMemoryIdx{
-		Partition: make(map[int32]*MemoryIdx),
+		Partition: make(map[int32]*UnpartitionedMemoryIdx),
 	}
 	partitions := cluster.Manager.GetPartitions()
-	//log.Infof("PartitionedMemoryIdx: initializing with partitions: %v", partitions)
+	log.Infof("PartitionedMemoryIdx: initializing with partitions: %v", partitions)
 	for _, p := range partitions {
-		idx.Partition[p] = NewMemoryIdx()
+		idx.Partition[p] = NewUnpartitionedMemoryIdx()
 	}
 	return idx
 }
@@ -33,7 +33,6 @@ func NewPartitionedMemoryIdx() *PartitionedMemoryIdx {
 // blocks until the index is ready for use.
 func (p *PartitionedMemoryIdx) Init() error {
 	for _, m := range p.Partition {
-		//log.Infof("PartitionedMemoryIdx: initializing MemoryIdx for partition %d", part)
 		err := m.Init()
 		if err != nil {
 			return err
@@ -170,13 +169,11 @@ func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([
 	for _, m := range p.Partition {
 		m := m
 		g.Go(func() error {
-			//fmt.Printf("running find on %d\n", pos)
 			found, err := m.Find(orgId, pattern, from)
 			if err != nil {
 				return err
 			}
 			resultChan <- found
-			//fmt.Printf("completed find on %d\n", pos)
 			return nil
 		})
 	}
