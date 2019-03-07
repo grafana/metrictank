@@ -335,6 +335,9 @@ func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter string, from int64) ([]
 			merged[t] = struct{}{}
 		}
 	}
+	if len(merged) == 0 {
+		return nil, nil
+	}
 	response := make([]string, 0, len(merged))
 	for tag := range merged {
 		response = append(response, tag)
