@@ -489,6 +489,11 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 		if err == nil {
 			return nil
 		}
+
+		// log first failure and every 20th after that.
+		if (attempts % 20) == 0 {
+			log.Warnf("cassandra-idx: Failed to write def to cassandra. it will be retried. %s. the value was: %+v", err, def)
+		}
 	}
 
 	return err
