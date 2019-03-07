@@ -460,10 +460,18 @@ func (c *CasIdx) processWriteQueue() {
 
 func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 	insertQry := `INSERT INTO metric_idx_archive (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	attempts := 0
+	maxAttempts := 5
+	var err error
 
-	for attempts < 5 {
-		attempts++
+	for attempts := 0; attempts < maxAttempts; attempts++ {
+		if attempts > 0 {
+			sleepTime := 100 * attempts
+			if sleepTime > 2000 {
+				sleepTime = 2000
+			}
+			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		}
+
 		err := c.session.Query(
 			insertQry,
 			def.Id.String(),
@@ -478,23 +486,11 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 			time.Now().UTC().Unix()).Exec()
 
 		if err == nil {
-			break
+			return nil
 		}
-
-		if attempts >= 5 {
-			return fmt.Errorf("Failed writing to cassandra: %s", err.Error())
-		}
-
-		sleepTime := 100 * attempts
-		if sleepTime > 2000 {
-			sleepTime = 2000
-		}
-		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-		attempts++
-
 	}
 
-	return nil
+	return err
 }
 
 func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
