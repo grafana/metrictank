@@ -185,7 +185,7 @@ func InitSmallIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, int32(i%partitionCount))
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	for i, series := range diskMetrics(5, 100, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -197,7 +197,7 @@ func InitSmallIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, int32(i%partitionCount))
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 }
 
@@ -230,7 +230,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, int32(i%partitionCount))
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	for i, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -242,7 +242,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, int32(i%partitionCount))
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	// orgId 1 has 1,680,000 series
 
@@ -256,7 +256,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, int32(i%partitionCount))
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	for i, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
@@ -268,7 +268,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, int32(i%partitionCount))
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	//orgId 2 has 168,000 mertics
 }
@@ -449,7 +449,7 @@ func testTagSorting(t *testing.T) {
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
-	index.AddOrUpdate(mkey, md1, int32(0/partitionCount))
+	index.AddOrUpdate(mkey, md1, getPartition(md1))
 
 	res, err := index.FindByTag(1, []string{"b=a"}, 0)
 	if err != nil {
@@ -477,7 +477,7 @@ func testTagSorting(t *testing.T) {
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
-	index.LoadPartition(int32(1/partitionCount), md2)
+	index.LoadPartition(getPartitionFromName("name2"), md2)
 
 	res, err = index.FindByTag(1, []string{"3=a"}, 0)
 	if err != nil {
@@ -903,7 +903,7 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 					}
 					data.SetId()
 					mkey, _ := schema.MKeyFromString(data.Id)
-					ix.AddOrUpdate(mkey, data, int32(hostNum%8))
+					ix.AddOrUpdate(mkey, data, getPartition(data))
 				}
 			}
 		}
