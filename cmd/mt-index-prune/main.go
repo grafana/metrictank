@@ -86,6 +86,7 @@ func main() {
 			cassI = i
 		}
 	}
+
 	if cassI == 0 {
 		log.Println("only indextype 'cass' supported")
 		flag.Usage()
@@ -95,14 +96,14 @@ func main() {
 
 	indexRules, err := conf.ReadIndexRules(indexRulesFile)
 	if os.IsNotExist(err) {
-		log.Fatalf("Index-rules.conf file %s does not exist; using defaults", indexRulesFile)
+		log.Fatalf("Index-rules.conf file %s does not exist; exiting", indexRulesFile)
+		os.Exit(1)
 	}
 	now := time.Now()
 	cutoffs := indexRules.Cutoffs(now)
 
 	cassFlags.Parse(os.Args[cassI+1:])
 	cassandra.CliConfig.Enabled = true
-
 	cassIdx := cassandra.New(cassandra.CliConfig)
 	err = cassIdx.InitBare()
 	perror(err)
