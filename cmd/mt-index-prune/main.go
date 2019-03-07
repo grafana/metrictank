@@ -163,7 +163,7 @@ func main() {
 		if noDryRun {
 			err = cassIdx.ArchiveDefs(deprecatedDefs)
 			if err != nil {
-				perror(fmt.Errorf("Failed to archive defs: %s", err.Error()))
+				log.Warnf("Failed to archive defs: %s", err.Error())
 			}
 		}
 
