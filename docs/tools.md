@@ -214,8 +214,10 @@ global config flags:
     	name of file which defines the max-stale times (default "/etc/metrictank/index-rules.conf")
   -no-dry-run
     	do not only plan and print what to do, but also execute it
-  -partition-count int
-    	the number of partitions in existence (default 8)
+  -partition-from int
+    	the partition to start at
+  -partition-to int
+    	prune all partitions up to this one (exclusive). If unset, only the partition defined with "--partition-from" gets pruned (default -1)
   -verbose
     	print every metric name that gets archived
 
