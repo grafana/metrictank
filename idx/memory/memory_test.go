@@ -3,12 +3,14 @@ package memory
 import (
 	"crypto/rand"
 	"fmt"
+	"hash/fnv"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
@@ -16,6 +18,30 @@ import (
 	"github.com/raintank/schema"
 	. "github.com/smartystreets/goconvey/convey"
 )
+
+var (
+	partitionCount int // number of partitions being used by PartitionedMemoryIdx
+)
+
+func init() {
+	cluster.Init("test", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPartitions([]int32{0, 1})
+	partitionCount = 2
+}
+
+func getPartition(md *schema.MetricData) int32 {
+	return getPartitionFromName(md.Name)
+}
+
+func getPartitionFromName(name string) int32 {
+	h := fnv.New32a()
+	h.Write([]byte(name))
+	p := int32(h.Sum32() % uint32(partitionCount))
+	if p < 0 {
+		p = p * -1
+	}
+	return p
+}
 
 // getSeriesNames returns a count-length slice of random strings comprised of the prefix and count nodes.like.this
 func getSeriesNames(depth, count int, prefix string) []string {
@@ -65,23 +91,41 @@ func getMetricData(orgId uint32, depth, count, interval int, prefix string, tagg
 	return data
 }
 
-// testWithAndWithoutTagSupport calls a test with the TagSupprt setting
+// withAndWithoutTagSupport calls a test with the TagSupprt setting
 // turned on and off. This is to verify that something works as expected
 // no matter what this flag is set to, it does not mean that the behavior
 // of a method should be changing dependent on that setting.
-func testWithAndWithoutTagSupport(t *testing.T, f func(*testing.T)) {
-	t.Helper()
-	_tagSupport := TagSupport
-	defer func() { TagSupport = _tagSupport }()
+func withAndWithoutTagSupport(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) {
+		t.Helper()
+		_tagSupport := TagSupport
+		defer func() { TagSupport = _tagSupport }()
 
-	TagSupport = true
-	f(t)
-	TagSupport = false
-	f(t)
+		TagSupport = true
+		t.Run("withTagSupport", f)
+		TagSupport = false
+		t.Run("withoutTagSupport", f)
+	}
+}
+
+// withAndWithoutPartitonedIndex calls a test with the Partitioned setting
+// turned on and off. This is to verify that something works as expected
+// no for both the partitioned and non-partitioned index versions.
+func withAndWithoutPartitonedIndex(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) {
+		t.Helper()
+		_partitioned := Partitioned
+		defer func() { Partitioned = _partitioned }()
+
+		Partitioned = false
+		t.Run("unPartitioned", f)
+		Partitioned = true
+		t.Run("partitioned", f)
+	}
 }
 
 func TestGetAddKey(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testGetAddKey)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testGetAddKey))(t)
 }
 
 func testGetAddKey(t *testing.T) {
@@ -100,7 +144,7 @@ func testGetAddKey(t *testing.T) {
 		Convey(fmt.Sprintf("When indexing metrics for orgId %d", orgId), t, func() {
 			for _, s := range series {
 				mkey, _ := schema.MKeyFromString(s.Id)
-				ix.AddOrUpdate(mkey, s, 1)
+				ix.AddOrUpdate(mkey, s, getPartition(s))
 			}
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
@@ -119,7 +163,7 @@ func testGetAddKey(t *testing.T) {
 			series.Interval = 60
 			series.SetId()
 			mkey, _ := schema.MKeyFromString(series.Id)
-			ix.AddOrUpdate(mkey, series, 1)
+			ix.AddOrUpdate(mkey, series, getPartition(series))
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
@@ -143,7 +187,7 @@ func testGetAddKey(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testFind)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testFind))(t)
 }
 
 func testFind(t *testing.T) {
@@ -158,7 +202,7 @@ func testFind(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 	for _, s := range getMetricData(1, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
@@ -166,7 +210,7 @@ func testFind(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 	for _, s := range getMetricData(1, 1, 5, 10, "foo.demo", false) {
 		s.Time = 1 * 86400
@@ -174,7 +218,7 @@ func testFind(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 		s.Time = 2 * 86400
 		s.Interval = 60
 		s.SetId()
@@ -182,7 +226,7 @@ func testFind(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	for _, s := range getMetricData(2, 2, 5, 10, "metric.foo", false) {
@@ -191,7 +235,7 @@ func testFind(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	Convey("When listing root nodes", t, func() {
@@ -294,7 +338,7 @@ func testFind(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testDelete)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testDelete))(t)
 }
 
 func testDelete(t *testing.T) {
@@ -312,18 +356,22 @@ func testDelete(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 	for _, s := range org1Series {
 		mkey, err := schema.MKeyFromString(s.Id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 }
 
 func TestDeleteTagged(t *testing.T) {
+	withAndWithoutPartitonedIndex(testDeleteTagged)(t)
+}
+
+func testDeleteTagged(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
 
@@ -338,14 +386,14 @@ func TestDeleteTagged(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 	for _, s := range org1Series {
 		mkey, err := schema.MKeyFromString(s.Id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	Convey("when deleting by tag", t, func() {
@@ -368,7 +416,7 @@ func TestDeleteTagged(t *testing.T) {
 }
 
 func TestDeleteNodeWith100kChildren(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testDeleteNodeWith100kChildren)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testDeleteNodeWith100kChildren))(t)
 }
 
 func testDeleteNodeWith100kChildren(t *testing.T) {
@@ -389,7 +437,7 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 
 	Convey("when deleting 100k series", t, func() {
@@ -417,7 +465,7 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 }
 
 func TestMixedBranchLeaf(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testMixedBranchLeaf)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testMixedBranchLeaf))(t)
 }
 
 func testMixedBranchLeaf(t *testing.T) {
@@ -449,14 +497,14 @@ func testMixedBranchLeaf(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ix.AddOrUpdate(mkey, first, 1)
+		ix.AddOrUpdate(mkey, first, getPartition(first))
 		Convey("we should be able to add a leaf under another leaf", func() {
 			mkey, err := schema.MKeyFromString(second.Id)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ix.AddOrUpdate(mkey, second, 1)
+			ix.AddOrUpdate(mkey, second, getPartition(second))
 			_, ok := ix.Get(mkey)
 			So(ok, ShouldEqual, true)
 			defs := ix.List(1)
@@ -468,7 +516,7 @@ func testMixedBranchLeaf(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ix.AddOrUpdate(mkey, third, 1)
+			ix.AddOrUpdate(mkey, third, getPartition(third))
 			_, ok := ix.Get(mkey)
 			So(ok, ShouldEqual, true)
 			defs := ix.List(1)
@@ -478,7 +526,7 @@ func testMixedBranchLeaf(t *testing.T) {
 }
 
 func TestMixedBranchLeafDelete(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testMixedBranchLeafDelete)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testMixedBranchLeafDelete))(t)
 }
 
 func testMixedBranchLeafDelete(t *testing.T) {
@@ -519,7 +567,7 @@ func testMixedBranchLeafDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 		mkeys = append(mkeys, mkey)
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	Convey("when deleting mixed leaf/branch", t, func() {
@@ -569,6 +617,10 @@ func testMixedBranchLeafDelete(t *testing.T) {
 }
 
 func TestPruneTaggedSeries(t *testing.T) {
+	withAndWithoutPartitonedIndex(testPruneTaggedSeries)(t)
+}
+
+func testPruneTaggedSeries(t *testing.T) {
 
 	IndexRules = conf.IndexRules{
 		Rules: []conf.IndexRule{
@@ -596,7 +648,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 	series = getMetricData(1, 2, 5, 10, "longterm.more-recent", true)
 	for _, s := range series {
@@ -606,7 +658,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	// data that will never expire due to the default
@@ -618,7 +670,7 @@ func TestPruneTaggedSeries(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	Convey("after populating index", t, func() {
@@ -659,13 +711,14 @@ func TestPruneTaggedSeries(t *testing.T) {
 					Time:     100,
 				}
 				data.SetId()
+				break
 			}
 		}
 		mkey, err := schema.MKeyFromString(data.Id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 		Convey("When pruning old series", func() {
 			pruned, err := ix.Prune(time.Unix(120, 0))
 			So(err, ShouldBeNil)
@@ -684,6 +737,10 @@ func TestPruneTaggedSeries(t *testing.T) {
 // it does not test matching over different rules or tag matching
 // we have other tests for that
 func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
+	withAndWithoutPartitonedIndex(testPruneTaggedSeriesWithCollidingTagSets)(t)
+}
+
+func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	_tagSupport := TagSupport
 	defer func() { TagSupport = _tagSupport }()
 	TagSupport = true
@@ -714,7 +771,7 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, s, 1)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
 	Convey("after populating index", t, func() {
@@ -758,7 +815,7 @@ func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 }
 
 func TestPrune(t *testing.T) {
-	testWithAndWithoutTagSupport(t, testPrune)
+	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testPrune))(t)
 }
 
 func testPrune(t *testing.T) {
@@ -786,7 +843,7 @@ func testPrune(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, d, 1)
+		ix.AddOrUpdate(mkey, d, getPartition(d))
 	}
 	//new series
 	for _, s := range getSeriesNames(2, 5, "metric.foo") {
@@ -801,7 +858,7 @@ func testPrune(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, d, 1)
+		ix.AddOrUpdate(mkey, d, getPartition(d))
 	}
 	Convey("after populating index", t, func() {
 		defs := ix.List(1)
@@ -834,7 +891,7 @@ func testPrune(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 0)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 		Convey("When pruning old series", func() {
 			pruned, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
@@ -848,6 +905,10 @@ func testPrune(t *testing.T) {
 }
 
 func TestSingleNodeMetric(t *testing.T) {
+	withAndWithoutPartitonedIndex(testSingleNodeMetric)(t)
+}
+
+func testSingleNodeMetric(t *testing.T) {
 	ix := New()
 	ix.Init()
 
@@ -861,10 +922,30 @@ func TestSingleNodeMetric(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ix.AddOrUpdate(mkey, data, 1)
+	ix.AddOrUpdate(mkey, data, getPartition(data))
+}
+
+// withAndWithoutPartitonedIndex calls a test with the Partitioned setting
+// turned on and off. This is to verify that something works as expected
+// no for both the partitioned and non-partitioned index versions.
+func benchWithAndWithoutPartitonedIndex(f func(*testing.B)) func(*testing.B) {
+	return func(b *testing.B) {
+		b.Helper()
+		_partitioned := Partitioned
+		defer func() { Partitioned = _partitioned }()
+
+		Partitioned = false
+		b.Run("unPartitioned", f)
+		Partitioned = true
+		b.Run("partitioned", f)
+	}
 }
 
 func BenchmarkIndexing(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkIndexing)(b)
+}
+
+func benchmarkIndexing(b *testing.B) {
 	ix := New()
 	ix.Init()
 
@@ -884,11 +965,15 @@ func BenchmarkIndexing(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 }
 
 func BenchmarkDeletes(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkDeletes)(b)
+}
+
+func benchmarkDeletes(b *testing.B) {
 	ix := New()
 	ix.Init()
 
@@ -906,7 +991,7 @@ func BenchmarkDeletes(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -915,6 +1000,10 @@ func BenchmarkDeletes(b *testing.B) {
 }
 
 func BenchmarkPrune(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkPrune)(b)
+}
+
+func benchmarkPrune(b *testing.B) {
 	ix := New()
 	ix.Init()
 
@@ -933,7 +1022,7 @@ func BenchmarkPrune(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -948,6 +1037,10 @@ func BenchmarkPrune(b *testing.B) {
 }
 
 func BenchmarkPruneLongSeriesNames(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkPruneLongSeriesNames)(b)
+}
+
+func benchmarkPruneLongSeriesNames(b *testing.B) {
 	ix := New()
 	ix.Init()
 
@@ -966,7 +1059,7 @@ func BenchmarkPruneLongSeriesNames(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -981,6 +1074,10 @@ func BenchmarkPruneLongSeriesNames(b *testing.B) {
 }
 
 func TestMatchSchemaWithTags(t *testing.T) {
+	withAndWithoutPartitonedIndex(testMatchSchemaWithTags)(t)
+}
+
+func testMatchSchemaWithTags(t *testing.T) {
 	_tagSupport := TagSupport
 	_schemas := mdata.Schemas
 	defer func() { TagSupport = _tagSupport }()
@@ -1003,10 +1100,11 @@ func TestMatchSchemaWithTags(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &schema.MetricDefinition{
-			Name:     name,
-			OrgId:    1,
-			Interval: 1,
-			Tags:     []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"},
+			Name:      name,
+			OrgId:     1,
+			Interval:  1,
+			Tags:      []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"},
+			Partition: getPartitionFromName(name),
 		}
 		data[i].SetId()
 		archives[i] = ix.add(data[i])

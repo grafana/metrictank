@@ -57,7 +57,7 @@ type writeReq struct {
 
 // CasIdx implements the the "MetricIndex" interface
 type CasIdx struct {
-	memory.MemoryIdx
+	memory.MemoryIndex
 	cfg              *IdxConfig
 	cluster          *gocql.ClusterConfig
 	session          *gocql.Session
@@ -96,7 +96,7 @@ func New(cfg *IdxConfig) *CasIdx {
 	}
 
 	idx := &CasIdx{
-		MemoryIdx:        *memory.New(),
+		MemoryIndex:      memory.New(),
 		cfg:              cfg,
 		cluster:          cluster,
 		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),
@@ -180,7 +180,7 @@ func (c *CasIdx) InitBare() error {
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (c *CasIdx) Init() error {
 	log.Infof("initializing cassandra-idx. Hosts=%s", c.cfg.hosts)
-	if err := c.MemoryIdx.Init(); err != nil {
+	if err := c.MemoryIndex.Init(); err != nil {
 		return err
 	}
 
@@ -207,7 +207,7 @@ func (c *CasIdx) Init() error {
 
 func (c *CasIdx) Stop() {
 	log.Info("cassandra-idx: stopping")
-	c.MemoryIdx.Stop()
+	c.MemoryIndex.Stop()
 
 	// if updateCassIdx is disabled then writeQueue should never have been initialized
 	if c.cfg.updateCassIdx {
@@ -222,7 +222,7 @@ func (c *CasIdx) Stop() {
 func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := c.MemoryIdx.Update(point, partition)
+	archive, oldPartition, inMemory := c.MemoryIndex.Update(point, partition)
 
 	if !c.cfg.updateCassIdx {
 		statUpdateDuration.Value(time.Since(pre))
@@ -251,7 +251,7 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive,
 func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := c.MemoryIdx.AddOrUpdate(mkey, data, partition)
+	archive, oldPartition, inMemory := c.MemoryIndex.AddOrUpdate(mkey, data, partition)
 
 	stat := statUpdateDuration
 	if !inMemory {
@@ -291,7 +291,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 		log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
-		c.MemoryIdx.UpdateArchive(archive)
+		c.MemoryIndex.UpdateArchive(archive)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -302,7 +302,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 		select {
 		case c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
 			archive.LastSave = now
-			c.MemoryIdx.UpdateArchive(archive)
+			c.MemoryIndex.UpdateArchive(archive)
 		default:
 			statSaveSkipped.Inc()
 			log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", archive.MetricDefinition.Id)
@@ -315,8 +315,12 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	defs := c.LoadPartitions(cluster.Manager.GetPartitions(), nil, pre)
-	num := c.MemoryIdx.Load(defs)
+	var defs []schema.MetricDefinition
+	var num int
+	for _, partition := range cluster.Manager.GetPartitions() {
+		defs = c.LoadPartitions([]int32{partition}, defs[:0], pre)
+		num += c.MemoryIndex.LoadPartition(partition, defs)
+	}
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
@@ -549,7 +553,7 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 
 func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	pre := time.Now()
-	defs, err := c.MemoryIdx.Delete(orgId, pattern)
+	defs, err := c.MemoryIndex.Delete(orgId, pattern)
 	if err != nil {
 		return defs, err
 	}
@@ -596,7 +600,7 @@ func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
 
 func (c *CasIdx) Prune(now time.Time) ([]idx.Archive, error) {
 	log.Info("cassandra-idx: start pruning of series")
-	pruned, err := c.MemoryIdx.Prune(now)
+	pruned, err := c.MemoryIndex.Prune(now)
 	duration := time.Since(now)
 	if err != nil {
 		log.Errorf("cassandra-idx: pruning error: %s", err)

@@ -377,6 +377,10 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 }
 
 func TestGetByTag(t *testing.T) {
+	withAndWithoutPartitonedIndex(testGetByTag)(t)
+}
+
+func testGetByTag(t *testing.T) {
 	_tagSupport := TagSupport
 	defer func() { TagSupport = _tagSupport }()
 	TagSupport = true
@@ -470,7 +474,7 @@ func TestGetByTag(t *testing.T) {
 
 		resPaths := make([]string, 0, len(res))
 		for id := range res {
-			def, ok := ix.defById[id]
+			def, ok := ix.Get(id)
 			if !ok {
 				t.Fatalf("Tag query returned ID that did not exist in DefByID: %s", id)
 			}

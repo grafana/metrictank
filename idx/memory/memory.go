@@ -55,12 +55,14 @@ var (
 	TagQueryWorkers     int // number of workers to spin up when evaluation tag expressions
 	indexRulesFile      string
 	IndexRules          conf.IndexRules
+	Partitioned         bool
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
@@ -85,6 +87,23 @@ func ConfigProcess() {
 	} else if err != nil {
 		log.Fatalf("can't read index-rules file %q: %s", indexRulesFile, err.Error())
 	}
+}
+
+// interface implemented by both MemoryIdx and PartitionedMemoryIdx
+// this is needed to support unit tests.
+type MemoryIndex interface {
+	idx.MetricIndex
+	LoadPartition(int32, []schema.MetricDefinition) int
+	UpdateArchive(idx.Archive)
+	add(*schema.MetricDefinition) idx.Archive
+	idsByTagQuery(uint32, TagQuery) IdSet
+}
+
+func New() MemoryIndex {
+	if Partitioned {
+		return NewPartitionedMemoryIdx()
+	}
+	return NewMemoryIdx()
 }
 
 type Tree struct {
@@ -372,6 +391,12 @@ func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) boo
 	m.defByTagSet.del(def)
 
 	return true
+}
+
+// Used to rebuild the index from an existing set of metricDefinitions for a specific paritition.
+func (m *MemoryIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) int {
+	// MemoryIdx isnt partitioned, so just ignore the partition passed and call Load()
+	return m.Load(defs)
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.

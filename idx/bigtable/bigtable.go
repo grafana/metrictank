@@ -54,7 +54,7 @@ type writeReq struct {
 }
 
 type BigtableIdx struct {
-	memory.MemoryIdx
+	memory.MemoryIndex
 	cfg        *IdxConfig
 	tbl        *bigtable.Table
 	client     *bigtable.Client
@@ -70,9 +70,9 @@ func New(cfg *IdxConfig) *BigtableIdx {
 		log.Fatalf("bigtable-idx: %s", err)
 	}
 	idx := &BigtableIdx{
-		MemoryIdx: *memory.New(),
-		cfg:       cfg,
-		shutdown:  make(chan struct{}),
+		MemoryIndex: memory.New(),
+		cfg:         cfg,
+		shutdown:    make(chan struct{}),
 	}
 	if cfg.UpdateBigtableIdx {
 		idx.writeQueue = make(chan writeReq, cfg.WriteQueueSize-cfg.WriteMaxFlushSize)
@@ -165,7 +165,7 @@ func (b *BigtableIdx) InitBare() error {
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (b *BigtableIdx) Init() error {
 	log.Infof("bigtable-idx: Initializing. Project=%s, Instance=%s", b.cfg.GcpProject, b.cfg.BigtableInstance)
-	if err := b.MemoryIdx.Init(); err != nil {
+	if err := b.MemoryIndex.Init(); err != nil {
 		return err
 	}
 
@@ -190,7 +190,7 @@ func (b *BigtableIdx) Init() error {
 }
 
 func (b *BigtableIdx) Stop() {
-	b.MemoryIdx.Stop()
+	b.MemoryIndex.Stop()
 	close(b.shutdown)
 	if b.cfg.UpdateBigtableIdx {
 		close(b.writeQueue)
@@ -208,7 +208,7 @@ func (b *BigtableIdx) Stop() {
 func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := b.MemoryIdx.Update(point, partition)
+	archive, oldPartition, inMemory := b.MemoryIndex.Update(point, partition)
 
 	if !b.cfg.UpdateBigtableIdx {
 		statUpdateDuration.Value(time.Since(pre))
@@ -241,7 +241,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := b.MemoryIdx.AddOrUpdate(mkey, data, partition)
+	archive, oldPartition, inMemory := b.MemoryIndex.AddOrUpdate(mkey, data, partition)
 
 	stat := statUpdateDuration
 	if !inMemory {
@@ -286,7 +286,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		log.Debugf("bigtable-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
-		b.MemoryIdx.UpdateArchive(archive)
+		b.MemoryIndex.UpdateArchive(archive)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -297,7 +297,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		select {
 		case b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
 			archive.LastSave = now
-			b.MemoryIdx.UpdateArchive(archive)
+			b.MemoryIndex.UpdateArchive(archive)
 		default:
 			statSaveSkipped.Inc()
 			log.Debugf("bigtable-idx: writeQueue is full, update of %s not saved this time", archive.MetricDefinition.Id)
@@ -315,7 +315,7 @@ func (b *BigtableIdx) rebuildIndex() {
 	var defs []schema.MetricDefinition
 	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = b.LoadPartition(partition, defs[:0], pre)
-		num += b.MemoryIdx.Load(defs)
+		num += b.MemoryIndex.LoadPartition(partition, defs)
 	}
 
 	log.Infof("bigtable-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
@@ -459,7 +459,7 @@ LOOP:
 
 func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	pre := time.Now()
-	defs, err := b.MemoryIdx.Delete(orgId, pattern)
+	defs, err := b.MemoryIndex.Delete(orgId, pattern)
 	if err != nil {
 		return defs, err
 	}
@@ -498,7 +498,7 @@ func (b *BigtableIdx) deleteRow(key string) error {
 
 func (b *BigtableIdx) Prune(now time.Time) ([]idx.Archive, error) {
 	log.Info("bigtable-idx: start pruning of series")
-	pruned, err := b.MemoryIdx.Prune(now)
+	pruned, err := b.MemoryIndex.Prune(now)
 	duration := time.Since(now)
 	if err != nil {
 		log.Errorf("bigtable-idx: prune error. %s", err)

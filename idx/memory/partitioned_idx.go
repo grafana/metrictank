@@ -17,12 +17,12 @@ type PartitionedMemoryIdx struct {
 	Partition map[int32]*MemoryIdx
 }
 
-func New() *PartitionedMemoryIdx {
+func NewPartitionedMemoryIdx() *PartitionedMemoryIdx {
 	idx := &PartitionedMemoryIdx{
 		Partition: make(map[int32]*MemoryIdx),
 	}
 	partitions := cluster.Manager.GetPartitions()
-	log.Infof("PartitionedMemoryIdx: initializing with partitions: %v", partitions)
+	//log.Infof("PartitionedMemoryIdx: initializing with partitions: %v", partitions)
 	for _, p := range partitions {
 		idx.Partition[p] = NewMemoryIdx()
 	}
@@ -32,8 +32,8 @@ func New() *PartitionedMemoryIdx {
 // Init initializes the index at startup and
 // blocks until the index is ready for use.
 func (p *PartitionedMemoryIdx) Init() error {
-	for part, m := range p.Partition {
-		log.Infof("PartitionedMemoryIdx: initializing MemoryIdx for partition %d", part)
+	for _, m := range p.Partition {
+		//log.Infof("PartitionedMemoryIdx: initializing MemoryIdx for partition %d", part)
 		err := m.Init()
 		if err != nil {
 			return err
@@ -59,6 +59,11 @@ func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32)
 // and should be called for every received metric.
 func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	return p.Partition[partition].AddOrUpdate(mkey, data, partition)
+}
+
+// UpdateArchive updates the archive information
+func (p *PartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
+	p.Partition[archive.Partition].UpdateArchive(archive)
 }
 
 // Get returns the archive for the requested id.
@@ -161,45 +166,49 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archi
 // * from is a unix timestamp. series not updated since then are excluded.
 func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]idx.Node, len(p.Partition))
-	var i int
+	resultChan := make(chan []idx.Node)
 	for _, m := range p.Partition {
-		pos, m := i, m
+		m := m
 		g.Go(func() error {
 			//fmt.Printf("running find on %d\n", pos)
 			found, err := m.Find(orgId, pattern, from)
 			if err != nil {
 				return err
 			}
-			result[pos] = found
+			resultChan <- found
 			//fmt.Printf("completed find on %d\n", pos)
 			return nil
 		})
-		i++
-	}
-	if err := g.Wait(); err != nil {
-		log.Errorf("memory-idx: failed to Find: orgId=%d pattern=%s from=%d. %s", orgId, pattern, from, err)
-		return nil, err
 	}
 
-	// de-dupe branches
+	// consume from the ResultChan and merge the results, de-duping branches
 	byPath := make(map[string]*idx.Node)
-
-	for _, r := range result {
-		for _, node := range r {
-			if _, ok := byPath[node.Path]; !ok {
-				byPath[node.Path] = &node
-			} else {
-				byPath[node.Path].Defs = append(byPath[node.Path].Defs, node.Defs...)
-				if node.HasChildren {
-					byPath[node.Path].HasChildren = true
-				}
-				if node.Leaf {
-					byPath[node.Path].Leaf = true
+	done := make(chan struct{})
+	go func() {
+		for found := range resultChan {
+			for _, node := range found {
+				if _, ok := byPath[node.Path]; !ok {
+					byPath[node.Path] = &node
+				} else {
+					if node.HasChildren {
+						byPath[node.Path].HasChildren = true
+					}
+					if node.Leaf {
+						byPath[node.Path].Defs = append(byPath[node.Path].Defs, node.Defs...)
+						byPath[node.Path].Leaf = true
+					}
 				}
 			}
 		}
+		close(done)
+	}()
+	if err := g.Wait(); err != nil {
+		close(resultChan)
+		log.Errorf("memory-idx: failed to Find: orgId=%d pattern=%s from=%d. %s", orgId, pattern, from, err)
+		return nil, err
 	}
+	close(resultChan)
+	<-done
 	response := make([]idx.Node, 0, len(byPath))
 	for _, node := range byPath {
 		response = append(response, *node)
