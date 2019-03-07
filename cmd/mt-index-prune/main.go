@@ -42,12 +42,13 @@ func (c *counters) PrintCounters() {
 
 func main() {
 	var noDryRun, verbose bool
-	var partitionCount int
+	var partitionFrom, partitionTo int
 	var indexRulesFile string
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
 	globalFlags.BoolVar(&noDryRun, "no-dry-run", false, "do not only plan and print what to do, but also execute it")
 	globalFlags.BoolVar(&verbose, "verbose", false, "print every metric name that gets archived")
-	globalFlags.IntVar(&partitionCount, "partition-count", 8, "the number of partitions in existence")
+	globalFlags.IntVar(&partitionFrom, "partition-from", 0, "the partition to start at")
+	globalFlags.IntVar(&partitionTo, "partition-to", -1, "prune all partitions up to this one (exclusive). If unset, only the partition defined with \"--partition-from\" gets pruned")
 	globalFlags.StringVar(&indexRulesFile, "index-rules-file", "/etc/metrictank/index-rules.conf", "name of file which defines the max-stale times")
 	cassFlags := cassandra.ConfigSetup()
 
@@ -122,9 +123,9 @@ func main() {
 	defCounters := counters{}
 	defs := make([]schema.MetricDefinition, 0)
 	deprecatedDefs := make([]schema.MetricDefinition, 0)
-	for partition := int32(0); partition < int32(partitionCount); partition++ {
+	for partition := partitionFrom; (partitionTo == -1 && partition == partitionFrom) || (partitionTo > 0 && partition < partitionTo); partition++ {
 		defsByNameWithTags := make(map[string][]schema.MetricDefinition)
-		defs = cassIdx.LoadPartitions([]int32{partition}, defs, now)
+		defs = cassIdx.LoadPartitions([]int32{int32(partition)}, defs, now)
 		defCounters.total += len(defs)
 		for _, def := range defs {
 			name := def.NameWithTags()
