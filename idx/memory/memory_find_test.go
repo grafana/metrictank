@@ -1,20 +1,24 @@
 package memory
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"runtime"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/cluster"
 	"github.com/raintank/schema"
 )
 
 var (
-	ix           idx.MetricIndex
-	currentIndex int // 1 small; 2 large
+	ix                   MemoryIndex
+	currentIndex         int  // 1 small; 2 large
+	currentlyPartitioned bool // was the last call to New() for a partitioned or un-partitioned index.
 )
 
 type query struct {
@@ -156,12 +160,14 @@ func TestMain(m *testing.M) {
 
 func InitSmallIndex() {
 	// if the current index is not the small index then initialize it
-	if currentIndex != 1 {
+	if currentIndex != 1 || currentlyPartitioned != Partitioned {
 		ix = nil
 
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
-
+		cluster.Manager.SetPartitions([]int32{0, 1})
+		partitionCount = 2
+		currentlyPartitioned = Partitioned
 		ix = New()
 		ix.Init()
 
@@ -182,7 +188,7 @@ func InitSmallIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	for i, series := range diskMetrics(5, 100, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -194,18 +200,20 @@ func InitSmallIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 }
 
 func InitLargeIndex() {
 	// if the current index is not the large index then initialize it
-	if currentIndex != 2 {
+	if currentIndex != 2 || currentlyPartitioned != Partitioned {
 		ix = nil
 
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
-
+		cluster.Manager.SetPartitions([]int32{0, 1, 2, 3, 4, 5, 6, 7})
+		partitionCount = 8
+		currentlyPartitioned = Partitioned
 		ix = New()
 		ix.Init()
 
@@ -215,7 +223,6 @@ func InitLargeIndex() {
 	}
 
 	var data *schema.MetricData
-
 	for i, series := range cpuMetrics(5, 1000, 0, 32, "collectd") {
 		data = &schema.MetricData{
 			Name:     series.Name,
@@ -226,7 +233,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	for i, series := range diskMetrics(5, 1000, 0, 10, "collectd") {
 		data = &schema.MetricData{
@@ -238,7 +245,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	// orgId 1 has 1,680,000 series
 
@@ -252,7 +259,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	for i, series := range diskMetrics(5, 100, 950, 10, "collectd") {
 		data = &schema.MetricData{
@@ -264,7 +271,7 @@ func InitLargeIndex() {
 		}
 		data.SetId()
 		mkey, _ := schema.MKeyFromString(data.Id)
-		ix.AddOrUpdate(mkey, data, 1)
+		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 	//orgId 2 has 168,000 mertics
 }
@@ -298,6 +305,10 @@ func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expe
 }
 
 func TestTagDetailsWithoutFilters(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagDetailsWithoutFilters)(t)
+}
+
+func testTagDetailsWithoutFilters(t *testing.T) {
 	InitSmallIndex()
 
 	expected := make(map[string]uint64)
@@ -310,6 +321,10 @@ func TestTagDetailsWithoutFilters(t *testing.T) {
 }
 
 func TestTagDetailsWithFrom(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagDetailsWithFrom)(t)
+}
+
+func testTagDetailsWithFrom(t *testing.T) {
 	InitSmallIndex()
 
 	expected := make(map[string]uint64)
@@ -320,6 +335,10 @@ func TestTagDetailsWithFrom(t *testing.T) {
 }
 
 func TestTagDetailsWithFilter(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagDetailsWithFilter)(t)
+}
+
+func testTagDetailsWithFilter(t *testing.T) {
 	InitSmallIndex()
 
 	expected := make(map[string]uint64)
@@ -330,6 +349,10 @@ func TestTagDetailsWithFilter(t *testing.T) {
 }
 
 func TestTagDetailsWithFilterAndFrom(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagDetailsWithFilterAndFrom)(t)
+}
+
+func testTagDetailsWithFilterAndFrom(t *testing.T) {
 	InitSmallIndex()
 
 	expected := make(map[string]uint64)
@@ -358,6 +381,10 @@ func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []
 }
 
 func TestTagKeysWithoutFilters(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagKeysWithoutFilters)(t)
+}
+
+func testTagKeysWithoutFilters(t *testing.T) {
 	InitSmallIndex()
 
 	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
@@ -365,6 +392,10 @@ func TestTagKeysWithoutFilters(t *testing.T) {
 }
 
 func TestTagKeysWithFrom(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagKeysWithFrom)(t)
+}
+
+func testTagKeysWithFrom(t *testing.T) {
 	InitSmallIndex()
 
 	// disk metrics should all have been added before ts 1000000
@@ -373,6 +404,10 @@ func TestTagKeysWithFrom(t *testing.T) {
 }
 
 func TestTagKeysWithFilter(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagKeysWithFilter)(t)
+}
+
+func testTagKeysWithFilter(t *testing.T) {
 	InitSmallIndex()
 
 	expected := []string{"dc", "device", "disk", "direction"}
@@ -383,6 +418,10 @@ func TestTagKeysWithFilter(t *testing.T) {
 }
 
 func TestTagKeysWithFromAndFilter(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagKeysWithFromAndFilter)(t)
+}
+
+func testTagKeysWithFromAndFilter(t *testing.T) {
 	InitSmallIndex()
 
 	expected := []string{"dc", "device"}
@@ -393,6 +432,10 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 }
 
 func TestTagSorting(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagSorting)(t)
+}
+
+func testTagSorting(t *testing.T) {
 	index := New()
 	index.Init()
 
@@ -409,7 +452,7 @@ func TestTagSorting(t *testing.T) {
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
-	index.AddOrUpdate(mkey, md1, 1)
+	index.AddOrUpdate(mkey, md1, getPartition(md1))
 
 	res, err := index.FindByTag(1, []string{"b=a"}, 0)
 	if err != nil {
@@ -437,7 +480,7 @@ func TestTagSorting(t *testing.T) {
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
-	index.Load(md2)
+	index.LoadPartition(getPartitionFromName("name2"), md2)
 
 	res, err = index.FindByTag(1, []string{"3=a"}, 0)
 	if err != nil {
@@ -453,6 +496,10 @@ func TestTagSorting(t *testing.T) {
 }
 
 func TestAutoCompleteTag(t *testing.T) {
+	withAndWithoutPartitonedIndex(testAutoCompleteTag)(t)
+}
+
+func testAutoCompleteTag(t *testing.T) {
 	InitSmallIndex()
 
 	type testCase struct {
@@ -555,6 +602,10 @@ func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, expr []st
 }
 
 func TestAutoCompleteTagValues(t *testing.T) {
+	withAndWithoutPartitonedIndex(testAutoCompleteTagValues)(t)
+}
+
+func testAutoCompleteTagValues(t *testing.T) {
 	InitSmallIndex()
 
 	type testCase struct {
@@ -625,6 +676,10 @@ func TestAutoCompleteTagValues(t *testing.T) {
 }
 
 func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagDetailsWithoutFromNorFilter)(b)
+}
+
+func benchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
 
 	b.ReportAllocs()
@@ -640,6 +695,10 @@ func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 }
 
 func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagDetailsWithFromAndFilter)(b)
+}
+
+func benchmarkTagDetailsWithFromAndFilter(b *testing.B) {
 	InitLargeIndex()
 
 	filters := []string{"i", ".+rr", ".+t", "interrupt"}
@@ -658,6 +717,10 @@ func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
 }
 
 func BenchmarkTagsWithFromAndFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagsWithFromAndFilter)(b)
+}
+
+func benchmarkTagsWithFromAndFilter(b *testing.B) {
 	InitLargeIndex()
 	filters := []string{"d", "di", "c"}
 	expected := [][]string{
@@ -676,6 +739,10 @@ func BenchmarkTagsWithFromAndFilter(b *testing.B) {
 }
 
 func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagsWithoutFromNorFilter)(b)
+}
+
+func benchmarkTagsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
 	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "name", "host"}
 	b.ReportAllocs()
@@ -688,6 +755,7 @@ func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
 
 func ixFind(b *testing.B, org uint32, q int) {
 	b.Helper()
+
 	nodes, err := ix.Find(org, queries[q].Pattern, 0)
 	if err != nil {
 		panic(err)
@@ -696,11 +764,15 @@ func ixFind(b *testing.B, org uint32, q int) {
 		for _, n := range nodes {
 			b.Log(n.Path)
 		}
-		b.Fatalf("%s expected %d got %d results instead", queries[q].Pattern, queries[q].ExpectedResults, len(nodes))
+		b.Errorf("%s expected %d got %d results instead", queries[q].Pattern, queries[q].ExpectedResults, len(nodes))
 	}
 }
 
 func BenchmarkFind(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkFind)(b)
+}
+
+func benchmarkFind(b *testing.B) {
 	InitLargeIndex()
 	queryCount := len(queries)
 	b.ReportAllocs()
@@ -718,15 +790,27 @@ type testQ struct {
 }
 
 func BenchmarkConcurrent4Find(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkConcurrent4Find)(b)
+}
+
+func benchmarkConcurrent4Find(b *testing.B) {
+	_tagSupport := TagSupport
+	TagSupport = false
+	defer func() {
+		TagSupport = _tagSupport
+	}()
+
 	InitLargeIndex()
 	queryCount := len(queries)
-
+	var wg sync.WaitGroup
 	ch := make(chan testQ)
 	for i := 0; i < 4; i++ {
+		wg.Add(1)
 		go func() {
 			for q := range ch {
 				ixFind(b, q.org, q.q)
 			}
+			wg.Done()
 		}()
 	}
 	b.ReportAllocs()
@@ -737,18 +821,30 @@ func BenchmarkConcurrent4Find(b *testing.B) {
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
+	wg.Wait()
 }
 
 func BenchmarkConcurrent8Find(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkConcurrent8Find)(b)
+}
+
+func benchmarkConcurrent8Find(b *testing.B) {
+	_tagSupport := TagSupport
+	TagSupport = false
+	defer func() {
+		TagSupport = _tagSupport
+	}()
 	InitLargeIndex()
 	queryCount := len(queries)
-
+	var wg sync.WaitGroup
 	ch := make(chan testQ)
 	for i := 0; i < 8; i++ {
+		wg.Add(1)
 		go func() {
 			for q := range ch {
 				ixFind(b, q.org, q.q)
 			}
+			wg.Done()
 		}()
 	}
 	b.ReportAllocs()
@@ -759,6 +855,77 @@ func BenchmarkConcurrent8Find(b *testing.B) {
 		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
+	wg.Wait()
+}
+
+func BenchmarkConcurrentInsertFind(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkConcurrentInsertFind)(b)
+}
+
+func benchmarkConcurrentInsertFind(b *testing.B) {
+	_tagSupport := TagSupport
+	TagSupport = false
+	defer func() {
+		TagSupport = _tagSupport
+	}()
+	currentIndex = -1
+	InitSmallIndex()
+	var wg sync.WaitGroup
+	ch := make(chan int, 100)
+	for i := 0; i < 200; i++ {
+		wg.Add(1)
+		go func() {
+			for range ch {
+				_, err := ix.Find(1, "collectd.dc3.host9*.cpu.*.*.*", 0)
+				if err != nil {
+					b.Errorf(err.Error())
+				}
+			}
+			wg.Done()
+		}()
+	}
+
+	// run a single thread loading the same metricDefinition over
+	// and over again.  Each call to LoadPartition will acquire an
+	// exclusive lock in the index.
+	done := make(chan struct{})
+	go func() {
+		i := 0
+		var t int64
+		for {
+			select {
+			case <-done:
+				// b.Logf("spent %s adding %d items to index.", time.Duration(t).String(), i)
+				return
+			default:
+				md := []schema.MetricDefinition{
+					{
+						Name:       fmt.Sprintf("benchmark.%d.bar.baz.sdfsdf.%d.asdfgg.sdhtawd.trtya", i, i),
+						Tags:       []string{},
+						Interval:   10,
+						OrgId:      1,
+						LastUpdate: int64(123),
+					},
+				}
+				md[0].SetId()
+				partition := getPartitionFromName(md[0].Name)
+				pre := time.Now()
+				ix.LoadPartition(partition, md)
+				t += time.Since(pre).Nanoseconds()
+				time.Sleep(time.Millisecond)
+				i++
+			}
+		}
+	}()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		ch <- n
+	}
+	close(ch)
+	wg.Wait()
+	close(done)
 }
 
 func ixFindByTag(b *testing.B, org uint32, q int) {
@@ -768,14 +935,18 @@ func ixFindByTag(b *testing.B, org uint32, q int) {
 	}
 	if len(series) != tagQueries[q].ExpectedResults {
 		for _, s := range series {
-			memoryIdx := ix.(*MemoryIdx)
-			b.Log(memoryIdx.defById[s.Defs[0].Id].Tags)
+			a, _ := ix.Get(s.Defs[0].Id)
+			b.Log(a.Tags)
 		}
 		b.Fatalf("%+v expected %d got %d results instead", tagQueries[q].Expressions, tagQueries[q].ExpectedResults, len(series))
 	}
 }
 
 func BenchmarkTagFindSimpleIntersect(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagFindSimpleIntersect)(b)
+}
+
+func benchmarkTagFindSimpleIntersect(b *testing.B) {
 	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -787,6 +958,10 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 }
 
 func BenchmarkTagFindRegexIntersect(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagFindRegexIntersect)(b)
+}
+
+func benchmarkTagFindRegexIntersect(b *testing.B) {
 	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -798,6 +973,10 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 }
 
 func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagFindMatchingAndFiltering)(b)
+}
+
+func benchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -809,6 +988,10 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 }
 
 func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagFindMatchingAndFilteringWithRegex)(b)
+}
+
+func benchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	InitLargeIndex()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -851,6 +1034,10 @@ func permutations(lst []string) [][]string {
 // benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
 // is enough for it to go through all the 6! permutations
 func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterAndIntersect)(b)
+}
+
+func benchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	InitLargeIndex()
 
 	queries := make([]tagQuery, 0)
@@ -877,6 +1064,10 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 // benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
 // is enough for it to go through all the 5! permutations
 func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterAndIntersectOnlyRegex)(b)
+}
+
+func benchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 	InitLargeIndex()
 
 	queries := make([]tagQuery, 0)
@@ -900,6 +1091,10 @@ func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 }
 
 func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryKeysByPrefixSimple)(b)
+}
+
+func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	InitLargeIndex()
 
 	type testCase struct {
@@ -925,6 +1120,10 @@ func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 }
 
 func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryKeysByPrefixExpressions)(b)
+}
+
+func benchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 	InitLargeIndex()
 
 	type testCase struct {

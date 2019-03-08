@@ -182,7 +182,6 @@ func main() {
 	notifierKafka.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
-	memory.ConfigProcess()
 	cassandra.ConfigProcess()
 	bigtable.ConfigProcess()
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())

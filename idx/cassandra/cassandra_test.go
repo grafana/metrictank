@@ -79,7 +79,7 @@ func init() {
 }
 
 func initForTests(c *CasIdx) error {
-	return c.MemoryIdx.Init()
+	return c.MemoryIndex.Init()
 }
 
 func getSeriesNames(depth, count int, prefix string) []string {
@@ -293,7 +293,7 @@ func TestAddToWriteQueue(t *testing.T) {
 			So(time.Now(), ShouldHappenAfter, pre.Add(time.Second))
 		})
 	})
-	ix.MemoryIdx.Stop()
+	ix.MemoryIndex.Stop()
 	close(ix.writeQueue)
 }
 

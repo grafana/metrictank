@@ -55,12 +55,14 @@ var (
 	TagQueryWorkers     int // number of workers to spin up when evaluation tag expressions
 	indexRulesFile      string
 	IndexRules          conf.IndexRules
+	Partitioned         bool
 )
 
 func ConfigSetup() {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
@@ -85,6 +87,23 @@ func ConfigProcess() {
 	} else if err != nil {
 		log.Fatalf("can't read index-rules file %q: %s", indexRulesFile, err.Error())
 	}
+}
+
+// interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
+// this is needed to support unit tests.
+type MemoryIndex interface {
+	idx.MetricIndex
+	LoadPartition(int32, []schema.MetricDefinition) int
+	UpdateArchive(idx.Archive)
+	add(*schema.MetricDefinition) idx.Archive
+	idsByTagQuery(uint32, TagQuery) IdSet
+}
+
+func New() MemoryIndex {
+	if Partitioned {
+		return NewPartitionedMemoryIdx()
+	}
+	return NewUnpartitionedMemoryIdx()
 }
 
 type Tree struct {
@@ -201,8 +220,7 @@ func (n *Node) String() string {
 	return fmt.Sprintf("branch - %s", n.Path)
 }
 
-// Implements the the "MetricIndex" interface
-type MemoryIdx struct {
+type UnpartitionedMemoryIdx struct {
 	sync.RWMutex
 
 	// used for both hierarchy and tag index, so includes all MDs, with
@@ -217,8 +235,8 @@ type MemoryIdx struct {
 	tags        map[uint32]TagIndex // by orgId
 }
 
-func New() *MemoryIdx {
-	return &MemoryIdx{
+func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
+	return &UnpartitionedMemoryIdx{
 		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
@@ -226,11 +244,11 @@ func New() *MemoryIdx {
 	}
 }
 
-func (m *MemoryIdx) Init() error {
+func (m *UnpartitionedMemoryIdx) Init() error {
 	return nil
 }
 
-func (m *MemoryIdx) Stop() {
+func (m *UnpartitionedMemoryIdx) Stop() {
 	return
 }
 
@@ -250,7 +268,7 @@ func bumpLastUpdate(loc *int64, newVal int64) {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	m.RLock()
@@ -274,7 +292,7 @@ func (m *MemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archi
 // AddOrUpdate returns the corresponding Archive for the MetricData.
 // if it is existing -> updates lastUpdate based on .Time, and partition
 // if was new        -> adds new MetricDefinition to index
-func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
+func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	// Optimistically read lock
@@ -309,7 +327,7 @@ func (m *MemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, parti
 }
 
 // UpdateArchive updates the archive information
-func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
+func (m *UnpartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
 	m.Lock()
 	defer m.Unlock()
 	if _, ok := m.defById[archive.Id]; !ok {
@@ -321,7 +339,7 @@ func (m *MemoryIdx) UpdateArchive(archive idx.Archive) {
 // indexTags reads the tags of a given metric definition and creates the
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
-func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
+func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	tags, ok := m.tags[def.OrgId]
 	if !ok {
 		tags = make(TagIndex)
@@ -352,7 +370,7 @@ func (m *MemoryIdx) indexTags(def *schema.MetricDefinition) {
 // a return value of "false" means there was an error and the deindexing was
 // unsuccessful, "true" means the indexing was at least partially or completely
 // successful
-func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
+func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) bool {
 	for _, tag := range def.Tags {
 		tagSplits := strings.SplitN(tag, "=", 2)
 		if len(tagSplits) < 2 {
@@ -375,8 +393,14 @@ func (m *MemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDefinition) boo
 	return true
 }
 
+// Used to rebuild the index from an existing set of metricDefinitions for a specific paritition.
+func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) int {
+	// UnpartitionedMemoryIdx isnt partitioned, so just ignore the partition passed and call Load()
+	return m.Load(defs)
+}
+
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
+func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 	m.Lock()
 	defer m.Unlock()
 	var pre time.Time
@@ -407,13 +431,12 @@ func (m *MemoryIdx) Load(defs []schema.MetricDefinition) int {
 	return num
 }
 
-func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
+func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	path := def.NameWithTags()
-
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
 	irId, _ := IndexRules.Match(path)
-	sort.Strings(def.Tags)
+
 	archive := &idx.Archive{
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
@@ -502,7 +525,7 @@ func (m *MemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	return *archive
 }
 
-func (m *MemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
+func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -516,7 +539,7 @@ func (m *MemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 
 // GetPath returns the node under the given org and path.
 // this is an alternative to Find for when you have a path, not a pattern, and want to lookup in a specific org tree only.
-func (m *MemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
+func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
 	m.RLock()
 	defer m.RUnlock()
 	tree, ok := m.tree[orgId]
@@ -535,7 +558,7 @@ func (m *MemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
 	return archives
 }
 
-func (m *MemoryIdx) TagDetails(orgId uint32, key, filter string, from int64) (map[string]uint64, error) {
+func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key, filter string, from int64) (map[string]uint64, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -607,7 +630,7 @@ func (m *MemoryIdx) TagDetails(orgId uint32, key, filter string, from int64) (ma
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *MemoryIdx) FindTags(orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -690,7 +713,7 @@ func (m *MemoryIdx) FindTags(orgId uint32, prefix string, expressions []string, 
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *MemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -793,7 +816,7 @@ func (m *MemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions 
 // organization. The return values are filtered by the regex in the second parameter.
 // If the third parameter is >0 then only metrics will be accounted of which the
 // LastUpdate time is >= the given value.
-func (m *MemoryIdx) Tags(orgId uint32, filter string, from int64) ([]string, error) {
+func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter string, from int64) ([]string, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -843,7 +866,7 @@ func (m *MemoryIdx) Tags(orgId uint32, filter string, from int64) ([]string, err
 	return res, nil
 }
 
-func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
+func (m *UnpartitionedMemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
 	for _, ids := range tags[tag] {
 		for id := range ids {
 			def, ok := m.defById[id]
@@ -863,7 +886,7 @@ func (m *MemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool
 	return false
 }
 
-func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([]idx.Node, error) {
+func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([]idx.Node, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -909,7 +932,7 @@ func (m *MemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([
 	return results, nil
 }
 
-func (m *MemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
+func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
@@ -918,7 +941,7 @@ func (m *MemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
 	return query.Run(tags, m.defById)
 }
 
-func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -975,7 +998,7 @@ func (m *MemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, 
 }
 
 // find returns all Nodes matching the pattern for the given orgId
-func (m *MemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
+func (m *UnpartitionedMemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
 	tree, ok := m.tree[orgId]
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
@@ -1067,7 +1090,7 @@ func (m *MemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
 	return children, nil
 }
 
-func (m *MemoryIdx) List(orgId uint32) []idx.Archive {
+func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
@@ -1084,7 +1107,7 @@ func (m *MemoryIdx) List(orgId uint32) []idx.Archive {
 	return defs
 }
 
-func (m *MemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, error) {
+func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -1125,7 +1148,7 @@ func (m *MemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, e
 // deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
 // it is important that only IDs of series with tags get passed in here, because
 // otherwise the result might be inconsistencies between DefByIDs and the tree index.
-func (m *MemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
+func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
@@ -1152,7 +1175,7 @@ func (m *MemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []idx.Archive {
 	return deletedDefs
 }
 
-func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	var deletedDefs []idx.Archive
 	pre := time.Now()
 	m.Lock()
@@ -1173,7 +1196,7 @@ func (m *MemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) 
 	return deletedDefs, nil
 }
 
-func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
+func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
 	tree := m.tree[orgId]
 	deletedDefs := make([]idx.Archive, 0)
 	if deleteChildren && n.HasChildren() {
@@ -1268,7 +1291,7 @@ func (m *MemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChil
 }
 
 // Prune prunes series from the index if they have become stale per their index-rule
-func (m *MemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
+func (m *UnpartitionedMemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
 	log.Info("memory-idx: start pruning of series across all orgs")
 	orgs := make(map[uint32]struct{})
 	m.RLock()
