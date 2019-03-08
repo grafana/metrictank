@@ -392,10 +392,17 @@ NAMES:
 	return defs
 }
 
-func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) error {
+// ArchiveDefs writes each of the provided defs to the archive table and
+// then deletes the defs from the metric_idx table.
+func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 	defChan := make(chan *schema.MetricDefinition, c.cfg.numConns)
 	g, ctx := errgroup.WithContext(context.Background())
+
+	// keep track of how many defs were successfully archived.
+	success := make([]int, c.cfg.numConns)
+
 	for i := 0; i < c.cfg.numConns; i++ {
+		i := i
 		g.Go(func() error {
 			for {
 				select {
@@ -405,13 +412,25 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) error {
 					}
 					err := c.addDefToArchive(*def)
 					if err != nil {
-						return err
+						// If we failed to add the def to the archive table then just continue on to the next def.
+						// As we havnet yet removed the this def from the metric_idx table yet, the next time archiving
+						// is performed the this def will be processed again. As no action is needed by an operator, we
+						// just log this as a warning.
+						log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
+						continue
 					}
 
 					err = c.deleteDef(def.Id, def.Partition)
 					if err != nil {
-						return err
+						// The next time archiving is performed this def will be processed again. Re-adding the def to the archive
+						// table will just be treated like an update with only the archived_at field changing. As no action is needed
+						// by an operator, we just log this as a warning.
+						log.Warnf("cassandra-idx: Failed to remove archived def from metric_idx table. error=%s. def=%+v", err, *def)
+						continue
 					}
+
+					// increment counter of defs successfully archived
+					success[i] = success[i] + 1
 				case <-ctx.Done():
 					return ctx.Err()
 				}
@@ -422,11 +441,17 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) error {
 		defChan <- &defs[i]
 	}
 	close(defChan)
-	if err := g.Wait(); err != nil {
-		return err
+
+	// wait for all goroutines to complete.
+	err := g.Wait()
+
+	// get the count of defs successfully archived.
+	total := 0
+	for _, count := range success {
+		total = total + count
 	}
 
-	return nil
+	return total, err
 }
 
 func (c *CasIdx) processWriteQueue() {
@@ -513,9 +538,9 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 			return nil
 		}
 
-		// log first failure and every 20th after that.
-		if (attempts % 20) == 0 {
-			log.Warnf("cassandra-idx: Failed to write def to cassandra. it will be retried. %s. the value was: %+v", err, def)
+		// log first failure as a warning.  If we reach max attempts, the error will bubble up to the caller.
+		if attempts == 0 {
+			log.Warnf("cassandra-idx: Failed to write def to cassandra. it will be retried. error=%s. def=%+v", err, def)
 		}
 	}
 

@@ -268,7 +268,7 @@ cass config flags:
 
 
 EXAMPLES:
-mt-index-prune --verbose --partition-count 128 cass -hosts cassandra:9042
+mt-index-prune --verbose --partition-from 0 --partition-to 8 cass -hosts cassandra:9042
 ```
 
 

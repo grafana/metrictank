@@ -32,12 +32,14 @@ type counters struct {
 	total      int
 	active     int
 	deprecated int
+	archived   int
 }
 
 func (c *counters) PrintCounters() {
 	fmt.Println(fmt.Sprintf("Total analyzed defs: %d", c.total))
 	fmt.Println(fmt.Sprintf("Active defs:         %d", c.active))
 	fmt.Println(fmt.Sprintf("Deprecated defs:     %d", c.deprecated))
+	fmt.Println(fmt.Sprintf("Archived defs:       %d", c.archived))
 }
 
 func main() {
@@ -68,7 +70,7 @@ func main() {
 		fmt.Println()
 		fmt.Println()
 		fmt.Println("EXAMPLES:")
-		fmt.Println("mt-index-prune --verbose --partition-count 128 cass -hosts cassandra:9042")
+		fmt.Println("mt-index-prune --verbose --partition-from 0 --partition-to 8 cass -hosts cassandra:9042")
 	}
 
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
@@ -123,7 +125,9 @@ func main() {
 	defCounters := counters{}
 	defs := make([]schema.MetricDefinition, 0)
 	deprecatedDefs := make([]schema.MetricDefinition, 0)
+
 	for partition := partitionFrom; (partitionTo == -1 && partition == partitionFrom) || (partitionTo > 0 && partition < partitionTo); partition++ {
+		log.Infof("starting to process partition %d", partition)
 		defsByNameWithTags := make(map[string][]schema.MetricDefinition)
 		defs = cassIdx.LoadPartitions([]int32{int32(partition)}, defs, now)
 		defCounters.total += len(defs)
@@ -161,10 +165,15 @@ func main() {
 		}
 
 		if noDryRun {
-			err = cassIdx.ArchiveDefs(deprecatedDefs)
+			count, err := cassIdx.ArchiveDefs(deprecatedDefs)
+			log.Infof("archiving request complete. successful=%d", count)
+			if count != len(deprecatedDefs) {
+				log.Warnf("some defs failed to be archived. failed=%d", len(deprecatedDefs)-count)
+			}
 			if err != nil {
 				log.Warnf("Failed to archive defs: %s", err.Error())
 			}
+			defCounters.archived += count
 		}
 
 		defs = defs[:0]
