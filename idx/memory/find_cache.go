@@ -83,7 +83,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	}
 	tree := &Tree{
 		Items: map[string]*Node{
-			"": &Node{
+			"": {
 				Path:     "",
 				Children: make([]string, 0),
 				Defs:     make([]schema.MKey, 0),
