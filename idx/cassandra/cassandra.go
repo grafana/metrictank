@@ -318,8 +318,11 @@ func (c *CasIdx) rebuildIndex() {
 	var defs []schema.MetricDefinition
 	var num int
 	for _, partition := range cluster.Manager.GetPartitions() {
+		partitionPre := time.Now()
 		defs = c.LoadPartitions([]int32{partition}, defs[:0], pre)
-		num += c.MemoryIndex.LoadPartition(partition, defs)
+		loaded := c.MemoryIndex.LoadPartition(partition, defs)
+		log.Infof("cassandra-idx: metricDefinitions for partition %d loaded. imported=%d time=%s", partition, loaded, time.Since(partitionPre))
+		num += loaded
 	}
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }

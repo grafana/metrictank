@@ -314,8 +314,11 @@ func (b *BigtableIdx) rebuildIndex() {
 	num := 0
 	var defs []schema.MetricDefinition
 	for _, partition := range cluster.Manager.GetPartitions() {
+		partitionPre := time.Now()
 		defs = b.LoadPartition(partition, defs[:0], pre)
-		num += b.MemoryIndex.LoadPartition(partition, defs)
+		loaded := b.MemoryIndex.LoadPartition(partition, defs)
+		log.Infof("bigtable-idx: metricDefinitions for partition %d loaded. imported=%d time=%s", partition, loaded, time.Since(partitionPre))
+		num += loaded
 	}
 
 	log.Infof("bigtable-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
