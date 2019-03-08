@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/grafana/metrictank/util"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -117,16 +119,22 @@ func (c *CasIdx) InitBare() error {
 	// read templates
 	schemaKeyspace := util.ReadEntry(c.cfg.schemaFile, "schema_keyspace").(string)
 	schemaTable := util.ReadEntry(c.cfg.schemaFile, "schema_table").(string)
+	schemaArchiveTable := util.ReadEntry(c.cfg.schemaFile, "schema_archive_table").(string)
 
 	// create the keyspace or ensure it exists
 	if c.cfg.createKeyspace {
-		log.Infof("cassandra-idx: ensuring that keyspace %s exist.", c.cfg.keyspace)
+		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.cfg.keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
-		log.Info("cassandra-idx: ensuring that table metric_idx exist.")
+		log.Info("cassandra-idx: ensuring that table metric_idx exists.")
 		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.cfg.keyspace)).Exec()
+		if err != nil {
+			return fmt.Errorf("failed to initialize cassandra table: %s", err)
+		}
+		log.Info("cassandra-idx: ensuring that table metric_idx_archive exists.")
+		err = tmpSession.Query(fmt.Sprintf(schemaArchiveTable, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
@@ -141,7 +149,9 @@ func (c *CasIdx) InitBare() error {
 				log.Warnf("cassandra-idx: cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
 				time.Sleep(5 * time.Second)
 			} else {
-				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
+				_, okIdx := keyspaceMetadata.Tables["metric_idx"]
+				_, okArchive := keyspaceMetadata.Tables["metric_idx_archive"]
+				if okIdx && okArchive {
 					break
 				} else {
 					if attempt >= 5 {
@@ -152,7 +162,6 @@ func (c *CasIdx) InitBare() error {
 				}
 			}
 		}
-
 	}
 
 	tmpSession.Close()
@@ -383,6 +392,68 @@ NAMES:
 	return defs
 }
 
+// ArchiveDefs writes each of the provided defs to the archive table and
+// then deletes the defs from the metric_idx table.
+func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
+	defChan := make(chan *schema.MetricDefinition, c.cfg.numConns)
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// keep track of how many defs were successfully archived.
+	success := make([]int, c.cfg.numConns)
+
+	for i := 0; i < c.cfg.numConns; i++ {
+		i := i
+		g.Go(func() error {
+			for {
+				select {
+				case def, ok := <-defChan:
+					if !ok {
+						return nil
+					}
+					err := c.addDefToArchive(*def)
+					if err != nil {
+						// If we failed to add the def to the archive table then just continue on to the next def.
+						// As we havnet yet removed the this def from the metric_idx table yet, the next time archiving
+						// is performed the this def will be processed again. As no action is needed by an operator, we
+						// just log this as a warning.
+						log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
+						continue
+					}
+
+					err = c.deleteDef(def.Id, def.Partition)
+					if err != nil {
+						// The next time archiving is performed this def will be processed again. Re-adding the def to the archive
+						// table will just be treated like an update with only the archived_at field changing. As no action is needed
+						// by an operator, we just log this as a warning.
+						log.Warnf("cassandra-idx: Failed to remove archived def from metric_idx table. error=%s. def=%+v", err, *def)
+						continue
+					}
+
+					// increment counter of defs successfully archived
+					success[i] = success[i] + 1
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+	}
+	for i := range defs {
+		defChan <- &defs[i]
+	}
+	close(defChan)
+
+	// wait for all goroutines to complete.
+	err := g.Wait()
+
+	// get the count of defs successfully archived.
+	total := 0
+	for _, count := range success {
+		total = total + count
+	}
+
+	return total, err
+}
+
 func (c *CasIdx) processWriteQueue() {
 	var success bool
 	var attempts int
@@ -433,6 +504,47 @@ func (c *CasIdx) processWriteQueue() {
 	}
 	log.Info("cassandra-idx: writeQueue handler ended.")
 	c.wg.Done()
+}
+
+func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
+	insertQry := `INSERT INTO metric_idx_archive (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	maxAttempts := 5
+	now := time.Now().UTC().Unix()
+	var err error
+
+	for attempts := 0; attempts < maxAttempts; attempts++ {
+		if attempts > 0 {
+			sleepTime := 100 * attempts
+			if sleepTime > 2000 {
+				sleepTime = 2000
+			}
+			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+		}
+
+		err := c.session.Query(
+			insertQry,
+			def.Id.String(),
+			def.OrgId,
+			def.Partition,
+			def.Name,
+			def.Interval,
+			def.Unit,
+			def.Mtype,
+			def.Tags,
+			def.LastUpdate,
+			now).Exec()
+
+		if err == nil {
+			return nil
+		}
+
+		// log first failure as a warning.  If we reach max attempts, the error will bubble up to the caller.
+		if attempts == 0 {
+			log.Warnf("cassandra-idx: Failed to write def to cassandra. it will be retried. error=%s. def=%+v", err, def)
+		}
+	}
+
+	return err
 }
 
 func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {

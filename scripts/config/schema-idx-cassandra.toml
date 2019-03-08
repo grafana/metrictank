@@ -17,3 +17,20 @@ CREATE TABLE IF NOT EXISTS %s.metric_idx (
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
 """
+
+schema_archive_table = """
+CREATE TABLE IF NOT EXISTS %s.metric_idx_archive (
+    id text,
+    orgid int,
+    partition int,
+    name text,
+    interval int,
+    unit text,
+    mtype text,
+    tags set<text>,
+    lastupdate int,
+    archived_at int,
+    PRIMARY KEY (partition, id)
+) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
+    AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
+"""

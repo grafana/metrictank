@@ -197,6 +197,81 @@ Flags:
 ```
 
 
+## mt-index-prune
+
+```
+mt-index-prune
+
+Retrieves a metrictank index and moves all deprecated entries into an archive table
+
+Usage:
+
+  mt-index-prune [global config flags] <idxtype> [idx config flags]
+
+global config flags:
+
+  -index-rules-file string
+    	name of file which defines the max-stale times (default "/etc/metrictank/index-rules.conf")
+  -no-dry-run
+    	do not only plan and print what to do, but also execute it
+  -partition-from int
+    	the partition to start at
+  -partition-to int
+    	prune all partitions up to this one (exclusive). If unset, only the partition defined with "--partition-from" gets pruned (default -1)
+  -verbose
+    	print every metric name that gets archived
+
+idxtype: only 'cass' supported for now
+
+cass config flags:
+
+  -auth
+    	enable cassandra user authentication
+  -ca-path string
+    	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+  -consistency string
+    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
+  -create-keyspace
+    	enable the creation of the index keyspace and tables, only one node needs this (default true)
+  -disable-initial-host-lookup
+    	instruct the driver to not attempt to get host info from the system.peers table
+  -enabled
+    	 (default true)
+  -host-verification
+    	host (hostname and server cert) verification when using SSL (default true)
+  -hosts string
+    	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
+  -keyspace string
+    	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -num-conns int
+    	number of concurrent connections to cassandra (default 10)
+  -password string
+    	password for authentication (default "cassandra")
+  -protocol-version int
+    	cql protocol version to use (default 4)
+  -prune-interval duration
+    	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -schema-file string
+    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
+  -ssl
+    	enable SSL connection to cassandra
+  -timeout duration
+    	cassandra request timeout (default 1s)
+  -update-cassandra-index
+    	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
+  -update-interval duration
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
+  -username string
+    	username for authentication (default "cassandra")
+  -write-queue-size int
+    	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
+
+
+EXAMPLES:
+mt-index-prune --verbose --partition-from 0 --partition-to 8 cass -hosts cassandra:9042
+```
+
+
 ## mt-kafka-mdm-sniff
 
 ```
