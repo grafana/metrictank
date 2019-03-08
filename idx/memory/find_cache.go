@@ -21,13 +21,16 @@ type FindCache struct {
 	cache map[uint32]*lru.Cache
 	size  int
 	sync.RWMutex
+	newSeries map[uint32]chan struct{}
 }
 
 func NewFindCache(size int) *FindCache {
-	return &FindCache{
-		cache: make(map[uint32]*lru.Cache),
-		size:  size,
+	fc := &FindCache{
+		cache:     make(map[uint32]*lru.Cache),
+		size:      size,
+		newSeries: make(map[uint32]chan struct{}),
 	}
+	return fc
 }
 
 func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
@@ -59,6 +62,7 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 		}
 		c.Lock()
 		c.cache[orgId] = cache
+		c.newSeries[orgId] = make(chan struct{}, 100)
 		c.Unlock()
 	}
 	cache.Add(pattern, nodes)
@@ -81,6 +85,20 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	if !ok || cache.Len() < 1 {
 		return
 	}
+
+	select {
+	case c.newSeries[orgId] <- struct{}{}:
+	default:
+		for i := 0; i < len(c.newSeries[orgId]); i++ {
+			select {
+			case <-c.newSeries[orgId]:
+			default:
+			}
+		}
+		c.Purge(orgId)
+		return
+	}
+
 	tree := &Tree{
 		Items: map[string]*Node{
 			"": {
@@ -118,5 +136,9 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 		if len(matches) > 0 {
 			cache.Remove(k)
 		}
+	}
+	select {
+	case <-c.newSeries[orgId]:
+	default:
 	}
 }
