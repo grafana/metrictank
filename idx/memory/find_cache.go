@@ -144,7 +144,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	for {
 		branch := path[:pos]
 		// add as child of parent branch
-		tree.Items[path[:prevPos]].Children = []string{branch}
+		tree.Items[path[:prevPos]].Children = []string{branch[prevPos+1:]}
 
 		// create this branch/leaf
 		tree.Items[branch] = &Node{
@@ -166,7 +166,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	for _, k := range cache.Keys() {
 		matches, err := find(tree, k.(string))
 		if err != nil {
-			log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s", path, k)
+			log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
 			continue
 		}
 		if len(matches) > 0 {
