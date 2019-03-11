@@ -59,6 +59,7 @@ func getTestIndex() (TagIndex, map[schema.MKey]*idx.Archive) {
 
 	for i, d := range data {
 		byId[d.id] = &idx.Archive{}
+		byId[d.id].MetricDefinition = new(idx.MetricDefinition)
 		byId[d.id].SetMetricName(fmt.Sprintf("metric%d", i))
 		byId[d.id].SetTags(d.tags)
 		byId[d.id].LastUpdate = d.lastUpdate

@@ -284,7 +284,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 	// then perform a blocking save.
 	if archive.LastSave < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
 		log.Debugf("bigtable-idx: updating def %s in index.", archive.MetricDefinition.Id)
-		b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
+		b.writeQueue <- writeReq{recvTime: time.Now(), def: archive.MetricDefinition}
 		archive.LastSave = now
 		b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 	} else {
@@ -295,7 +295,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
 		// do a blocking write to the queue.
 		select {
-		case b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
+		case b.writeQueue <- writeReq{recvTime: time.Now(), def: archive.MetricDefinition}:
 			archive.LastSave = now
 			b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 		default:
@@ -466,7 +466,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 	}
 	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
-			delErr := b.deleteDef(&def.MetricDefinition)
+			delErr := b.deleteDef(def.MetricDefinition)
 			// the last error encountered will be passed back to the caller
 			if delErr != nil {
 				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinition.Id, err)
@@ -480,7 +480,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 	// so this is the safest place to release the objects in MetricDefinition
 	// that have been interned
 	for _, arc := range defs {
-		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
+		idx.InternReleaseMetricDefinition(*arc.MetricDefinition)
 	}
 	return len(defs), err
 }

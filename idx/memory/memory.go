@@ -193,9 +193,15 @@ func (defs defByTagSet) add(def *idx.MetricDefinition) {
 
 	fullName := def.NameWithTagsHash()
 	if _, ok = orgDefs[fullName]; !ok {
+		overheadCounter.AddUint64(uint64(len(fullName) + 16))
+		mapsizeCounter.Inc()
 		orgDefs[fullName] = make(map[*idx.MetricDefinition]struct{}, 1)
 	}
-	orgDefs[fullName][def] = struct{}{}
+
+	if _, ok = orgDefs[fullName][def]; !ok {
+		mapsizeDefCounter.Inc()
+		orgDefs[fullName][def] = struct{}{}
+	}
 }
 
 func (defs defByTagSet) del(def *idx.MetricDefinition) {
@@ -590,6 +596,7 @@ func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 	var num int
 	for i := range defs {
 		def := &defs[i]
+		nDef := *def
 		pre = time.Now()
 		if _, ok := m.defById[def.Id]; ok {
 			continue
@@ -599,7 +606,6 @@ func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 
 		if TagSupport {
 			// create new def to avoid holding open the backing array of defs which is passed up from the persistent index
-			nDef := *def
 			m.indexTags(&nDef)
 		}
 
@@ -622,7 +628,7 @@ func createArchive(def *idx.MetricDefinition) *idx.Archive {
 	irId, _ := IndexRules.Match(path)
 
 	return &idx.Archive{
-		MetricDefinition: *def,
+		MetricDefinition: def,
 		SchemaId:         schemaId,
 		AggId:            aggId,
 		IrId:             irId,
@@ -644,7 +650,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 
 	statMetricsActive.Inc()
 
-	def := &archive.MetricDefinition
+	def := archive.MetricDefinition
 	path := def.NameWithTags()
 
 	if TagSupport {
@@ -1399,7 +1405,7 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 	// this is a special case where the MetricDefinitions need to be
 	// released outside of the normal Delete() path.
 	for _, arc := range deleted {
-		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
+		idx.InternReleaseMetricDefinition(*arc.MetricDefinition)
 	}
 	return deleted
 }
@@ -1422,7 +1428,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 			// while we switched from read to write lock
 			continue
 		}
-		if !m.deindexTags(tags, &def.MetricDefinition) {
+		if !m.deindexTags(tags, def.MetricDefinition) {
 			continue
 		}
 		deletedDefs = append(deletedDefs, CloneArchive(def))
