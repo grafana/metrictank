@@ -46,7 +46,7 @@ func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 	c.RUnlock()
 	if !ok {
 		findCacheMiss.Inc()
-		return nil, false
+		return nil, ok
 	}
 	nodes, ok := cache.Get(pattern)
 	if !ok {
