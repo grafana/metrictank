@@ -25,7 +25,7 @@ type Node struct {
 }
 
 type Archive struct {
-	MetricDefinition
+	*MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
@@ -35,6 +35,7 @@ type Archive struct {
 // used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
 	arc := Archive{}
+	arc.MetricDefinition = new(MetricDefinition)
 	arc.MetricDefinition.SetMetricName(name)
 	return arc
 }

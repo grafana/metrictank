@@ -280,7 +280,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 	// then perform a blocking save.
 	if archive.LastSave < (now - c.updateInterval32 - c.updateInterval32/2) {
 		log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinition.Id)
-		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
+		c.writeQueue <- writeReq{recvTime: time.Now(), def: archive.MetricDefinition}
 		archive.LastSave = now
 		c.MemoryIdx.UpdateArchive(archive)
 	} else {
@@ -291,7 +291,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
 		// do a blocking write to the queue.
 		select {
-		case c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
+		case c.writeQueue <- writeReq{recvTime: time.Now(), def: archive.MetricDefinition}:
 			archive.LastSave = now
 			c.MemoryIdx.UpdateArchive(archive)
 		default:
@@ -456,7 +456,7 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) (int, error) {
 	// so this is the safest place to release the objects in MetricDefinition
 	// that have been interned
 	for _, arc := range defs {
-		idx.InternReleaseMetricDefinition(arc.MetricDefinition)
+		idx.InternReleaseMetricDefinition(*arc.MetricDefinition)
 	}
 	return len(defs), err
 }
