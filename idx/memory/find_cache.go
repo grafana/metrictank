@@ -107,6 +107,7 @@ func (c *FindCache) PurgeAll() {
 
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.RLock()
+	ch := c.newSeries[orgId]
 	cache, ok := c.cache[orgId]
 	c.RUnlock()
 	if !ok || cache.Len() < 1 {
@@ -114,15 +115,15 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	}
 
 	select {
-	case c.newSeries[orgId] <- struct{}{}:
+	case ch <- struct{}{}:
 	default:
 		c.Lock()
 		c.backoff[orgId] = time.Now().Add(findCacheBackoff)
 		delete(c.cache, orgId)
 		c.Unlock()
-		for i := 0; i < len(c.newSeries[orgId]); i++ {
+		for i := 0; i < len(ch); i++ {
 			select {
-			case <-c.newSeries[orgId]:
+			case <-ch:
 			default:
 			}
 		}
@@ -144,7 +145,11 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	for {
 		branch := path[:pos]
 		// add as child of parent branch
-		tree.Items[path[:prevPos]].Children = []string{branch[prevPos+1:]}
+		thisNode := branch[prevPos+1:]
+		if prevPos == 0 {
+			thisNode = branch[prevPos:]
+		}
+		tree.Items[path[:prevPos]].Children = []string{thisNode}
 
 		// create this branch/leaf
 		tree.Items[branch] = &Node{
@@ -174,7 +179,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 		}
 	}
 	select {
-	case <-c.newSeries[orgId]:
+	case <-ch:
 	default:
 	}
 }
