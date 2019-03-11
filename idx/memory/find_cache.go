@@ -14,7 +14,7 @@ import (
 var (
 	// metric idx.memory.find-cache.hit is a counter of findCache hits
 	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.hit")
-	// metric idx.memory.find-cache.hit is a counter of findCache misses
+	// metric idx.memory.find-cache.miss is a counter of findCache misses
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.miss")
 
 	findCacheSize            = 1000
