@@ -16,6 +16,10 @@ var (
 	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.hit")
 	// metric idx.memory.find-cache.hit is a counter of findCache misses
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.miss")
+
+	findCacheSize            = 1000
+	findCacheInvalidateQueue = 100
+	findCacheBackoff         = time.Minute
 )
 
 type FindCache struct {
@@ -70,7 +74,7 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 		}
 		c.Lock()
 		c.cache[orgId] = cache
-		c.newSeries[orgId] = make(chan struct{}, 100)
+		c.newSeries[orgId] = make(chan struct{}, findCacheInvalidateQueue)
 		c.Unlock()
 	}
 	cache.Add(pattern, nodes)
@@ -98,7 +102,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	case c.newSeries[orgId] <- struct{}{}:
 	default:
 		c.Lock()
-		c.backoff[orgId] = time.Now().Add(time.Minute)
+		c.backoff[orgId] = time.Now().Add(findCacheBackoff)
 		delete(c.cache, orgId)
 		c.Unlock()
 		for i := 0; i < len(c.newSeries[orgId]); i++ {
@@ -107,7 +111,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 			default:
 			}
 		}
-
+		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", findCacheBackoff.String(), cache.Len())
 		return
 	}
 
