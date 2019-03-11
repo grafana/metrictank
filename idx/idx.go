@@ -14,7 +14,7 @@ var OrgIdPublic = uint32(0)
 // Object Interning for the index
 //
 // Default config uses NOCPRSN
-var IdxIntern = goi.NewObjectIntern(nil)
+var IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 
 //go:generate msgp
 type Node struct {
@@ -145,5 +145,5 @@ func InternReleaseMetricDefinition(md MetricDefinition) {
 		IdxIntern.Delete(id)
 	}
 
-	IdxIntern.DeleteByValString(md.Unit)
+	IdxIntern.DeleteByString(md.Unit)
 }

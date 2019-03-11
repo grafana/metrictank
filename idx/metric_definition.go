@@ -69,7 +69,7 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 	// should be faster than calling IdxIntern.SetString in a tight loop
 	var tmpSz string
 	szHeader := (*reflect.StringHeader)(unsafe.Pointer(&tmpSz))
-	first, _ := IdxIntern.GetNoRefCntString(mn.nodes[0])
+	first, _ := IdxIntern.GetStringFromPtr(mn.nodes[0])
 	bld.WriteString(first)
 	for idx, nodePtr := range mn.nodes[1:] {
 		szHeader.Data = nodePtr
@@ -89,7 +89,7 @@ func (mn *MetricName) setMetricName(name string) {
 	mn.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
 		// TODO: add error checking? Fail somehow
-		nodePtr, err := IdxIntern.AddOrGet([]byte(node))
+		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
 		if err != nil {
 			log.Error("idx: Failed to acquire interned string for node name: ", err)
 			internError.Inc()
@@ -138,12 +138,12 @@ type TagKeyValue struct {
 func (t *TagKeyValue) String() string {
 	bld := strings.Builder{}
 
-	key, err := IdxIntern.GetNoRefCntString(t.Key)
+	key, err := IdxIntern.GetStringFromPtr(t.Key)
 	if err != nil {
 		log.Error("idx: Failed to retrieve interned tag key: ", err)
 		internError.Inc()
 	}
-	val, err := IdxIntern.GetNoRefCntString(t.Value)
+	val, err := IdxIntern.GetStringFromPtr(t.Value)
 	if err != nil {
 		log.Error("idx: Failed to retrieve interned tag value: ", err)
 		internError.Inc()
@@ -159,12 +159,12 @@ func (t *TagKeyValue) String() string {
 func (t TagKeyValue) createTagKeyValue() string {
 	bld := strings.Builder{}
 
-	key, err := IdxIntern.GetNoRefCntString(t.Key)
+	key, err := IdxIntern.GetStringFromPtr(t.Key)
 	if err != nil {
 		log.Error("idx: Failed to retrieve interned tag key: ", err)
 		internError.Inc()
 	}
-	val, err := IdxIntern.GetNoRefCntString(t.Value)
+	val, err := IdxIntern.GetStringFromPtr(t.Value)
 	if err != nil {
 		log.Error("idx: Failed to retrieve interned tag value: ", err)
 		internError.Inc()
@@ -190,7 +190,7 @@ func parseTagKeyValue(tag string) TagKeyValue {
 		invalidTag.Inc()
 		return TagKeyValue{}
 	}
-	key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]))
+	key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]), true)
 	if err != nil {
 		log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 		internError.Inc()
@@ -198,7 +198,7 @@ func parseTagKeyValue(tag string) TagKeyValue {
 	}
 	tkv.Key = key
 
-	value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]))
+	value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]), true)
 	if err != nil {
 		log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 		internError.Inc()
@@ -213,8 +213,8 @@ type KeyValuesSlice []TagKeyValue
 func (kvs KeyValuesSlice) Len() int      { return len(kvs) }
 func (kvs KeyValuesSlice) Swap(i, j int) { kvs[i], kvs[j] = kvs[j], kvs[i] }
 func (kvs KeyValuesSlice) Less(i, j int) bool {
-	k1, _ := IdxIntern.GetNoRefCntString(kvs[i].Key)
-	k2, _ := IdxIntern.GetNoRefCntString(kvs[j].Key)
+	k1, _ := IdxIntern.GetStringFromPtr(kvs[i].Key)
+	k2, _ := IdxIntern.GetStringFromPtr(kvs[j].Key)
 	return k1 < k2
 }
 
@@ -295,7 +295,7 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 			invalidTag.Inc()
 			continue
 		}
-		key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]))
+		key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]), true)
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
@@ -304,7 +304,7 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 			(*t).KeyValues[i].Key = key
 		}
 
-		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]))
+		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]), true)
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
@@ -339,7 +339,7 @@ func (md *MetricDefinition) NameWithTags() string {
 	md.Name.string(&bld)
 	sort.Sort(md.Tags.KeyValues)
 	for _, tag := range md.Tags.KeyValues {
-		key, err := IdxIntern.GetNoRefCntString(tag.Key)
+		key, err := IdxIntern.GetStringFromPtr(tag.Key)
 		if err != nil {
 			log.Error("idx: Failed to retrieve interned tag key: ", err)
 			internError.Inc()
@@ -402,7 +402,7 @@ func (md *MetricDefinition) Mtype() string {
 // SetUnit takes a string, interns it in an object store
 // and then uses it to store the unit.
 func (md *MetricDefinition) SetUnit(unit string) {
-	sz, err := IdxIntern.AddOrGetString([]byte(unit))
+	sz, err := IdxIntern.AddOrGetString([]byte(unit), false)
 	if err != nil {
 		log.Errorf("idx: Failed to intern Unit %v. %v", unit, err)
 		internError.Inc()
@@ -420,7 +420,7 @@ func (md *MetricDefinition) SetMetricName(name string) {
 	md.Name.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
 		// TODO: add error checking? Fail somehow
-		nodePtr, err := IdxIntern.AddOrGet([]byte(node))
+		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
 		if err != nil {
 			log.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
 			internError.Inc()
@@ -457,7 +457,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			invalidTag.Inc()
 			continue
 		}
-		key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]))
+		key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]), true)
 		if err != nil {
 			log.Errorf("idx: SetTags: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
@@ -466,7 +466,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			md.Tags.KeyValues[i].Key = key
 		}
 
-		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]))
+		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]), true)
 		if err != nil {
 			log.Errorf("idx: SetTags: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
@@ -489,7 +489,7 @@ func (md *MetricDefinition) SetId() {
 	fmt.Fprintf(buffer, "%d", md.Interval)
 
 	for _, t := range md.Tags.KeyValues {
-		key, err := IdxIntern.GetNoRefCntString(t.Key)
+		key, err := IdxIntern.GetStringFromPtr(t.Key)
 		if err != nil {
 			log.Error("idx: Failed to retrieve interned tag key: ", err)
 			internError.Inc()

@@ -24,11 +24,11 @@ type ObjectInternConfig struct {
 //
 // Compress: Shoco,
 // Cache: true,
-// MasCacheSize: 157286400,
-func NewConfig() *ObjectInternConfig {
-	return &ObjectInternConfig{
+// MaxCacheSize: 157286400,
+func NewConfig() ObjectInternConfig {
+	return ObjectInternConfig{
 		Compression:  None,
 		Index:        true,
-		MaxIndexSize: 157286400, // 150 MB
+		MaxIndexSize: 157286400, // 150 MiB
 	}
 }

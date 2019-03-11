@@ -64,7 +64,7 @@ func TestCreateDeleteMetricDefinition1000(t *testing.T) {
 }
 
 func testCreateDeleteMetricDefinition(t *testing.T, num int) {
-	IdxIntern = goi.NewObjectIntern(nil)
+	IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 	defs := genMetricDefinitionsWithSameName(num)
 	name := "anotheryetlonger.short.metric.name"
 
@@ -114,7 +114,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		Convey("After adding more metricdefinitions with the same name as before we should have a new object address for their names", func() {
 			// create this to use the first memory offset of the new slab in a fresh slabPool in case
 			// MMap decides to use the same memory chunk. The string is the same length as what should be in slot 0.
-			IdxIntern.AddOrGetString([]byte("bopuifszfumpohfs"))
+			IdxIntern.AddOrGetString([]byte("bopuifszfumpohfs"), false)
 			defs := genMetricDefinitionsWithSameName(num)
 			So(originalNameAddress, ShouldNotEqual, defs[0].Name.Nodes()[0])
 		})
@@ -122,7 +122,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 }
 
 func TestMetricNameAndTagAddresses(t *testing.T) {
-	IdxIntern = goi.NewObjectIntern(nil)
+	IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 	defs := make([]*MetricDefinition, 5)
 	for i := 0; i < len(defs); i++ {
 		defs[i] = &MetricDefinition{
@@ -160,7 +160,7 @@ func TestMetricNameAndTagAddresses(t *testing.T) {
 }
 
 func TestTagKeyValuesAndNameWithTags(t *testing.T) {
-	IdxIntern = goi.NewObjectIntern(nil)
+	IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 	defs := genMetricDefinitionsWithSameName(1)
 	tags := genTags(5)
 	defs[0].SetTags(tags)
