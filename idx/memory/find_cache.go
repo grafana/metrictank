@@ -3,6 +3,7 @@ package memory
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/grafana/metrictank/stats"
 	lru "github.com/hashicorp/golang-lru"
@@ -22,6 +23,7 @@ type FindCache struct {
 	size  int
 	sync.RWMutex
 	newSeries map[uint32]chan struct{}
+	backoff   map[uint32]time.Time
 }
 
 func NewFindCache(size int) *FindCache {
@@ -29,6 +31,7 @@ func NewFindCache(size int) *FindCache {
 		cache:     make(map[uint32]*lru.Cache),
 		size:      size,
 		newSeries: make(map[uint32]chan struct{}),
+		backoff:   make(map[uint32]time.Time),
 	}
 	return fc
 }
@@ -52,9 +55,14 @@ func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
+	t := c.backoff[orgId]
 	c.RUnlock()
 	var err error
 	if !ok {
+		// dont init the cache if we are in backoff mode.
+		if time.Until(t) > 0 {
+			return
+		}
 		cache, err = lru.New(c.size)
 		if err != nil {
 			log.Errorf("memory-idx: findCache failed to create lru. err=%s", err)
@@ -89,13 +97,17 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	select {
 	case c.newSeries[orgId] <- struct{}{}:
 	default:
+		c.Lock()
+		c.backoff[orgId] = time.Now().Add(time.Minute)
+		delete(c.cache, orgId)
+		c.Unlock()
 		for i := 0; i < len(c.newSeries[orgId]); i++ {
 			select {
 			case <-c.newSeries[orgId]:
 			default:
 			}
 		}
-		c.Purge(orgId)
+
 		return
 	}
 
