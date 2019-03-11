@@ -50,6 +50,7 @@ func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 	}
 	nodes, ok := cache.Get(pattern)
 	if !ok {
+		findCacheMiss.Inc()
 		return nil, ok
 	}
 	findCacheHit.Inc()
