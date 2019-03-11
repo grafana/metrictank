@@ -90,6 +90,20 @@ func (c *FindCache) Purge(orgId uint32) {
 	cache.Purge()
 }
 
+func (c *FindCache) PurgeAll() {
+	c.RLock()
+	orgs := make([]uint32, len(c.cache))
+	i := 0
+	for k := range c.cache {
+		orgs[i] = k
+		i++
+	}
+	c.RUnlock()
+	for _, org := range orgs {
+		c.Purge(org)
+	}
+}
+
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
@@ -140,7 +154,12 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 			break
 		}
 		prevPos = pos
-		pos = pos + strings.Index(path[pos+1:], ".")
+		nextPos := strings.Index(path[pos+1:], ".")
+		if nextPos < 0 {
+			pos = len(path)
+		} else {
+			pos = pos + nextPos + 1
+		}
 	}
 
 	for _, k := range cache.Keys() {
@@ -156,5 +175,15 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	select {
 	case <-c.newSeries[orgId]:
 	default:
+	}
+}
+
+func (m *UnpartitionedMemoryIdx) PurgeFindCache() {
+	m.findCache.PurgeAll()
+}
+
+func (p *PartitionedMemoryIdx) PurgeFindCache() {
+	for _, m := range p.Partition {
+		m.findCache.PurgeAll()
 	}
 }
