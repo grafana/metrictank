@@ -47,15 +47,18 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled             bool
-	matchCacheSize      int
-	maxPruneLockTime    = time.Millisecond * 100
-	maxPruneLockTimeStr string
-	TagSupport          bool
-	TagQueryWorkers     int // number of workers to spin up when evaluation tag expressions
-	indexRulesFile      string
-	IndexRules          conf.IndexRules
-	Partitioned         bool
+	Enabled                  bool
+	matchCacheSize           int
+	maxPruneLockTime         = time.Millisecond * 100
+	maxPruneLockTimeStr      string
+	TagSupport               bool
+	TagQueryWorkers          int // number of workers to spin up when evaluation tag expressions
+	indexRulesFile           string
+	IndexRules               conf.IndexRules
+	Partitioned              bool
+	findCacheSize            = 1000
+	findCacheInvalidateQueue = 100
+	findCacheBackoff         = time.Minute
 )
 
 func ConfigSetup() {
@@ -65,6 +68,9 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache")
+	memoryIdx.IntVar(&findCacheInvalidateQueue, "find-cache-invalidate-queue", 100, "size of queue for invalidating findCache entries.")
+	memoryIdx.DurationVar(&findCacheBackoff, "find-cache-backoff", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
@@ -97,6 +103,7 @@ type MemoryIndex interface {
 	UpdateArchive(idx.Archive)
 	add(*schema.MetricDefinition) idx.Archive
 	idsByTagQuery(uint32, TagQuery) IdSet
+	PurgeFindCache()
 }
 
 func New() MemoryIndex {
@@ -233,6 +240,8 @@ type UnpartitionedMemoryIdx struct {
 	// used by tag index
 	defByTagSet defByTagSet
 	tags        map[uint32]TagIndex // by orgId
+
+	findCache *FindCache
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
@@ -241,6 +250,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
+		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueue, findCacheBackoff),
 	}
 }
 
@@ -452,6 +462,10 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		}
 		return *archive
 	}
+
+	defer func() {
+		go m.findCache.InvalidateFor(def.OrgId, path)
+	}()
 
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.tree[def.OrgId]
@@ -943,18 +957,36 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdS
 
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
+	var matchedNodes []*Node
+	var err error
 	m.RLock()
 	defer m.RUnlock()
-	matchedNodes, err := m.find(orgId, pattern)
-	if err != nil {
-		return nil, err
+	tree, ok := m.tree[orgId]
+	if !ok {
+		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
+	} else {
+		matchedNodes, ok = m.findCache.Get(orgId, pattern)
+		if !ok {
+			matchedNodes, err = find(tree, pattern)
+			if err != nil {
+				return nil, err
+			}
+			m.findCache.Add(orgId, pattern, matchedNodes)
+		}
 	}
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
-		publicNodes, err := m.find(idx.OrgIdPublic, pattern)
-		if err != nil {
-			return nil, err
+		tree, ok = m.tree[idx.OrgIdPublic]
+		if ok {
+			publicNodes, ok := m.findCache.Get(idx.OrgIdPublic, pattern)
+			if !ok {
+				publicNodes, err = find(tree, pattern)
+				if err != nil {
+					return nil, err
+				}
+				m.findCache.Add(idx.OrgIdPublic, pattern, publicNodes)
+			}
+			matchedNodes = append(matchedNodes, publicNodes...)
 		}
-		matchedNodes = append(matchedNodes, publicNodes...)
 	}
 	log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
 	results := make([]idx.Node, 0)
@@ -997,14 +1029,8 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 	return results, nil
 }
 
-// find returns all Nodes matching the pattern for the given orgId
-func (m *UnpartitionedMemoryIdx) find(orgId uint32, pattern string) ([]*Node, error) {
-	tree, ok := m.tree[orgId]
-	if !ok {
-		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
-		return nil, nil
-	}
-
+// find returns all Nodes matching the pattern for the given tree
+func find(tree *Tree, pattern string) ([]*Node, error) {
 	var nodes []string
 	if strings.Index(pattern, ";") == -1 {
 		nodes = strings.Split(pattern, ".")
@@ -1031,17 +1057,17 @@ func (m *UnpartitionedMemoryIdx) find(orgId uint32, pattern string) ([]*Node, er
 	if pos != 0 {
 		branch = strings.Join(nodes[:pos], ".")
 	}
-	log.Debugf("memory-idx: starting search at orgId %d, node %q", orgId, branch)
+	log.Debugf("memory-idx: starting search at node %q", branch)
 	startNode, ok := tree.Items[branch]
 
 	if !ok {
-		log.Debugf("memory-idx: branch %q does not exist in the index for orgId %d", branch, orgId)
+		log.Debugf("memory-idx: branch %q does not exist in the index", branch)
 		return nil, nil
 	}
 
 	if startNode == nil {
 		corruptIndex.Inc()
-		log.Errorf("memory-idx: startNode is nil. org=%d,patt=%q,pos=%d,branch=%q", orgId, pattern, pos, branch)
+		log.Errorf("memory-idx: startNode is nil. patt=%q,pos=%d,branch=%q", pattern, pos, branch)
 		return nil, errors.NewInternal("hit an empty path in the index")
 	}
 
@@ -1072,7 +1098,7 @@ func (m *UnpartitionedMemoryIdx) find(orgId uint32, pattern string) ([]*Node, er
 				grandChild := tree.Items[newBranch]
 				if grandChild == nil {
 					corruptIndex.Inc()
-					log.Errorf("memory-idx: grandChild is nil. org=%d,patt=%q,i=%d,pos=%d,p=%q,path=%q", orgId, pattern, i, pos, p, newBranch)
+					log.Errorf("memory-idx: grandChild is nil. patt=%q,i=%d,pos=%d,p=%q,path=%q", pattern, i, pos, p, newBranch)
 					return nil, errors.NewInternal("hit an empty path in the index")
 				}
 
@@ -1180,7 +1206,11 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	pre := time.Now()
 	m.Lock()
 	defer m.Unlock()
-	found, err := m.find(orgId, pattern)
+	tree, ok := m.tree[orgId]
+	if !ok {
+		return nil, nil
+	}
+	found, err := find(tree, pattern)
 	if err != nil {
 		return nil, err
 	}
@@ -1192,7 +1222,13 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 
 	statMetricsActive.Set(len(m.defById))
 	statDeleteDuration.Value(time.Since(pre))
-
+	if len(deletedDefs) > findCacheInvalidateQueue {
+		m.findCache.Purge(orgId)
+	} else {
+		for _, d := range deletedDefs {
+			m.findCache.InvalidateFor(orgId, d.NameWithTags())
+		}
+	}
 	return deletedDefs, nil
 }
 
@@ -1411,7 +1447,13 @@ ORGS:
 			m.Unlock()
 			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
-
+		}
+		if len(paths) > findCacheInvalidateQueue {
+			m.findCache.Purge(org)
+		} else {
+			for path := range paths {
+				m.findCache.InvalidateFor(org, path)
+			}
 		}
 	}
 

@@ -180,6 +180,10 @@ the duration of a delete of one or more metrics from the memory idx
 number of series that have been excluded from responses due to their lastUpdate property
 * `idx.memory.find`:  
 the duration of memory idx find
+* `idx.memory.find-cache.hit`:  
+a counter of findCache hits
+* `idx.memory.find-cache.miss`:  
+a counter of findCache misses
 * `idx.memory.get`:  
 the duration of a get of one metric in the memory idx
 * `idx.memory.list`:  

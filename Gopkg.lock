@@ -382,6 +382,17 @@
   revision = "9b4c5fa5b10a683339a270d664474b9f4aee62fc"
 
 [[projects]]
+  digest = "1:52094d0f8bdf831d1a2401e9b6fee5795fdc0b2a2d1f8bb1980834c289e79129"
+  name = "github.com/hashicorp/golang-lru"
+  packages = [
+    ".",
+    "simplelru",
+  ]
+  pruneopts = "NUT"
+  revision = "7087cb70de9f7a8bc0a10c375cb0d2280a8edf9c"
+  version = "v0.5.1"
+
+[[projects]]
   branch = "master"
   digest = "1:5dda4b99e405ae36407a21de1292b4b8c9f640c3cdf28b9ff6bf1187cd94396b"
   name = "github.com/hashicorp/memberlist"
@@ -1036,6 +1047,7 @@
     "github.com/golang/snappy",
     "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
+    "github.com/hashicorp/golang-lru",
     "github.com/hashicorp/memberlist",
     "github.com/kisielk/og-rek",
     "github.com/kisielk/whisper-go/whisper",

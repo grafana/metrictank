@@ -463,6 +463,12 @@ rules-file = /etc/metrictank/index-rules.conf
 max-prune-lock-time = 100ms
 # use separate indexes per partition
 partitioned = false
+# number of find expressions to cache
+find-cache-size = 1000
+# size of queue for invalidating findCache entries.
+find-cache-invalidate-queue = 100
+# amount of time to disable the findCache when the invalidate queue fills up
+find-cache-backoff = 60s
 ```
 
 ### Bigtable index

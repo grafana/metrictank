@@ -13,6 +13,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -155,6 +156,8 @@ func TestMain(m *testing.M) {
 	TagSupport = true
 	TagQueryWorkers = 5
 	matchCacheSize = 1000
+	// we dont need info logs in the test output
+	log.SetLevel(log.ErrorLevel)
 	os.Exit(m.Run())
 }
 
@@ -173,6 +176,7 @@ func InitSmallIndex() {
 
 		currentIndex = 1
 	} else {
+		ix.PurgeFindCache()
 		return
 	}
 
@@ -219,6 +223,7 @@ func InitLargeIndex() {
 
 		currentIndex = 2
 	} else {
+		ix.PurgeFindCache()
 		return
 	}
 
@@ -868,51 +873,46 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 	defer func() {
 		TagSupport = _tagSupport
 	}()
-	currentIndex = -1
-	InitSmallIndex()
+	findCacheInvalidateQueue = 10
+	InitLargeIndex()
+	queryCount := len(queries)
 	var wg sync.WaitGroup
-	ch := make(chan int, 100)
+	ch := make(chan testQ)
 	for i := 0; i < 200; i++ {
 		wg.Add(1)
 		go func() {
-			for range ch {
-				_, err := ix.Find(1, "collectd.dc3.host9*.cpu.*.*.*", 0)
-				if err != nil {
-					b.Errorf(err.Error())
-				}
+			for q := range ch {
+				ixFind(b, q.org, q.q)
 			}
 			wg.Done()
 		}()
 	}
 
-	// run a single thread loading the same metricDefinition over
-	// and over again.  Each call to LoadPartition will acquire an
-	// exclusive lock in the index.
+	// run a single thread adding a new series every few milliseconds
 	done := make(chan struct{})
 	go func() {
 		i := 0
 		var t int64
+		var data *schema.MetricData
 		for {
 			select {
 			case <-done:
-				// b.Logf("spent %s adding %d items to index.", time.Duration(t).String(), i)
+				//b.Logf("spent %s adding %d items to index.", time.Duration(t).String(), i)
 				return
 			default:
-				md := []schema.MetricDefinition{
-					{
-						Name:       fmt.Sprintf("benchmark.%d.bar.baz.sdfsdf.%d.asdfgg.sdhtawd.trtya", i, i),
-						Tags:       []string{},
-						Interval:   10,
-						OrgId:      1,
-						LastUpdate: int64(123),
-					},
+				data = &schema.MetricData{
+					Name:     fmt.Sprintf("benchmark.foo.%d", i),
+					Tags:     []string{},
+					Interval: 10,
+					OrgId:    1,
+					Time:     int64(i + 100),
 				}
-				md[0].SetId()
-				partition := getPartitionFromName(md[0].Name)
+				data.SetId()
+				mkey, _ := schema.MKeyFromString(data.Id)
 				pre := time.Now()
-				ix.LoadPartition(partition, md)
+				ix.AddOrUpdate(mkey, data, getPartition(data))
 				t += time.Since(pre).Nanoseconds()
-				time.Sleep(time.Millisecond)
+				time.Sleep(time.Millisecond * 5)
 				i++
 			}
 		}
@@ -921,7 +921,9 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		ch <- n
+		q := n % queryCount
+		org := uint32((n % 2) + 1)
+		ch <- testQ{q: q, org: org}
 	}
 	close(ch)
 	wg.Wait()
