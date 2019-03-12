@@ -1445,7 +1445,13 @@ ORGS:
 			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
 		}
-		m.findCache.Purge(org)
+		if len(paths) > findCacheInvalidateQueue {
+			m.findCache.Purge(org)
+		} else {
+			for path := range paths {
+				m.findCache.InvalidateFor(org, path)
+			}
+		}
 	}
 
 	statMetricsActive.Set(len(m.defById))
