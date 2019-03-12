@@ -119,7 +119,6 @@ func (c *CasIdx) InitBare() error {
 	// read templates
 	schemaKeyspace := util.ReadEntry(c.cfg.schemaFile, "schema_keyspace").(string)
 	schemaTable := util.ReadEntry(c.cfg.schemaFile, "schema_table").(string)
-	schemaArchiveTable := util.ReadEntry(c.cfg.schemaFile, "schema_archive_table").(string)
 
 	// create the keyspace or ensure it exists
 	if c.cfg.createKeyspace {
@@ -133,11 +132,7 @@ func (c *CasIdx) InitBare() error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
-		log.Info("cassandra-idx: ensuring that table metric_idx_archive exists.")
-		err = tmpSession.Query(fmt.Sprintf(schemaArchiveTable, c.cfg.keyspace)).Exec()
-		if err != nil {
-			return fmt.Errorf("failed to initialize cassandra table: %s", err)
-		}
+		c.EnsureArchiveTableExists(tmpSession)
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
@@ -149,9 +144,7 @@ func (c *CasIdx) InitBare() error {
 				log.Warnf("cassandra-idx: cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
 				time.Sleep(5 * time.Second)
 			} else {
-				_, okIdx := keyspaceMetadata.Tables["metric_idx"]
-				_, okArchive := keyspaceMetadata.Tables["metric_idx_archive"]
-				if okIdx && okArchive {
+				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
 					break
 				} else {
 					if attempt >= 5 {
@@ -173,6 +166,41 @@ func (c *CasIdx) InitBare() error {
 
 	c.session = session
 
+	return nil
+}
+
+// EnsureArchiveTableExists checks if the index archive table exists or not. If it does not exist and
+// the create-keyspace flag is true, then it will create it, if it doesn't exist and the create-keyspace
+// flag is false, then it will return an error. If the table exists then it just returns nil.
+// The index archive table is not required for Metrictank to run, it's only required by the
+// mt-index-prune utility to archive old metrics from the index.
+func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
+	var err error
+	if session == nil {
+		session, err = c.cluster.CreateSession()
+		if err != nil {
+			return fmt.Errorf("failed to create cassandra session: %s", err)
+		}
+	}
+
+	schemaArchiveTable := util.ReadEntry(c.cfg.schemaFile, "schema_archive_table").(string)
+
+	if c.cfg.createKeyspace {
+		log.Info("cassandra-idx: ensuring that table metric_idx_archive exists.")
+		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.cfg.keyspace)).Exec()
+		if err != nil {
+			return fmt.Errorf("failed to initialize cassandra table: %s", err)
+		}
+	} else {
+		var keyspaceMetadata *gocql.KeyspaceMetadata
+		keyspaceMetadata, err = session.KeyspaceMetadata(c.cfg.keyspace)
+		if err != nil {
+			return fmt.Errorf("failed to read cassandra tables: %s", err)
+		}
+		if _, ok := keyspaceMetadata.Tables["metric_idx_archive"]; !ok {
+			return fmt.Errorf("table metric_idx_archive does not exist")
+		}
+	}
 	return nil
 }
 

@@ -110,6 +110,8 @@ func main() {
 	cassIdx := cassandra.New(cassandra.CliConfig)
 	err = cassIdx.InitBare()
 	perror(err)
+	err = cassIdx.EnsureArchiveTableExists(nil)
+	perror(err)
 
 	// we don't want to filter any metric definitions during the loading
 	// so MaxStale is set to 0
