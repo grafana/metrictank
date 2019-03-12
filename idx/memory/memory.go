@@ -47,15 +47,18 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled             bool
-	matchCacheSize      int
-	maxPruneLockTime    = time.Millisecond * 100
-	maxPruneLockTimeStr string
-	TagSupport          bool
-	TagQueryWorkers     int // number of workers to spin up when evaluation tag expressions
-	indexRulesFile      string
-	IndexRules          conf.IndexRules
-	Partitioned         bool
+	Enabled                  bool
+	matchCacheSize           int
+	maxPruneLockTime         = time.Millisecond * 100
+	maxPruneLockTimeStr      string
+	TagSupport               bool
+	TagQueryWorkers          int // number of workers to spin up when evaluation tag expressions
+	indexRulesFile           string
+	IndexRules               conf.IndexRules
+	Partitioned              bool
+	findCacheSize            = 1000
+	findCacheInvalidateQueue = 100
+	findCacheBackoff         = time.Minute
 )
 
 func ConfigSetup() {
@@ -247,7 +250,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
-		findCache:   NewFindCache(findCacheSize),
+		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueue, findCacheBackoff),
 	}
 }
 
