@@ -170,7 +170,7 @@ func (c *CasIdx) InitBare() error {
 }
 
 // EnsureArchiveTableExists checks if the index archive table exists or not. If it does not exist and
-// the create-keyspace flag is true, then it will create it, if it does exist and the create-keyspace
+// the create-keyspace flag is true, then it will create it, if it doesn't exist and the create-keyspace
 // flag is false, then it will return an error. If the table exists then it just returns nil.
 // The index archive table is not required for Metrictank to run, it's only required by the
 // mt-index-prune utility to archive old metrics from the index.
