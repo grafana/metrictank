@@ -1222,8 +1222,12 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 
 	statMetricsActive.Set(len(m.defById))
 	statDeleteDuration.Value(time.Since(pre))
-	if len(deletedDefs) > 0 {
+	if len(deletedDefs) > findCacheInvalidateQueue {
 		m.findCache.Purge(orgId)
+	} else {
+		for _, d := range deletedDefs {
+			m.findCache.InvalidateFor(orgId, d.NameWithTags())
+		}
 	}
 	return deletedDefs, nil
 }
