@@ -53,6 +53,10 @@ func TestFindCache(t *testing.T) {
 				})
 			})
 			Convey("when findCache invalidation falls behind", func() {
+				c.Add(1, "foo.{a,b,c}*.*", results)
+				c.Add(1, "foo.{a,b,e}*.*", results)
+				c.Add(1, "foo.{a,b,f}*.*", results)
+				c.Lock()
 				var wg sync.WaitGroup
 				wg.Add(10)
 				for i := 0; i < 10; i++ {
@@ -61,6 +65,7 @@ func TestFindCache(t *testing.T) {
 						wg.Done()
 					}()
 				}
+				c.Unlock()
 				wg.Wait()
 
 				So(len(c.cache), ShouldEqual, 0)
