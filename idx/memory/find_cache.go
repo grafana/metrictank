@@ -18,6 +18,15 @@ var (
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.miss")
 )
 
+// FindCache is a caching layer for the in-memory index. The cache provides
+// per org LRU caches of patterns and the resulting []*Nodes from searches
+// on the index.  Users should call `InvalidateFor(orgId, path)` when new
+// entries are added to the cache to invalidate any cached patterns that match
+// the path. `invalidateQueueSize` sets the maximum number of invalidations for
+// a specific orgId that can be running at any time. If this number is exceeded
+// then the cache for that orgId will be immediately purged and disabled for
+// `backoffTime`.  This mechanism protects the instance from excessive resource
+// usage when a large number of new series are added at once.
 type FindCache struct {
 	sync.RWMutex
 	cache               map[uint32]*lru.Cache
@@ -81,6 +90,7 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	cache.Add(pattern, nodes)
 }
 
+// Purge clears the cache for the specified orgId
 func (c *FindCache) Purge(orgId uint32) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
@@ -91,6 +101,7 @@ func (c *FindCache) Purge(orgId uint32) {
 	cache.Purge()
 }
 
+// PurgeAll clears the caches for all orgIds
 func (c *FindCache) PurgeAll() {
 	c.RLock()
 	orgs := make([]uint32, len(c.cache))
@@ -105,6 +116,12 @@ func (c *FindCache) PurgeAll() {
 	}
 }
 
+// InvalidateFor removes entries from the cache for 'orgId'
+// that match the provided path. If lots of InvalidateFor calls
+// are made at once and we end up with `invalidateQueueSize` concurrent
+// goroutines processing the invalidations, we purge the cache and
+// disable it for `backoffTime`. Future InvalidateFor calls made during
+// the backoff time will then return immediately.
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.RLock()
 	ch := c.newSeries[orgId]
@@ -131,6 +148,8 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 		return
 	}
 
+	// convert our path to a tree so that we can call `find(tree, pattern)`
+	// for each pattern in the cache.
 	tree := treeFromPath(path)
 
 	for _, k := range cache.Keys() {
@@ -149,16 +168,22 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	}
 }
 
+// PurgeFindCache purges the findCaches for all orgIds
 func (m *UnpartitionedMemoryIdx) PurgeFindCache() {
 	m.findCache.PurgeAll()
 }
 
+// PurgeFindCache purges the findCaches for all orgIds
+// across all partitions
 func (p *PartitionedMemoryIdx) PurgeFindCache() {
 	for _, m := range p.Partition {
 		m.findCache.PurgeAll()
 	}
 }
 
+// treeFromPath creates a index tree from a series path.
+// The tree will have a single leaf node and nodes for
+// each branch.
 func treeFromPath(path string) *Tree {
 	tree := &Tree{
 		Items: map[string]*Node{

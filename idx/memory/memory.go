@@ -463,7 +463,6 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		return *archive
 	}
 
-	// invalidate any findCache items that match this series name
 	defer func() {
 		go m.findCache.InvalidateFor(def.OrgId, path)
 	}()

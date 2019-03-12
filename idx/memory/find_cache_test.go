@@ -26,7 +26,7 @@ func TestTreeFromPath(t *testing.T) {
 
 func TestFindCache(t *testing.T) {
 	Convey("when findCache is empty", t, func() {
-		c := NewFindCache(10, 1, time.Second)
+		c := NewFindCache(10, 1, time.Second*2)
 		Convey("0 results should be returned", func() {
 			result, ok := c.Get(1, "foo.bar.*")
 			So(ok, ShouldBeFalse)
@@ -54,8 +54,8 @@ func TestFindCache(t *testing.T) {
 			})
 			Convey("when findCache invalidation falls behind", func() {
 				var wg sync.WaitGroup
-				for i := 0; i < 20; i++ {
-					wg.Add(1)
+				wg.Add(10)
+				for i := 0; i < 10; i++ {
 					go func() {
 						c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 						wg.Done()
@@ -72,7 +72,7 @@ func TestFindCache(t *testing.T) {
 					So(result, ShouldHaveLength, 0)
 				})
 				Convey("when adding to cache after backoff time", func() {
-					time.Sleep(time.Millisecond * 1500)
+					time.Sleep(time.Millisecond * 2500)
 					c.Add(1, "foo.*.*", results)
 					So(len(c.cache), ShouldEqual, 1)
 					result, ok := c.Get(1, "foo.*.*")
