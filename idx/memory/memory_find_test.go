@@ -13,6 +13,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -155,6 +156,8 @@ func TestMain(m *testing.M) {
 	TagSupport = true
 	TagQueryWorkers = 5
 	matchCacheSize = 1000
+	// we dont need info logs in the test output
+	log.SetLevel(log.ErrorLevel)
 	os.Exit(m.Run())
 }
 
