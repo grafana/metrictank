@@ -131,6 +131,35 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 		return
 	}
 
+	tree := treeFromPath(path)
+
+	for _, k := range cache.Keys() {
+		matches, err := find(tree, k.(string))
+		if err != nil {
+			log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
+			continue
+		}
+		if len(matches) > 0 {
+			cache.Remove(k)
+		}
+	}
+	select {
+	case <-ch:
+	default:
+	}
+}
+
+func (m *UnpartitionedMemoryIdx) PurgeFindCache() {
+	m.findCache.PurgeAll()
+}
+
+func (p *PartitionedMemoryIdx) PurgeFindCache() {
+	for _, m := range p.Partition {
+		m.findCache.PurgeAll()
+	}
+}
+
+func treeFromPath(path string) *Tree {
 	tree := &Tree{
 		Items: map[string]*Node{
 			"": {
@@ -168,28 +197,5 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 		}
 	}
 
-	for _, k := range cache.Keys() {
-		matches, err := find(tree, k.(string))
-		if err != nil {
-			log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
-			continue
-		}
-		if len(matches) > 0 {
-			cache.Remove(k)
-		}
-	}
-	select {
-	case <-ch:
-	default:
-	}
-}
-
-func (m *UnpartitionedMemoryIdx) PurgeFindCache() {
-	m.findCache.PurgeAll()
-}
-
-func (p *PartitionedMemoryIdx) PurgeFindCache() {
-	for _, m := range p.Partition {
-		m.findCache.PurgeAll()
-	}
+	return tree
 }
