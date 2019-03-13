@@ -142,20 +142,23 @@ type defByTagSet map[uint32]map[string]map[*idx.MetricDefinition]struct{}
 func (defs defByTagSet) add(def *idx.MetricDefinition) {
 	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
 	var ok bool
+	var fullName string
 	if orgDefs, ok = defs[def.OrgId]; !ok {
 		orgDefs = make(map[string]map[*idx.MetricDefinition]struct{})
 		defs[def.OrgId] = orgDefs
 	}
 
-	fullName := def.NameWithTagsHash()
+	if len(def.NameWithTags()) > 31 {
+		fullName = def.NameWithTagsHash()
+	} else {
+		fullName = def.NameWithTags()
+	}
+	// fullName = def.NameWithTagsHash()
 	if _, ok = orgDefs[fullName]; !ok {
-		overheadCounter.AddUint64(uint64(len(fullName) + 16))
-		mapsizeCounter.Inc()
 		orgDefs[fullName] = make(map[*idx.MetricDefinition]struct{}, 1)
 	}
 
 	if _, ok = orgDefs[fullName][def]; !ok {
-		mapsizeDefCounter.Inc()
 		orgDefs[fullName][def] = struct{}{}
 	}
 }
@@ -163,11 +166,17 @@ func (defs defByTagSet) add(def *idx.MetricDefinition) {
 func (defs defByTagSet) del(def *idx.MetricDefinition) {
 	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
 	var ok bool
+	var fullName string
 	if orgDefs, ok = defs[def.OrgId]; !ok {
 		return
 	}
 
-	fullName := def.NameWithTagsHash()
+	if len(def.NameWithTags()) > 31 {
+		fullName = def.NameWithTagsHash()
+	} else {
+		fullName = def.NameWithTags()
+	}
+	// fullName = def.NameWithTagsHash()
 	delete(orgDefs[fullName], def)
 
 	if len(orgDefs[fullName]) == 0 {
