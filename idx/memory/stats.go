@@ -12,8 +12,4 @@ var (
 	// an error is encountered while attempting to intern a string.
 	// each time this happens, an error is logged with more details.
 	internError = stats.NewCounter32("recovered_errors.idx.memory.intern-error")
-
-	overheadCounter   = stats.NewCounter64("idx.memory.defbytagset-memory")
-	mapsizeCounter    = stats.NewCounter64("idx.memory.defbytagset-mapsize")
-	mapsizeDefCounter = stats.NewCounter64("idx.memory.defbytagset-defs-mapsize")
 )
