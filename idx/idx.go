@@ -16,6 +16,14 @@ var OrgIdPublic = uint32(0)
 // Default config uses NOCPRSN
 var IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 
+//msgp:ignore Md5Hash
+
+// Md5Hash is a structure for more compactly storing an md5 hash than using a string
+type Md5Hash struct {
+	Upper uint64
+	Lower uint64
+}
+
 //go:generate msgp
 type Node struct {
 	Path        string
