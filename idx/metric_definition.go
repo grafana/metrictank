@@ -3,6 +3,7 @@ package idx
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/binary"
 	"fmt"
 	"reflect"
 	"sort"
@@ -354,9 +355,13 @@ func (md *MetricDefinition) NameWithTags() string {
 	return bld.String()
 }
 
-func (md *MetricDefinition) NameWithTagsHash() string {
-	buffer := bytes.NewBufferString(md.NameWithTags())
-	return fmt.Sprintf("%x", md5.Sum(buffer.Bytes()))
+func (md *MetricDefinition) NameWithTagsHash() Md5Hash {
+	md5Sum := md5.Sum(bytes.NewBufferString(md.NameWithTags()).Bytes())
+	ret := Md5Hash{
+		Upper: binary.LittleEndian.Uint64(md5Sum[:8]),
+		Lower: binary.LittleEndian.Uint64(md5Sum[8:]),
+	}
+	return ret
 }
 
 // SetMType translates a string into a uint8 which is used to store

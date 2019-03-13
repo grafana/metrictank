@@ -3,6 +3,7 @@ package memory
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"os"
@@ -181,50 +182,38 @@ func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey, m *Unpartitione
 
 // org id -> nameWithTags -> Set of references to idx.MetricDefinition
 // nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
-type defByTagSet map[uint32]map[string]map[*idx.MetricDefinition]struct{}
+type defByTagSet map[uint32]map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
 
 func (defs defByTagSet) add(def *idx.MetricDefinition) {
-	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
+	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
 	var ok bool
-	var fullName string
 	if orgDefs, ok = defs[def.OrgId]; !ok {
-		orgDefs = make(map[string]map[*idx.MetricDefinition]struct{})
+		orgDefs = make(map[idx.Md5Hash]map[*idx.MetricDefinition]struct{})
 		defs[def.OrgId] = orgDefs
 	}
 
-	if len(def.NameWithTags()) > 31 {
-		fullName = def.NameWithTagsHash()
-	} else {
-		fullName = def.NameWithTags()
-	}
-	// fullName = def.NameWithTagsHash()
-	if _, ok = orgDefs[fullName]; !ok {
-		orgDefs[fullName] = make(map[*idx.MetricDefinition]struct{}, 1)
+	hashedName := def.NameWithTagsHash()
+	if _, ok = orgDefs[hashedName]; !ok {
+		orgDefs[hashedName] = make(map[*idx.MetricDefinition]struct{}, 1)
 	}
 
-	if _, ok = orgDefs[fullName][def]; !ok {
-		orgDefs[fullName][def] = struct{}{}
+	if _, ok = orgDefs[hashedName][def]; !ok {
+		orgDefs[hashedName][def] = struct{}{}
 	}
 }
 
 func (defs defByTagSet) del(def *idx.MetricDefinition) {
-	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
+	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
 	var ok bool
-	var fullName string
 	if orgDefs, ok = defs[def.OrgId]; !ok {
 		return
 	}
 
-	if len(def.NameWithTags()) > 31 {
-		fullName = def.NameWithTagsHash()
-	} else {
-		fullName = def.NameWithTags()
-	}
-	// fullName = def.NameWithTagsHash()
-	delete(orgDefs[fullName], def)
+	hashedName := def.NameWithTagsHash()
+	delete(orgDefs[hashedName], def)
 
-	if len(orgDefs[fullName]) == 0 {
-		delete(orgDefs, fullName)
+	if len(orgDefs[hashedName]) == 0 {
+		delete(orgDefs, hashedName)
 	}
 
 	if len(orgDefs) == 0 {
@@ -233,14 +222,17 @@ func (defs defByTagSet) del(def *idx.MetricDefinition) {
 }
 
 func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefinition]struct{} {
-	var orgDefs map[string]map[*idx.MetricDefinition]struct{}
+	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
 	var ok bool
 	if orgDefs, ok = defs[id]; !ok {
 		return nil
 	}
 
-	buffer := bytes.NewBufferString(fullName)
-	hashedName := fmt.Sprintf("%x", md5.Sum(buffer.Bytes()))
+	md5Sum := md5.Sum(bytes.NewBufferString(fullName).Bytes())
+	hashedName := idx.Md5Hash{
+		Upper: binary.LittleEndian.Uint64(md5Sum[:8]),
+		Lower: binary.LittleEndian.Uint64(md5Sum[8:]),
+	}
 
 	return orgDefs[hashedName]
 }
