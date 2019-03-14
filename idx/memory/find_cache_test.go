@@ -89,3 +89,14 @@ func TestFindCache(t *testing.T) {
 	})
 
 }
+
+func BenchmarkTreeFromPath(b *testing.B) {
+	numPaths := 1000
+	paths := getSeriesNames(10, numPaths, "benchmark")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		p := i % numPaths
+		treeFromPath(paths[p])
+	}
+}

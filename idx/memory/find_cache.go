@@ -149,7 +149,9 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	}
 
 	// convert our path to a tree so that we can call `find(tree, pattern)`
-	// for each pattern in the cache.
+	// for each pattern in the cache and purge it if it matches the path or a subtree of it.
+	// we can't simply prune all cache keys that equal path or a subtree of it, because
+	// what's cached are search patterns which may contain wildcards and other expressions
 	tree := treeFromPath(path)
 
 	for _, k := range cache.Keys() {
@@ -181,29 +183,23 @@ func (p *PartitionedMemoryIdx) PurgeFindCache() {
 	}
 }
 
-// treeFromPath creates a index tree from a series path.
+// treeFromPath creates an index tree from a series path.
 // The tree will have a single leaf node and nodes for
 // each branch.
 func treeFromPath(path string) *Tree {
-	tree := &Tree{
+	tree := Tree{
 		Items: map[string]*Node{
-			"": {
-				Path:     "",
-				Children: make([]string, 0),
-				Defs:     make([]schema.MKey, 0),
-			},
+			"": {},
 		},
 	}
 	pos := strings.Index(path, ".")
-	prevPos := 0
+	var parentBranch string
+	prevPos := -1
 	for {
 		branch := path[:pos]
-		// add as child of parent branch
 		thisNode := branch[prevPos+1:]
-		if prevPos == 0 {
-			thisNode = branch[prevPos:]
-		}
-		tree.Items[path[:prevPos]].Children = []string{thisNode}
+
+		tree.Items[parentBranch].Children = []string{thisNode}
 
 		// create this branch/leaf
 		tree.Items[branch] = &Node{
@@ -220,7 +216,8 @@ func treeFromPath(path string) *Tree {
 		} else {
 			pos = pos + nextPos + 1
 		}
+		parentBranch = branch
 	}
 
-	return tree
+	return &tree
 }
