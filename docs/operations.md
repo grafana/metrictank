@@ -165,6 +165,7 @@ For more information on profiling see the excellent [Profiling Go Programs](http
 * can use debug logging to trace data throughout the pipeline. mt-store-cat to see what's in cassandra, mt-kafka-mdm-sniff, etc.
 * if it's old data, make sure you have a primary that can save data to cassandra, that the write queue can drain
 * check `metric-max-stale` and `chunk-max-stale` settings, make sure chunks are not being prematurely sealed (happens in some rare cases if you send data very infrequently. see `tank.add_to_closed_chunk` metric)
+* did you restart instances? if so: make sure your instances start replaying data within the allotted "overhead window". E.g. if your kafka retention is 7 hours and your largest chunks are 6 hours, then instances need to start replaying data within an hour after startup. (so make sure processing of metricpersist messages, index loading, etc doesn't take too long). Any subsequent restart (e.g. due to kafka removing a segment currently being consumed) starts the process from zero again, so watch out.   Increase kafka retention as needed.
 
 ## Opentracing
 
