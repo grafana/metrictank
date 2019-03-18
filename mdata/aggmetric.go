@@ -540,16 +540,16 @@ func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {
 	return a.lastWrite < chunkMinTs && currentChunk.Series.T0+a.chunkSpan+15*60 < now
 }
 
-// GC returns whether or not this AggMetric is stale and can be removed
+// GC returns whether or not this AggMetric is stale and can be removed, and its pointcount if so
 // chunkMinTs -> min timestamp of a chunk before to be considered stale and to be persisted to Cassandra
 // metricMinTs -> min timestamp for a metric before to be considered stale and to be purged from the tank
-func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
+func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) (uint32, bool) {
 	a.Lock()
 	defer a.Unlock()
 
 	// unless it looks like the AggMetric is collectable, abort and mark as not stale
 	if !a.collectable(now, chunkMinTs) {
-		return false
+		return 0, false
 	}
 
 	// make sure any points in the reorderBuffer are moved into our chunks so we can save the data
@@ -576,7 +576,7 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 	// * data from the ROB is flushed and moved into a new chunk
 	// * this new chunk is active so we're not collectable, even though earlier we thought we were.
 	if !a.collectable(now, chunkMinTs) {
-		return false
+		return 0, false
 	}
 
 	if !currentChunk.Series.Finished {
@@ -591,14 +591,24 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) bool {
 			a.persist(a.currentChunkPos)
 		}
 	}
-	return a.gcAggregators(now, chunkMinTs, metricMinTs) && a.lastWrite < metricMinTs
+
+	var points uint32
+	for _, chunk := range a.chunks {
+		points += chunk.NumPoints
+	}
+	p, stale := a.gcAggregators(now, chunkMinTs, metricMinTs)
+	points += p
+	return points, stale && a.lastWrite < metricMinTs
 }
 
-// gcAggregators returns whether all aggregators are stale and can be removed
-func (a *AggMetric) gcAggregators(now, chunkMinTs, metricMinTs uint32) bool {
-	ret := true
+// gcAggregators returns whether all aggregators are stale and can be removed, and their pointcount if so
+func (a *AggMetric) gcAggregators(now, chunkMinTs, metricMinTs uint32) (uint32, bool) {
+	var points uint32
+	stale := true
 	for _, agg := range a.aggregators {
-		ret = agg.GC(now, chunkMinTs, metricMinTs, a.lastWrite) && ret
+		p, s := agg.GC(now, chunkMinTs, metricMinTs, a.lastWrite)
+		points += p
+		stale = stale && s
 	}
-	return ret
+	return points, stale
 }

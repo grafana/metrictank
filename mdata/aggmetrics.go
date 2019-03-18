@@ -77,11 +77,16 @@ func (ms *AggMetrics) GC() {
 				ms.RLock()
 				a := ms.Metrics[org][key]
 				ms.RUnlock()
-				if a.GC(now, chunkMinTs, metricMinTs) {
+				points, stale := a.GC(now, chunkMinTs, metricMinTs)
+				if stale {
 					log.Debugf("metric %s is stale. Purging data from memory.", key)
 					ms.Lock()
 					delete(ms.Metrics[org], key)
 					orgActiveMetrics.Set(float64(len(ms.Metrics[org])))
+					// note: this is racey. if a metric has just become unstale, it may have created a new chunk,
+					// pruning an older one. in which case we double-subtract those points
+					// hard to fix and super rare. see https://github.com/grafana/metrictank/pull/1242
+					totalPoints.DecUint64(uint64(points))
 					ms.Unlock()
 				}
 			}
