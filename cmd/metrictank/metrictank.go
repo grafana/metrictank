@@ -186,8 +186,13 @@ func main() {
 	bigtable.ConfigProcess()
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
-		log.Fatal("you should enable at least 1 input plugin")
+	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled || inPrometheus.Enabled
+	wantInput := cluster.Mode == cluster.ModeFull || cluster.Mode == cluster.ModeShard
+	if !inputEnabled && wantInput {
+		log.Fatal("you should enable at least 1 input plugin in 'full' or 'shard' cluster mode")
+	}
+	if inputEnabled && !wantInput {
+		log.Fatal("you should not have an input enabled in 'query' cluster mode")
 	}
 
 	sec := dur.MustParseNDuration("warm-up-period", *warmUpPeriodStr)
@@ -263,8 +268,14 @@ func main() {
 	if cassandraStore.CliConfig.Enabled && bigtableStore.CliConfig.Enabled {
 		log.Fatal("only 1 backend store plugin can be enabled at once.")
 	}
-	if !cassandraStore.CliConfig.Enabled && !bigtableStore.CliConfig.Enabled {
-		log.Fatal("at least 1 backend store plugin needs to be enabled.")
+	if wantInput {
+		if !cassandraStore.CliConfig.Enabled && !bigtableStore.CliConfig.Enabled {
+			log.Fatal("at least 1 backend store plugin needs to be enabled in 'full' or 'shard' cluster mode")
+		}
+	} else {
+		if cassandraStore.CliConfig.Enabled || bigtableStore.CliConfig.Enabled {
+			log.Fatal("no backend store plugin may be enabled in 'query' cluster mode")
+		}
 	}
 	if bigtableStore.CliConfig.Enabled {
 		schemaMaxChunkSpan := mdata.MaxChunkSpan()
@@ -272,14 +283,15 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to initialize bigtable backend store. %s", err)
 		}
+		store.SetTracer(tracer)
 	}
 	if cassandraStore.CliConfig.Enabled {
 		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
 		if err != nil {
 			log.Fatalf("failed to initialize cassandra backend store. %s", err)
 		}
+		store.SetTracer(tracer)
 	}
-	store.SetTracer(tracer)
 
 	/***********************************
 		Initialize the Chunk Cache
@@ -329,10 +341,15 @@ func main() {
 
 	idx.OrgIdPublic = uint32(*publicOrg)
 
+	idxEnabled := memory.Enabled || cassandra.CliConfig.Enabled || bigtable.CliConfig.Enabled
+	if !idxEnabled && wantInput {
+		log.Fatal("you should enable 1 index plugin in 'full' or 'shard' cluster mode")
+	}
+	if idxEnabled && !wantInput {
+		log.Fatal("you should not have an index plugin enabled in 'query' cluster mode")
+	}
+
 	if memory.Enabled {
-		if metricIndex != nil {
-			log.Fatal("Only 1 metricIndex handler can be enabled.")
-		}
 		metricIndex = memory.New()
 	}
 	if cassandra.CliConfig.Enabled {
@@ -346,10 +363,6 @@ func main() {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = bigtable.New(bigtable.CliConfig)
-	}
-
-	if metricIndex == nil {
-		log.Fatal("No metricIndex handlers enabled.")
 	}
 
 	/***********************************
@@ -372,23 +385,29 @@ func main() {
 	/***********************************
 		Load index entries from the backend store.
 	***********************************/
-	err = metricIndex.Init()
-	if err != nil {
-		log.Fatalf("failed to initialize metricIndex: %s", err.Error())
+	if wantInput {
+		err = metricIndex.Init()
+		if err != nil {
+			log.Fatalf("failed to initialize metricIndex: %s", err.Error())
+		}
+		log.Infof("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 	}
-	log.Infof("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
 	/***********************************
 		Initialize MetricPersist notifiers
 	***********************************/
 	var notifiers []mdata.Notifier
-	if notifierKafka.Enabled {
-		// The notifierKafka notifiers will block here until it has processed the backlog of metricPersist messages.
-		// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
-		notifiers = append(notifiers, notifierKafka.New(*instance, mdata.NewDefaultNotifierHandler(metrics, metricIndex)))
+	if wantInput {
+		if notifierKafka.Enabled {
+			// The notifierKafka notifiers will block here until it has processed the backlog of metricPersist messages.
+			// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
+			notifiers = append(notifiers, notifierKafka.New(*instance, mdata.NewDefaultNotifierHandler(metrics, metricIndex)))
+		}
+		mdata.InitPersistNotifier(notifiers...)
 	}
-
-	mdata.InitPersistNotifier(notifiers...)
+	if !wantInput && notifierKafka.Enabled {
+		log.Fatal("you should disable notifier plugins in 'query' cluster mode")
+	}
 
 	/***********************************
 		Start our inputs
@@ -469,8 +488,11 @@ func shutdown() {
 		timer.Stop()
 	}
 
-	log.Info("closing store")
-	store.Stop()
-	metricIndex.Stop()
+	if cluster.Mode != cluster.ModeQuery {
+		log.Info("closing store")
+		store.Stop()
+		log.Info("closing index")
+		metricIndex.Stop()
+	}
 	log.Info("terminating.")
 }

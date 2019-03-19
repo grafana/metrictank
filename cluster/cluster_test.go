@@ -6,15 +6,15 @@ import (
 	"time"
 )
 
-func TestPeersForQuerySingle(t *testing.T) {
-	Mode = ModeSingle
+func TestPeersForQueryFull(t *testing.T) {
+	Mode = ModeFull
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
 	maxPrio = 10
 	Manager.SetPriority(10)
 	Manager.SetReady()
-	Convey("when cluster in single mode", t, func() {
+	Convey("when instance is in full mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 1)
@@ -22,8 +22,8 @@ func TestPeersForQuerySingle(t *testing.T) {
 	})
 }
 
-func TestPeersForQueryMulti(t *testing.T) {
-	Mode = ModeMulti
+func TestPeersForQueryShard(t *testing.T) {
+	Mode = ModeShard
 	Init("node1", "test", time.Now(), "http", 6060)
 	manager := Manager.(*MemberlistManager)
 	manager.SetPrimary(true)
@@ -58,7 +58,7 @@ func TestPeersForQueryMulti(t *testing.T) {
 		},
 	}
 	manager.Unlock()
-	Convey("when cluster in multi mode", t, func() {
+	Convey("when cluster in shard mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 2)
