@@ -47,7 +47,7 @@ func TestFindCache(t *testing.T) {
 					c.InvalidateFor(1, "foo.bar.baz")
 					So(c.cache[1].Len(), ShouldEqual, 0)
 				})
-				Convey("After invalidating path that doesnt matche cached pattern", func() {
+				Convey("After invalidating path that doesn't match cached pattern", func() {
 					c.InvalidateFor(1, "foo.foo.baz")
 					So(c.cache[1].Len(), ShouldEqual, 1)
 				})
