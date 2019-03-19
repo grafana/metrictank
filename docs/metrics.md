@@ -104,6 +104,10 @@ the number of partitions in the cluster that we know of
 the number of nodes we know to be primary but not ready (total should only be in this state very temporarily)
 * `cluster.total.state.primary-ready`:  
 the number of nodes we know to be primary and ready
+* `cluster.total.state.query-not-ready`:  
+the number of nodes we know to be query nodes and not ready
+* `cluster.total.state.query-ready`:  
+the number of nodes we know to be query nodes and ready
 * `cluster.total.state.secondary-not-ready`:  
 the number of nodes we know to be secondary and not ready
 * `cluster.total.state.secondary-ready`:  
