@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"sync"
 	"testing"
 	"time"
 
@@ -56,17 +55,8 @@ func TestFindCache(t *testing.T) {
 				c.Add(1, "foo.{a,b,c}*.*", results)
 				c.Add(1, "foo.{a,b,e}*.*", results)
 				c.Add(1, "foo.{a,b,f}*.*", results)
-				c.Lock()
-				var wg sync.WaitGroup
-				wg.Add(10)
-				for i := 0; i < 10; i++ {
-					go func() {
-						c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
-						wg.Done()
-					}()
-				}
-				c.Unlock()
-				wg.Wait()
+				c.newSeries[1] <- struct{}{}
+				c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 
 				So(len(c.cache), ShouldEqual, 0)
 				Convey("when adding to cache in backoff", func() {
