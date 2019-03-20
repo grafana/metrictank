@@ -101,19 +101,11 @@ func ConfigSetup() {
 
 func ConfigProcess() {
 	// check settings in cluster section
-	if mode == ModeSingle {
-		log.Warn("CLU Config: 'single' mode deprecated. converting to 'full' mode")
-		mode = "full"
+	var ok bool
+	Mode, ok = NodeModeFromString(mode)
+	if !ok {
+		log.Fatalf("CLU Config: invalid cluster operating mode %q", mode)
 	}
-	if mode == ModeMulti {
-		log.Warn("CLU Config: 'multi' mode deprecated. converting to 'shard' mode")
-		mode = "shard"
-	}
-	if !validMode(mode) {
-		log.Fatal("CLU Config: invalid cluster operating mode")
-	}
-
-	Mode = ModeType(mode)
 
 	if httpTimeout == 0 {
 		log.Fatal("CLU Config: http-timeout must be a non-zero duration string like 60s")
@@ -134,7 +126,7 @@ func ConfigProcess() {
 	}
 
 	// all further stuff is only relevant in shard/query mode
-	if mode == ModeFull {
+	if Mode == ModeFull {
 		return
 	}
 

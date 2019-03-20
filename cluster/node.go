@@ -20,6 +20,32 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type NodeMode uint8
+
+const (
+	ModeFull NodeMode = iota
+	ModeShard
+	ModeQuery
+)
+
+func NodeModeFromString(s string) (NodeMode, bool) {
+	switch mode {
+	case "single":
+		log.Warn("CLU Config: 'single' mode deprecated. converting to 'full' mode")
+		return ModeFull, true
+	case "multi":
+		log.Warn("CLU Config: 'multi' mode deprecated. converting to 'shard' mode")
+		return ModeShard, true
+	case "full":
+		return ModeFull, true
+	case "shard":
+		return ModeShard, true
+	case "query":
+		return ModeQuery, true
+	}
+	return 0, false
+}
+
 //go:generate stringer -type=NodeState
 type NodeState int
 

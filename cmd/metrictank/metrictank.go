@@ -321,7 +321,7 @@ func main() {
 		inputs = append(inputs, inKafkaMdm.New())
 	}
 
-	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
+	if cluster.Mode == cluster.ModeShard && len(inputs) > 1 {
 		log.Warn("It is not recommended to run a multi-node cluster with more than 1 input plugin.")
 	}
 

@@ -11,25 +11,10 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
-type ModeType string
-
 var counter uint32
 
-const (
-	ModeFull  = "full"
-	ModeShard = "shard"
-	ModeQuery = "query"
-	// deprecated
-	ModeSingle = "single"
-	ModeMulti  = "multi"
-)
-
-func validMode(m string) bool {
-	return (ModeType(m) == ModeFull || ModeType(m) == ModeShard || ModeType(m) == ModeQuery)
-}
-
 var (
-	Mode    ModeType
+	Mode    NodeMode
 	Manager ClusterManager
 	Tracer  opentracing.Tracer
 
