@@ -30,6 +30,7 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		Version:       version,
 		Primary:       primary,
 		Priority:      10000,
+		Mode:          Mode,
 		PrimaryChange: time.Now(),
 		StateChange:   time.Now(),
 		Updated:       time.Now(),

@@ -23,8 +23,8 @@ import (
 type NodeMode uint8
 
 const (
-	ModeFull NodeMode = iota
-	ModeShard
+	ModeShard NodeMode = iota
+	ModeFull
 	ModeQuery
 )
 
@@ -124,6 +124,7 @@ type HTTPNode struct {
 	Version       string    `json:"version"`
 	Primary       bool      `json:"primary"`
 	PrimaryChange time.Time `json:"primaryChange"`
+	Mode          NodeMode  `json:"mode"`
 	State         NodeState `json:"state"`
 	Priority      int       `json:"priority"`
 	Started       time.Time `json:"started"`

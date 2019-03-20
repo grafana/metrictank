@@ -192,14 +192,13 @@ func (c *MemberlistManager) clusterStats() {
 	queryNotReady := 0
 	partitions := make(map[int32]int)
 	for _, p := range c.members {
-		parts := p.GetPartitions()
 		if p.Primary {
 			if p.IsReady() {
 				primReady++
 			} else {
 				primNotReady++
 			}
-		} else if len(parts) > 0 {
+		} else if p.Mode != ModeQuery {
 			if p.IsReady() {
 				secReady++
 			} else {
