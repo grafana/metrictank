@@ -101,10 +101,10 @@ func ConfigSetup() {
 
 func ConfigProcess() {
 	// check settings in cluster section
-	var ok bool
-	Mode, ok = NodeModeFromString(mode)
-	if !ok {
-		log.Fatalf("CLU Config: invalid cluster operating mode %q", mode)
+	var err error
+	Mode, err = NodeModeFromString(mode)
+	if err != nil {
+		log.Fatalf("CLU Config: %s", err.Error())
 	}
 
 	if httpTimeout == 0 {

@@ -20,6 +20,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type InvalidNodeModeErr string
+
+func (e InvalidNodeModeErr) Error() string {
+	return fmt.Sprintf("invalid cluster operating mode %q", string(e))
+}
+
+//go:generate stringer -type=NodeMode -trimprefix=Mode
 type NodeMode uint8
 
 const (
@@ -28,22 +35,42 @@ const (
 	ModeQuery
 )
 
-func NodeModeFromString(s string) (NodeMode, bool) {
+// capitalized form is what stringer (.String()) generates and is used for json serialization
+func NodeModeFromString(mode string) (NodeMode, error) {
 	switch mode {
 	case "single":
 		log.Warn("CLU Config: 'single' mode deprecated. converting to 'full' mode")
-		return ModeFull, true
+		return ModeFull, nil
 	case "multi":
 		log.Warn("CLU Config: 'multi' mode deprecated. converting to 'shard' mode")
-		return ModeShard, true
-	case "full":
-		return ModeFull, true
-	case "shard":
-		return ModeShard, true
-	case "query":
-		return ModeQuery, true
+		return ModeShard, nil
+	case "full", "Full":
+		return ModeFull, nil
+	case "shard", "Shard":
+		return ModeShard, nil
+	case "query", "Query":
+		return ModeQuery, nil
 	}
-	return 0, false
+	return 0, InvalidNodeModeErr(mode)
+}
+
+// MarshalJSON marshals a NodeMode
+func (n NodeMode) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(n.String())
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmashals a NodeMode
+func (n *NodeMode) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*n, err = NodeModeFromString(j)
+	return err
 }
 
 //go:generate stringer -type=NodeState
