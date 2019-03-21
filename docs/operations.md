@@ -168,7 +168,7 @@ For more information on profiling see the excellent [Profiling Go Programs](http
 * did you restart instances? if so: make sure your instances start replaying data within the allotted "overhead window". E.g. if your kafka retention is 7 hours and your largest chunks are 6 hours, then instances need to start replaying data within an hour after startup. (so make sure processing of metricpersist messages, index loading, etc doesn't take too long). Any subsequent restart (e.g. due to kafka removing a segment currently being consumed) starts the process from zero again, so watch out.   Increase kafka retention as needed.
 
 In the below example, we:
-* use a max chunk span of 6hours
+* use a max chunk span of 6 hours
 * use 30 minutes as time needed to get all chunks saved to the store
 * assume startup until data backfill takes about 1 hour (see [startup procedure](startup.md))
 * assume 7.5 hours Kafka retention
