@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/logger"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -125,12 +125,12 @@ func main() {
 	}
 
 	defCounters := counters{}
-	defs := make([]schema.MetricDefinition, 0)
-	deprecatedDefs := make([]schema.MetricDefinition, 0)
+	defs := make([]idx.MetricDefinition, 0)
+	deprecatedDefs := make([]idx.MetricDefinition, 0)
 
 	for partition := partitionFrom; (partitionTo == -1 && partition == partitionFrom) || (partitionTo > 0 && partition < partitionTo); partition++ {
 		log.Infof("starting to process partition %d", partition)
-		defsByNameWithTags := make(map[string][]schema.MetricDefinition)
+		defsByNameWithTags := make(map[string][]idx.MetricDefinition)
 		defs = cassIdx.LoadPartitions([]int32{int32(partition)}, defs, now)
 		defCounters.total += len(defs)
 		for _, def := range defs {

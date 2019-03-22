@@ -54,7 +54,7 @@ func (mn *MetricName) String() string {
 		return ""
 	}
 
-	bld := strings.Builder{}
+	var bld strings.Builder
 	return mn.string(&bld)
 }
 
@@ -85,7 +85,7 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 // setMetricName interns the MetricName in an
 // object store and stores the addresses of those strings
 // in MetricName.nodes
-func (mn *MetricName) setMetricName(name string) {
+func (mn *MetricName) setMetricName(name string) error {
 	nodes := strings.Split(name, ".")
 	mn.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
@@ -94,9 +94,12 @@ func (mn *MetricName) setMetricName(name string) {
 		if err != nil {
 			log.Error("idx: Failed to acquire interned string for node name: ", err)
 			internError.Inc()
+			return fmt.Errorf("idx: Failed to acquire interned string for node name: %v", err)
 		}
 		mn.nodes[i] = nodePtr
 	}
+
+	return nil
 }
 
 // ExtensionType is required to use custom marshaling as an extension
@@ -121,8 +124,8 @@ func (mn *MetricName) MarshalBinaryTo(b []byte) error {
 // UnmarshalBinary is required to use custom marshaling as an extension
 // in msgp
 func (mn *MetricName) UnmarshalBinary(b []byte) error {
-	mn.setMetricName(string(b))
-	return nil
+	err := mn.setMetricName(string(b))
+	return err
 }
 
 //msgp:shim TagKeyValue as:string using:TagKeyValue.createTagKeyValue/parseTagKeyValue
@@ -137,8 +140,11 @@ type TagKeyValue struct {
 // String returns a Key/Value pair in the form of
 // 'key=value'
 func (t *TagKeyValue) String() string {
-	bld := strings.Builder{}
+	var bld strings.Builder
+	return t.string(&bld)
+}
 
+func (t *TagKeyValue) string(bld *strings.Builder) string {
 	key, err := IdxIntern.GetStringFromPtr(t.Key)
 	if err != nil {
 		log.Error("idx: Failed to retrieve interned tag key: ", err)
@@ -244,9 +250,6 @@ func (t *TagKeyValues) Len() int {
 		if strings.HasPrefix(kv, "name") {
 			continue
 		}
-		if kv == "=" || kv == "" {
-			continue
-		}
 		total += len(kv) + 1
 	}
 	return total
@@ -335,7 +338,7 @@ type MetricDefinition struct {
 // NameWithTags returns a string version of the MetricDefinition's name with
 // all of its tags in the form of 'name;key1=value1;key2=value2;key3=value3'
 func (md *MetricDefinition) NameWithTags() string {
-	bld := strings.Builder{}
+	var bld strings.Builder
 
 	md.Name.string(&bld)
 	sort.Sort(md.Tags.KeyValues)
@@ -350,11 +353,13 @@ func (md *MetricDefinition) NameWithTags() string {
 			continue
 		}
 		bld.WriteString(";")
-		bld.WriteString(tag.String())
+		tag.string(&bld)
 	}
 	return bld.String()
 }
 
+// NameWithTagsHash returns an Md5Hash struct containing the
+// hashed md5 sum of a NameWithTags for the given MetricDefinition
 func (md *MetricDefinition) NameWithTagsHash() Md5Hash {
 	md5Sum := md5.Sum(bytes.NewBufferString(md.NameWithTags()).Bytes())
 	ret := Md5Hash{

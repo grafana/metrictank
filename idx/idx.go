@@ -13,9 +13,9 @@ import (
 
 var OrgIdPublic = uint32(0)
 
-// Object Interning for the index
+// IdxIntern is a pointer into the object interning layer for the index
 //
-// Default config uses NOCPRSN
+// Default config does not use compression
 var IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 
 //msgp:ignore Md5Hash
@@ -89,6 +89,8 @@ type MetricIndex interface {
 	// It returns the number of Archives that were deleted.
 	Delete(orgId uint32, pattern string) (int, error)
 
+	// DeletePersistent deletes items from the index
+	// It returns the deleted items in a []idx.Archive
 	DeletePersistent(orgId uint32, pattern string) ([]Archive, error)
 
 	// Find searches the index for matching nodes.

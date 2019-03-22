@@ -115,7 +115,7 @@ func ConfigProcess() {
 
 }
 
-// interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
+// MemoryIndex is an interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
 // this is needed to support unit tests.
 type MemoryIndex interface {
 	idx.MetricIndex
@@ -139,7 +139,7 @@ type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
 
-type IdSet map[schema.MKey]struct{} // set of ids
+type IdSet map[schema.MKey]struct{}
 
 func (ids IdSet) String() string {
 	var res string
@@ -167,7 +167,7 @@ func (t *TagIndex) addTagId(name, value uintptr, id schema.MKey) {
 	ti[name][value][id] = struct{}{}
 }
 
-func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey, m *UnpartitionedMemoryIdx) {
+func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey) {
 	ti := *t
 
 	delete(ti[name][value], id)
@@ -180,8 +180,7 @@ func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey, m *Unpartitione
 	}
 }
 
-// org id -> nameWithTags -> Set of references to idx.MetricDefinition
-// nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
+// org id -> NameWithTagsHash() -> Map keyed by *idx.MetricDefinition.
 type defByTagSet map[uint32]map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
 
 func (defs defByTagSet) add(def *idx.MetricDefinition) {
@@ -274,6 +273,7 @@ type UnpartitionedMemoryIdx struct {
 	metaTags       map[uint32]metaTagIndex   // by orgId
 	metaTagRecords map[uint32]metaTagRecords // by orgId
 
+	// used to reduce contention
 	findCache *FindCache
 
 	// used to intern objects used by the index to reduce memory overhead
@@ -293,8 +293,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tags:           make(map[uint32]TagIndex),
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
-		findCache:      NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
-		objIntern:      goi.NewObjectIntern(oiCnf),
+		objIntern:      goi.NewObjectIntern(goi.NewConfig()),
 	}
 	return m
 }
@@ -571,25 +570,25 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 // successful
 func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefinition) bool {
 	for _, tag := range def.Tags.KeyValues {
-		tags.delTagId(tag.Key, tag.Value, def.Id, m)
+		tags.delTagId(tag.Key, tag.Value, def.Id)
 	}
 
 	nameKey, _ := idx.IdxIntern.GetPtrFromByte([]byte("name"))
 	nameValue, _ := idx.IdxIntern.GetPtrFromByte([]byte(schema.SanitizeNameAsTagValue(def.Name.String())))
-	tags.delTagId(nameKey, nameValue, def.Id, m)
+	tags.delTagId(nameKey, nameValue, def.Id)
 
 	m.defByTagSet.del(def)
 
 	return true
 }
 
-// Used to rebuild the index from an existing set of metricDefinitions for a specific paritition.
+// LoadPartition is used to rebuild the index from an existing set of metricDefinitions for a specific paritition.
 func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinition) int {
 	// UnpartitionedMemoryIdx isnt partitioned, so just ignore the partition passed and call Load()
 	return m.Load(defs)
 }
 
-// Used to rebuild the index from an existing set of metricDefinitions.
+// Load is used to rebuild the index from an existing set of metricDefinitions.
 func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 	m.Lock()
 	defer m.Unlock()
@@ -748,6 +747,8 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	return
 }
 
+// Get returns an idx.Archive that matches the supplied schema.MKey.
+// Upon failure it returns an empty idx.Archive
 func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
