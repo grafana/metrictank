@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/expr"
 	"github.com/grafana/metrictank/idx"
@@ -48,6 +49,46 @@ var (
 	// metric plan.run is the time spent running the plan for a request (function processing of all targets and runtime consolidation)
 	planRunDuration = stats.NewLatencyHistogram15s32("plan.run")
 )
+
+// map of consolidation methods and the ordered list of rollup aggregations that should
+// be used. e.g. if a user requests 'min' but all we have is 'avg' and 'sum' then use 'avg'.
+var rollupPreference = map[consolidation.Consolidator][]consolidation.Consolidator{
+	consolidation.Avg: {
+		consolidation.Avg,
+		consolidation.Lst,
+		consolidation.Max,
+		consolidation.Min,
+		consolidation.Sum,
+	},
+	consolidation.Min: {
+		consolidation.Min,
+		consolidation.Lst,
+		consolidation.Avg,
+		consolidation.Max,
+		consolidation.Sum,
+	},
+	consolidation.Max: {
+		consolidation.Max,
+		consolidation.Lst,
+		consolidation.Avg,
+		consolidation.Min,
+		consolidation.Sum,
+	},
+	consolidation.Sum: {
+		consolidation.Sum,
+		consolidation.Lst,
+		consolidation.Avg,
+		consolidation.Max,
+		consolidation.Min,
+	},
+	consolidation.Lst: {
+		consolidation.Lst,
+		consolidation.Avg,
+		consolidation.Max,
+		consolidation.Min,
+		consolidation.Sum,
+	},
+}
 
 type Series struct {
 	Pattern string // pattern used for index lookup. typically user input like foo.{b,a}r.*
@@ -622,7 +663,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		for _, s := range series {
 			for _, metric := range s.Series {
 				for _, archive := range metric.Defs {
-					cons := r.Cons
+					var cons consolidation.Consolidator
 					consReq := r.Cons
 					if consReq == 0 {
 						// unless the user overrode the consolidation to use via a consolidateBy
@@ -633,6 +674,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 						// * a pattern may expand to multiple series, each of which can have their own aggregation method.
 						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+					} else {
+						// get the consolidation method of the most appropriate rollup based on the consolidation method
+						// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
+						// use 'avg'.
+						cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
 					}
 
 					newReq := models.NewReq(
@@ -696,6 +742,31 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	out, err = plan.Run(data)
 	planRunDuration.Value(time.Since(preRun))
 	return out, err
+}
+
+// find the best consolidation method based on what was requested and what aggregations are available.
+func closestAggMethod(requested consolidation.Consolidator, available []conf.Method) consolidation.Consolidator {
+	// if there is only 1 consolidation method available, then that is all we can return.
+	if len(available) == 1 {
+		return consolidation.Consolidator(available[0])
+	}
+
+	avail := map[consolidation.Consolidator]struct{}{}
+	for _, a := range available {
+		avail[consolidation.Consolidator(a)] = struct{}{}
+	}
+	var orderOfPreference []consolidation.Consolidator
+	orderOfPreference, ok := rollupPreference[requested]
+	if !ok {
+		return consolidation.Consolidator(available[0])
+	}
+	for _, p := range orderOfPreference {
+		if _, ok := avail[p]; ok {
+			return p
+		}
+	}
+	// fall back to the default aggregation method.
+	return consolidation.Consolidator(available[0])
 }
 
 func getFromTo(ft models.FromTo, now time.Time, defaultFrom, defaultTo uint32) (uint32, uint32, error) {
