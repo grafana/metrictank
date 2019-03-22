@@ -522,7 +522,7 @@ func testTagSorting(t *testing.T) {
 	k, _ = idx.IdxIntern.AddOrGet([]byte("3"), false)
 	v, _ = idx.IdxIntern.AddOrGet([]byte("a"), false)
 	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
-	index.Load(md2)
+	index.LoadPartition(0, md2)
 
 	query, err = tagquery.NewQueryFromStrings([]string{"3=a"}, 0)
 	if err != nil {

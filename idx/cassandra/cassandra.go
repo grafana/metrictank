@@ -348,7 +348,7 @@ func (c *CasIdx) rebuildIndex() {
 	var wg sync.WaitGroup
 	defPool := sync.Pool{
 		New: func() interface{} {
-			return []schema.MetricDefinition{}
+			return []idx.MetricDefinition{}
 		},
 	}
 	var num uint32
@@ -356,7 +356,7 @@ func (c *CasIdx) rebuildIndex() {
 		wg.Add(1)
 		go func(p int32) {
 			gate <- struct{}{}
-			defs := defPool.Get().([]schema.MetricDefinition)
+			defs := defPool.Get().([]idx.MetricDefinition)
 			defer func() {
 				defPool.Put(defs[:0])
 				wg.Done()
@@ -444,9 +444,9 @@ NAMES:
 }
 
 // ArchiveDefs writes each of the provided defs to the archive table and
-// then deletes the defs from the metric index table.
-func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
-	defChan := make(chan *schema.MetricDefinition, c.Config.NumConns)
+// then deletes the defs from the metric_idx table.
+func (c *CasIdx) ArchiveDefs(defs []idx.MetricDefinition) (int, error) {
+	defChan := make(chan *idx.MetricDefinition, c.Config.NumConns)
 	g, ctx := errgroup.WithContext(context.Background())
 
 	// keep track of how many defs were successfully archived.

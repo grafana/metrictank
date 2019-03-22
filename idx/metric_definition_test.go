@@ -13,11 +13,11 @@ var metNameRepeating = "metric.metric.metric.metric.metric.metric.metric.metric"
 var testSz string
 
 func genTags(num int) []string {
-	szs := make([]string, num)
+	tags := make([]string, num)
 	for i := 0; i < num; i++ {
-		szs[i] = fmt.Sprintf("key%d=val%d", i, i)
+		tags[i] = fmt.Sprintf("key%d=val%d", i, i)
 	}
-	return szs
+	return tags
 }
 
 func genMetricDefinitionsWithSameName(num int) []*MetricDefinition {

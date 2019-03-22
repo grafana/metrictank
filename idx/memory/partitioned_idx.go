@@ -137,9 +137,9 @@ func (p *PartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archive 
 // all leaf nodes on that branch are deleted. So if the pattern is
 // "*", all items in the index are deleted.
 // It returns a copy of all of the Archives deleted.
-func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) (int, error) {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]idx.Archive, len(p.Partition))
+	result := make([]int, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
@@ -155,6 +155,36 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archi
 	}
 	if err := g.Wait(); err != nil {
 		log.Errorf("memory-idx: failed to Delete: orgId=%d pattern=%s. %s", orgId, pattern, err)
+		return 0, err
+	}
+
+	// get our total count, so we can allocate our response in one go.
+	items := 0
+	for _, r := range result {
+		items += r
+	}
+
+	return items, nil
+}
+
+func (p *PartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([]idx.Archive, error) {
+	g, _ := errgroup.WithContext(context.Background())
+	result := make([][]idx.Archive, len(p.Partition))
+	var i int
+	for _, m := range p.Partition {
+		pos, m := i, m
+		g.Go(func() error {
+			deleted, err := m.DeletePersistent(orgId, pattern)
+			if err != nil {
+				return err
+			}
+			result[pos] = deleted
+			return nil
+		})
+		i++
+	}
+	if err := g.Wait(); err != nil {
+		log.Errorf("memory-idx: failed to DeletePersistent: orgId=%d pattern=%s. %s", orgId, pattern, err)
 		return nil, err
 	}
 
@@ -163,6 +193,7 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archi
 	for _, r := range result {
 		items += len(r)
 	}
+
 	response := make([]idx.Archive, 0, items)
 	for _, r := range result {
 		response = append(response, r...)
@@ -488,7 +519,7 @@ func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) 
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) int {
+func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinition) int {
 	return p.Partition[partition].Load(defs)
 }
 
