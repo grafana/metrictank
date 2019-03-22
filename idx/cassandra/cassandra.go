@@ -424,9 +424,17 @@ NAMES:
 	return defs
 }
 
+func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition) (int, error) {
+	return c.archiveAndDeleteDefs(defs, false)
+}
+
 // ArchiveDefs writes each of the provided defs to the archive table and
 // then deletes the defs from the metric_idx table.
 func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
+	return c.archiveAndDeleteDefs(defs, true)
+}
+
+func (c *CasIdx) archiveAndDeleteDefs(defs []schema.MetricDefinition, archive bool) (int, error) {
 	defChan := make(chan *schema.MetricDefinition, c.cfg.numConns)
 	g, ctx := errgroup.WithContext(context.Background())
 
@@ -436,32 +444,36 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 	for i := 0; i < c.cfg.numConns; i++ {
 		i := i
 		g.Go(func() error {
+			var err error
 			for {
 				select {
 				case def, ok := <-defChan:
 					if !ok {
 						return nil
 					}
-					err := c.addDefToArchive(*def)
-					if err != nil {
-						// If we failed to add the def to the archive table then just continue on to the next def.
-						// As we havnet yet removed the this def from the metric_idx table yet, the next time archiving
-						// is performed the this def will be processed again. As no action is needed by an operator, we
-						// just log this as a warning.
-						log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
-						continue
+
+					if archive {
+						err = c.addDefToArchive(*def)
+						if err != nil {
+							// If we failed to add the def to the archive table then just continue on to the next def.
+							// As we havnet yet removed the this def from the metric_idx table yet, the next time archiving
+							// is performed the this def will be processed again. As no action is needed by an operator, we
+							// just log this as a warning.
+							log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
+							continue
+						}
 					}
 
 					err = c.deleteDef(def.Id, def.Partition)
 					if err != nil {
-						// The next time archiving is performed this def will be processed again. Re-adding the def to the archive
+						// The next time this operation is performed this def will be processed again. Re-adding the def to the archive
 						// table will just be treated like an update with only the archived_at field changing. As no action is needed
 						// by an operator, we just log this as a warning.
 						log.Warnf("cassandra-idx: Failed to remove archived def from metric_idx table. error=%s. def=%+v", err, *def)
 						continue
 					}
 
-					// increment counter of defs successfully archived
+					// increment counter of defs successfully processed
 					success[i] = success[i] + 1
 				case <-ctx.Done():
 					return ctx.Err()
