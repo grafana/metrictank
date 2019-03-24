@@ -8,6 +8,9 @@ import (
 	"time"
 )
 
+// careful when setting rates.
+// see https://github.com/golang/go/issues/23401
+
 // blockhandler writes out a blocking profile
 // similar to the standard library handler,
 // except it allows to specify a rate.
