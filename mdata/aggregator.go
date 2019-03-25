@@ -116,13 +116,14 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 	}
 }
 
-// GC returns whether all of the associated series are stale and can be removed
-func (agg *Aggregator) GC(now, chunkMinTs, metricMinTs, lastWriteTime uint32) bool {
-	ret := true
+// GC returns whether all of the associated series are stale and can be removed, and their combined pointcount if so
+func (agg *Aggregator) GC(now, chunkMinTs, metricMinTs, lastWriteTime uint32) (uint32, bool) {
+	var points uint32
+	stale := true
 
 	if lastWriteTime+agg.span > chunkMinTs {
 		// Last datapoint was less than one aggregation window before chunkMinTs, hold out for more data
-		return false
+		return 0, false
 	}
 
 	// Haven't seen datapoints in an entire aggregation window before chunkMinTs, time to flush
@@ -131,20 +132,31 @@ func (agg *Aggregator) GC(now, chunkMinTs, metricMinTs, lastWriteTime uint32) bo
 	}
 
 	if agg.minMetric != nil {
-		ret = agg.minMetric.GC(now, chunkMinTs, metricMinTs) && ret
+		p, s := agg.minMetric.GC(now, chunkMinTs, metricMinTs)
+		stale = stale && s
+		points += p
+
 	}
 	if agg.maxMetric != nil {
-		ret = agg.maxMetric.GC(now, chunkMinTs, metricMinTs) && ret
+		p, s := agg.maxMetric.GC(now, chunkMinTs, metricMinTs)
+		stale = stale && s
+		points += p
 	}
 	if agg.sumMetric != nil {
-		ret = agg.sumMetric.GC(now, chunkMinTs, metricMinTs) && ret
+		p, s := agg.sumMetric.GC(now, chunkMinTs, metricMinTs)
+		stale = stale && s
+		points += p
 	}
 	if agg.cntMetric != nil {
-		ret = agg.cntMetric.GC(now, chunkMinTs, metricMinTs) && ret
+		p, s := agg.cntMetric.GC(now, chunkMinTs, metricMinTs)
+		stale = stale && s
+		points += p
 	}
 	if agg.lstMetric != nil {
-		ret = agg.lstMetric.GC(now, chunkMinTs, metricMinTs) && ret
+		p, s := agg.lstMetric.GC(now, chunkMinTs, metricMinTs)
+		stale = stale && s
+		points += p
 	}
 
-	return ret
+	return points, stale
 }
