@@ -280,7 +280,7 @@ org-id = 0
 # tcp address (may be given multiple times as a comma-separated list)
 brokers = kafka:9092
 # Kafka version in semver format. All brokers must be this version or newer.
-kafka-version = 0.10.0.0
+kafka-version = 2.0.0
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
 # offset to start consuming from. Can be oldest, newest or a time duration
@@ -387,7 +387,7 @@ enabled = false
 # tcp address (may be given multiple times as a comma-separated list)
 brokers = kafka:9092
 # Kafka version in semver format. All brokers must be this version or newer.
-kafka-version = 0.10.0.0
+kafka-version = 2.0.0
 # kafka topic (only one)
 topic = metricpersist
 # kafka partitions to consume. use '*' or a comma separated list of id's. Should match kafka-mdm-in's partitions.
