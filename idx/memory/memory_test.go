@@ -114,7 +114,6 @@ func getMetricDataWithCustomTags(orgId uint32, depth, count, interval int, prefi
 	}
 
 	uniqueNumber := 0
-	uniqueInt := int(unique * 10)
 
 	data := make([]*schema.MetricData, count)
 	series := getSeriesNames(depth, count, prefix)
@@ -126,12 +125,14 @@ func getMetricDataWithCustomTags(orgId uint32, depth, count, interval int, prefi
 			Interval: interval,
 		}
 		data[i].Tags = make([]string, 10)
-		for a := 0; a < uniqueInt; a++ {
-			data[i].Tags[a] = fmt.Sprintf("unique_series_id%d=%d", uniqueNumber, uniqueNumber)
+		var j int
+		for j = 0; j < int(unique*10); j++ {
+			data[i].Tags[j] = fmt.Sprintf("unique_series_id%d=%d", uniqueNumber, uniqueNumber)
 			uniqueNumber++
 		}
-		for a := (10 - (10 - uniqueInt)); a < 10; a++ {
-			data[i].Tags[a] = tags[a]
+		for j < 10 {
+			data[i].Tags[j] = tags[j]
+			j++
 		}
 		data[i].SetId()
 	}
