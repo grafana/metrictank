@@ -8,7 +8,7 @@ We'll go over these in more detail below.
   See [Cassandra](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md)
 * The latest (1.0.1 or newer) version of [Graphite](http://graphite.readthedocs.io/en/latest/install.html)
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite.
-* Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 0.10.0.1 is highly recommended.
+* Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 2.0.0 is highly recommended.
   [more info](https://github.com/grafana/metrictank/blob/master/docs/kafka.md)
 
 Note: Cassandra and Kafka require Java. We recommend using Oracle Java 8.
@@ -16,12 +16,12 @@ Note: Cassandra and Kafka require Java. We recommend using Oracle Java 8.
 ## How things fit together
 
 metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
-[Inputs](https://github.com/grafana/metrictank/blob/master/docs/inputs.md)).  
+[Inputs](https://github.com/grafana/metrictank/blob/master/docs/inputs.md)).
 Metrictank will compress the data into chunks in RAM, a configurable number of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
 instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
-Metrictank maintains an index of metrics metadata, for all series it sees.  
+Metrictank maintains an index of metrics metadata, for all series it sees.
 You can use an index entirely in memory, or backed by Cassandra for persistence.
 You can query metrictank directly (it has fast, but limited built-in processing and will fallback to graphite when needed)
 or you can also just query graphite which will always use graphite's processing but use metrictank as a datastore.
@@ -221,16 +221,16 @@ EOF
 
 ### Kafka
 
-Kafka 0.10.0.1 is highly recommended.  0.10.0.0 and 0.9 should work too, with some caveats [explained here](https://github.com/grafana/metrictank/blob/master/docs/kafka.md)
+Kafka 2.0.0 is highly recommended, though older versions work too. [more info](https://github.com/grafana/metrictank/blob/master/docs/kafka.md)
 
-* Download kafka. Find a mirror at https://www.apache.org/dyn/closer.cgi?path=/kafka/0.10.0.1/kafka_2.11-0.10.0.1.tgz, and download kafka to your server.
+* Download kafka. Find a mirror at https://archive.apache.org/dist/kafka/2.0.0/kafka_2.12-2.0.0.tgz, and download kafka to your server.
 
 * Unpack kafka. Like zookeeper, we'll do so in `/opt`.
 
 ```
 cd /opt
-tar -zxvf /root/kafka_2.11-0.10.0.1.tgz  # update path if you downloaded elsewhere
-ln -s /opt/kafka_2.11-0.10.0.1 /opt/kafka
+tar -zxvf /root/kafka_2.12-2.0.0.tgz  # update path if you downloaded elsewhere
+ln -s /opt/kafka_2.12-2.0.0 /opt/kafka
 ```
 
 * Start kafka: `/opt/kafka/bin/kafka-server-start.sh -daemon /opt/kafka/config/server.properties`

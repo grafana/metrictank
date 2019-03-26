@@ -354,7 +354,7 @@ Flags:
   -enabled
     	
   -kafka-version string
-    	Kafka version in semver format. All brokers must be this version or newer. (default "0.10.0.0")
+    	Kafka version in semver format. All brokers must be this version or newer. (default "2.0.0")
   -offset string
     	Set the offset to start consuming from. Can be oldest, newest or a time duration (default "newest")
   -partitions string
