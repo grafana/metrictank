@@ -1005,7 +1005,7 @@ func TestMemoryIndexHeapUsageWithTagsUniqueAll5(t *testing.T) {
 
 var globalMemoryIndex MemoryIndex
 
-func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, num int) {
+func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 	// turn partitioning off
 	Partitioned = false
 
@@ -1015,7 +1015,7 @@ func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, num int) {
 	globalMemoryIndex = New()
 	globalMemoryIndex.Init()
 
-	series := getMetricDataWithCustomTags(1, 2, num, 10, "somekindof.longereven.metricname.butinstead.ofashorterone.bunchofthingsandstuff", unique)
+	series := getMetricDataWithCustomTags(1, 2, count, 10, "somekindof.longereven.metricname.butinstead.ofashorterone.bunchofthingsandstuff", unique)
 
 	t.Log("Initial memory stats after series has been allocated")
 	printMemUsage(t)
