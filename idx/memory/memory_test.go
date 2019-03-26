@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -89,6 +90,65 @@ func getMetricData(orgId uint32, depth, count, interval int, prefix string, tagg
 	}
 
 	return data
+}
+
+// getMetricDataWithCustomTags returns a count-length slice of MetricData's with random Name and the given orgId
+// unique is a float between 0.0 and 1.0. A total of 10 tags will be added to each MetricData and unique determines how
+// many will be identical vs unique. For example, a unique value of 0.4 will add 4 unique tags and 6 identical tags.
+func getMetricDataWithCustomTags(orgId uint32, depth, count, interval int, prefix string, unique float32) []*schema.MetricData {
+	if unique < 0.0 || unique > 1.0 {
+		panic("getMetricDataWithCustomTags: unique must be a value between 0.0 and 1.0")
+	}
+
+	tags := []string{
+		"secondkey=anothervalue",
+		"thirdkey=onemorevalue",
+		"region=west",
+		"os=ubuntu",
+		"anothertag=somelongervalue",
+		"manymoreother=lotsoftagstointern",
+		"afewmoretags=forgoodmeasure",
+		"onetwothreefourfivesix=seveneightnineten",
+		"lotsandlotsoftags=morefunforeveryone",
+		"goodforpeoplewhojustusetags=forbasicallyeverything",
+	}
+
+	uniqueNumber := 0
+
+	data := make([]*schema.MetricData, count)
+	series := getSeriesNames(depth, count, prefix)
+
+	for i, s := range series {
+		data[i] = &schema.MetricData{
+			Name:     s,
+			OrgId:    int(orgId),
+			Interval: interval,
+		}
+		data[i].Tags = make([]string, 10)
+		var j int
+		for j = 0; j < int(unique*10); j++ {
+			data[i].Tags[j] = fmt.Sprintf("unique_series_id%d=%d", uniqueNumber, uniqueNumber)
+			uniqueNumber++
+		}
+		for j < 10 {
+			data[i].Tags[j] = tags[j]
+			j++
+		}
+		data[i].SetId()
+	}
+
+	return data
+}
+
+func printMemUsage(t *testing.T) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	t.Logf("HeapAlloc = \t\t%v MB\t\t %v KB\t %v B\n", (m.HeapAlloc / 1024 / 1024), (m.HeapAlloc / 1024), m.HeapAlloc)
+	t.Logf("TotalAlloc = \t\t%v MB\t\t %v KB\t %v B\n", (m.TotalAlloc / 1024 / 1024), (m.TotalAlloc / 1024), m.TotalAlloc)
+	t.Logf("Sys = \t\t\t%v MB\t\t %v KB\t %v B\n", (m.Sys / 1024 / 1024), (m.Sys / 1024), m.Sys)
+	t.Logf("Live Heap Objects = \t%v\n", (m.Mallocs - m.Frees))
+	t.Logf("NumGC = \t\t%v\n\n\n", m.NumGC)
 }
 
 // withAndWithoutTagSupport calls a test with the TagSupprt setting
@@ -923,6 +983,58 @@ func testSingleNodeMetric(t *testing.T) {
 		t.Fatal(err)
 	}
 	ix.AddOrUpdate(mkey, data, getPartition(data))
+}
+
+// TestMemoryIndexHeapUsageWithTagsUniqueNone5 gives a rough estimate of how much memory the index is using with tag support turned on.
+// It uses 0 unique tags and 10 identical tags
+func TestMemoryIndexHeapUsageWithTagsUniqueNone5(t *testing.T) {
+	testMemoryIndexHeapUsageWithTags(t, 0.0, 5)
+}
+
+// TestMemoryIndexHeapUsageWithTagsUnique5 gives a rough estimate of how much memory the index is using with tag support turned on.
+// It uses 5 unique tags and 5 identical tags
+func TestMemoryIndexHeapUsageWithTagsUniqueHalf5(t *testing.T) {
+	testMemoryIndexHeapUsageWithTags(t, 0.5, 5)
+}
+
+// TestMemoryIndexHeapUsageQithTagsUniqueAll5 gives a rough estimate of how much memory the index is using with tag support turned on.
+// It uses 10 unique tags and 0 identical tags
+func TestMemoryIndexHeapUsageWithTagsUniqueAll5(t *testing.T) {
+	testMemoryIndexHeapUsageWithTags(t, 1.0, 5)
+}
+
+var globalMemoryIndex MemoryIndex
+
+func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
+	// turn partitioning off
+	Partitioned = false
+
+	// turn tag support on
+	TagSupport = true
+
+	globalMemoryIndex = New()
+	globalMemoryIndex.Init()
+
+	series := getMetricDataWithCustomTags(1, 2, count, 10, "somekindof.longereven.metricname.butinstead.ofashorterone.bunchofthingsandstuff", unique)
+
+	t.Log("Initial memory stats after series has been allocated")
+	printMemUsage(t)
+
+	for _, data := range series {
+		mkey, err := schema.MKeyFromString(data.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		globalMemoryIndex.AddOrUpdate(mkey, data, 0)
+	}
+
+	t.Log("Memory stats after AddOrUpdate called")
+	printMemUsage(t)
+
+	runtime.GC()
+
+	t.Log("Memory stats after runtime.GC() called")
+	printMemUsage(t)
 }
 
 // withAndWithoutPartitonedIndex calls a bench with the Partitioned setting
