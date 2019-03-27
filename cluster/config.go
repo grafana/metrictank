@@ -23,6 +23,9 @@ var (
 	minAvailableShards int
 	gcPercent          int
 	gcPercentNotReady  int
+	GossipSettlePeriod time.Duration // if gossip not enabled, will be 0 regardless of config
+
+	gossipSettlePeriodStr string
 
 	swimUseConfig               = "default-lan"
 	swimAdvertiseAddrStr        string
@@ -75,6 +78,7 @@ func ConfigSetup() {
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
 	clusterCfg.IntVar(&gcPercentNotReady, "gc-percent-not-ready", gcPercent, "GOGC value to use when node is not ready.  Defaults to GOGC")
+	clusterCfg.StringVar(&gossipSettlePeriodStr, "gossip-settle-period", "10s", "duration until when the cluster topology can be considered up-to-date and this node to be ready to serve requests (when gossip enabled).")
 	globalconf.Register("cluster", clusterCfg, flag.ExitOnError)
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)
@@ -128,6 +132,11 @@ func ConfigProcess() {
 	// all further stuff is only relevant in shard/query mode
 	if Mode == ModeDev {
 		return
+	}
+
+	GossipSettlePeriod, err = time.ParseDuration(gossipSettlePeriodStr)
+	if err != nil {
+		log.Fatalf("CLU Config: invalid gossip-settle-period: %s", err.Error())
 	}
 
 	// check settings in swim section

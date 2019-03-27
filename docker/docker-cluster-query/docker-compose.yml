@@ -125,7 +125,7 @@ services:
       MT_CLUSTER_PRIMARY_NODE: "false"
       MT_INSTANCE: metrictank-q0
       MT_LOG_LEVEL: info
-      MT_WARM_UP_PERIOD: "10s"
+      MT_CLUSTER_GOSSIP_SETTLE_PERIOD: "10s"
     links:
      - metrictank0
 

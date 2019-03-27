@@ -123,7 +123,7 @@ When the input plugin is not sure, or not started yet priority is 10k (2.8 hours
 
 Readyness or "ready state":
 
-(whenever we say "ready", "ready state" we mean the value taking into account priority, not the internal NodeState, as explained below)
+(whenever we say "ready", "ready state" we mean the value taking into account priority and gossip settle time, not the internal NodeState, as explained below)
 
 * indicates whether an instance is considered ready to satisfy data requests
 * refuses data or index requests when not ready
@@ -133,8 +133,9 @@ Readyness or "ready state":
 A node is ready when all of the following are true:
 * priority does not exceed the `cluster.max-priority` setting, which defaults to 10.
 * its internal NodeState is ready, which happens:
-  * for primary nodes, immediately after startup (loading index, starting input plugins, etc)
-  * for secondary nodes, "warm-up-period" after startup.
+  * for primary nodes and query nodes (that don't have data), immediately after startup (loading index, starting input plugins, etc)
+  * for other nodes, when we assume all data needed to respond to queries without gaps, has been consumed. (the config specifies `cluster.warm-up-period` for this)
+* gossip - if enabled - has had time to settle. (see `cluster.gossip-settle-period`).
 
 Special cases:
 * the `/node` and `/cluster` endpoint shows the internal state of the node, including the internal NodeState.

@@ -62,7 +62,7 @@ var (
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
-	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before non-primary (secondary or query ) nodes start serving requests")
+	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration until when secondary nodes are considered to have enough data to be ready and serve requests.")
 	publicOrg         = flag.Int("public-org", 0, "org Id for publically (any org) accessible data. leave 0 to disable")
 
 	// Profiling, instrumentation and logging:
@@ -434,14 +434,24 @@ func main() {
 	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/maxChunkSpan+1)*maxChunkSpan)
 
 	/***********************************
-		Set our status so we can accept
-		requests from users.
+		Set our ready state so we can accept requests from users
+		For this, both warm-up-period and gossip-settle-period must have lapsed
+		(it is valid for either, or both to be 0)
 	***********************************/
-	if cluster.Manager.IsPrimary() {
-		cluster.Manager.SetReady()
-	} else {
-		time.AfterFunc(warmupPeriod, cluster.Manager.SetReady)
+	waitWarmup := warmupPeriod
+	waitSettle := cluster.GossipSettlePeriod
+
+	// for primary nodes and query nodes, no warmup
+	if cluster.Manager.IsPrimary() || !wantInput {
+		waitWarmup = 0
 	}
+	wait := waitWarmup
+	if waitSettle > waitWarmup {
+		wait = waitSettle
+	}
+
+	log.Infof("Will set ready state after %s (warm-up-period %s, gossip-settle-period %s)", wait, warmupPeriod, cluster.GossipSettlePeriod)
+	time.AfterFunc(wait, cluster.Manager.SetReady)
 
 	/***********************************
 		Wait for Shutdown
