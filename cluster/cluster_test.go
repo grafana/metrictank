@@ -6,15 +6,15 @@ import (
 	"time"
 )
 
-func TestPeersForQueryFull(t *testing.T) {
-	Mode = ModeFull
+func TestPeersForQueryDev(t *testing.T) {
+	Mode = ModeDev
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
 	maxPrio = 10
 	Manager.SetPriority(10)
 	Manager.SetReady()
-	Convey("when instance is in full mode", t, func() {
+	Convey("when instance is in dev mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 1)

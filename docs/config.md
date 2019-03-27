@@ -245,7 +245,7 @@ time-zone = local
 get-targets-concurrency = 20
 # default limit for tagdb query results, can be overridden with query parameter "limit"
 tagdb-default-limit = 100
-# ratio of peer responses after which speculation is used. Set to 1 to disable.
+# ratio of peer responses after which speculative querying (aka spec-exec) is used. Set to 1 to disable.
 speculation-threshold = 1
 ```
 
@@ -315,11 +315,14 @@ name = metrictank
 primary-node = true
 # maximum priority before a node should be considered not-ready.
 max-priority = 10
-# TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances.
+# TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other nodes.
 # If no port is specified, it is assumed the other nodes are using the same port this node is listening on.
 peers =
-# Operating mode of this instance within the cluster. (full|shard|query)
-mode = full
+# Operating mode of this node within the cluster. (dev|shard|query)
+# * dev: gossip disabled. node is not aware of other nodes but can serve up all data it is aware of (from memory or from the store)
+# * shard: gossip enabled. node receives data and participates in fan-in/fan-out if it receives queries but owns only a part of the data set and spec-exec if enabled.
+# * query: gossip enabled. node receives no data and fans out queries to shard nodes (e.g. if you rather not query shard nodes directly)
+mode = dev
 # minimum number of shards that must be available for a query to be handled.
 min-available-shards = 0
 # How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable
@@ -379,7 +382,7 @@ enable-compression = true
 dns-config-path = /etc/resolv.conf
 ```
 
-## clustering transports for tracking chunk saves between replicated instances ##
+## clustering transports for tracking chunk saves between replicated node ##
 ### kafka as transport for clustering messages (recommended)
 
 ```

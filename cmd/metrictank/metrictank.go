@@ -187,9 +187,9 @@ func main() {
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 
 	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled || inPrometheus.Enabled
-	wantInput := cluster.Mode == cluster.ModeFull || cluster.Mode == cluster.ModeShard
+	wantInput := cluster.Mode == cluster.ModeDev || cluster.Mode == cluster.ModeShard
 	if !inputEnabled && wantInput {
-		log.Fatal("you should enable at least 1 input plugin in 'full' or 'shard' cluster mode")
+		log.Fatal("you should enable at least 1 input plugin in 'dev' or 'shard' cluster mode")
 	}
 	if inputEnabled && !wantInput {
 		log.Fatal("you should not have an input enabled in 'query' cluster mode")
@@ -270,7 +270,7 @@ func main() {
 	}
 	if wantInput {
 		if !cassandraStore.CliConfig.Enabled && !bigtableStore.CliConfig.Enabled {
-			log.Fatal("at least 1 backend store plugin needs to be enabled in 'full' or 'shard' cluster mode")
+			log.Fatal("at least 1 backend store plugin needs to be enabled in 'dev' or 'shard' cluster mode")
 		}
 	} else {
 		if cassandraStore.CliConfig.Enabled || bigtableStore.CliConfig.Enabled {
@@ -343,7 +343,7 @@ func main() {
 
 	idxEnabled := memory.Enabled || cassandra.CliConfig.Enabled || bigtable.CliConfig.Enabled
 	if !idxEnabled && wantInput {
-		log.Fatal("you should enable 1 index plugin in 'full' or 'shard' cluster mode")
+		log.Fatal("you should enable 1 index plugin in 'dev' or 'shard' cluster mode")
 	}
 	if idxEnabled && !wantInput {
 		log.Fatal("you should not have an index plugin enabled in 'query' cluster mode")

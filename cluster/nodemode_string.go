@@ -9,13 +9,13 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[ModeShard-0]
-	_ = x[ModeFull-1]
+	_ = x[ModeDev-1]
 	_ = x[ModeQuery-2]
 }
 
-const _NodeMode_name = "ShardFullQuery"
+const _NodeMode_name = "ShardDevQuery"
 
-var _NodeMode_index = [...]uint8{0, 5, 9, 14}
+var _NodeMode_index = [...]uint8{0, 5, 8, 13}
 
 func (i NodeMode) String() string {
 	if i >= NodeMode(len(_NodeMode_index)-1) {

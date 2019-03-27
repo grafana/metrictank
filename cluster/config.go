@@ -70,7 +70,7 @@ func ConfigSetup() {
 	clusterCfg.StringVar(&ClusterName, "name", "metrictank", "Unique name of the cluster.")
 	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per shardGroup.")
 	clusterCfg.StringVar(&peersStr, "peers", "", "TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
-	clusterCfg.StringVar(&mode, "mode", "full", "Operating mode of this instance within the cluster. (full|shard|query)")
+	clusterCfg.StringVar(&mode, "mode", "dev", "Operating mode of this instance within the cluster. (dev|shard|query)")
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
@@ -126,7 +126,7 @@ func ConfigProcess() {
 	}
 
 	// all further stuff is only relevant in shard/query mode
-	if Mode == ModeFull {
+	if Mode == ModeDev {
 		return
 	}
 

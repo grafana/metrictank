@@ -39,7 +39,7 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 	if Mode == ModeQuery {
 		thisNode.Priority = 0
 	}
-	if Mode == ModeFull {
+	if Mode == ModeDev {
 		Manager = NewSingleNodeManager(thisNode)
 	} else { // Shard or Query mode
 		Manager = NewMemberlistManager(thisNode)
@@ -70,8 +70,8 @@ type partitionCandidates struct {
 // nodes with the lowest prio.
 func MembersForQuery() ([]Node, error) {
 	thisNode := Manager.ThisNode()
-	// If we are running in full mode, just return thisNode
-	if Mode == ModeFull {
+	// If we are running in dev mode, just return thisNode
+	if Mode == ModeDev {
 		return []Node{thisNode}, nil
 	}
 
@@ -162,8 +162,8 @@ func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 	allNodes := Manager.MemberList()
 	membersMap := make(map[int32][]Node)
 
-	// If we are running in full mode, just return thisNode
-	if Mode == ModeFull {
+	// If we are running in dev mode, just return thisNode
+	if Mode == ModeDev {
 		membersMap[0] = []Node{thisNode}
 		return membersMap, nil
 	}

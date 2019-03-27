@@ -31,7 +31,7 @@ type NodeMode uint8
 
 const (
 	ModeShard NodeMode = iota
-	ModeFull
+	ModeDev
 	ModeQuery
 )
 
@@ -39,13 +39,13 @@ const (
 func NodeModeFromString(mode string) (NodeMode, error) {
 	switch mode {
 	case "single":
-		log.Warn("CLU Config: 'single' mode deprecated. converting to 'full' mode")
-		return ModeFull, nil
+		log.Warn("CLU Config: 'single' mode deprecated. converting to 'dev' mode")
+		return ModeDev, nil
 	case "multi":
 		log.Warn("CLU Config: 'multi' mode deprecated. converting to 'shard' mode")
 		return ModeShard, nil
-	case "full", "Full":
-		return ModeFull, nil
+	case "dev", "Dev":
+		return ModeDev, nil
 	case "shard", "Shard":
 		return ModeShard, nil
 	case "query", "Query":
