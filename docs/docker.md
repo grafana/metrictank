@@ -63,6 +63,10 @@ Similar to docker-dev-custom-cfg-kafka
 
 [see our docker-cluster quickstart guide](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker-cluster.md)
 
+### docker-cluster-query
+
+A cluster just like docker-cluster, but with an extra query layer (of 1 metrictank instance) in front.
+
 ### docker-chaos
 
 Similar to docker-cluster but used for chaos testing

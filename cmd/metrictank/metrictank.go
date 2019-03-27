@@ -62,7 +62,7 @@ var (
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
-	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration before secondary nodes start serving requests")
+	warmUpPeriodStr   = flag.String("warm-up-period", "1h", "duration until when secondary nodes are considered to have enough data to be ready and serve requests.")
 	publicOrg         = flag.Int("public-org", 0, "org Id for publically (any org) accessible data. leave 0 to disable")
 
 	// Profiling, instrumentation and logging:
@@ -186,8 +186,13 @@ func main() {
 	bigtable.ConfigProcess()
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 
-	if !inCarbon.Enabled && !inKafkaMdm.Enabled && !inPrometheus.Enabled {
-		log.Fatal("you should enable at least 1 input plugin")
+	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled || inPrometheus.Enabled
+	wantInput := cluster.Mode == cluster.ModeDev || cluster.Mode == cluster.ModeShard
+	if !inputEnabled && wantInput {
+		log.Fatal("you should enable at least 1 input plugin in 'dev' or 'shard' cluster mode")
+	}
+	if inputEnabled && !wantInput {
+		log.Fatal("you should not have an input enabled in 'query' cluster mode")
 	}
 
 	sec := dur.MustParseNDuration("warm-up-period", *warmUpPeriodStr)
@@ -263,8 +268,14 @@ func main() {
 	if cassandraStore.CliConfig.Enabled && bigtableStore.CliConfig.Enabled {
 		log.Fatal("only 1 backend store plugin can be enabled at once.")
 	}
-	if !cassandraStore.CliConfig.Enabled && !bigtableStore.CliConfig.Enabled {
-		log.Fatal("at least 1 backend store plugin needs to be enabled.")
+	if wantInput {
+		if !cassandraStore.CliConfig.Enabled && !bigtableStore.CliConfig.Enabled {
+			log.Fatal("at least 1 backend store plugin needs to be enabled in 'dev' or 'shard' cluster mode")
+		}
+	} else {
+		if cassandraStore.CliConfig.Enabled || bigtableStore.CliConfig.Enabled {
+			log.Fatal("no backend store plugin may be enabled in 'query' cluster mode")
+		}
 	}
 	if bigtableStore.CliConfig.Enabled {
 		schemaMaxChunkSpan := mdata.MaxChunkSpan()
@@ -272,14 +283,15 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to initialize bigtable backend store. %s", err)
 		}
+		store.SetTracer(tracer)
 	}
 	if cassandraStore.CliConfig.Enabled {
 		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
 		if err != nil {
 			log.Fatalf("failed to initialize cassandra backend store. %s", err)
 		}
+		store.SetTracer(tracer)
 	}
-	store.SetTracer(tracer)
 
 	/***********************************
 		Initialize the Chunk Cache
@@ -309,7 +321,7 @@ func main() {
 		inputs = append(inputs, inKafkaMdm.New())
 	}
 
-	if cluster.Mode == cluster.ModeMulti && len(inputs) > 1 {
+	if cluster.Mode == cluster.ModeShard && len(inputs) > 1 {
 		log.Warn("It is not recommended to run a multi-node cluster with more than 1 input plugin.")
 	}
 
@@ -329,10 +341,15 @@ func main() {
 
 	idx.OrgIdPublic = uint32(*publicOrg)
 
+	idxEnabled := memory.Enabled || cassandra.CliConfig.Enabled || bigtable.CliConfig.Enabled
+	if !idxEnabled && wantInput {
+		log.Fatal("you should enable 1 index plugin in 'dev' or 'shard' cluster mode")
+	}
+	if idxEnabled && !wantInput {
+		log.Fatal("you should not have an index plugin enabled in 'query' cluster mode")
+	}
+
 	if memory.Enabled {
-		if metricIndex != nil {
-			log.Fatal("Only 1 metricIndex handler can be enabled.")
-		}
 		metricIndex = memory.New()
 	}
 	if cassandra.CliConfig.Enabled {
@@ -346,10 +363,6 @@ func main() {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
 		metricIndex = bigtable.New(bigtable.CliConfig)
-	}
-
-	if metricIndex == nil {
-		log.Fatal("No metricIndex handlers enabled.")
 	}
 
 	/***********************************
@@ -372,23 +385,29 @@ func main() {
 	/***********************************
 		Load index entries from the backend store.
 	***********************************/
-	err = metricIndex.Init()
-	if err != nil {
-		log.Fatalf("failed to initialize metricIndex: %s", err.Error())
+	if wantInput {
+		err = metricIndex.Init()
+		if err != nil {
+			log.Fatalf("failed to initialize metricIndex: %s", err.Error())
+		}
+		log.Infof("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 	}
-	log.Infof("metricIndex initialized in %s. starting data consumption", time.Now().Sub(pre))
 
 	/***********************************
 		Initialize MetricPersist notifiers
 	***********************************/
 	var notifiers []mdata.Notifier
-	if notifierKafka.Enabled {
-		// The notifierKafka notifiers will block here until it has processed the backlog of metricPersist messages.
-		// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
-		notifiers = append(notifiers, notifierKafka.New(*instance, mdata.NewDefaultNotifierHandler(metrics, metricIndex)))
+	if wantInput {
+		if notifierKafka.Enabled {
+			// The notifierKafka notifiers will block here until it has processed the backlog of metricPersist messages.
+			// it will block for at most kafka-cluster.backlog-process-timeout (default 60s)
+			notifiers = append(notifiers, notifierKafka.New(*instance, mdata.NewDefaultNotifierHandler(metrics, metricIndex)))
+		}
+		mdata.InitPersistNotifier(notifiers...)
 	}
-
-	mdata.InitPersistNotifier(notifiers...)
+	if !wantInput && notifierKafka.Enabled {
+		log.Fatal("you should disable notifier plugins in 'query' cluster mode")
+	}
 
 	/***********************************
 		Start our inputs
@@ -415,14 +434,24 @@ func main() {
 	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/maxChunkSpan+1)*maxChunkSpan)
 
 	/***********************************
-		Set our status so we can accept
-		requests from users.
+		Set our ready state so we can accept requests from users
+		For this, both warm-up-period and gossip-settle-period must have lapsed
+		(it is valid for either, or both to be 0)
 	***********************************/
-	if cluster.Manager.IsPrimary() {
-		cluster.Manager.SetReady()
-	} else {
-		time.AfterFunc(warmupPeriod, cluster.Manager.SetReady)
+	waitWarmup := warmupPeriod
+	waitSettle := cluster.GossipSettlePeriod
+
+	// for primary nodes and query nodes, no warmup
+	if cluster.Manager.IsPrimary() || !wantInput {
+		waitWarmup = 0
 	}
+	wait := waitWarmup
+	if waitSettle > waitWarmup {
+		wait = waitSettle
+	}
+
+	log.Infof("Will set ready state after %s (warm-up-period %s, gossip-settle-period %s)", wait, warmupPeriod, cluster.GossipSettlePeriod)
+	time.AfterFunc(wait, cluster.Manager.SetReady)
 
 	/***********************************
 		Wait for Shutdown
@@ -469,8 +498,11 @@ func shutdown() {
 		timer.Stop()
 	}
 
-	log.Info("closing store")
-	store.Stop()
-	metricIndex.Stop()
+	if cluster.Mode != cluster.ModeQuery {
+		log.Info("closing store")
+		store.Stop()
+		log.Info("closing index")
+		metricIndex.Stop()
+	}
 	log.Info("terminating.")
 }

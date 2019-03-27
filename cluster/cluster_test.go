@@ -6,15 +6,15 @@ import (
 	"time"
 )
 
-func TestPeersForQuerySingle(t *testing.T) {
-	Mode = ModeSingle
+func TestPeersForQueryDev(t *testing.T) {
+	Mode = ModeDev
 	Init("node1", "test", time.Now(), "http", 6060)
 	Manager.SetPrimary(true)
 	Manager.SetPartitions([]int32{1, 2})
 	maxPrio = 10
 	Manager.SetPriority(10)
 	Manager.SetReady()
-	Convey("when cluster in single mode", t, func() {
+	Convey("when instance is in dev mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 1)
@@ -22,8 +22,8 @@ func TestPeersForQuerySingle(t *testing.T) {
 	})
 }
 
-func TestPeersForQueryMulti(t *testing.T) {
-	Mode = ModeMulti
+func TestPeersForQueryShard(t *testing.T) {
+	Mode = ModeShard
 	Init("node1", "test", time.Now(), "http", 6060)
 	manager := Manager.(*MemberlistManager)
 	manager.SetPrimary(true)
@@ -39,6 +39,7 @@ func TestPeersForQueryMulti(t *testing.T) {
 			Name:       "node2",
 			Primary:    true,
 			Partitions: []int32{1, 2},
+			Mode:       ModeShard,
 			State:      NodeReady,
 			Priority:   10,
 		},
@@ -46,6 +47,7 @@ func TestPeersForQueryMulti(t *testing.T) {
 			Name:       "node3",
 			Primary:    true,
 			Partitions: []int32{3, 4},
+			Mode:       ModeShard,
 			State:      NodeReady,
 			Priority:   10,
 		},
@@ -53,12 +55,13 @@ func TestPeersForQueryMulti(t *testing.T) {
 			Name:       "node4",
 			Primary:    true,
 			Partitions: []int32{3, 4},
+			Mode:       ModeShard,
 			State:      NodeReady,
 			Priority:   10,
 		},
 	}
 	manager.Unlock()
-	Convey("when cluster in multi mode", t, func() {
+	Convey("when cluster in shard mode", t, func() {
 		selected, err := MembersForQuery()
 		So(err, ShouldBeNil)
 		So(selected, ShouldHaveLength, 2)

@@ -11,24 +11,10 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
-type ModeType string
-
 var counter uint32
 
-const (
-	ModeSingle = "single"
-	ModeMulti  = "multi"
-)
-
-func validMode(m string) bool {
-	if ModeType(m) == ModeSingle || ModeType(m) == ModeMulti {
-		return true
-	}
-	return false
-}
-
 var (
-	Mode    ModeType
+	Mode    NodeMode
 	Manager ClusterManager
 	Tracer  opentracing.Tracer
 
@@ -44,15 +30,19 @@ func Init(name, version string, started time.Time, apiScheme string, apiPort int
 		Version:       version,
 		Primary:       primary,
 		Priority:      10000,
+		Mode:          Mode,
 		PrimaryChange: time.Now(),
 		StateChange:   time.Now(),
 		Updated:       time.Now(),
 		local:         true,
 	}
-	if Mode == ModeMulti {
-		Manager = NewMemberlistManager(thisNode)
-	} else {
+	if Mode == ModeQuery {
+		thisNode.Priority = 0
+	}
+	if Mode == ModeDev {
 		Manager = NewSingleNodeManager(thisNode)
+	} else { // Shard or Query mode
+		Manager = NewMemberlistManager(thisNode)
 	}
 	// initialize our "primary" state metric.
 	nodePrimary.Set(primary)
@@ -80,8 +70,8 @@ type partitionCandidates struct {
 // nodes with the lowest prio.
 func MembersForQuery() ([]Node, error) {
 	thisNode := Manager.ThisNode()
-	// If we are running in single mode, just return thisNode
-	if Mode == ModeSingle {
+	// If we are running in dev mode, just return thisNode
+	if Mode == ModeDev {
 		return []Node{thisNode}, nil
 	}
 
@@ -172,8 +162,8 @@ func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 	allNodes := Manager.MemberList()
 	membersMap := make(map[int32][]Node)
 
-	// If we are running in single mode, just return thisNode
-	if Mode == ModeSingle {
+	// If we are running in dev mode, just return thisNode
+	if Mode == ModeDev {
 		membersMap[0] = []Node{thisNode}
 		return membersMap, nil
 	}
@@ -185,10 +175,14 @@ func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 		if !member.IsReady() {
 			continue
 		}
-		memberStartPartition := member.GetPartitions()[0]
+		partitions := member.GetPartitions()
+		if len(partitions) == 0 {
+			continue
+		}
+		memberStartPartition := partitions[0]
 
 		if _, ok := membersMap[memberStartPartition]; !ok {
-			peerPartitions += len(member.GetPartitions())
+			peerPartitions += len(partitions)
 		}
 
 		membersMap[memberStartPartition] = append(membersMap[memberStartPartition], member)

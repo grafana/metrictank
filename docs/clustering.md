@@ -1,29 +1,40 @@
 # Clustering
 
-There are some different concerns here.  First we describe the clustering of the underlying storage, Cassandra.
+There are some different concerns here.  First we describe the clustering of the underlying store.
 Next is the clustering of metrictank itself, which is really two separate features (partitioning for horizontal scalability, and replication for high availability),
-described separately below, though they can be combined.
+described separately below, though they can, and should be combined for production clusters.
 
 ## Underlying storage
 
-For clustering (in all senses of the word) of the underlying storage, we of course can simply rely on Cassandra. It has built-in replication and data partitioning to assure both HA and load balancing.
+For clustering (in all senses of the word) of the underlying store, we rely simply on the store itself.
+* Cassandra has built-in replication and data partitioning to assure both HA and load balancing.
+* Bigtable is a highly available clustered, hosted storage system
 
-## Metrictank horizontal scaling (partitioning)
+## Metrictank itself
+
+The cluster topology is defined by how individual nodes behave within it, which happens via 2 key configuration options in the `cluster` section:
+
+* `primary-node`: controls whether or not the node persists chunks data to the store. Can also be adjusted dynamically. If disabled, also referred to as a "secondary node".
+* `mode`: how the instance participates in the cluster. There are 3 values:
+     * 'dev': gossip disabled. node is not aware of other nodes but can serve up all data it is aware of (from memory or from the store)
+     * 'shard': gossip enabled. node receives data and participates in fan-in/fan-out if it receives queries but owns only a part of the data set and spec-exec if enabled. (see below)
+     * 'query': gossip enabled. node receives no data and fans out queries to shard nodes (e.g. if you rather not query shard nodes directly)
+
+### Metrictank horizontal scaling (partitioning)
 
 If single nodes are incapable of handling your volume of metrics, you will want to split up your data in shards or partitions, and have multiple metrictank instances each handle a portion of the stream (e.g. one or a select few shards per instance).
 
 * When ingesting data via kafka, you can simply use Kafka partitions.  The partition config setting for the plugin will control which instances consume which partitions.
-* When using carbon, you can route data by setting up the carbon connections manually (possibly using a relay). It is important that you set the configuration of the plugin to reflect how you actually route your traffic.
+* When using carbon, you can route data by setting up the carbon connections manually (possibly using a relay) and align the "partition" configuration of the plugin to reflect your data stream.
 
 Any instance can serve reads for data residing anywhere in (and spread throughout) the cluster.
 Instances join the cluster by announcing themselves to the `peers` set in their configuration.
 Any pre-existing instances part of the cluster will receive the announcement directly, or via gossip.
-An instance will regularly poll the health of other nodes and involve healthy peers if they host data we might not have locally.
+An instance will regularly poll the health of other nodes and involve healthy peers if they host data we might not have locally, aka fan-out.
 
 Please see "Metrictank horizontal scaling plus high availability" below for a caveat.
 
-
-## Metrictank for high availability (replication)
+### Metrictank for high availability (replication)
 
 Metrictank achieves redundancy and fault tolerance by running multiple instances which receive identical inputs.
 One of the instances needs to have the primary role, which means it saves data chunks to Cassandra.   The other instances are secondaries.
@@ -33,10 +44,21 @@ Configuration of primary vs secondary:
 * statically in the [cluster section of the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#clustering) for each instance.
 * dynamically (see [http api docs](https://github.com/grafana/metrictank/blob/master/docs/http-api.md)) should your primary crash or you want to shut it down.
 
+### Spec-exec
+
+Also known as Speculative execution.
+When a (shard or query) node receives a query, it uses its internal topology to know which peers there are and their priority (see below).
+Using this, it'll fire off queries to all peers in parallel, to cover all partitions.
+When some peers are slow to respond (this can happen when they are garbage collecting),
+it can fire off the same query to other peers covering the same partitions and get faster results, so it can return the full response back to the client, rather than having to wait
+for the slow peers.
+Can be configured via the `cluster.speculation-threshold` setting.
+Note: currently only implemented for find requests, not yet for data requests.
+
 ### Clustering transport and synchronisation
 
 The primary sends out persistence messages when it saves chunks to Cassandra.  These messages simply detail which chunks have been saved.
-If you want to be able to promote secondaries to primaries, it's important they have been ingesting and processing these messages, so that the moment they become primary,
+If you want to be able to promote secondaries to primaries (or restart primaries), it's important they have been ingesting and processing these messages, so that the moment they become primary,
 they don't start saving all the chunks it has in memory, which could be a significant sudden load on Cassandra.
 
 Metrictank supports 1 transports for clustering: kafka, configured in the [clustering transports section in the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#clustering-transports)
@@ -60,7 +82,7 @@ The `cluster.promotion_wait` is automatically determined based on the largest ch
 
 3) open the Grafana dashboard and verify that the secondary is able to save chunks 
 
-## Combining metrictank's horizontal scaling plus high availability.
+### Combining metrictank's horizontal scaling plus high availability.
 
 If you use both the partitioning (for write load sharding) and replication (for fault tolerance) it is important that the replicas consume the same partitions, and hence, contain the same data.
 We call the "set of consumed shards" a shard group.
@@ -83,7 +105,7 @@ partitions | 0,1 | 0,2 | 1,3 | 2,3 |
 This would offer better load balancing should node A fail (B and C will each take over a portion of the load), but will require making primary status a per-partition concept.
 Hence, this is currently **not supported**.
 
-## Priority and ready state
+### Priority and ready state
 
 Priority is a measure of how in-sync a metrictank process is, expressed in seconds.
 
@@ -101,7 +123,7 @@ When the input plugin is not sure, or not started yet priority is 10k (2.8 hours
 
 Readyness or "ready state":
 
-(whenever we say "ready", "ready state" we mean the value taking into account priority, not the internal NodeState, as explained below)
+(whenever we say "ready", "ready state" we mean the value taking into account priority and gossip settle time, not the internal NodeState, as explained below)
 
 * indicates whether an instance is considered ready to satisfy data requests
 * refuses data or index requests when not ready
@@ -111,8 +133,9 @@ Readyness or "ready state":
 A node is ready when all of the following are true:
 * priority does not exceed the `cluster.max-priority` setting, which defaults to 10.
 * its internal NodeState is ready, which happens:
-  * for primary nodes, immediately after startup (loading index, starting input plugins, etc)
-  * for secondary nodes, "warm-up-period" after startup.
+  * for primary nodes and query nodes (that don't have data), immediately after startup (loading index, starting input plugins, etc)
+  * for other nodes, when we assume all data needed to respond to queries without gaps, has been consumed. (the config specifies `cluster.warm-up-period` for this)
+* gossip - if enabled - has had time to settle. (see `cluster.gossip-settle-period`).
 
 Special cases:
 * the `/node` and `/cluster` endpoint shows the internal state of the node, including the internal NodeState.

@@ -23,6 +23,9 @@ var (
 	minAvailableShards int
 	gcPercent          int
 	gcPercentNotReady  int
+	GossipSettlePeriod time.Duration // if gossip not enabled, will be 0 regardless of config
+
+	gossipSettlePeriodStr string
 
 	swimUseConfig               = "default-lan"
 	swimAdvertiseAddrStr        string
@@ -70,11 +73,12 @@ func ConfigSetup() {
 	clusterCfg.StringVar(&ClusterName, "name", "metrictank", "Unique name of the cluster.")
 	clusterCfg.BoolVar(&primary, "primary-node", false, "the primary node writes data to cassandra. There should only be 1 primary node per shardGroup.")
 	clusterCfg.StringVar(&peersStr, "peers", "", "TCP addresses of other nodes, comma separated. use this if you shard your data and want to query other instances")
-	clusterCfg.StringVar(&mode, "mode", "single", "Operating mode of cluster. (single|multi)")
+	clusterCfg.StringVar(&mode, "mode", "dev", "Operating mode of this instance within the cluster. (dev|shard|query)")
 	clusterCfg.DurationVar(&httpTimeout, "http-timeout", time.Second*60, "How long to wait before aborting http requests to cluster peers and returning a http 503 service unavailable")
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
 	clusterCfg.IntVar(&gcPercentNotReady, "gc-percent-not-ready", gcPercent, "GOGC value to use when node is not ready.  Defaults to GOGC")
+	clusterCfg.StringVar(&gossipSettlePeriodStr, "gossip-settle-period", "10s", "duration until when the cluster topology can be considered up-to-date and this node to be ready to serve requests (when gossip enabled).")
 	globalconf.Register("cluster", clusterCfg, flag.ExitOnError)
 
 	swimCfg := flag.NewFlagSet("swim", flag.ExitOnError)
@@ -101,11 +105,11 @@ func ConfigSetup() {
 
 func ConfigProcess() {
 	// check settings in cluster section
-	if !validMode(mode) {
-		log.Fatal("CLU Config: invalid cluster operating mode")
+	var err error
+	Mode, err = NodeModeFromString(mode)
+	if err != nil {
+		log.Fatalf("CLU Config: %s", err.Error())
 	}
-
-	Mode = ModeType(mode)
 
 	if httpTimeout == 0 {
 		log.Fatal("CLU Config: http-timeout must be a non-zero duration string like 60s")
@@ -125,9 +129,14 @@ func ConfigProcess() {
 		Timeout:   httpTimeout,
 	}
 
-	// all further stuff is only relevant in multi mode
-	if mode != ModeMulti {
+	// all further stuff is only relevant in shard/query mode
+	if Mode == ModeDev {
 		return
+	}
+
+	GossipSettlePeriod, err = time.ParseDuration(gossipSettlePeriodStr)
+	if err != nil {
+		log.Fatalf("CLU Config: invalid gossip-settle-period: %s", err.Error())
 	}
 
 	// check settings in swim section

@@ -20,6 +20,59 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type InvalidNodeModeErr string
+
+func (e InvalidNodeModeErr) Error() string {
+	return fmt.Sprintf("invalid cluster operating mode %q", string(e))
+}
+
+//go:generate stringer -type=NodeMode -trimprefix=Mode
+type NodeMode uint8
+
+const (
+	ModeShard NodeMode = iota
+	ModeDev
+	ModeQuery
+)
+
+// capitalized form is what stringer (.String()) generates and is used for json serialization
+func NodeModeFromString(mode string) (NodeMode, error) {
+	switch mode {
+	case "single":
+		log.Warn("CLU Config: 'single' mode deprecated. converting to 'dev' mode")
+		return ModeDev, nil
+	case "multi":
+		log.Warn("CLU Config: 'multi' mode deprecated. converting to 'shard' mode")
+		return ModeShard, nil
+	case "dev", "Dev":
+		return ModeDev, nil
+	case "shard", "Shard":
+		return ModeShard, nil
+	case "query", "Query":
+		return ModeQuery, nil
+	}
+	return 0, InvalidNodeModeErr(mode)
+}
+
+// MarshalJSON marshals a NodeMode
+func (n NodeMode) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(n.String())
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmashals a NodeMode
+func (n *NodeMode) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	*n, err = NodeModeFromString(j)
+	return err
+}
+
 //go:generate stringer -type=NodeState
 type NodeState int
 
@@ -98,6 +151,7 @@ type HTTPNode struct {
 	Version       string    `json:"version"`
 	Primary       bool      `json:"primary"`
 	PrimaryChange time.Time `json:"primaryChange"`
+	Mode          NodeMode  `json:"mode"`
 	State         NodeState `json:"state"`
 	Priority      int       `json:"priority"`
 	Started       time.Time `json:"started"`

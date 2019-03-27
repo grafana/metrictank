@@ -38,6 +38,10 @@ var (
 	totalSecondaryReady = stats.NewGauge32("cluster.total.state.secondary-ready")
 	// metric cluster.total.state.secondary-not-ready is the number of nodes we know to be secondary and not ready
 	totalSecondaryNotReady = stats.NewGauge32("cluster.total.state.secondary-not-ready")
+	// metric cluster.total.state.query-ready is the number of nodes we know to be query nodes and ready
+	totalQueryReady = stats.NewGauge32("cluster.total.state.query-ready")
+	// metric cluster.total.state.query-not-ready is the number of nodes we know to be query nodes and not ready
+	totalQueryNotReady = stats.NewGauge32("cluster.total.state.query-not-ready")
 	// metric cluster.total.partitions is the number of partitions in the cluster that we know of
 	totalPartitions = stats.NewGauge32("cluster.total.partitions")
 
@@ -184,6 +188,8 @@ func (c *MemberlistManager) clusterStats() {
 	primNotReady := 0
 	secReady := 0
 	secNotReady := 0
+	queryReady := 0
+	queryNotReady := 0
 	partitions := make(map[int32]int)
 	for _, p := range c.members {
 		if p.Primary {
@@ -192,11 +198,17 @@ func (c *MemberlistManager) clusterStats() {
 			} else {
 				primNotReady++
 			}
-		} else {
+		} else if p.Mode != ModeQuery {
 			if p.IsReady() {
 				secReady++
 			} else {
 				secNotReady++
+			}
+		} else {
+			if p.IsReady() {
+				queryReady++
+			} else {
+				queryNotReady++
 			}
 		}
 		for _, partition := range p.Partitions {
@@ -208,6 +220,8 @@ func (c *MemberlistManager) clusterStats() {
 	totalPrimaryNotReady.Set(primNotReady)
 	totalSecondaryReady.Set(secReady)
 	totalSecondaryNotReady.Set(secNotReady)
+	totalQueryReady.Set(queryReady)
+	totalQueryNotReady.Set(queryNotReady)
 
 	totalPartitions.Set(len(partitions))
 }
