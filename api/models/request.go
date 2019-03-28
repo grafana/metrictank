@@ -23,7 +23,7 @@ type Req struct {
 	MaxPoints    uint32                     `json:"maxPoints"`
 	RawInterval  uint32                     `json:"rawInterval"`  // the interval of the raw metric before any consolidation
 	Consolidator consolidation.Consolidator `json:"consolidator"` // consolidation method for rollup archive and normalization. (not runtime consolidation)
-	// requested consolidation method: either same as Consolidator, or 0 (meaning use configured default)
+	// requested consolidation method. could be 0 (meaning use configured default)
 	// we need to make this differentiation to tie back to the original request (and we can't just fill in the concrete consolidation in the request,
 	// because one request may result in multiple series with different consolidators)
 	ConsReq  consolidation.Consolidator `json:"consolidator_req"`

@@ -666,7 +666,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 					var cons consolidation.Consolidator
 					consReq := r.Cons
 					if consReq == 0 {
-						// unless the user overrode the consolidation to use via a consolidateBy
 						// we will use the primary method dictated by the storage-aggregations rules
 						// note:
 						// * we can't just let the expr library take care of normalization, as we may have to fetch targets
@@ -675,6 +674,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
 						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
 					} else {
+						// user specified a runtime consolidation function via consolidateBy()
 						// get the consolidation method of the most appropriate rollup based on the consolidation method
 						// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
 						// use 'avg'.
