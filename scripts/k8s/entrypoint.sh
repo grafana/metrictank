@@ -26,7 +26,7 @@ fi
 
 # set cluster PEERs
 if [ ! -z "$LABEL_SELECTOR" ]; then
-	export MT_CLUSTER_MODE=${MT_CLUSTER_MODE:-"shard"}
+	export MT_CLUSTER_MODE=${MT_CLUSTER_MODE:-shard}
 	POD_NAMESPACE=${POD_NAMESPACE:-default}
 	SERVICE_NAME=${SERVICE_NAME:-metrictank}
 	if [ ! -z $KUBERNETES_SERVICE_PORT_HTTP ]; then
