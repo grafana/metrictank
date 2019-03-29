@@ -62,9 +62,7 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 	// get []int of the lengths of all of the mn.Nodes
 	lns, ok := IdxIntern.Len(mn.nodes)
 	if !ok {
-		internError.Inc()
-		log.Error("idx: Failed to retrieve length of strings from interning library for MetricName")
-		return ""
+		panic("idx: Failed to retrieve length of strings from interning library for MetricName")
 	}
 
 	// should be faster than calling IdxIntern.SetString in a tight loop
@@ -147,13 +145,11 @@ func (t *TagKeyValue) String() string {
 func (t *TagKeyValue) string(bld *strings.Builder) string {
 	key, err := IdxIntern.GetStringFromPtr(t.Key)
 	if err != nil {
-		log.Error("idx: Failed to retrieve interned tag key: ", err)
-		internError.Inc()
+		panic(fmt.Sprintf("idx: Failed to retrieve interned tag key: %v", err))
 	}
 	val, err := IdxIntern.GetStringFromPtr(t.Value)
 	if err != nil {
-		log.Error("idx: Failed to retrieve interned tag value: ", err)
-		internError.Inc()
+		panic(fmt.Sprintf("idx: Failed to retrieve interned tag value: %v", err))
 	}
 
 	bld.WriteString(key)
@@ -345,9 +341,7 @@ func (md *MetricDefinition) NameWithTags() string {
 	for _, tag := range md.Tags.KeyValues {
 		key, err := IdxIntern.GetStringFromPtr(tag.Key)
 		if err != nil {
-			log.Error("idx: Failed to retrieve interned tag key: ", err)
-			internError.Inc()
-			continue
+			panic(fmt.Sprintf("idx: Failed to retrieve interned tag key: %v", err))
 		}
 		if key == "name" {
 			continue
