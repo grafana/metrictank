@@ -409,7 +409,10 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		return CloneArchive(existing), oldPart, ok
 	}
 
-	def := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
+	def, err := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
+	if err != nil {
+		return idx.Archive{}, 0, false
+	}
 	def.Partition = partition
 
 	archive := createArchive(def)
