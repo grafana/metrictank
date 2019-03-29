@@ -516,6 +516,23 @@ func (md *MetricDefinition) SetId() {
 	}
 }
 
+// ConvertToSchemaMd converts an idx.MetricDefinition to a schema.MetricDefinition
+func (md *MetricDefinition) ConvertToSchemaMd() schema.MetricDefinition {
+	smd := schema.MetricDefinition{
+		Id:         md.Id,
+		OrgId:      md.OrgId,
+		Name:       md.Name.String(),
+		Interval:   md.Interval,
+		Unit:       md.Unit,
+		Mtype:      md.Mtype(),
+		Tags:       md.Tags.Strings(),
+		LastUpdate: md.LastUpdate,
+		Partition:  md.Partition,
+	}
+	smd.NameWithTags() //ensure nameWithTags is set
+	return smd
+}
+
 // MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition
 // based on them.
 func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricData) (*MetricDefinition, error) {
