@@ -79,7 +79,7 @@ func TestMetricDefinitionConversion(t *testing.T) {
 	idxMds := genMetricDefinitions(5)
 	schemaMds := make([]schema.MetricDefinition, 5)
 	for i := 0; i < 5; i++ {
-		schemaMds[i] = convertIdxMdToSchemaMd(idxMds[i])
+		schemaMds[i] = idxMds[i].ConvertToSchemaMd()
 		err := compareSchemaWithIdxMd(schemaMds[i], idxMds[i])
 		if err != nil {
 			t.Error(err)
