@@ -409,7 +409,10 @@ func (c *CasIdx) load(defs []idx.MetricDefinition, iter cqlIterator, now time.Ti
 			Interval:   interval,
 			LastUpdate: lastupdate,
 		}
-		mdef.SetMetricName(name)
+		err = mdef.SetMetricName(name)
+		if err != nil {
+			continue
+		}
 		mdef.SetUnit(unit)
 		mdef.SetMType(mtype)
 		mdef.SetTags(tags)

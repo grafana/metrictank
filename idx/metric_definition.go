@@ -94,7 +94,7 @@ func (mn *MetricName) setMetricName(name string) error {
 		if err != nil {
 			log.Error("idx: Failed to acquire interned string for node name: ", err)
 			internError.Inc()
-			return fmt.Errorf("idx: Failed to acquire interned string for node name: %v", err)
+			return fmt.Errorf("idx: Failed to acquire interned string for node %v, %v", node, err)
 		}
 		mn.nodes[i] = nodePtr
 	}
@@ -425,7 +425,7 @@ func (md *MetricDefinition) SetUnit(unit string) {
 // SetMetricName interns the MetricName in an
 // object store and stores the addresses of those strings
 // in MetricName.nodes
-func (md *MetricDefinition) SetMetricName(name string) {
+func (md *MetricDefinition) SetMetricName(name string) error {
 	nodes := strings.Split(name, ".")
 	md.Name.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
@@ -434,9 +434,12 @@ func (md *MetricDefinition) SetMetricName(name string) {
 		if err != nil {
 			log.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
 			internError.Inc()
+			return fmt.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
 		}
 		md.Name.nodes[i] = nodePtr
 	}
+
+	return nil
 }
 
 // SetTags takes a []string which should contain Key/Value pairs
@@ -521,7 +524,7 @@ func (md *MetricDefinition) SetId() {
 
 // MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition
 // based on them.
-func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricData) *MetricDefinition {
+func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricData) (*MetricDefinition, error) {
 	md := &MetricDefinition{
 		Id:         mkey,
 		OrgId:      uint32(d.OrgId),
@@ -529,12 +532,15 @@ func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricDa
 		LastUpdate: d.Time,
 	}
 
-	md.SetMetricName(d.Name)
+	err := md.SetMetricName(d.Name)
+	if err != nil {
+		return &MetricDefinition{}, err
+	}
 	md.SetUnit(d.Unit)
 	md.SetMType(d.Mtype)
 	md.SetTags(d.Tags)
 
-	return md
+	return md, nil
 }
 
 // MetricDefinitionFromMetricData takes a MetricData, attempts to generate an MKey for it,
@@ -545,5 +551,5 @@ func MetricDefinitionFromMetricData(d *schema.MetricData) (*MetricDefinition, er
 		return nil, fmt.Errorf("idx: Error parsing ID: %s", err)
 	}
 
-	return MetricDefinitionFromMetricDataWithMKey(mkey, d), nil
+	return MetricDefinitionFromMetricDataWithMKey(mkey, d)
 }

@@ -47,7 +47,10 @@ type Archive struct {
 func NewArchiveBare(name string) Archive {
 	arc := Archive{}
 	arc.MetricDefinition = new(MetricDefinition)
-	arc.MetricDefinition.SetMetricName(name)
+	err := arc.MetricDefinition.SetMetricName(name)
+	if err != nil {
+		return Archive{}
+	}
 	return arc
 }
 

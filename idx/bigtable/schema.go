@@ -80,7 +80,10 @@ func RowToSchema(row bigtable.Row, def *idx.MetricDefinition) error {
 				def.OrgId = uint32(val)
 			}
 		case "Name":
-			def.SetMetricName(string(col.Value))
+			err := def.SetMetricName(string(col.Value))
+			if err != nil {
+				return err
+			}
 		case "Interval":
 			val, err = binary.ReadVarint(bytes.NewReader(col.Value))
 			if err != nil {

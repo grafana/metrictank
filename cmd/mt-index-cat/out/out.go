@@ -6,14 +6,32 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/raintank/schema"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/idx"
 )
 
 var QueryTime int64
 
+func convertIdxMdToSchemaMd(d idx.MetricDefinition) schema.MetricDefinition {
+	md := schema.MetricDefinition{
+		Id:         d.Id,
+		OrgId:      d.OrgId,
+		Name:       d.Name.String(),
+		Interval:   d.Interval,
+		Unit:       d.Unit,
+		Mtype:      d.Mtype(),
+		Tags:       d.Tags.Strings(),
+		LastUpdate: d.LastUpdate,
+		Partition:  d.Partition,
+	}
+	md.NameWithTags() //ensure nameWithTags is set
+	return md
+}
+
 func Dump(d idx.MetricDefinition) {
-	spew.Dump(d)
+	spew.Dump(convertIdxMdToSchemaMd(d))
 }
 
 <<<<<<< HEAD
@@ -50,7 +68,8 @@ func Template(format string) func(d idx.MetricDefinition) {
 	tpl := template.Must(template.New("format").Funcs(funcs).Parse(format))
 
 	return func(d idx.MetricDefinition) {
-		err := tpl.Execute(os.Stdout, &d)
+		md := convertIdxMdToSchemaMd(d)
+		err := tpl.Execute(os.Stdout, &md)
 		if err != nil {
 			panic(err)
 		}
