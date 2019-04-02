@@ -282,7 +282,7 @@ func (c *FindCache) processInvalidateQueue() {
 			}
 			buf.buffer[req.orgId] = append(buf.buffer[req.orgId], req)
 			buf.count++
-			if int(buf.count) >= c.invalidateQueueSize {
+			if int(buf.count) >= c.invalidateMaxSize {
 				if !timer.Stop() {
 					<-timer.C
 				}
