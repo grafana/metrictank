@@ -193,6 +193,15 @@ func (c *FindCache) processInvalidateQueue() {
 
 	processQueue := func() {
 		for orgid, reqs := range buf.buffer {
+			c.RLock()
+			cache := c.cache[orgid]
+			c.RUnlock()
+
+			// nothing cached for this org. nothing to do
+			if cache == nil {
+				continue
+			}
+
 			// construct a tree including all of the now-invalid paths
 			// we can then call `find(tree, pattern)` for each pattern in the cache and purge it if it matches the tree
 			// we can't simply prune all cache keys that equal path or a subtree of it, because
@@ -201,10 +210,6 @@ func (c *FindCache) processInvalidateQueue() {
 			for _, req := range reqs {
 				tree.add(req.path)
 			}
-
-			c.RLock()
-			cache := c.cache[orgid]
-			c.RUnlock()
 
 			for _, k := range cache.Keys() {
 				matches, err := find((*Tree)(tree), k.(string))
