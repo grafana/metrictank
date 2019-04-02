@@ -731,19 +731,19 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:436f98cdc482798ed4c9ce40bca0c9e79de3b9ec6f22169ede9b8641ea2c82f5"
+  digest = "1:441eb37ed43d9bbb0016a616d03ec2e9e5b98374fdd607111656b231ea9eb383"
   name = "github.com/replay/go-generic-object-store"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "77a7c6ea041c0ad49c4e1c28f528356de8f270b6"
+  revision = "8c52832c468de58c14cd3ac4223188ac523a569e"
 
 [[projects]]
   branch = "master"
-  digest = "1:ab77ea0d6140f17621d9c420ea2dc1015e6fd1f229d4e0720eacdf6f42b636df"
+  digest = "1:e26536c11bb945e55bf981514b0d0716570c299d57aab58168b1049c7ceb5ff3"
   name = "github.com/robert-milan/go-object-interning"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "da91d5ae7d57c5a1eaed5c6ceccdf5ace8ef9ab5"
+  revision = "79ed8585eda3bf89a8abfffe81a3ddd4d5418109"
 
 [[projects]]
   digest = "1:c5741d3d03a06220bcca801547f28de803103249b739eb5537e54b77e89f435a"

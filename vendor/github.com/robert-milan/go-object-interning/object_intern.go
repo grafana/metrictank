@@ -3,6 +3,7 @@ package goi
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -15,8 +16,8 @@ import (
 type ObjectIntern struct {
 	sync.RWMutex
 	conf       ObjectInternConfig
-	Store      gos.ObjectStore
-	ObjIndex   map[string]uintptr
+	store      gos.ObjectStore
+	objIndex   map[string]uintptr
 	compress   func(in []byte) []byte
 	decompress func(in []byte) ([]byte, error)
 }
@@ -26,8 +27,8 @@ type ObjectIntern struct {
 func NewObjectIntern(c ObjectInternConfig) *ObjectIntern {
 	oi := ObjectIntern{
 		conf:     Config,
-		Store:    gos.NewObjectStore(100),
-		ObjIndex: make(map[string]uintptr),
+		store:    gos.NewObjectStore(100),
+		objIndex: make(map[string]uintptr),
 	}
 
 	// set compression and decompression functions
@@ -87,10 +88,7 @@ func (oi *ObjectIntern) DecompressString(in string) (string, error) {
 		return in, nil
 	}
 	b, err := oi.decompress([]byte(in))
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
+	return string(b), err
 }
 
 // AddOrGet finds or adds an object and returns its uintptr and nil upon success.
@@ -122,13 +120,13 @@ func (oi *ObjectIntern) AddOrGet(obj []byte, safe bool) (uintptr, error) {
 	}
 
 	// string used for the index
-	objString = string(obj)
+	objString = string(objComp)
 
 	// acquire lock
 	oi.Lock()
 
 	// try to find the object in the index
-	addr, ok = oi.ObjIndex[objString]
+	addr, ok = oi.objIndex[objString]
 	if ok {
 		// increment reference count by 1
 		(*(*uint32)(unsafe.Pointer(addr + uintptr(len(objComp)))))++
@@ -144,7 +142,7 @@ func (oi *ObjectIntern) AddOrGet(obj []byte, safe bool) (uintptr, error) {
 	// henceforth as the reference count for this object. Reference count is
 	// always placed as the LAST 4 bytes of an object and is NEVER compressed.
 	objComp = append(objComp, []byte{0x1, 0x0, 0x0, 0x0}...)
-	addr, err = oi.Store.Add(objComp)
+	addr, err = oi.store.Add(objComp)
 	if err != nil {
 		oi.Unlock()
 		return 0, err
@@ -154,7 +152,7 @@ func (oi *ObjectIntern) AddOrGet(obj []byte, safe bool) (uintptr, error) {
 	((*reflect.StringHeader)(unsafe.Pointer(&objString))).Data = addr
 
 	// add the object to the index
-	oi.ObjIndex[objString] = addr
+	oi.objIndex[objString] = addr
 
 	oi.Unlock()
 	return addr, nil
@@ -195,7 +193,7 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 	oi.Lock()
 
 	// try to find the object in the index
-	addr, ok = oi.ObjIndex[objString]
+	addr, ok = oi.objIndex[objString]
 	if ok {
 		// increment reference count by 1
 		(*(*uint32)(unsafe.Pointer(addr + uintptr(len(objComp)))))++
@@ -218,7 +216,7 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 	// henceforth as the reference count for this object. Reference count is
 	// always placed as the LAST 4 bytes of an object and is NEVER compressed.
 	objComp = append(objComp, []byte{0x1, 0x0, 0x0, 0x0}...)
-	addr, err = oi.Store.Add(objComp)
+	addr, err = oi.store.Add(objComp)
 	if err != nil {
 		oi.Unlock()
 		return "", err
@@ -228,7 +226,7 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 	(*reflect.StringHeader)(unsafe.Pointer(&objString)).Data = addr
 
 	// add the object to the index
-	oi.ObjIndex[objString] = addr
+	oi.objIndex[objString] = addr
 
 	oi.Unlock()
 	if oi.conf.Compression != None {
@@ -263,7 +261,7 @@ func (oi *ObjectIntern) GetPtrFromByte(obj []byte) (uintptr, error) {
 	oi.RLock()
 
 	// try to find the object in the index
-	addr, ok = oi.ObjIndex[objString]
+	addr, ok = oi.objIndex[objString]
 	if ok {
 		oi.RUnlock()
 		return addr, nil
@@ -282,7 +280,7 @@ func (oi *ObjectIntern) GetStringFromPtr(objAddr uintptr) (string, error) {
 	oi.RLock()
 	defer oi.RUnlock()
 
-	b, err := oi.Store.Get(objAddr)
+	b, err := oi.store.Get(objAddr)
 	if err != nil {
 		return "", err
 	}
@@ -290,12 +288,9 @@ func (oi *ObjectIntern) GetStringFromPtr(objAddr uintptr) (string, error) {
 	if oi.conf.Compression != None {
 		// get decompressed []byte after removing the trailing 4 bytes for the reference count
 		b, err = oi.decompress(b[:len(b)-4])
-		if err != nil {
-			return "", err
-		}
 		// because compression is turned on we can't just set string's Data to the address,
 		// we need to actually create a new string from the decompressed []byte
-		return string(b), nil
+		return string(b), err
 	}
 
 	// since compression is turned off, we can simply use the uncompressed interned data for the string
@@ -325,7 +320,7 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	oi.Lock()
 
 	// check if object exists in the object store
-	compObj, err = oi.Store.Get(objAddr)
+	compObj, err = oi.store.Get(objAddr)
 	if err != nil {
 		oi.Unlock()
 		return false, err
@@ -351,10 +346,10 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	// access the key to delete it from the ObjIndex you will get a SEGFAULT
 	//
 	// remove 4 trailing bytes for reference count since ObjIndex does not store reference count in the key
-	delete(oi.ObjIndex, string(compObj[:len(compObj)-4]))
+	delete(oi.objIndex, string(compObj[:len(compObj)-4]))
 
 	// delete object from object store
-	err = oi.Store.Delete(objAddr)
+	err = oi.store.Delete(objAddr)
 
 	if err == nil {
 		oi.Unlock()
@@ -388,7 +383,7 @@ func (oi *ObjectIntern) DeleteByByte(obj []byte) (bool, error) {
 	oi.RLock()
 
 	// try to find the object in the index
-	addr, ok = oi.ObjIndex[objString]
+	addr, ok = oi.objIndex[objString]
 	if !ok {
 		oi.RUnlock()
 		return false, fmt.Errorf("Could not find object in store")
@@ -420,7 +415,7 @@ func (oi *ObjectIntern) DeleteByString(obj string) (bool, error) {
 	oi.RLock()
 
 	// try to find the object in the index
-	addr, ok = oi.ObjIndex[obj]
+	addr, ok = oi.objIndex[obj]
 	if !ok {
 		oi.RUnlock()
 		return false, fmt.Errorf("Could not find object in store")
@@ -439,7 +434,7 @@ func (oi *ObjectIntern) RefCnt(objAddr uintptr) (uint32, error) {
 	defer oi.RUnlock()
 
 	// check if object exists in the object store
-	compObj, err := oi.Store.Get(objAddr)
+	compObj, err := oi.store.Get(objAddr)
 	if err != nil {
 		return 0, err
 	}
@@ -460,7 +455,7 @@ func (oi *ObjectIntern) ObjBytes(objAddr uintptr) ([]byte, error) {
 	oi.RLock()
 	defer oi.RUnlock()
 
-	b, err := oi.Store.Get(objAddr)
+	b, err := oi.store.Get(objAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -468,10 +463,7 @@ func (oi *ObjectIntern) ObjBytes(objAddr uintptr) ([]byte, error) {
 	if oi.conf.Compression != None {
 		// remove 4 trailing bytes for reference count and decompress
 		b, err = oi.decompress(b[:len(b)-4])
-		if err != nil {
-			return nil, err
-		}
-		return b, nil
+		return b, err
 	}
 
 	// remove 4 trailing bytes for reference count
@@ -489,7 +481,7 @@ func (oi *ObjectIntern) ObjString(objAddr uintptr) (string, error) {
 	oi.RLock()
 	defer oi.RUnlock()
 
-	b, err := oi.Store.Get(objAddr)
+	b, err := oi.store.Get(objAddr)
 	if err != nil {
 		return "", err
 	}
@@ -517,7 +509,7 @@ func (oi *ObjectIntern) Len(ptrs []uintptr) (retLn []int, all bool) {
 	defer oi.RUnlock()
 
 	for idx, ptr := range ptrs {
-		b, err := oi.Store.Get(ptr)
+		b, err := oi.store.Get(ptr)
 		if err != nil {
 			return retLn, false
 		}
@@ -525,4 +517,118 @@ func (oi *ObjectIntern) Len(ptrs []uintptr) (retLn []int, all bool) {
 		retLn[idx] = len(b) - 4
 	}
 	return
+}
+
+// JoinStrings takes a slice of uintptr and returns a reconstructed string using sep
+// as the separator.
+func (oi *ObjectIntern) JoinStrings(nodes []uintptr, sep string) (string, error) {
+	if oi.conf.Compression != None {
+		return oi.joinStringsCompressed(nodes, sep)
+	}
+
+	return oi.joinStringsUncompressed(nodes, sep)
+}
+
+func (oi *ObjectIntern) joinStringsCompressed(nodes []uintptr, sep string) (string, error) {
+	switch len(nodes) {
+	case 0:
+		return "", fmt.Errorf("Cannot create string from 0 length slice")
+	case 1:
+		single, err := oi.GetStringFromPtr(nodes[0])
+		return single, err
+	}
+
+	var bld strings.Builder
+
+	first, err := oi.GetStringFromPtr(nodes[0])
+	if err != nil {
+		return "", err
+	}
+	bld.WriteString(first)
+
+	for _, nodePtr := range nodes[1:] {
+		tmpString, err := oi.GetStringFromPtr(nodePtr)
+		if err != nil {
+			return "", err
+		}
+		bld.WriteString(sep)
+		bld.WriteString(tmpString)
+	}
+
+	return bld.String(), nil
+}
+
+func (oi *ObjectIntern) joinStringsUncompressed(nodes []uintptr, sep string) (string, error) {
+	switch len(nodes) {
+	case 0:
+		return "", fmt.Errorf("Cannot create string from 0 length slice")
+	case 1:
+		single, err := oi.GetStringFromPtr(nodes[0])
+		return single, err
+	}
+
+	lengths, complete := oi.Len(nodes)
+	if !complete {
+		return "", fmt.Errorf("Could not find object in store")
+	}
+
+	totalSize := len(sep) * (len(nodes) - 1)
+	for _, length := range lengths {
+		totalSize += length
+	}
+
+	var tmpString string
+	var bld strings.Builder
+	bld.Grow(totalSize)
+
+	stringHeader := (*reflect.StringHeader)(unsafe.Pointer(&tmpString))
+
+	stringHeader.Data = nodes[0]
+	stringHeader.Len = lengths[0]
+	bld.WriteString(tmpString)
+
+	for idx, nodePtr := range nodes[1:] {
+		stringHeader.Data = nodePtr
+		stringHeader.Len = lengths[idx+1]
+		bld.WriteString(sep)
+		bld.WriteString(tmpString)
+	}
+
+	return bld.String(), nil
+}
+
+func (oi *ObjectIntern) FragStatsByObjSize(objSize uint8) (float32, error) {
+	oi.RLock()
+	defer oi.RUnlock()
+	return oi.store.FragStatsByObjSize(objSize)
+}
+
+func (oi *ObjectIntern) FragStatsPerPool() []gos.FragStat {
+	oi.RLock()
+	defer oi.RUnlock()
+	return oi.store.FragStatsPerPool()
+}
+
+func (oi *ObjectIntern) FragStatsTotal() (float32, error) {
+	oi.RLock()
+	defer oi.RUnlock()
+	return oi.store.FragStatsTotal()
+}
+
+func (oi *ObjectIntern) MemStatsByObjSize(objSize uint8) (uint64, error) {
+	oi.RLock()
+	defer oi.RUnlock()
+	return oi.store.MemStatsByObjSize(objSize)
+}
+
+func (oi *ObjectIntern) MemStatsPerPool() []gos.MemStat {
+	oi.RLock()
+	defer oi.RUnlock()
+	return oi.store.MemStatsPerPool()
+}
+
+func (oi *ObjectIntern) MemStatsTotal() (uint64, error) {
+	oi.RLock()
+	defer oi.RUnlock()
+	return oi.store.MemStatsTotal()
 }
