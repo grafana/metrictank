@@ -18,6 +18,11 @@ var (
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.miss")
 )
 
+type invalidateRequest struct {
+	orgId uint32
+	path  string
+}
+
 // FindCache is a caching layer for the in-memory index. The cache provides
 // per org LRU caches of patterns and the resulting []*Nodes from searches
 // on the index.  Users should call `InvalidateFor(orgId, path)` when new
@@ -31,7 +36,9 @@ var (
 type FindCache struct {
 	size                int
 	invalidateQueueSize int
-	backoffTime         time.Duration
+	invalidateWaitTime  time.Duration
+	shutdown            chan struct{}
+	invalidateQueue     chan invalidateRequest
 
 	cache     map[uint32]*lru.Cache
 	newSeries map[uint32]chan struct{}
@@ -39,14 +46,15 @@ type FindCache struct {
 	sync.RWMutex
 }
 
-func NewFindCache(size, invalidateQueueSize int, backoffTime time.Duration) *FindCache {
+func NewFindCache(size, invalidateQueueSize int, invalidateWaitTime time.Duration) *FindCache {
 	fc := &FindCache{
 		cache:               make(map[uint32]*lru.Cache),
 		size:                size,
 		invalidateQueueSize: invalidateQueueSize,
-		backoffTime:         backoffTime,
+		invalidateWaitTime:  invalidateWaitTime,
 		newSeries:           make(map[uint32]chan struct{}),
 		backoff:             make(map[uint32]time.Time),
+		invalidateQueue:     make(chan invalidateRequest, invalidateQueueSize*2),
 	}
 	return fc
 }
@@ -125,6 +133,10 @@ func (c *FindCache) PurgeAll() {
 // disable it for `backoffTime`. Future InvalidateFor calls made during
 // the backoff time will then return immediately.
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
+	if time.Now().Before(c.backoff[orgId]) {
+		return
+	}
+
 	c.RLock()
 	ch := c.newSeries[orgId]
 	cache, ok := c.cache[orgId]
@@ -137,7 +149,8 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	case ch <- struct{}{}:
 	default:
 		c.Lock()
-		c.backoff[orgId] = time.Now().Add(c.backoffTime)
+		// TODO: set this back to a minute, move it back down to processQueue
+		c.backoff[orgId] = time.Now().Add(c.invalidateWaitTime)
 		delete(c.cache, orgId)
 		c.Unlock()
 		for i := 0; i < len(ch); i++ {
@@ -146,30 +159,91 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 			default:
 			}
 		}
-		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
+		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.invalidateWaitTime.String(), cache.Len())
 		return
 	}
+	c.invalidateQueue <- invalidateRequest{
+		orgId: orgId,
+		path:  path,
+	}
+}
 
-	// convert our path to a tree so that we can call `find(tree, pattern)`
-	// for each pattern in the cache and purge it if it matches the path or a subtree of it.
-	// we can't simply prune all cache keys that equal path or a subtree of it, because
-	// what's cached are search patterns which may contain wildcards and other expressions
-	tree := newBareTree()
-	tree.add(path)
+func (c *FindCache) processInvalidateQueue() {
+	type invalidateBuffer struct {
+		bufffer map[uint32][]invalidateRequest
+		count   uint32
+	}
+	timer := time.NewTimer(c.invalidateWaitTime)
+	buf := invalidateBuffer{
+		bufffer: make(map[uint32][]invalidateRequest),
+	}
+	var byOrg map[uint32][]invalidateRequest
 
-	for _, k := range cache.Keys() {
-		matches, err := find((*Tree)(tree), k.(string))
-		if err != nil {
-			log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
-			continue
+	dumpCache := func() {
+		c.PurgeAll()
+	}
+
+	processQueue := func() {
+		for i, ir := range buf {
+			byOrg = make(map[uint32][]invalidateRequest)
+			byOrg[ir.orgId] = append(byOrg[ir.orgId], ir)
 		}
-		if len(matches) > 0 {
-			cache.Remove(k)
+
+		for _, irs := range byOrg {
+			if len(irs) < 1 {
+				continue
+			}
+			for i, ir := range irs {
+
+			}
+		}
+
+		// convert our path to a tree so that we can call `find(tree, pattern)`
+		// for each pattern in the cache and purge it if it matches the path or a subtree of it.
+		// we can't simply prune all cache keys that equal path or a subtree of it, because
+		// what's cached are search patterns which may contain wildcards and other expressions
+		tree := newBareTree()
+		tree.add(path)
+
+		for _, k := range cache.Keys() {
+			matches, err := find(tree, k.(string))
+			if err != nil {
+				log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
+				continue
+			}
+			if len(matches) > 0 {
+				cache.Remove(k)
+			}
+		}
+		select {
+		case <-ch:
+		default:
 		}
 	}
-	select {
-	case <-ch:
-	default:
+
+	for {
+		select {
+		case <-timer.C:
+			timer.Reset(c.invalidateWaitTime)
+			if len(c.invalidateQueue) > 0 {
+				processQueue()
+			}
+		case iqr := <-c.invalidateQueue:
+			if len(c.invalidateQueue) == c.invalidateQueueSize*2-1 {
+				log.Info("memory-idx: findCache was full, clearing entire findCache")
+				dumpCache()
+			}
+			buf.bufffer = append(buf.bufffer, iqr)
+			if len(buf.bufffer) >= c.invalidateQueueSize {
+				if !timer.Stop() {
+					<-timer.C
+				}
+				timer.Reset(c.invalidateWaitTime)
+				processQueue()
+			}
+		case <-c.shutdown:
+			return
+		}
 	}
 }
 
