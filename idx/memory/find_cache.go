@@ -171,10 +171,12 @@ func (c *FindCache) triggerBackoff() {
 	c.backoff = time.Now().Add(c.backoffTime)
 	c.cache = make(map[uint32]*lru.Cache)
 	// drain queue
+L:
 	for {
-		_, ok := <-c.invalidateReqs
-		if !ok {
-			break
+		select {
+		case <-c.invalidateReqs:
+		default:
+			break L
 		}
 	}
 }
