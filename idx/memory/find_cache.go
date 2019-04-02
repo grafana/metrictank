@@ -188,10 +188,6 @@ func (c *FindCache) processInvalidateQueue() {
 		buffer: make(map[uint32][]invalidateRequest),
 	}
 
-	dumpCache := func() {
-		c.PurgeAll()
-	}
-
 	processQueue := func() {
 		for orgid, reqs := range buf.buffer {
 			// construct a tree including all of the now-invalid paths
@@ -215,6 +211,9 @@ func (c *FindCache) processInvalidateQueue() {
 				}
 			}
 		}
+		// all done, reset the buffer
+		buf.buffer = make(map[uint32][]invalidateRequest)
+		buf.count = 0
 	}
 
 	for {
@@ -225,9 +224,12 @@ func (c *FindCache) processInvalidateQueue() {
 				processQueue()
 			}
 		case req := <-c.invalidateReqs:
-			if len(c.invalidateReqs) == c.invalidateQueueSize*2-1 {
-				log.Info("memory-idx: findCache was full, clearing entire findCache")
-				dumpCache()
+			if len(c.invalidateReqs) == c.invalidateQueueSize-1 {
+				log.Info("memory-idx: findCache invalidation channel was full, clearing findCache") // note: responsibility of InvalidateFor to set up backoff
+				c.PurgeAll()
+				buf.buffer = make(map[uint32][]invalidateRequest)
+				buf.count = 0
+				continue
 			}
 			buf.buffer[req.orgId] = append(buf.buffer[req.orgId], req)
 			buf.count += 1
