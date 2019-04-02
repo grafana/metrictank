@@ -873,7 +873,7 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 	defer func() {
 		TagSupport = _tagSupport
 	}()
-	findCacheInvalidateQueue = 10
+	findCacheInvalidateQueueSize = 10
 	InitLargeIndex()
 	queryCount := len(queries)
 	var wg sync.WaitGroup

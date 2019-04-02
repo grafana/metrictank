@@ -401,12 +401,11 @@
   revision = "9bdd37bfb26bd039c08b0f36be6f80ceede4aaf3"
 
 [[projects]]
-  digest = "1:e831b0374fcf4e93da5e7980be00f0b4a4cd6014df78a5ef48d708d3dff7f060"
+  digest = "1:395b1480ae42c3fec6fff19823e66e173819f85826811387f9045c88515a7f0f"
   name = "github.com/jtolds/gls"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "8ddce2a84170772b95dd5d576c48d517b22cac63"
-  version = "v4.2.0"
+  revision = "b4936e06046bbecbb94cae9c18127ebe510a2cb9"
 
 [[projects]]
   digest = "1:f392d4a257904a86bee1467a5b2221f475cea9da2c89ad6f6675eb0cf43bc100"

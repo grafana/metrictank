@@ -29,6 +29,13 @@ func (b *Bool) Set(val bool) {
 	}
 }
 
+func (b *Bool) Peek() bool {
+	if atomic.LoadUint32(&b.val) == 0 {
+		return false
+	}
+	return true
+}
+
 func (b *Bool) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&b.val)
 	buf = WriteUint32(buf, prefix, []byte("gauge1"), val, now)

@@ -47,18 +47,20 @@ var (
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
-	Enabled                  bool
-	matchCacheSize           int
-	maxPruneLockTime         = time.Millisecond * 100
-	maxPruneLockTimeStr      string
-	TagSupport               bool
-	TagQueryWorkers          int // number of workers to spin up when evaluation tag expressions
-	indexRulesFile           string
-	IndexRules               conf.IndexRules
-	Partitioned              bool
-	findCacheSize            = 1000
-	findCacheInvalidateQueue = 100
-	findCacheBackoff         = time.Minute
+	Enabled                      bool
+	matchCacheSize               int
+	maxPruneLockTime             = time.Millisecond * 100
+	maxPruneLockTimeStr          string
+	TagSupport                   bool
+	TagQueryWorkers              int // number of workers to spin up when evaluation tag expressions
+	indexRulesFile               string
+	IndexRules                   conf.IndexRules
+	Partitioned                  bool
+	findCacheSize                = 1000
+	findCacheInvalidateQueueSize = 200
+	findCacheInvalidateMaxSize   = 100
+	findCacheInvalidateMaxWait   = 5 * time.Second
+	findCacheBackoffTime         = time.Minute
 )
 
 func ConfigSetup() {
@@ -68,9 +70,11 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache")
-	memoryIdx.IntVar(&findCacheInvalidateQueue, "find-cache-invalidate-queue", 100, "size of queue for invalidating findCache entries.")
-	memoryIdx.DurationVar(&findCacheBackoff, "find-cache-backoff", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
+	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org)")
+	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
+	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
+	memoryIdx.DurationVar(&findCacheInvalidateMaxWait, "find-cache-invalidate-max-wait", 5*time.Second, "max duration to wait building up a batch to invalidate")
+	memoryIdx.DurationVar(&findCacheBackoffTime, "find-cache-backoff-time", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
@@ -93,6 +97,11 @@ func ConfigProcess() {
 	} else if err != nil {
 		log.Fatalf("can't read index-rules file %q: %s", indexRulesFile, err.Error())
 	}
+
+	if findCacheInvalidateMaxSize >= findCacheInvalidateQueueSize {
+		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
+	}
+
 }
 
 // interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
@@ -104,6 +113,7 @@ type MemoryIndex interface {
 	add(*schema.MetricDefinition) idx.Archive
 	idsByTagQuery(uint32, TagQuery) IdSet
 	PurgeFindCache()
+	ForceInvalidationFindCache()
 }
 
 func New() MemoryIndex {
@@ -207,7 +217,7 @@ func (defs defByTagSet) defs(id uint32, fullName string) map[*schema.MetricDefin
 }
 
 type Node struct {
-	Path     string
+	Path     string // branch or NameWithTags for leafs
 	Children []string
 	Defs     []schema.MKey
 }
@@ -250,7 +260,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
-		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueue, findCacheBackoff),
+		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
 	}
 }
 
@@ -1222,7 +1232,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 
 	statMetricsActive.Set(len(m.defById))
 	statDeleteDuration.Value(time.Since(pre))
-	if len(deletedDefs) > findCacheInvalidateQueue {
+	if len(deletedDefs) > findCacheInvalidateQueueSize {
 		m.findCache.Purge(orgId)
 	} else {
 		for _, d := range deletedDefs {
@@ -1448,7 +1458,7 @@ ORGS:
 			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
 		}
-		if len(paths) > findCacheInvalidateQueue {
+		if len(paths) > findCacheInvalidateQueueSize {
 			m.findCache.Purge(org)
 		} else {
 			for path := range paths {

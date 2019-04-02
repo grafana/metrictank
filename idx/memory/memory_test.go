@@ -956,6 +956,7 @@ func testPrune(t *testing.T) {
 			pruned, err := ix.Prune(time.Unix(12, 0))
 			So(err, ShouldBeNil)
 			So(pruned, ShouldHaveLength, 4)
+			ix.ForceInvalidationFindCache()
 			nodes, err := ix.Find(1, "metric.foo.*", 0)
 			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 1)

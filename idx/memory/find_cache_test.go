@@ -1,31 +1,90 @@
 package memory
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/raintank/schema"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestTreeFromPath(t *testing.T) {
-	path := "foo.bar.baz"
-	Convey("when treeFromPath is given a path", t, func() {
-		tree := treeFromPath(path)
-		So(len(tree.Items), ShouldEqual, 4)
-		So(tree.Items[""], ShouldNotBeNil)
-		So(tree.Items[""].Leaf(), ShouldBeFalse)
-		So(tree.Items["foo"], ShouldNotBeNil)
-		So(tree.Items["foo"].Leaf(), ShouldBeFalse)
-		So(tree.Items["foo.bar"], ShouldNotBeNil)
-		So(tree.Items["foo.bar"].Leaf(), ShouldBeFalse)
-		So(tree.Items["foo.bar.baz"], ShouldNotBeNil)
-		So(tree.Items["foo.bar.baz"].Leaf(), ShouldBeTrue)
-	})
+	type testCase struct {
+		paths []string
+		tree  *bareTree
+	}
+	testCases := []testCase{
+		{
+			paths: []string{"foo.bar.baz"},
+			tree: &bareTree{
+				Items: map[string]*Node{
+					"": {
+						Path:     "",
+						Children: []string{"foo"},
+					},
+					"foo": {
+						Path:     "foo",
+						Children: []string{"bar"},
+					},
+					"foo.bar": {
+						Path:     "foo.bar",
+						Children: []string{"baz"},
+					},
+					"foo.bar.baz": {
+						Path: "foo.bar.baz",
+						Defs: []schema.MKey{},
+					},
+				},
+			},
+		},
+		{
+			paths: []string{"foo.bar.baz", "foo.abc", "a"},
+			tree: &bareTree{
+				Items: map[string]*Node{
+					"": {
+						Path:     "",
+						Children: []string{"foo", "a"},
+					},
+					"a": {
+						Path: "a",
+						Defs: []schema.MKey{},
+					},
+					"foo": {
+						Path:     "foo",
+						Children: []string{"bar", "abc"},
+					},
+					"foo.abc": {
+						Path: "foo.abc",
+						Defs: []schema.MKey{},
+					},
+					"foo.bar": {
+						Path:     "foo.bar",
+						Children: []string{"baz"},
+					},
+					"foo.bar.baz": {
+						Path: "foo.bar.baz",
+						Defs: []schema.MKey{},
+					},
+				},
+			},
+		},
+	}
+	for i, c := range testCases {
+		tree := newBareTree()
+		for _, path := range c.paths {
+			tree.add(path)
+		}
+		if !reflect.DeepEqual(tree, c.tree) {
+			t.Errorf("TestTreeFromPath case %d\nexpected:\n%s\ngot:\n%s", i, spew.Sdump(c.tree), spew.Sdump(tree))
+		}
+	}
 }
 
 func TestFindCache(t *testing.T) {
 	Convey("when findCache is empty", t, func() {
-		c := NewFindCache(10, 1, time.Second*2)
+		c := NewFindCache(10, 5, 2, 100*time.Millisecond, time.Second*2)
 		Convey("0 results should be returned", func() {
 			result, ok := c.Get(1, "foo.bar.*")
 			So(ok, ShouldBeFalse)
@@ -33,7 +92,9 @@ func TestFindCache(t *testing.T) {
 		})
 		Convey("when adding entries to the cache", func() {
 			pattern := "foo.bar.*"
-			results, err := find(treeFromPath("foo.bar.foo"), pattern)
+			tree := newBareTree()
+			tree.add("foo.bar.foo")
+			results, err := find((*Tree)(tree), pattern)
 			So(err, ShouldBeNil)
 			So(results, ShouldHaveLength, 1)
 			c.Add(1, "foo.bar.*", results)
@@ -44,6 +105,7 @@ func TestFindCache(t *testing.T) {
 				So(result, ShouldHaveLength, 1)
 				Convey("After invalidating path that matches pattern", func() {
 					c.InvalidateFor(1, "foo.bar.baz")
+					time.Sleep(time.Second) // make sure we reach invalidateMaxWait
 					So(c.cache[1].Len(), ShouldEqual, 0)
 				})
 				Convey("After invalidating path that doesn't match cached pattern", func() {
@@ -55,7 +117,7 @@ func TestFindCache(t *testing.T) {
 				c.Add(1, "foo.{a,b,c}*.*", results)
 				c.Add(1, "foo.{a,b,e}*.*", results)
 				c.Add(1, "foo.{a,b,f}*.*", results)
-				c.newSeries[1] <- struct{}{}
+				c.triggerBackoff()
 				c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 
 				So(len(c.cache), ShouldEqual, 0)
@@ -87,6 +149,7 @@ func BenchmarkTreeFromPath(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		p := i % numPaths
-		treeFromPath(paths[p])
+		tree := newBareTree()
+		tree.add(paths[p])
 	}
 }
