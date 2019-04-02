@@ -58,8 +58,8 @@ var (
 	Partitioned                  bool
 	findCacheSize                = 1000
 	findCacheInvalidateQueueSize = 200
-	findCacheInvalidateMaxSize   = 100             // TODO validation that << queue size
-	findCacheInvalidateMaxWait   = 5 * time.Second // TODO make sure validation for the durations works
+	findCacheInvalidateMaxSize   = 100
+	findCacheInvalidateMaxWait   = 5 * time.Second
 	findCacheBackoffTime         = time.Minute
 )
 
@@ -97,6 +97,11 @@ func ConfigProcess() {
 	} else if err != nil {
 		log.Fatalf("can't read index-rules file %q: %s", indexRulesFile, err.Error())
 	}
+
+	if findCacheInvalidateMaxSize >= findCacheInvalidateQueueSize {
+		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
+	}
+
 }
 
 // interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
