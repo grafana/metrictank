@@ -186,6 +186,8 @@ number of series that have been excluded from responses due to their lastUpdate 
 the duration of memory idx find
 * `idx.memory.find-cache.backoff`:  
 the number of find caches in backoff mode
+* `idx.memory.find-cache.entries`:  
+the number of entries in the cache
 * `idx.memory.find-cache.invalidation.drop`:  
 the number of dropped invalidation requests
 * `idx.memory.find-cache.invalidation.exec`:  
