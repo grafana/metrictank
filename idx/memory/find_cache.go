@@ -44,7 +44,7 @@ type FindCache struct {
 	invalidateReqs chan invalidateRequest
 
 	cache   map[uint32]*lru.Cache
-	backoff map[uint32]time.Time
+	backoff time.Time
 	sync.RWMutex
 }
 
@@ -59,8 +59,7 @@ func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMa
 		shutdown:       make(chan struct{}),
 		invalidateReqs: make(chan invalidateRequest, invalidateQueueSize),
 
-		cache:   make(map[uint32]*lru.Cache),
-		backoff: make(map[uint32]time.Time),
+		cache: make(map[uint32]*lru.Cache),
 	}
 	go fc.processInvalidateQueue()
 	return fc
@@ -86,12 +85,12 @@ func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
-	t := c.backoff[orgId]
+	backoff := c.backoff
 	c.RUnlock()
 	var err error
 	if !ok {
 		// don't init the cache if we are in backoff mode.
-		if time.Until(t) > 0 {
+		if time.Until(backoff) > 0 {
 			return
 		}
 		cache, err = lru.New(c.size)
@@ -145,7 +144,7 @@ func (c *FindCache) PurgeAll() {
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.Lock()
 	defer c.Unlock()
-	if time.Now().Before(c.backoff[orgId]) {
+	if time.Now().Before(c.backoff) {
 		return
 	}
 
@@ -162,7 +161,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	case c.invalidateReqs <- req:
 	default:
 		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
-		c.backoff[orgId] = time.Now().Add(c.backoffTime)
+		c.backoff = time.Now().Add(c.backoffTime)
 		delete(c.cache, orgId)
 		// drain queue
 		for {
