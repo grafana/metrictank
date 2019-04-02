@@ -58,8 +58,8 @@ var (
 	Partitioned                  bool
 	findCacheSize                = 1000
 	findCacheInvalidateQueueSize = 200
-	findCacheInvalidateMaxSize   = 100
-	findCacheInvalidateMaxWait   = 5 * time.Second
+	findCacheInvalidateMaxSize   = 100             // TODO validation that << queue size
+	findCacheInvalidateMaxWait   = 5 * time.Second // TODO make sure validation for the durations works
 	findCacheBackoffTime         = time.Minute
 )
 
