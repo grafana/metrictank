@@ -184,6 +184,8 @@ the duration of a delete of one or more metrics from the memory idx
 number of series that have been excluded from responses due to their lastUpdate property
 * `idx.memory.find`:  
 the duration of memory idx find
+* `idx.memory.find-cache.backoff`:  
+the number of find caches in backoff mode
 * `idx.memory.find-cache.invalidation.drop`:  
 the number of dropped invalidation requests
 * `idx.memory.find-cache.invalidation.exec`:  

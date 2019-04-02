@@ -16,8 +16,8 @@ var (
 	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.ops.hit")
 	// metric idx.memory.find-cache.ops.miss is a counter of findCache misses
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.ops.miss")
-	// metric idx.memory.find-cache.backoff tracks whether the find cache is in backoff mode
-	findCacheBackoff = stats.NewBool("idx.memory.find-cache.backoff") // note: we use this as our source of truth
+	// metric idx.memory.find-cache.backoff is the number of find caches in backoff mode
+	findCacheBackoff = stats.NewGauge32("idx.memory.find-cache.backoff")
 	// metric idx.memory.find-cache.invalidation.recv is the number of received invalidation requests
 	findCacheInvalidationsReceived = stats.NewCounterRate32("idx.memory.find-cache.invalidation.recv")
 	// metric idx.memory.find-cache.invalidation.exec is the number of executed invalidation requests
@@ -53,7 +53,8 @@ type FindCache struct {
 	forceInvalidationReq  chan struct{}
 	forceInvalidationResp chan struct{}
 
-	cache map[uint32]*lru.Cache
+	cache   map[uint32]*lru.Cache
+	backoff bool
 	sync.RWMutex
 }
 
@@ -96,7 +97,7 @@ func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
-	backoff := findCacheBackoff.Peek()
+	backoff := c.backoff
 	c.RUnlock()
 	var err error
 	if !ok {
@@ -157,7 +158,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.Lock()
 	findCacheInvalidationsReceived.Inc()
 	defer c.Unlock()
-	if findCacheBackoff.Peek() {
+	if c.backoff {
 		findCacheInvalidationsDropped.Inc()
 		return
 	}
@@ -183,8 +184,14 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 // caller must hold lock!
 func (c *FindCache) triggerBackoff() {
 	log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s", c.backoffTime.String())
-	findCacheBackoff.SetTrue()
-	time.AfterFunc(c.backoffTime, findCacheBackoff.SetFalse)
+	findCacheBackoff.Inc()
+	c.backoff = true
+	time.AfterFunc(c.backoffTime, func() {
+		findCacheBackoff.Dec()
+		c.Lock()
+		c.backoff = false
+		c.Unlock()
+	})
 	c.cache = make(map[uint32]*lru.Cache)
 	// drain queue
 L:
