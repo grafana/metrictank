@@ -154,10 +154,11 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	// for each pattern in the cache and purge it if it matches the path or a subtree of it.
 	// we can't simply prune all cache keys that equal path or a subtree of it, because
 	// what's cached are search patterns which may contain wildcards and other expressions
-	tree := treeFromPath(path)
+	tree := newBareTree()
+	tree.add(path)
 
 	for _, k := range cache.Keys() {
-		matches, err := find(tree, k.(string))
+		matches, err := find((*Tree)(tree), k.(string))
 		if err != nil {
 			log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
 			continue
@@ -185,41 +186,64 @@ func (p *PartitionedMemoryIdx) PurgeFindCache() {
 	}
 }
 
-// treeFromPath creates an index tree from a series path.
-// The tree will have a single leaf node and nodes for
-// each branch.
-func treeFromPath(path string) *Tree {
+// BareTree is a Tree that can be used for finds,
+// but is incomplete
+// (it does not track actual MKey's or multiple Defs with same path)
+// so should not be used as an actual index
+type bareTree Tree
+
+func newBareTree() *bareTree {
 	tree := Tree{
 		Items: map[string]*Node{
 			"": {},
 		},
 	}
-	pos := strings.Index(path, ".")
-	var parentBranch string
-	prevPos := -1
-	for {
-		branch := path[:pos]
-		thisNode := branch[prevPos+1:]
+	return (*bareTree)(&tree)
+}
 
-		tree.Items[parentBranch].Children = []string{thisNode}
-
-		// create this branch/leaf
-		tree.Items[branch] = &Node{
-			Path: branch,
-		}
-		if branch == path {
-			tree.Items[branch].Defs = []schema.MKey{{}}
-			break
-		}
-		prevPos = pos
-		nextPos := strings.Index(path[pos+1:], ".")
-		if nextPos < 0 {
-			pos = len(path)
-		} else {
-			pos = pos + nextPos + 1
-		}
-		parentBranch = branch
+// Add adds the series path,
+// creating the nodes for each branch and the leaf node
+// based on UnpartitionedMemoryIdx.add() but without all the stuff
+// we don't need
+func (tree *bareTree) add(path string) {
+	// if a node already exists under the same path, nothing left to do
+	if _, ok := tree.Items[path]; ok {
+		return
 	}
 
-	return &tree
+	pos := strings.LastIndex(path, ".")
+
+	// now walk backwards through the node path to find the first branch which exists that
+	// this path extends and add us as a child
+	// until then, keep adding new intermediate branches
+	prevPos := len(path)
+	for pos != -1 {
+		branch := path[:pos]
+		prevNode := path[pos+1 : prevPos]
+		if n, ok := tree.Items[branch]; ok {
+			n.Children = append(n.Children, prevNode)
+			break
+		}
+
+		tree.Items[branch] = &Node{
+			Path:     branch,
+			Children: []string{prevNode},
+		}
+
+		prevPos = pos
+		pos = strings.LastIndex(branch, ".")
+	}
+
+	if pos == -1 {
+		// no existing branches found that match. need to add to the root node.
+		branch := path[:prevPos]
+		n := tree.Items[""]
+		n.Children = append(n.Children, branch)
+	}
+
+	// Add leaf node
+	tree.Items[path] = &Node{
+		Path: path,
+		Defs: []schema.MKey{},
+	}
 }
