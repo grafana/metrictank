@@ -17,7 +17,7 @@ var (
 	// metric idx.memory.find-cache.ops.miss is a counter of findCache misses
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.ops.miss")
 	// metric idx.memory.find-cache.backoff tracks whether the find cache is in backoff mode
-	findCacheBackoff = stats.NewBool("idx.memory.find-cache.backoff")
+	findCacheBackoff = stats.NewBool("idx.memory.find-cache.backoff") // note: we use this as our source of truth
 	// metric idx.memory.find-cache.invalidation.recv is the number of received invalidation requests
 	findCacheInvalidationsReceived = stats.NewCounterRate32("idx.memory.find-cache.invalidation.recv")
 	// metric idx.memory.find-cache.invalidation.exec is the number of executed invalidation requests
@@ -53,8 +53,7 @@ type FindCache struct {
 	forceInvalidationReq  chan struct{}
 	forceInvalidationResp chan struct{}
 
-	cache   map[uint32]*lru.Cache
-	backoff time.Time
+	cache map[uint32]*lru.Cache
 	sync.RWMutex
 }
 
@@ -97,12 +96,12 @@ func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
-	backoff := c.backoff
+	backoff := findCacheBackoff.Peek()
 	c.RUnlock()
 	var err error
 	if !ok {
 		// don't init the cache if we are in backoff mode.
-		if time.Until(backoff) > 0 {
+		if backoff {
 			return
 		}
 		c.Lock()
@@ -158,7 +157,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.Lock()
 	findCacheInvalidationsReceived.Inc()
 	defer c.Unlock()
-	if time.Now().Before(c.backoff) {
+	if findCacheBackoff.Peek() {
 		findCacheInvalidationsDropped.Inc()
 		return
 	}
@@ -184,7 +183,6 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 // caller must hold lock!
 func (c *FindCache) triggerBackoff() {
 	log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s", c.backoffTime.String())
-	c.backoff = time.Now().Add(c.backoffTime)
 	findCacheBackoff.SetTrue()
 	time.AfterFunc(c.backoffTime, findCacheBackoff.SetFalse)
 	c.cache = make(map[uint32]*lru.Cache)
