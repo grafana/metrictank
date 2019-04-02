@@ -117,7 +117,7 @@ func TestFindCache(t *testing.T) {
 				c.Add(1, "foo.{a,b,c}*.*", results)
 				c.Add(1, "foo.{a,b,e}*.*", results)
 				c.Add(1, "foo.{a,b,f}*.*", results)
-				c.backoff = time.Now().Add(time.Second)
+				c.triggerBackoff()
 				c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 
 				So(len(c.cache), ShouldEqual, 0)

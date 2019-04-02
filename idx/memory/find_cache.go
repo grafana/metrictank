@@ -160,17 +160,22 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	select {
 	case c.invalidateReqs <- req:
 	default:
-		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
-		c.backoff = time.Now().Add(c.backoffTime)
-		delete(c.cache, orgId)
-		// drain queue
-		for {
-			_, ok := <-c.invalidateReqs
-			if !ok {
-				break
-			}
-		}
+		c.triggerBackoff()
 		return
+	}
+}
+
+// caller must hold lock!
+func (c *FindCache) triggerBackoff() {
+	log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s", c.backoffTime.String())
+	c.backoff = time.Now().Add(c.backoffTime)
+	c.cache = make(map[uint32]*lru.Cache)
+	// drain queue
+	for {
+		_, ok := <-c.invalidateReqs
+		if !ok {
+			break
+		}
 	}
 }
 
