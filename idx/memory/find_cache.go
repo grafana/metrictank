@@ -51,6 +51,7 @@ func NewFindCache(size, invalidateQueueSize int, invalidateWaitTime time.Duratio
 		size:                size,
 		invalidateQueueSize: invalidateQueueSize,
 		invalidateWaitTime:  invalidateWaitTime,
+		shutdown:            make(chan struct{}),
 		invalidateReqs:      make(chan invalidateRequest, invalidateQueueSize),
 		backoff:             make(map[uint32]time.Time),
 	}
