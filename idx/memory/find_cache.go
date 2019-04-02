@@ -12,10 +12,18 @@ import (
 )
 
 var (
-	// metric idx.memory.find-cache.hit is a counter of findCache hits
-	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.hit")
-	// metric idx.memory.find-cache.miss is a counter of findCache misses
-	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.miss")
+	// metric idx.memory.find-cache.ops.hit is a counter of findCache hits
+	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.ops.hit")
+	// metric idx.memory.find-cache.ops.miss is a counter of findCache misses
+	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.ops.miss")
+	// metric idx.memory.find-cache.backoff tracks whether the find cache is in backoff mode
+	findCacheBackoff = stats.NewBool("idx.memory.find-cache.backoff")
+	// metric idx.memory.find-cache.invalidation.recv is the number of received invalidation requests
+	findCacheInvalidationsReceived = stats.NewCounterRate32("idx.memory.find-cache.invalidation.recv")
+	// metric idx.memory.find-cache.invalidation.exec is the number of executed invalidation requests
+	findCacheInvalidationsExecuted = stats.NewCounterRate32("idx.memory.find-cache.invalidation.exec")
+	// metric idx.memory.find-cache.invalidation.drop is the number of dropped invalidation requests
+	findCacheInvalidationsDropped = stats.NewCounterRate32("idx.memory.find-cache.invalidation.drop")
 )
 
 type invalidateRequest struct {
@@ -144,13 +152,16 @@ func (c *FindCache) PurgeAll() {
 // the backoff time will then return immediately.
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.Lock()
+	findCacheInvalidationsReceived.Inc()
 	defer c.Unlock()
 	if time.Now().Before(c.backoff) {
+		findCacheInvalidationsDropped.Inc()
 		return
 	}
 
 	cache, ok := c.cache[orgId]
 	if !ok || cache.Len() < 1 {
+		findCacheInvalidationsDropped.Inc()
 		return
 	}
 
@@ -170,6 +181,8 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 func (c *FindCache) triggerBackoff() {
 	log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s", c.backoffTime.String())
 	c.backoff = time.Now().Add(c.backoffTime)
+	findCacheBackoff.SetTrue()
+	time.AfterFunc(c.backoffTime, findCacheBackoff.SetFalse)
 	c.cache = make(map[uint32]*lru.Cache)
 	// drain queue
 L:
@@ -200,6 +213,7 @@ func (c *FindCache) processInvalidateQueue() {
 
 			// nothing cached for this org. nothing to do
 			if cache == nil {
+				findCacheInvalidationsDropped.Inc()
 				continue
 			}
 
@@ -221,6 +235,7 @@ func (c *FindCache) processInvalidateQueue() {
 					cache.Remove(k)
 				}
 			}
+			findCacheInvalidationsExecuted.Add(len(reqs))
 		}
 		// all done, reset the buffer
 		buf.buffer = make(map[uint32][]invalidateRequest)
