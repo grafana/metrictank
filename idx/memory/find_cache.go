@@ -56,6 +56,7 @@ func NewFindCache(size, invalidateQueueSize int, invalidateWaitTime time.Duratio
 		backoff:             make(map[uint32]time.Time),
 		invalidateQueue:     make(chan invalidateRequest, invalidateQueueSize*2),
 	}
+	go fc.processInvalidateQueue()
 	return fc
 }
 
@@ -170,54 +171,40 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 
 func (c *FindCache) processInvalidateQueue() {
 	type invalidateBuffer struct {
-		bufffer map[uint32][]invalidateRequest
-		count   uint32
+		buffer map[uint32][]invalidateRequest
+		count  uint32
 	}
 	timer := time.NewTimer(c.invalidateWaitTime)
 	buf := invalidateBuffer{
-		bufffer: make(map[uint32][]invalidateRequest),
+		buffer: make(map[uint32][]invalidateRequest),
 	}
-	var byOrg map[uint32][]invalidateRequest
 
 	dumpCache := func() {
 		c.PurgeAll()
 	}
 
 	processQueue := func() {
-		for i, ir := range buf {
-			byOrg = make(map[uint32][]invalidateRequest)
-			byOrg[ir.orgId] = append(byOrg[ir.orgId], ir)
-		}
-
-		for _, irs := range byOrg {
-			if len(irs) < 1 {
-				continue
+		for orgid, reqs := range buf.buffer {
+			// construct a tree including all of the now-invalid paths
+			// we can then call `find(tree, pattern)` for each pattern in the cache and purge it if it matches the tree
+			// we can't simply prune all cache keys that equal path or a subtree of it, because
+			// what's cached are search patterns which may contain wildcards and other expressions
+			tree := newBareTree()
+			for _, req := range reqs {
+				tree.add(req.path)
 			}
-			for i, ir := range irs {
 
-			}
-		}
+			cache := c.cache[orgid]
 
-		// convert our path to a tree so that we can call `find(tree, pattern)`
-		// for each pattern in the cache and purge it if it matches the path or a subtree of it.
-		// we can't simply prune all cache keys that equal path or a subtree of it, because
-		// what's cached are search patterns which may contain wildcards and other expressions
-		tree := newBareTree()
-		tree.add(path)
-
-		for _, k := range cache.Keys() {
-			matches, err := find(tree, k.(string))
-			if err != nil {
-				log.Errorf("memory-idx: checking if new series matches expressions in findCache. series=%s expr=%s err=%s", path, k, err)
-				continue
+			for _, k := range cache.Keys() {
+				matches, err := find((*Tree)(tree), k.(string))
+				if err != nil {
+					log.Errorf("memory-idx: checking if cache key %q matches any of the %d invalid patterns resulted in error: %s", k, len(reqs), err)
+				}
+				if err != nil || len(matches) > 0 {
+					cache.Remove(k)
+				}
 			}
-			if len(matches) > 0 {
-				cache.Remove(k)
-			}
-		}
-		select {
-		case <-ch:
-		default:
 		}
 	}
 
@@ -225,16 +212,17 @@ func (c *FindCache) processInvalidateQueue() {
 		select {
 		case <-timer.C:
 			timer.Reset(c.invalidateWaitTime)
-			if len(c.invalidateQueue) > 0 {
+			if buf.count > 0 {
 				processQueue()
 			}
-		case iqr := <-c.invalidateQueue:
+		case req := <-c.invalidateQueue:
 			if len(c.invalidateQueue) == c.invalidateQueueSize*2-1 {
 				log.Info("memory-idx: findCache was full, clearing entire findCache")
 				dumpCache()
 			}
-			buf.bufffer = append(buf.bufffer, iqr)
-			if len(buf.bufffer) >= c.invalidateQueueSize {
+			buf.buffer[req.orgId] = append(buf.buffer[req.orgId], req)
+			buf.count += 1
+			if int(buf.count) >= c.invalidateQueueSize {
 				if !timer.Stop() {
 					<-timer.C
 				}
