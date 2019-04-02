@@ -84,7 +84,7 @@ func TestTreeFromPath(t *testing.T) {
 
 func TestFindCache(t *testing.T) {
 	Convey("when findCache is empty", t, func() {
-		c := NewFindCache(10, 1, time.Second*2)
+		c := NewFindCache(10, 5, 2, 100*time.Millisecond, time.Second*2)
 		Convey("0 results should be returned", func() {
 			result, ok := c.Get(1, "foo.bar.*")
 			So(ok, ShouldBeFalse)
@@ -105,6 +105,7 @@ func TestFindCache(t *testing.T) {
 				So(result, ShouldHaveLength, 1)
 				Convey("After invalidating path that matches pattern", func() {
 					c.InvalidateFor(1, "foo.bar.baz")
+					time.Sleep(time.Second) // make sure we reach invalidateMaxWait
 					So(c.cache[1].Len(), ShouldEqual, 0)
 				})
 				Convey("After invalidating path that doesn't match cached pattern", func() {
@@ -116,7 +117,7 @@ func TestFindCache(t *testing.T) {
 				c.Add(1, "foo.{a,b,c}*.*", results)
 				c.Add(1, "foo.{a,b,e}*.*", results)
 				c.Add(1, "foo.{a,b,f}*.*", results)
-				c.newSeries[1] <- struct{}{}
+				c.backoff = time.Now().Add(time.Second)
 				c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 
 				So(len(c.cache), ShouldEqual, 0)
