@@ -68,8 +68,8 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache")
-	memoryIdx.IntVar(&findCacheInvalidateQueue, "find-cache-invalidate-queue", 100, "size of queue for invalidating findCache entries.")
+	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org)")
+	memoryIdx.IntVar(&findCacheInvalidateQueue, "find-cache-invalidate-queue", 100, "size of queue for invalidating findCache entries (per org)")
 	memoryIdx.DurationVar(&findCacheBackoff, "find-cache-backoff", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
@@ -207,7 +207,7 @@ func (defs defByTagSet) defs(id uint32, fullName string) map[*schema.MetricDefin
 }
 
 type Node struct {
-	Path     string
+	Path     string // branch or NameWithTags for leafs
 	Children []string
 	Defs     []schema.MKey
 }

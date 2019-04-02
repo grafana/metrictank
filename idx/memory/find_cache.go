@@ -21,8 +21,9 @@ var (
 // FindCache is a caching layer for the in-memory index. The cache provides
 // per org LRU caches of patterns and the resulting []*Nodes from searches
 // on the index.  Users should call `InvalidateFor(orgId, path)` when new
-// entries are added to the cache to invalidate any cached patterns that match
-// the path. `invalidateQueueSize` sets the maximum number of invalidations for
+// entries are added to, or removed from the index to invalidate any cached
+// patterns that match the path.
+// `invalidateQueueSize` sets the maximum number of invalidations for
 // a specific orgId that can be running at any time. If this number is exceeded
 // then the cache for that orgId will be immediately purged and disabled for
 // `backoffTime`.  This mechanism protects the instance from excessive resource
@@ -73,7 +74,7 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	c.RUnlock()
 	var err error
 	if !ok {
-		// dont init the cache if we are in backoff mode.
+		// don't init the cache if we are in backoff mode.
 		if time.Until(t) > 0 {
 			return
 		}
