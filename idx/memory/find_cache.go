@@ -143,14 +143,13 @@ func (c *FindCache) PurgeAll() {
 // disable it for `backoffTime`. Future InvalidateFor calls made during
 // the backoff time will then return immediately.
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
-	c.RLock()
+	c.Lock()
+	defer c.Unlock()
 	if time.Now().Before(c.backoff[orgId]) {
-		c.RUnlock()
 		return
 	}
 
 	cache, ok := c.cache[orgId]
-	c.RUnlock()
 	if !ok || cache.Len() < 1 {
 		return
 	}
@@ -163,7 +162,6 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	case c.invalidateReqs <- req:
 	default:
 		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
-		c.Lock()
 		c.backoff[orgId] = time.Now().Add(c.backoffTime)
 		delete(c.cache, orgId)
 		// drain queue
@@ -173,7 +171,6 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 				break
 			}
 		}
-		c.Unlock()
 		return
 	}
 }
@@ -199,7 +196,9 @@ func (c *FindCache) processInvalidateQueue() {
 				tree.add(req.path)
 			}
 
+			c.RLock()
 			cache := c.cache[orgid]
+			c.RUnlock()
 
 			for _, k := range cache.Keys() {
 				matches, err := find((*Tree)(tree), k.(string))
@@ -225,14 +224,18 @@ func (c *FindCache) processInvalidateQueue() {
 			}
 		case req := <-c.invalidateReqs:
 			if len(c.invalidateReqs) == c.invalidateQueueSize-1 {
-				log.Info("memory-idx: findCache invalidation channel was full, clearing findCache") // note: responsibility of InvalidateFor to set up backoff
-				c.PurgeAll()
+				log.Info("memory-idx: findCache invalidation channel was full, clearing findCache") // note: responsability of InvalidateFor to set up backoff
+				c.Lock()
+				for idx := range c.cache {
+					delete(c.cache, idx)
+				}
+				c.Unlock()
 				buf.buffer = make(map[uint32][]invalidateRequest)
 				buf.count = 0
 				continue
 			}
 			buf.buffer[req.orgId] = append(buf.buffer[req.orgId], req)
-			buf.count += 1
+			buf.count++
 			if int(buf.count) >= c.invalidateQueueSize {
 				if !timer.Stop() {
 					<-timer.C
