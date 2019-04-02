@@ -204,6 +204,10 @@ func (c *FindCache) forceInvalidation() {
 	<-c.forceInvalidationResp
 }
 
+func (c *FindCache) Shutdown() {
+	c.shutdown <- struct{}{}
+}
+
 func (c *FindCache) processInvalidateQueue() {
 	type invalidateBuffer struct {
 		buffer map[uint32][]invalidateRequest
