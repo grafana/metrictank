@@ -29,13 +29,14 @@ var (
 // `backoffTime`.  This mechanism protects the instance from excessive resource
 // usage when a large number of new series are added at once.
 type FindCache struct {
-	sync.RWMutex
-	cache               map[uint32]*lru.Cache
 	size                int
 	invalidateQueueSize int
 	backoffTime         time.Duration
-	newSeries           map[uint32]chan struct{}
-	backoff             map[uint32]time.Time
+
+	cache     map[uint32]*lru.Cache
+	newSeries map[uint32]chan struct{}
+	backoff   map[uint32]time.Time
+	sync.RWMutex
 }
 
 func NewFindCache(size, invalidateQueueSize int, backoffTime time.Duration) *FindCache {
