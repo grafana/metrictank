@@ -33,34 +33,17 @@ func (o *ObjectStore) FragStatsByObjSize(size uint8) (float32, error) {
 		return 0, fmt.Errorf("ObjectStore: FragStatsByObjSize failed to find pool with object size %d", size)
 	}
 
-	len := float32(len(o.slabPools[size].slabs))
-
-	if len < 1 {
-		return 0, fmt.Errorf("ObjectStore: No slabs found in pool for object size %d", size)
-	}
-
-	var total float32
-
-	// iterate over all slabs in the pool
-	// get fragmentation percent
-	for _, sl := range pool.slabs {
-		total += float32(sl.bitSet().Count()) / float32(sl.objsPerSlab())
-	}
-
-	return total / len, nil
+	return pool.fragStats(), nil
 }
 
 // FragStatsPerPool returns a slice containing a FragStat for each
 // non-empty slab pool
 func (o *ObjectStore) FragStatsPerPool() (fragStats []FragStat) {
-	for size, sl := range o.slabPools {
-		fragPercent, err := o.FragStatsByObjSize(size)
-		if err != nil {
-			continue
-		}
-		fragStats = append(fragStats, FragStat{ObjSize: size, ObjsPerSlab: sl.objsPerSlab, FragPercent: fragPercent})
+	for _, sl := range o.slabPools {
+		fragPercent := sl.fragStats()
+		fragStats = append(fragStats, FragStat{ObjSize: sl.objSize, ObjsPerSlab: sl.objsPerSlab, FragPercent: fragPercent})
 	}
-	return
+	return fragStats
 }
 
 // FragStatsTotal returns the total fragmentation percent across the object store
@@ -68,13 +51,12 @@ func (o *ObjectStore) FragStatsTotal() (float32, error) {
 	var total float32
 	var numPools float32
 
-	for size := range o.slabPools {
-		fragPercent, err := o.FragStatsByObjSize(size)
-		if err != nil {
+	for _, sl := range o.slabPools {
+		if len(sl.slabs) < 1 {
 			continue
 		}
 		numPools++
-		total += fragPercent
+		total += sl.fragStats()
 	}
 
 	if numPools < 1 {
@@ -84,7 +66,7 @@ func (o *ObjectStore) FragStatsTotal() (float32, error) {
 	return total / numPools, nil
 }
 
-// MemStatsByObjSize returns the size of a slab pool in bytes
+// MemStatsByObjSize returns the size of a slab pool in bytes. It only looks at MMapped memory
 func (o *ObjectStore) MemStatsByObjSize(size uint8) (uint64, error) {
 	// check if pool exists
 	var pool *slabPool
@@ -93,63 +75,26 @@ func (o *ObjectStore) MemStatsByObjSize(size uint8) (uint64, error) {
 		return 0, fmt.Errorf("ObjectStore: MemStatsByObjSize failed to find pool with object size %d", size)
 	}
 
-	len := uint64(len(o.slabPools[size].slabs))
-
-	if len < 1 {
-		return uint64(sizeOfSlabPool), nil
-	}
-
-	var total uint64
-
-	// iterate over all slabs in the pool and add their memory usage
-	for _, sl := range pool.slabs {
-		total += uint64(sl.getTotalLength())
-	}
-
-	// add overhead of the slab pool
-	total += uint64(sizeOfSlabPool)
-
-	// add overhead for each slab in the slice
-	total += uint64(unsafe.Sizeof(uintptr(0))) * len
-
-	return total, nil
+	return pool.memStats(), nil
 }
 
 // MemStatsPerPool returns a slice containing a MemStat for each
 // non-empty slab pool
 func (o *ObjectStore) MemStatsPerPool() (memStats []MemStat) {
-	for size := range o.slabPools {
-		memUsed, err := o.MemStatsByObjSize(size)
-		if err != nil {
-			continue
-		}
-		memStats = append(memStats, MemStat{ObjSize: size, MemUsed: memUsed})
+	for _, p := range o.slabPools {
+		memUsed := p.memStats()
+		memStats = append(memStats, MemStat{ObjSize: p.objSize, MemUsed: memUsed})
 	}
 	return
 }
 
-// MemStatsTotal returns the estimated total memory used across the object store
+// MemStatsTotal returns the estimated total MMapped memory used across the object store
 func (o *ObjectStore) MemStatsTotal() (uint64, error) {
 	var total uint64
-	var numPools uint64
 
-	for size := range o.slabPools {
-		memUsed, err := o.MemStatsByObjSize(size)
-		if err != nil {
-			continue
-		}
-		numPools++
-		total += memUsed
+	for _, p := range o.slabPools {
+		total += p.memStats()
 	}
-
-	// add overhead of lookupTable
-	total += uint64(unsafe.Sizeof([]SlabAddr{}))
-	// add overhead of objsPerSlab
-	total += uint64(unsafe.Sizeof(uint(0)))
-	// add overhead of pointers in slabPools
-	total += uint64(unsafe.Sizeof(uintptr(0))) * numPools
-
-	//TODO: add estimated size of the map
 
 	return total, nil
 }

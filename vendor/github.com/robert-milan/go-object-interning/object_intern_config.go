@@ -22,9 +22,9 @@ type ObjectInternConfig struct {
 
 // NewConfig returns a new configuration with default settings
 //
-// Compress: Shoco,
-// Cache: true,
-// MaxCacheSize: 157286400,
+// Compression: 	None,
+// Index:			true,
+// MaxCacheSize: 	157286400,
 func NewConfig() ObjectInternConfig {
 	return ObjectInternConfig{
 		Compression:  None,
