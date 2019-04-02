@@ -36,24 +36,31 @@ type invalidateRequest struct {
 type FindCache struct {
 	size                int
 	invalidateQueueSize int
-	invalidateWaitTime  time.Duration
-	shutdown            chan struct{}
-	invalidateReqs      chan invalidateRequest
+	invalidateMaxSize   int
+	invalidateMaxWait   time.Duration
+	backoffTime         time.Duration
+
+	shutdown       chan struct{}
+	invalidateReqs chan invalidateRequest
 
 	cache   map[uint32]*lru.Cache
 	backoff map[uint32]time.Time
 	sync.RWMutex
 }
 
-func NewFindCache(size, invalidateQueueSize int, invalidateWaitTime time.Duration) *FindCache {
+func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMaxWait, backoffTime time.Duration) *FindCache {
 	fc := &FindCache{
-		cache:               make(map[uint32]*lru.Cache),
 		size:                size,
 		invalidateQueueSize: invalidateQueueSize,
-		invalidateWaitTime:  invalidateWaitTime,
-		shutdown:            make(chan struct{}),
-		invalidateReqs:      make(chan invalidateRequest, invalidateQueueSize),
-		backoff:             make(map[uint32]time.Time),
+		invalidateMaxSize:   invalidateMaxSize,
+		invalidateMaxWait:   invalidateMaxWait,
+		backoffTime:         backoffTime,
+
+		shutdown:       make(chan struct{}),
+		invalidateReqs: make(chan invalidateRequest, invalidateQueueSize),
+
+		cache:   make(map[uint32]*lru.Cache),
+		backoff: make(map[uint32]time.Time),
 	}
 	go fc.processInvalidateQueue()
 	return fc
@@ -151,8 +158,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	case c.invalidateReqs <- req:
 	default:
 		c.Lock()
-		// TODO: set this back to a minute, move it back down to processQueue
-		c.backoff[orgId] = time.Now().Add(c.invalidateWaitTime)
+		c.backoff[orgId] = time.Now().Add(c.backoffTime)
 		delete(c.cache, orgId)
 		c.Unlock()
 		for i := 0; i < len(c.invalidateReqs); i++ {
@@ -161,7 +167,7 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 			default:
 			}
 		}
-		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.invalidateWaitTime.String(), cache.Len())
+		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
 		return
 	}
 }
@@ -171,7 +177,7 @@ func (c *FindCache) processInvalidateQueue() {
 		buffer map[uint32][]invalidateRequest
 		count  uint32
 	}
-	timer := time.NewTimer(c.invalidateWaitTime)
+	timer := time.NewTimer(c.invalidateMaxWait)
 	buf := invalidateBuffer{
 		buffer: make(map[uint32][]invalidateRequest),
 	}
@@ -208,7 +214,7 @@ func (c *FindCache) processInvalidateQueue() {
 	for {
 		select {
 		case <-timer.C:
-			timer.Reset(c.invalidateWaitTime)
+			timer.Reset(c.invalidateMaxWait)
 			if buf.count > 0 {
 				processQueue()
 			}
@@ -223,7 +229,7 @@ func (c *FindCache) processInvalidateQueue() {
 				if !timer.Stop() {
 					<-timer.C
 				}
-				timer.Reset(c.invalidateWaitTime)
+				timer.Reset(c.invalidateMaxWait)
 				processQueue()
 			}
 		case <-c.shutdown:
