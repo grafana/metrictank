@@ -100,7 +100,11 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 			return
 		}
 		c.Lock()
-		c.cache[orgId] = cache
+		// re-check. someone else may have added a cache in the meantime.
+		_, ok := c.cache[orgId]
+		if !ok {
+			c.cache[orgId] = cache
+		}
 		c.Unlock()
 	}
 	cache.Add(pattern, nodes)
@@ -139,11 +143,12 @@ func (c *FindCache) PurgeAll() {
 // disable it for `backoffTime`. Future InvalidateFor calls made during
 // the backoff time will then return immediately.
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
+	c.RLock()
 	if time.Now().Before(c.backoff[orgId]) {
+		c.RUnlock()
 		return
 	}
 
-	c.RLock()
 	cache, ok := c.cache[orgId]
 	c.RUnlock()
 	if !ok || cache.Len() < 1 {
@@ -157,17 +162,18 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	select {
 	case c.invalidateReqs <- req:
 	default:
+		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
 		c.Lock()
 		c.backoff[orgId] = time.Now().Add(c.backoffTime)
 		delete(c.cache, orgId)
-		c.Unlock()
-		for i := 0; i < len(c.invalidateReqs); i++ {
-			select {
-			case <-c.invalidateReqs:
-			default:
+		// drain queue
+		for {
+			_, ok := <-c.invalidateReqs
+			if !ok {
+				break
 			}
 		}
-		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.backoffTime.String(), cache.Len())
+		c.Unlock()
 		return
 	}
 }
