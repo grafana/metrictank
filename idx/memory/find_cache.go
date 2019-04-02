@@ -93,15 +93,16 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 		if time.Until(backoff) > 0 {
 			return
 		}
-		cache, err = lru.New(c.size)
-		if err != nil {
-			log.Errorf("memory-idx: findCache failed to create lru. err=%s", err)
-			return
-		}
 		c.Lock()
 		// re-check. someone else may have added a cache in the meantime.
-		_, ok := c.cache[orgId]
+		cache, ok = c.cache[orgId]
 		if !ok {
+			cache, err = lru.New(c.size)
+			if err != nil {
+				log.Errorf("memory-idx: findCache failed to create lru. err=%s", err)
+				c.Unlock()
+				return
+			}
 			c.cache[orgId] = cache
 		}
 		c.Unlock()
