@@ -38,11 +38,10 @@ type FindCache struct {
 	invalidateQueueSize int
 	invalidateWaitTime  time.Duration
 	shutdown            chan struct{}
-	invalidateQueue     chan invalidateRequest
+	invalidateReqs      chan invalidateRequest
 
-	cache     map[uint32]*lru.Cache
-	newSeries map[uint32]chan struct{}
-	backoff   map[uint32]time.Time
+	cache   map[uint32]*lru.Cache
+	backoff map[uint32]time.Time
 	sync.RWMutex
 }
 
@@ -52,9 +51,8 @@ func NewFindCache(size, invalidateQueueSize int, invalidateWaitTime time.Duratio
 		size:                size,
 		invalidateQueueSize: invalidateQueueSize,
 		invalidateWaitTime:  invalidateWaitTime,
-		newSeries:           make(map[uint32]chan struct{}),
+		invalidateReqs:      make(chan invalidateRequest, invalidateQueueSize),
 		backoff:             make(map[uint32]time.Time),
-		invalidateQueue:     make(chan invalidateRequest, invalidateQueueSize*2),
 	}
 	go fc.processInvalidateQueue()
 	return fc
@@ -95,7 +93,6 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 		}
 		c.Lock()
 		c.cache[orgId] = cache
-		c.newSeries[orgId] = make(chan struct{}, c.invalidateQueueSize)
 		c.Unlock()
 	}
 	cache.Add(pattern, nodes)
@@ -139,33 +136,32 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	}
 
 	c.RLock()
-	ch := c.newSeries[orgId]
 	cache, ok := c.cache[orgId]
 	c.RUnlock()
 	if !ok || cache.Len() < 1 {
 		return
 	}
 
+	req := invalidateRequest{
+		orgId: orgId,
+		path:  path,
+	}
 	select {
-	case ch <- struct{}{}:
+	case c.invalidateReqs <- req:
 	default:
 		c.Lock()
 		// TODO: set this back to a minute, move it back down to processQueue
 		c.backoff[orgId] = time.Now().Add(c.invalidateWaitTime)
 		delete(c.cache, orgId)
 		c.Unlock()
-		for i := 0; i < len(ch); i++ {
+		for i := 0; i < len(c.invalidateReqs); i++ {
 			select {
-			case <-ch:
+			case <-c.invalidateReqs:
 			default:
 			}
 		}
 		log.Infof("memory-idx: findCache invalidate-queue full. Disabling cache for %s. num-cached-entries=%d", c.invalidateWaitTime.String(), cache.Len())
 		return
-	}
-	c.invalidateQueue <- invalidateRequest{
-		orgId: orgId,
-		path:  path,
 	}
 }
 
@@ -215,8 +211,8 @@ func (c *FindCache) processInvalidateQueue() {
 			if buf.count > 0 {
 				processQueue()
 			}
-		case req := <-c.invalidateQueue:
-			if len(c.invalidateQueue) == c.invalidateQueueSize*2-1 {
+		case req := <-c.invalidateReqs:
+			if len(c.invalidateReqs) == c.invalidateQueueSize*2-1 {
 				log.Info("memory-idx: findCache was full, clearing entire findCache")
 				dumpCache()
 			}
