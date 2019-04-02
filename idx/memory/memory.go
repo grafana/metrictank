@@ -108,6 +108,7 @@ type MemoryIndex interface {
 	add(*schema.MetricDefinition) idx.Archive
 	idsByTagQuery(uint32, TagQuery) IdSet
 	PurgeFindCache()
+	ForceInvalidationFindCache()
 }
 
 func New() MemoryIndex {

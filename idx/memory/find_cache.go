@@ -48,8 +48,10 @@ type FindCache struct {
 	invalidateMaxWait   time.Duration
 	backoffTime         time.Duration
 
-	shutdown       chan struct{}
-	invalidateReqs chan invalidateRequest
+	shutdown              chan struct{}
+	invalidateReqs        chan invalidateRequest
+	forceInvalidationReq  chan struct{}
+	forceInvalidationResp chan struct{}
 
 	cache   map[uint32]*lru.Cache
 	backoff time.Time
@@ -64,8 +66,10 @@ func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMa
 		invalidateMaxWait:   invalidateMaxWait,
 		backoffTime:         backoffTime,
 
-		shutdown:       make(chan struct{}),
-		invalidateReqs: make(chan invalidateRequest, invalidateQueueSize),
+		shutdown:              make(chan struct{}),
+		invalidateReqs:        make(chan invalidateRequest, invalidateQueueSize),
+		forceInvalidationReq:  make(chan struct{}),
+		forceInvalidationResp: make(chan struct{}),
 
 		cache: make(map[uint32]*lru.Cache),
 	}
@@ -195,6 +199,11 @@ L:
 	}
 }
 
+func (c *FindCache) forceInvalidation() {
+	c.forceInvalidationReq <- struct{}{}
+	<-c.forceInvalidationResp
+}
+
 func (c *FindCache) processInvalidateQueue() {
 	type invalidateBuffer struct {
 		buffer map[uint32][]invalidateRequest
@@ -249,6 +258,16 @@ func (c *FindCache) processInvalidateQueue() {
 			if buf.count > 0 {
 				processQueue()
 			}
+		case <-c.forceInvalidationReq:
+			if !timer.Stop() {
+				<-timer.C
+			}
+			timer.Reset(c.invalidateMaxWait)
+			if buf.count > 0 {
+				processQueue()
+			}
+			c.forceInvalidationResp <- struct{}{}
+
 		case req := <-c.invalidateReqs:
 			if len(c.invalidateReqs) == c.invalidateQueueSize-1 {
 				log.Info("memory-idx: findCache invalidation channel was full, clearing findCache") // note: responsibility of InvalidateFor to set up backoff
@@ -279,11 +298,23 @@ func (m *UnpartitionedMemoryIdx) PurgeFindCache() {
 	m.findCache.PurgeAll()
 }
 
+// ForceInvalidationFindCache forces a full invalidation cycle of the find cache
+func (m *UnpartitionedMemoryIdx) ForceInvalidationFindCache() {
+	m.findCache.forceInvalidation()
+}
+
 // PurgeFindCache purges the findCaches for all orgIds
 // across all partitions
 func (p *PartitionedMemoryIdx) PurgeFindCache() {
 	for _, m := range p.Partition {
 		m.findCache.PurgeAll()
+	}
+}
+
+// ForceInvalidationFindCache forces a full invalidation cycle of the find cache
+func (p *PartitionedMemoryIdx) ForceInvalidationFindCache() {
+	for _, m := range p.Partition {
+		m.findCache.forceInvalidation()
 	}
 }
 
