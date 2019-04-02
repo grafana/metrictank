@@ -230,9 +230,7 @@ func (c *FindCache) processInvalidateQueue() {
 			if len(c.invalidateReqs) == c.invalidateQueueSize-1 {
 				log.Info("memory-idx: findCache invalidation channel was full, clearing findCache") // note: responsibility of InvalidateFor to set up backoff
 				c.Lock()
-				for idx := range c.cache {
-					delete(c.cache, idx)
-				}
+				c.cache = make(map[uint32]*lru.Cache)
 				c.Unlock()
 				buf.buffer = make(map[uint32][]invalidateRequest)
 				buf.count = 0
