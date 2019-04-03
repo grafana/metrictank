@@ -3428,7 +3428,7 @@
       "fill": 0,
       "gridPos": {
         "h": 4,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 66
       },
@@ -3516,20 +3516,18 @@
     },
     {
       "aliasColors": {
-        "invalidation.drop": "#f29191",
-        "invalidation.exec": "#5195ce",
-        "invalidation.recv": "#ba43a9",
+        "hit-rate": "#1f78c1",
         "miss": "#e0752d"
       },
       "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": "$datasource",
-      "fill": 1,
+      "fill": 10,
       "gridPos": {
         "h": 4,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 66
       },
       "id": 57,
@@ -3543,7 +3541,7 @@
         "values": false
       },
       "lines": true,
-      "linewidth": 1,
+      "linewidth": 0,
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
@@ -3552,44 +3550,130 @@
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "alias": "invalidation.recv",
+          "alias": "hit-rate",
+          "dashes": true,
+          "fill": 0,
+          "linewidth": 3,
+          "stack": false,
           "yaxis": 2
-        },
-        {
-          "alias": "invalidation.exec",
-          "yaxis": 2
-        },
-        {
-          "alias": "invalidation.drop",
-          "yaxis": 2
-        },
-        {
-          "alias": "/invalidation/",
-          "fill": 3,
-          "linewidth": 0,
-          "stack": "A"
         }
       ],
       "spaceLength": 10,
-      "stack": false,
+      "stack": true,
       "steppedLine": false,
       "targets": [
         {
-          "refCount": 0,
+          "refCount": 1,
           "refId": "A",
           "target": "groupByNode(metrictank.stats.$environment.$instance.idx.memory.find-cache.ops.*.rate32, 8, 'sum')"
         },
         {
+          "hide": true,
+          "refCount": 1,
+          "refId": "B",
+          "target": "alias(sumSeries(keepLastValue(metrictank.stats.$environment.$instance.idx.memory.find-cache.ops.*.rate32, 10)), 'sum')",
+          "textEditor": false
+        },
+        {
           "refCount": 0,
-          "refId": "D",
-          "target": "groupByNodes(metrictank.stats.$environment.$instance.idx.memory.find-cache.invalidation.*.rate32, 'sum', 7, 8)"
+          "refId": "C",
+          "target": "alias(asPercent(sumSeries(keepLastValue(metrictank.stats.$environment.$instance.idx.memory.find-cache.ops.hit.rate32, 10)), #B), 'hit-rate')",
+          "targetFull": "alias(asPercent(sumSeries(keepLastValue(metrictank.stats.$environment.$instance.idx.memory.find-cache.ops.hit.rate32, 10)), alias(sumSeries(keepLastValue(metrictank.stats.$environment.$instance.idx.memory.find-cache.ops.*.rate32, 10)), 'sum')), 'hit-rate')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "find cache",
+      "title": "find cache hit/miss",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "hertz",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "percent",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "drop": "#f2c96d",
+        "exec": "#5195ce",
+        "recv": "#962d82"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fill": 10,
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 66
+      },
+      "id": 58,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refCount": 0,
+          "refId": "A",
+          "target": "groupByNode(metrictank.stats.$environment.$instance.idx.memory.find-cache.invalidation.*.rate32, 8, 'sum')",
+          "textEditor": false
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "find cache invalidations",
       "tooltip": {
         "shared": true,
         "sort": 0,
