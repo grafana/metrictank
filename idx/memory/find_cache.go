@@ -18,6 +18,8 @@ var (
 	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.ops.miss")
 	// metric idx.memory.find-cache.backoff is the number of find caches in backoff mode
 	findCacheBackoff = stats.NewGauge32("idx.memory.find-cache.backoff")
+	// metric idx.memory.find-cache.entries is the number of entries in the cache
+	findCacheEntries = stats.NewGauge32("idx.memory.find-cache.entries")
 	// metric idx.memory.find-cache.invalidation.recv is the number of received invalidation requests
 	findCacheInvalidationsReceived = stats.NewCounterRate32("idx.memory.find-cache.invalidation.recv")
 	// metric idx.memory.find-cache.invalidation.exec is the number of executed invalidation requests
@@ -74,6 +76,7 @@ func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMa
 		cache: make(map[uint32]*lru.Cache),
 	}
 	go fc.processInvalidateQueue()
+	go fc.stats()
 	return fc
 }
 
@@ -177,7 +180,6 @@ func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	case c.invalidateReqs <- req:
 	default:
 		c.triggerBackoff()
-		return
 	}
 }
 
@@ -211,6 +213,34 @@ func (c *FindCache) forceInvalidation() {
 
 func (c *FindCache) Shutdown() {
 	c.shutdown <- struct{}{}
+}
+
+func (c *FindCache) stats() {
+	var prev int
+	tick := time.NewTicker(2 * time.Second)
+	for {
+		select {
+		case <-tick.C:
+			size := 0
+			c.RLock()
+			for _, cache := range c.cache {
+				size += cache.Len()
+			}
+			c.RUnlock()
+			// we track and subtract our previous entry, so that this works for
+			// partitioned index, which has multiple findcaches. want to see
+			// total entries across them all.
+			if size > prev {
+				findCacheEntries.AddUint32(uint32(size - prev))
+			} else {
+				findCacheEntries.DecUint32(uint32(prev - size))
+			}
+			prev = size
+		case <-c.shutdown:
+			tick.Stop()
+			return
+		}
+	}
 }
 
 func (c *FindCache) processInvalidateQueue() {
