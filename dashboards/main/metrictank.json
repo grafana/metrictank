@@ -3453,9 +3453,16 @@
       "seriesOverrides": [
         {
           "alias": "backoff",
+          "dashes": true,
+          "fill": 0,
+          "linewidth": 3,
+          "yaxis": 2
+        },
+        {
+          "alias": "/entries/",
           "fill": 6,
           "linewidth": 0,
-          "yaxis": 2
+          "stack": "A"
         }
       ],
       "spaceLength": 10,
@@ -3465,19 +3472,19 @@
         {
           "refCount": 0,
           "refId": "B",
-          "target": "alias(metrictank.stats.$environment.$instance.idx.memory.find-cache.entries.gauge32, 'entries')"
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.memory.find-cache.entries.gauge32, 7, 3)"
         },
         {
           "refCount": 0,
           "refId": "C",
-          "target": "alias(metrictank.stats.$environment.$instance.idx.memory.find-cache.backoff.gauge32, 'backoff')"
+          "target": "alias(sumSeries(metrictank.stats.$environment.$instance.idx.memory.find-cache.backoff.gauge32), 'backoff')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "find cache",
+      "title": "find cache entries & backoff",
       "tooltip": {
         "shared": true,
         "sort": 0,
