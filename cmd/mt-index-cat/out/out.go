@@ -18,7 +18,7 @@ func Dump(d schema.MetricDefinition) {
 }
 
 func List(d schema.MetricDefinition) {
-	fmt.Println(d.OrgId, d.Name)
+	fmt.Println(d.OrgId, d.NameWithTags())
 }
 
 func GetVegetaRender(addr, from string) func(d schema.MetricDefinition) {
