@@ -200,6 +200,10 @@ a counter of findCache hits
 a counter of findCache misses
 * `idx.memory.get`:  
 the duration of a get of one metric in the memory idx
+* `idx.memory.intern.fragmentation`:  
+the total fragmentation percent of the object store used by the interning layer by object size
+* `idx.memory.intern.memory`:  
+the total memory used by the interning layer in bytes by object size
 * `idx.memory.list`:  
 the duration of memory idx listings
 * `idx.memory.ops.add`:  
