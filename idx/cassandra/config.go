@@ -39,6 +39,7 @@ type IdxConfig struct {
 	numConns                 int
 	protoVer                 int
 	disableInitialHostLookup bool
+	initLoadConcurrency      int
 }
 
 // NewIdxConfig returns IdxConfig with default values set.
@@ -64,6 +65,7 @@ func NewIdxConfig() *IdxConfig {
 		auth:                     false,
 		username:                 "cassandra",
 		password:                 "cassandra",
+		initLoadConcurrency:      1,
 	}
 }
 
@@ -92,6 +94,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.BoolVar(&CliConfig.updateCassIdx, "update-cassandra-index", CliConfig.updateCassIdx, "synchronize index changes to cassandra. not all your nodes need to do this.")
 	casIdx.DurationVar(&CliConfig.updateInterval, "update-interval", CliConfig.updateInterval, "frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates")
 	casIdx.DurationVar(&CliConfig.pruneInterval, "prune-interval", CliConfig.pruneInterval, "Interval at which the index should be checked for stale series.")
+	casIdx.IntVar(&CliConfig.initLoadConcurrency, "init-load-concurrency", CliConfig.initLoadConcurrency, "Number of partitions to load concurrently on startup.")
 	casIdx.IntVar(&CliConfig.protoVer, "protocol-version", CliConfig.protoVer, "cql protocol version to use")
 	casIdx.BoolVar(&CliConfig.createKeyspace, "create-keyspace", CliConfig.createKeyspace, "enable the creation of the index keyspace and tables, only one node needs this")
 	casIdx.StringVar(&CliConfig.schemaFile, "schema-file", CliConfig.schemaFile, "File containing the needed schemas in case database needs initializing")

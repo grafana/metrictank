@@ -343,17 +343,20 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
+	gate := make(chan struct{}, c.cfg.initLoadConcurrency)
 	var wg sync.WaitGroup
 	var num int
 	for _, partition := range cluster.Manager.GetPartitions() {
 		wg.Add(1)
 		go func(p int32) {
-			log.Infof("Loading partition %s", p)
+			gate <- struct{}{}
+			defer func() {
+				wg.Done()
+				<-gate
+			}()
 			var defs []schema.MetricDefinition
 			defs = c.LoadPartitions([]int32{p}, defs, pre)
 			num += c.MemoryIndex.LoadPartition(p, defs)
-			wg.Done()
-			log.Infof("Done loading partition %s", p)
 		}(partition)
 	}
 	wg.Wait()
