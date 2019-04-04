@@ -1,14 +1,40 @@
 # unreleased/master
 
+## Important changes that require your attention:
+
+* This release includes the "query layer" functionality.
+Versions prior to v0.11.0-184-g293b55b9 cannot handle query nodes joining the cluster and will crash.
+To deploy the new query nodes and introduce them into the cluster, you must first
+upgrade all other nodes to this version (or later)
+Also, regarding cluster.mode:
+    - 'single' is now 'dev'
+    - 'multi' is now 'shard'
+(The old values are still allowed for the time being)
+
+* since v0.11.0-169-g59ebb227, kafka-version now defaults to 2.0.0 instead of 0.10.0.0. Make sure to set
+  this to a proper version if your brokers are not at least at version 2.0.0.
+
+## Other changes
+
 * Improve performance of SetTags #1158
 * speed up cross series aggregators by being more cache friendly #1164
 * Fix summarize crash #1170
 * groupByTags Performance improvements + fix setting consolidator per group #1165
 * document startup procedure #1186
 * fix dashboard render latency queries + remove old dashboards #1192
+* Dashboard: mem.to_iter fix and use UTC #1219
 * Dynamic GOGC based on ready state #1194
 * improve kafka-mdm stats/priority tracking #1200
 * tweak cluster priority calculation to be resilient against GC pauses #1022, #1218
+* Better document priority ready state #1223
+* update messagepack to v1.1 #1214
+* add the mt-index-prune utility #1231, #1235
+* Add partitioned index (experimental and not recommended) #1232
+* Add find cache to speed up render requests #1233, #1236, #1263, #1265, #1266
+* fix decrement tank.total_points upon GC. fix #1239
+* update kafka docs and defaults to v2.0.0 #1221
+* add new 'query' cluster mode and better name for modes #1243
+* mt-index-cat should use NameWithTags() when listing series #1267
 
 ## api
 
