@@ -296,7 +296,9 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 
 	existing, ok := m.defById[point.MKey]
 	if ok {
-		log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
+		}
 
 		bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
 
@@ -320,7 +322,9 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 
 	existing, ok := m.defById[mkey]
 	if ok {
-		log.Debugf("memory-idx: metricDef with id %s already in index.", mkey)
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("memory-idx: metricDef with id %s already in index.", mkey)
+		}
 		bumpLastUpdate(&existing.LastUpdate, data.Time)
 		oldPart := atomic.SwapInt32(&existing.Partition, partition)
 		statUpdate.Inc()

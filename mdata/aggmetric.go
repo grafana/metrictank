@@ -467,7 +467,10 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		}
 		totalPoints.Inc()
 		a.lastWrite = uint32(time.Now().Unix())
-		log.Debugf("AM: %s Add(): pushed new value to last chunk: %v", a.key, a.chunks[0])
+
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("AM: %s Add(): pushed new value to last chunk: %v", a.key, a.chunks[0])
+		}
 	} else if t0 < currentChunk.Series.T0 {
 		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.Series.T0, currentChunk.Series.T)
 		metricsTooOld.Inc()
