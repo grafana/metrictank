@@ -22,7 +22,6 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
-	goi "github.com/robert-milan/go-object-interning"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -51,6 +50,11 @@ var (
 
 	// metric idx.metrics_active is the number of currently known metrics in the index
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
+
+	// metric idx.memory.intern.memory is the total memory used by the interning layer in bytes by object size
+	statInternMemory = make([]*stats.Gauge64, 256)
+	// metric idx.memory.intern.fragmentation is the total fragmentation percent of the object store used by the interning layer by object size
+	statInternFragmentation = make([]*stats.Gauge32, 256)
 
 	Enabled                      bool
 	matchCacheSize               int
@@ -276,16 +280,10 @@ type UnpartitionedMemoryIdx struct {
 	// used to reduce contention
 	findCache *FindCache
 
-	// used to intern objects used by the index to reduce memory overhead
-	// currently it is only used by the tag index
-	objIntern *goi.ObjectIntern
-
 	writeQueue *WriteQueue
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
-	oiCnf := goi.NewConfig()
-	oiCnf.CompressionType = goi.NOCPRSN
 	m := &UnpartitionedMemoryIdx{
 		defById:        make(map[schema.MKey]*idx.Archive),
 		defByTagSet:    make(defByTagSet),
@@ -293,7 +291,30 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tags:           make(map[uint32]TagIndex),
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
-		objIntern:      goi.NewObjectIntern(goi.NewConfig()),
+	}
+
+	// instantiate strats for the interning layer/object store
+	for i := 0; i < 256; i++ {
+		statInternMemory[i] = stats.NewGauge64(fmt.Sprintf("idx.memory.intern.memory.%d", i))
+		statInternFragmentation[i] = stats.NewGauge32(fmt.Sprintf("idx.memory.intern.fragmentation.%d", i))
+	}
+
+	// gather memory and fragmentation statistics on the object store every minute
+	go func() {
+		for {
+			for _, internMemStat := range idx.IdxIntern.MemStatsPerPool() {
+				statInternMemory[internMemStat.ObjSize].SetUint64(internMemStat.MemUsed)
+			}
+			for _, internFragStat := range idx.IdxIntern.FragStatsPerPool() {
+				// need to fix this in the interning library or object store
+				statInternFragmentation[internFragStat.ObjSize].SetUint32(uint32(100 - (internFragStat.FragPercent * 100)))
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
+
+	if findCacheSize > 0 {
+		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
 	}
 	return m
 }
@@ -660,7 +681,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		// Even if there are no tags, index at least "name". It's important to use the definition
 		// in the archive pointer that we add to defById, because the pointers must reference the
 		// same underlying object in m.defById and m.defByTagSet
-		m.indexTags(def)
+		m.indexTags(archive.MetricDefinition)
 
 		if len(def.Tags.KeyValues) > 0 {
 			if _, ok := m.defById[def.Id]; !ok {
