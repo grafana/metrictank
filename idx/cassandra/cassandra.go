@@ -345,16 +345,22 @@ func (c *CasIdx) rebuildIndex() {
 	pre := time.Now()
 	gate := make(chan struct{}, c.cfg.initLoadConcurrency)
 	var wg sync.WaitGroup
+	defPool := sync.Pool{
+		New: func() interface{} {
+			return []schema.MetricDefinition{}
+		},
+	}
 	var num int
 	for _, partition := range cluster.Manager.GetPartitions() {
 		wg.Add(1)
 		go func(p int32) {
 			gate <- struct{}{}
+			defs := defPool.Get().([]schema.MetricDefinition)
 			defer func() {
+				defPool.Put(defs[:0])
 				wg.Done()
 				<-gate
 			}()
-			var defs []schema.MetricDefinition
 			defs = c.LoadPartitions([]int32{p}, defs, pre)
 			num += c.MemoryIndex.LoadPartition(p, defs)
 		}(partition)
