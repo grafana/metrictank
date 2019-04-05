@@ -16,6 +16,7 @@ import (
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
+	goi "github.com/robert-milan/go-object-interning"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -92,6 +93,33 @@ var tagQueries = []testQuery{
 	// matching and filtering by regular expressions
 	{Expressions: []string{"dc=dc1", "host=host666", "cpu!=~cpu[0-9]{2}", "device!=~d.*"}, ExpectedResults: 80},
 	{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 4000},
+}
+
+func newTestIndex() MemoryIndex {
+	if Partitioned {
+		pidx := &PartitionedMemoryIdx{
+			Partition: make(map[int32]*UnpartitionedMemoryIdx),
+		}
+		partitions := cluster.Manager.GetPartitions()
+		log.Infof("PartitionedMemoryIdx: initializing with partitions: %v", partitions)
+		for _, p := range partitions {
+			pidx.Partition[p] = &UnpartitionedMemoryIdx{
+				defById:     make(map[schema.MKey]*idx.Archive),
+				defByTagSet: make(defByTagSet),
+				tree:        make(map[uint32]*Tree),
+				tags:        make(map[uint32]TagIndex),
+				findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
+			}
+		}
+		return pidx
+	}
+	return &UnpartitionedMemoryIdx{
+		defById:     make(map[schema.MKey]*idx.Archive),
+		defByTagSet: make(defByTagSet),
+		tree:        make(map[uint32]*Tree),
+		tags:        make(map[uint32]TagIndex),
+		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
+	}
 }
 
 func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []metric {
@@ -172,16 +200,21 @@ func InitSmallIndex() {
 		}
 		ix = nil
 
+		idx.IdxIntern = nil
+		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1})
 		partitionCount = 2
 		currentlyPartitioned = Partitioned
-		ix = New()
+		ix = newTestIndex()
 		ix.Init()
 
 		currentIndex = 1
 	} else {
+		idx.IdxIntern = nil
+		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		runtime.GC()
 		ix.PurgeFindCache()
 		ix.Init()
 		return
@@ -223,16 +256,21 @@ func InitLargeIndex() {
 		}
 		ix = nil
 
+		idx.IdxIntern = nil
+		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1, 2, 3, 4, 5, 6, 7})
 		partitionCount = 8
 		currentlyPartitioned = Partitioned
-		ix = New()
+		ix = newTestIndex()
 		ix.Init()
 
 		currentIndex = 2
 	} else {
+		idx.IdxIntern = nil
+		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		runtime.GC()
 		ix.PurgeFindCache()
 		ix.Init()
 		return
@@ -460,7 +498,7 @@ func TestTagSorting(t *testing.T) {
 }
 
 func testTagSorting(t *testing.T) {
-	index := New()
+	index := newTestIndex()
 	defer index.Stop()
 	index.Init()
 
