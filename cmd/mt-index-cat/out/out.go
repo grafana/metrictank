@@ -16,13 +16,8 @@ func Dump(d idx.MetricDefinition) {
 	spew.Dump(d.ConvertToSchemaMd())
 }
 
-<<<<<<< HEAD
-func List(d schema.MetricDefinition) {
-	fmt.Println(d.OrgId, d.NameWithTags())
-=======
 func List(d idx.MetricDefinition) {
-	fmt.Println(d.OrgId, d.Name.String())
->>>>>>> update mt-index-cat
+	fmt.Println(d.OrgId, d.NameWithTags())
 }
 
 func GetVegetaRender(addr, from string) func(d idx.MetricDefinition) {
