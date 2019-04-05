@@ -5,10 +5,8 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
-	"unsafe"
 
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -59,24 +57,12 @@ func (mn *MetricName) String() string {
 }
 
 func (mn *MetricName) string(bld *strings.Builder) string {
-	// get []int of the lengths of all of the mn.Nodes
-	lns, ok := IdxIntern.Len(mn.nodes)
-	if !ok {
-		panic("idx: Failed to retrieve length of strings from interning library for MetricName")
+	name, err := IdxIntern.JoinStrings(mn.nodes, ".")
+	if err != nil {
+		bld.WriteString("invalid")
+		return bld.String()
 	}
-
-	// should be faster than calling IdxIntern.SetString in a tight loop
-	var tmpSz string
-	szHeader := (*reflect.StringHeader)(unsafe.Pointer(&tmpSz))
-	first, _ := IdxIntern.GetStringFromPtr(mn.nodes[0])
-	bld.WriteString(first)
-	for idx, nodePtr := range mn.nodes[1:] {
-		szHeader.Data = nodePtr
-		szHeader.Len = lns[idx+1]
-		bld.WriteString(".")
-		bld.WriteString(tmpSz)
-	}
-
+	bld.WriteString(name)
 	return bld.String()
 }
 
