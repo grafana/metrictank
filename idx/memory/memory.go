@@ -1265,7 +1265,13 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 	// delete the metricDefs
 	for _, id := range n.Defs {
 		log.Debugf("memory-idx: deleting %s from index", id)
-		deletedDefs = append(deletedDefs, *m.defById[id])
+		archivePointer, ok := m.defById[id]
+		if archivePointer == nil {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() path %q: nil, %t := defById[%s]. Index is corrupt.", n.Path, ok, id.String())
+			continue
+		}
+		deletedDefs = append(deletedDefs, *archivePointer)
 		delete(m.defById, id)
 	}
 
