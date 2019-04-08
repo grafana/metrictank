@@ -357,7 +357,7 @@ func (m *UnpartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
 	if _, ok := m.defById[archive.Id]; !ok {
 		return
 	}
-	*(m.defById[archive.Id]) = archive
+	*m.defById[archive.Id] = archive
 }
 
 // indexTags reads the tags of a given metric definition and creates the

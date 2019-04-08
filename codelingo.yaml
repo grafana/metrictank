@@ -1,4 +1,34 @@
+funcs:
+  - name: removeParen
+    type: resolver
+    body: |
+      function(parenExpr) {
+        parenExpr = parenExpr.replace("(","")
+        parenExpr = parenExpr.replace(")","")
+        return parenExpr
+      }
 tenets:
-- import: codelingo/go
-- import: codelingo/effective-go
-- import: codelingo/code-review-comments
+  - import: codelingo/go
+  - import: codelingo/effective-go
+  - import: codelingo/code-review-comments
+
+  - name: unnecessary-parentheses
+    flows:
+      codelingo/docs:
+        title: Unnecessary Parentheses
+        body: |
+          Avoid sunnecessary parentheses to make your code easier to read.
+      codelingo/review:
+        comment: Avoid sunnecessary parentheses to make your code easier to read.
+      codelingo/rewrite:
+    query: |
+      import codelingo/ast/go
+      
+      @review comment
+      @rewrite --replace "{{removeParen(raw1)}}"
+      go.paren_expr(depth = any):
+        raw as raw1
+        any_of:
+          go.basic_lit
+          go.ident
+          go.index_expr
