@@ -1268,7 +1268,7 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 		archivePointer, ok := m.defById[id]
 		if archivePointer == nil {
 			corruptIndex.Inc()
-			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() path %q: nil, %t := defById[%s]. Index is corrupt.", n.Path, ok, id.String())
+			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() Index is corrupt. nil, %t := defById[%s]. path=%s ",  ok, id.String(), n.Path)
 			continue
 		}
 		deletedDefs = append(deletedDefs, *archivePointer)
