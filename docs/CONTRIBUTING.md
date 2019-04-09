@@ -4,7 +4,7 @@ Thanks for your interest in contributing to metrictank!
 
 * [dep](https://github.com/golang/dep) for managing vendored dependencies
 * `make` to build binaries and docker image.
-* [metrics2docs](https://github.com/Dieterbe/metrics2docs) generates the metrics documentation for the [metrics page](https://github.com/grafana/metrictank/blob/master/docs/metrics.md) though it is buggy and manual intervention is needed, for now can just manually update the metrics page.
+* [metrics2docs](https://github.com/Dieterbe/metrics2docs) generates the metrics documentation for the [metrics page](https://github.com/grafana/metrictank/blob/master/docs/metrics.md).
 
 # Building, testing and QA
 
@@ -27,7 +27,7 @@ see the [Makefile](../Makefile) for more targets
 6. never merge master into your PR. As it mangles up git history and makes things harder to review. Instead, rebase your PR on top of master.
 7. code must be well formatted. (checked via `scripts/qa/gofmt.sh`, `make qa` and circleCI)
 8. regarding configuration:
-   * config options and metrictank-sample.ini must be in sync. the latter must match the former.
+   * config options and metrictank-sample.ini must be in sync.
    * all other config files should also be in sync with metrictank-sample.ini except where the file should differ on purpose.
    (example: `docker/docker-cluster/metrictank.ini` is the same as metrictank-sample.ini except for the options that support the use case of running metrictank in a cluster)
    Use `scripts/dev/sync-configs.sh` which helps with the process of updating all configs based on metrictank-sample.ini.
@@ -43,6 +43,7 @@ see the [Makefile](../Makefile) for more targets
 13. Documentation in the [docs](../docs) folder should be kept in sync with current state of affairs
 14. HTTP status codes: use the [named codes defined in the standard library](https://golang.org/pkg/net/http/#pkg-constants) for easy searchability
 15. Don't rely on `.String()` being called implicitly, instead write the call out. This is to prevent that adding a `.Error()` method to structs can unexpectedly change the printed values.
+16. Any change which requires attention upon upgrade, must come with a corresponding mention in the CHANGELOG.md, right under the 'unreleased/master' header.
 
 # Documentation
 
