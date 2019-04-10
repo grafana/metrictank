@@ -12,7 +12,7 @@ import (
 
 type Metrics interface {
 	Get(key schema.MKey) (Metric, bool)
-	GetOrCreate(key schema.MKey, schemaId, aggId uint16) Metric
+	GetOrCreate(key schema.MKey, schemaId, aggId uint16, interval uint32) Metric
 }
 
 type Metric interface {

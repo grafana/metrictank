@@ -364,7 +364,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				num += 1
 				id := test.GetMKey(num)
 
-				metric := metrics.GetOrCreate(id, 0, 0)
+				metric := metrics.GetOrCreate(id, 0, 0, 1)
 				metric.Add(offset, 10)    // this point will always be quantized to 10
 				metric.Add(10+offset, 20) // this point will always be quantized to 20, so it should be selected
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
@@ -698,7 +698,7 @@ func TestGetSeriesAggMetrics(t *testing.T) {
 	req.ArchInterval = archInterval
 	ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
 
-	metric := metrics.GetOrCreate(metricKey, 0, 0)
+	metric := metrics.GetOrCreate(metricKey, 0, 0, 1)
 	for i := uint32(50); i < 3000; i++ {
 		metric.Add(i, float64(i^2))
 	}
