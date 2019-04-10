@@ -110,6 +110,8 @@ cass config flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -hosts string
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
+  -init-load-concurrency int
+    	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -num-conns int
@@ -241,6 +243,8 @@ cass config flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -hosts string
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
+  -init-load-concurrency int
+    	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -num-conns int
@@ -787,6 +791,8 @@ cass config flags:
     	host (hostname and server cert) verification when using SSL (default true)
   -hosts string
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
+  -init-load-concurrency int
+    	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -num-conns int

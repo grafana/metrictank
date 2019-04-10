@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -343,12 +344,29 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	var defs []schema.MetricDefinition
-	var num int
-	for _, partition := range cluster.Manager.GetPartitions() {
-		defs = c.LoadPartitions([]int32{partition}, defs[:0], pre)
-		num += c.MemoryIndex.LoadPartition(partition, defs)
+	gate := make(chan struct{}, c.cfg.initLoadConcurrency)
+	var wg sync.WaitGroup
+	defPool := sync.Pool{
+		New: func() interface{} {
+			return []schema.MetricDefinition{}
+		},
 	}
+	var num uint32
+	for _, partition := range cluster.Manager.GetPartitions() {
+		wg.Add(1)
+		go func(p int32) {
+			gate <- struct{}{}
+			defs := defPool.Get().([]schema.MetricDefinition)
+			defer func() {
+				defPool.Put(defs[:0])
+				wg.Done()
+				<-gate
+			}()
+			defs = c.LoadPartitions([]int32{p}, defs, pre)
+			atomic.AddUint32(&num, uint32(c.MemoryIndex.LoadPartition(p, defs)))
+		}(partition)
+	}
+	wg.Wait()
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
@@ -357,6 +375,7 @@ func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.Me
 	return c.load(defs, iter, now)
 }
 
+// LoadPartitions appends MetricDefinitions from the given partitions to defs and returns the modified defs, honoring pruning settings relative to now
 func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
 	placeholders := make([]string, len(partitions))
 	for i, p := range partitions {
@@ -367,6 +386,7 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefiniti
 	return c.load(defs, iter, now)
 }
 
+// load appends MetricDefinitions from the iterator to defs and returns the modified defs, honoring pruning settings relative to now
 func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time.Time) []schema.MetricDefinition {
 	defsByNames := make(map[string][]*schema.MetricDefinition)
 	var id, name, unit, mtype string
