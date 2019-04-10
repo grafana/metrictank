@@ -14,6 +14,9 @@ Also, regarding cluster.mode:
 * since v0.11.0-169-g59ebb227, kafka-version now defaults to 2.0.0 instead of 0.10.0.0. Make sure to set
   this to a proper version if your brokers are not at least at version 2.0.0.
 
+* since v0.11.0-233-gcf24c43a, if queries need rollup data, but asked for a consolidateBy() without matching rollup aggregation
+  we pick the most approriate rollup from what is available.
+
 ## Other changes
 
 * Improve performance of SetTags #1158
