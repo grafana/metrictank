@@ -39,6 +39,11 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
 	var res []schema.Point
 	oldest := (rob.newest + 1) % uint32(cap(rob.buf))
 	index := (ts / rob.interval) % uint32(cap(rob.buf))
+	if rob.buf[index].Ts == ts {
+		// duplicate datapoint received.
+		metricsTooOld.Inc()
+		return nil, false
+	}
 	if ts > rob.buf[rob.newest].Ts {
 		flushCount := (ts - rob.buf[rob.newest].Ts) / rob.interval
 		if flushCount > uint32(cap(rob.buf)) {
