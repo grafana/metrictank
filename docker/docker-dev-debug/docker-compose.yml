@@ -13,10 +13,10 @@ services:
      - "40000:40000"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ./metrictank.ini:/etc/metrictank/metrictank.ini
-      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
-      - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+      - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
       - ../../scripts/config/index-rules.conf:/etc/metrictank/index-rules.conf
+      - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ../../scripts/config/schema-store-cassandra.toml:/etc/metrictank/schema-store-cassandra.toml
       - ../../scripts/config/schema-idx-cassandra.toml:/etc/metrictank/schema-idx-cassandra.toml
 
