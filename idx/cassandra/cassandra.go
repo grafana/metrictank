@@ -375,6 +375,7 @@ func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.Me
 	return c.load(defs, iter, now)
 }
 
+// LoadPartitions appends MetricDefinitions from the given partitions to defs and returns the modified defs, honoring pruning settings relative to now
 func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
 	placeholders := make([]string, len(partitions))
 	for i, p := range partitions {
@@ -385,6 +386,7 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefiniti
 	return c.load(defs, iter, now)
 }
 
+// load appends MetricDefinitions from the iterator to defs and returns the modified defs, honoring pruning settings relative to now
 func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time.Time) []schema.MetricDefinition {
 	defsByNames := make(map[string][]*schema.MetricDefinition)
 	var id, name, unit, mtype string
