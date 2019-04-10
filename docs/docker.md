@@ -43,6 +43,10 @@ Same as docker-dev but instead of using cassandra as the backend store and index
 
 Same as docker-dev but using scylladb instead of cassandra
 
+### docker-dev-debug
+
+Like docker-dev but uses debug image (build with `make debug`) and exposes port 40000 for delve.
+
 ### docker-dev-custom-cfg-kafka
 
 Similar to docker-dev in terms of build and configuration.

@@ -1,4 +1,4 @@
-.PHONY: test bin docker
+.PHONY: test bin docker debug
 default:
 	$(MAKE) all
 test:
@@ -13,8 +13,16 @@ bin-race:
 	./scripts/build.sh -race
 docker:
 	./scripts/build_docker.sh
+qa: bin qa-common
 
-qa: bin
+#debug versions for remote debugging with delve
+bin-debug:
+	./scripts/build.sh -debug
+docker-debug:
+	./scripts/build_docker.sh -debug
+qa-debug: bin-debug qa-common
+
+qa-common:
 	# regular qa steps (can run directly on code)
 	scripts/qa/gofmt.sh
 	scripts/qa/go-generate.sh
@@ -26,10 +34,16 @@ qa: bin
 	scripts/qa/vet-high-confidence.sh
 	# qa-post-build steps minus stack tests
 	scripts/qa/docs.sh
+
 all:
 	$(MAKE) bin
 	$(MAKE) docker
 	$(MAKE) qa
+
+debug:
+	$(MAKE) bin-debug
+	$(MAKE) docker-debug
+	$(MAKE) qa-debug
 
 clean:
 	rm build/*
