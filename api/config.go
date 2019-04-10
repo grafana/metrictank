@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
-	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )
 
