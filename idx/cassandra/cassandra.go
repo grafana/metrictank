@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gocql/gocql"
@@ -350,7 +351,7 @@ func (c *CasIdx) rebuildIndex() {
 			return []schema.MetricDefinition{}
 		},
 	}
-	var num int
+	var num uint32
 	for _, partition := range cluster.Manager.GetPartitions() {
 		wg.Add(1)
 		go func(p int32) {
@@ -362,7 +363,7 @@ func (c *CasIdx) rebuildIndex() {
 				<-gate
 			}()
 			defs = c.LoadPartitions([]int32{p}, defs, pre)
-			num += c.MemoryIndex.LoadPartition(p, defs)
+			atomic.AddUint32(&num, uint32(c.MemoryIndex.LoadPartition(p, defs)))
 		}(partition)
 	}
 	wg.Wait()
