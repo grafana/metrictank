@@ -15,6 +15,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	discardReasonLabel = "reason"
+
+	sampleOutOfOrder = "sample-out-of-order"
+	receivedTooLate  = "received-too-late"
+)
+
 var (
 	// metric tank.chunk_operations.create is a counter of how many chunks are created
 	chunkCreate = stats.NewCounter32("tank.chunk_operations.create")
@@ -74,6 +81,12 @@ var (
 		Name:      "metrics_active",
 		Help:      "Current # of active metrics",
 	}, []string{"org"})
+
+	PromDiscardedSamples = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "metrictank",
+		Name:      "discarded_samples_total",
+		Help:      "Total # of samples that were discarded",
+	}, []string{discardReasonLabel, "org"})
 )
 
 func ConfigSetup() {

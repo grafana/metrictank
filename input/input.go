@@ -5,6 +5,7 @@ package input
 import (
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/raintank/schema"
 	"github.com/raintank/schema/msg"
@@ -34,6 +35,17 @@ type DefaultHandler struct {
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
 }
+
+// Possible reason labels for Prometheus metric discarded_samples_total
+const (
+	invalidTimestamp = "invalid-timestamp"
+	invalidInterval  = "invalid-interval"
+	invalidOrgId     = "invalid-orgID"
+	invalidName      = "invalid-name"
+	invalidMtype     = "invalid-mtype"
+	invalidTagFormat = "invalid-tag-format"
+	unknownPointId   = "unknown-point-id"
+)
 
 func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input string) DefaultHandler {
 	return DefaultHandler{
@@ -67,6 +79,7 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 	// math.MaxInt32 = Jan 19 03:14:07 UTC 2038
 	if !point.Valid() || point.Time >= math.MaxInt32 {
 		in.invalidMP.Inc()
+		mdata.PromDiscardedSamples.WithLabelValues(invalidTimestamp, strconv.Itoa(int(point.MKey.Org))).Inc()
 		log.Debugf("in: Invalid metric %v", point)
 		return
 	}
@@ -75,6 +88,7 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 
 	if !ok {
 		in.unknownMP.Inc()
+		mdata.PromDiscardedSamples.WithLabelValues(unknownPointId, strconv.Itoa(int(point.MKey.Org))).Inc()
 		return
 	}
 
@@ -90,17 +104,35 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 	if err != nil {
 		in.invalidMD.Inc()
 		log.Debugf("in: Invalid metric %v: %s", md, err)
+
+		var reason string
+		switch err {
+		case schema.ErrInvalidIntervalzero:
+			reason = invalidInterval
+		case schema.ErrInvalidOrgIdzero:
+			reason = invalidOrgId
+		case schema.ErrInvalidEmptyName:
+			reason = invalidName
+		case schema.ErrInvalidMtype:
+			reason = invalidMtype
+		case schema.ErrInvalidTagFormat:
+			reason = invalidTagFormat
+		}
+		mdata.PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(md.OrgId)).Inc()
+
 		return
 	}
 	// in cassandra we store timestamps and interval as 32bit signed integers.
 	// math.MaxInt32 = Jan 19 03:14:07 UTC 2038
 	if md.Time <= 0 || md.Time >= math.MaxInt32 {
 		in.invalidMD.Inc()
+		mdata.PromDiscardedSamples.WithLabelValues(invalidTimestamp, strconv.Itoa(md.OrgId)).Inc()
 		log.Warnf("in: invalid metric %q: .Time %d out of range", md.Id, md.Time)
 		return
 	}
 	if md.Interval <= 0 || md.Interval >= math.MaxInt32 {
 		in.invalidMD.Inc()
+		mdata.PromDiscardedSamples.WithLabelValues(invalidInterval, strconv.Itoa(md.OrgId)).Inc()
 		log.Warnf("in: invalid metric %q. .Interval %d out of range", md.Id, md.Interval)
 		return
 	}
