@@ -1,7 +1,13 @@
 package mdata
 
 import (
+	"errors"
+
 	"github.com/raintank/schema"
+)
+
+var (
+	errMetricsTooOld = errors.New("metrics too old")
 )
 
 // ReorderBuffer keeps a window of data during which it is ok to send data out of order.
@@ -27,13 +33,13 @@ func NewReorderBuffer(reorderWindow, interval uint32) *ReorderBuffer {
 
 // Add adds the point if it falls within the window.
 // it returns points that have been purged out of the buffer, as well as whether the add succeeded.
-func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
+func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 	ts = AggBoundary(ts, rob.interval)
 
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
 		metricsTooOld.Inc()
-		return nil, false
+		return nil, errMetricsTooOld
 	}
 
 	var res []schema.Point
@@ -61,7 +67,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, bool) {
 		rob.buf[index].Val = val
 	}
 
-	return res, true
+	return res, nil
 }
 
 // Get returns the points in the buffer

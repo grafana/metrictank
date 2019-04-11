@@ -14,9 +14,9 @@ func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []
 	metricsReordered.SetUint32(0)
 	addedCount := uint32(0)
 	for _, point := range testData {
-		addRes, accepted := b.Add(point.Ts, point.Val)
+		addRes, err := b.Add(point.Ts, point.Val)
 		flushed = append(flushed, addRes...)
-		if accepted {
+		if err == nil {
 			addedCount++
 		}
 	}
@@ -217,8 +217,8 @@ func TestROBFlushSortedData(t *testing.T) {
 	buf := NewReorderBuffer(600, 1)
 	metricsTooOld.SetUint32(0)
 	for i := 1100; i < 2100; i++ {
-		flushed, accepted := buf.Add(uint32(i), float64(i))
-		if metricsTooOld.Peek() != 0 || !accepted {
+		flushed, err := buf.Add(uint32(i), float64(i))
+		if metricsTooOld.Peek() != 0 || err != nil {
 			t.Fatalf("Adding failed")
 		}
 		results = append(results, flushed...)
@@ -247,8 +247,8 @@ func TestROBFlushUnsortedData1(t *testing.T) {
 	failedCount := 0
 	metricsTooOld.SetUint32(0)
 	for _, p := range data {
-		flushed, accepted := buf.Add(p.Ts, p.Val)
-		if metricsTooOld.Peek() != 0 || !accepted {
+		flushed, err := buf.Add(p.Ts, p.Val)
+		if metricsTooOld.Peek() != 0 || err != nil {
 			failedCount++
 			metricsTooOld.SetUint32(0)
 		} else {

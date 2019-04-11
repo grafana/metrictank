@@ -409,14 +409,22 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.add(ts, val)
 	} else {
 		// write through reorder buffer
-		res, accepted := a.rob.Add(ts, val)
+		res, err := a.rob.Add(ts, val)
 
-		if len(res) == 0 && accepted {
+		if err == nil {
+			if len(res) == 0 {
 			a.lastWrite = uint32(time.Now().Unix())
-		}
-
+			} else {
 		for _, p := range res {
 			a.add(p.Ts, p.Val)
+		}
+	}
+		} else {
+			var reason string
+			switch err {
+			case errMetricsTooOld:
+				reason = sampleOutOfOrder
+			}
 		}
 	}
 }
