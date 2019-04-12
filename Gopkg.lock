@@ -118,6 +118,14 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:1605a72a775deccb79dcf7561f311270dfe79a4da8dec0d951f37610cfff2832"
+  name = "github.com/dchest/siphash"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "34f201214d993633bb24f418ba11736ab8b55aa7"
+  version = "v1.2.1"
+
+[[projects]]
   branch = "master"
   digest = "1:3db74f0cf75d9759d2bdfb6cb55f7d7d372c01f847c5e1ab2fe03773dc2bf024"
   name = "github.com/dgryski/go-jump"
@@ -1053,6 +1061,7 @@
     "github.com/Shopify/sarama",
     "github.com/alyu/configparser",
     "github.com/davecgh/go-spew/spew",
+    "github.com/dchest/siphash",
     "github.com/dgryski/go-jump",
     "github.com/dgryski/go-linlog",
     "github.com/dgryski/go-metro",
