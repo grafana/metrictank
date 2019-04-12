@@ -7,6 +7,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	jump "github.com/dgryski/go-jump"
+	metro "github.com/dgryski/go-metro"
 	"github.com/raintank/schema"
 )
 
@@ -85,5 +86,21 @@ func (p jumpPartitionerFnv) Partition(message *sarama.ProducerMessage, numPartit
 }
 
 func (p jumpPartitionerFnv) RequiresConsistency() bool {
+	return true
+}
+
+type jumpPartitionerMetro struct{}
+
+func (p jumpPartitionerMetro) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
+	key, err := message.Key.Encode()
+	if err != nil {
+		return 0, err
+	}
+	jumpKey := metro.Hash64(key, 0)
+	return jump.Hash(jumpKey, int(numPartitions)), nil
+
+}
+
+func (p jumpPartitionerMetro) RequiresConsistency() bool {
 	return true
 }
