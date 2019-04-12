@@ -38,7 +38,6 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
-		metricsTooOld.Inc()
 		return nil, errMetricsTooOld
 	}
 

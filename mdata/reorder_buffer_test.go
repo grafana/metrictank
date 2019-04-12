@@ -10,18 +10,20 @@ import (
 func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded, expectAddFail, expectReordered uint32) []schema.Point {
 	var flushed []schema.Point
 	b := NewReorderBuffer(reorderWindow, 1)
-	metricsTooOld.SetUint32(0)
 	metricsReordered.SetUint32(0)
 	addedCount := uint32(0)
+	errorCount := uint32(0)
 	for _, point := range testData {
 		addRes, err := b.Add(point.Ts, point.Val)
 		flushed = append(flushed, addRes...)
 		if err == nil {
 			addedCount++
+		} else {
+			errorCount++
 		}
 	}
-	if expectAddFail != metricsTooOld.Peek() {
-		t.Fatalf("Expected %d failures, but had %d", expectAddFail, metricsTooOld.Peek())
+	if expectAddFail != errorCount {
+		t.Fatalf("Expected %d failures, but had %d", expectAddFail, errorCount)
 	}
 
 	if expectAdded != addedCount {
@@ -215,10 +217,9 @@ func TestROBAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 func TestROBFlushSortedData(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(600, 1)
-	metricsTooOld.SetUint32(0)
 	for i := 1100; i < 2100; i++ {
 		flushed, err := buf.Add(uint32(i), float64(i))
-		if metricsTooOld.Peek() != 0 || err != nil {
+		if err != nil {
 			t.Fatalf("Adding failed")
 		}
 		results = append(results, flushed...)
@@ -245,12 +246,10 @@ func TestROBFlushUnsortedData1(t *testing.T) {
 		{19, 19},
 	}
 	failedCount := 0
-	metricsTooOld.SetUint32(0)
 	for _, p := range data {
 		flushed, err := buf.Add(p.Ts, p.Val)
-		if metricsTooOld.Peek() != 0 || err != nil {
+		if err != nil {
 			failedCount++
-			metricsTooOld.SetUint32(0)
 		} else {
 			results = append(results, flushed...)
 		}
