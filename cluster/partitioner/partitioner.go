@@ -6,6 +6,7 @@ import (
 	"hash/fnv"
 
 	"github.com/Shopify/sarama"
+	"github.com/dchest/siphash"
 	jump "github.com/dgryski/go-jump"
 	metro "github.com/dgryski/go-metro"
 	"github.com/raintank/schema"
@@ -102,5 +103,21 @@ func (p jumpPartitionerMetro) Partition(message *sarama.ProducerMessage, numPart
 }
 
 func (p jumpPartitionerMetro) RequiresConsistency() bool {
+	return true
+}
+
+type jumpPartitionerSip struct{}
+
+func (p jumpPartitionerSip) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
+	key, err := message.Key.Encode()
+	if err != nil {
+		return 0, err
+	}
+	jumpKey := siphash.Hash(0, 0, key)
+	return jump.Hash(jumpKey, int(numPartitions)), nil
+
+}
+
+func (p jumpPartitionerSip) RequiresConsistency() bool {
 	return true
 }
