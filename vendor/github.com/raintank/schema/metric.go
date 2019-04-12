@@ -9,11 +9,11 @@ import (
 	"sort"
 )
 
-var errInvalidIntervalzero = errors.New("interval cannot be 0")
-var errInvalidOrgIdzero = errors.New("org-id cannot be 0")
-var errInvalidEmptyName = errors.New("name cannot be empty")
-var errInvalidMtype = errors.New("invalid mtype")
-var errInvalidTagFormat = errors.New("invalid tag format")
+var ErrInvalidIntervalzero = errors.New("interval cannot be 0")
+var ErrInvalidOrgIdzero = errors.New("org-id cannot be 0")
+var ErrInvalidEmptyName = errors.New("name cannot be empty")
+var ErrInvalidMtype = errors.New("invalid mtype")
+var ErrInvalidTagFormat = errors.New("invalid tag format")
 
 type PartitionedMetric interface {
 	Validate() error
@@ -45,19 +45,19 @@ type MetricData struct {
 
 func (m *MetricData) Validate() error {
 	if m.OrgId == 0 {
-		return errInvalidOrgIdzero
+		return ErrInvalidOrgIdzero
 	}
 	if m.Interval == 0 {
-		return errInvalidIntervalzero
+		return ErrInvalidIntervalzero
 	}
 	if m.Name == "" {
-		return errInvalidEmptyName
+		return ErrInvalidEmptyName
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
-		return errInvalidMtype
+		return ErrInvalidMtype
 	}
 	if !ValidateTags(m.Tags) {
-		return errInvalidTagFormat
+		return ErrInvalidTagFormat
 	}
 	return nil
 }
@@ -189,19 +189,19 @@ func (m *MetricDefinition) SetId() {
 
 func (m *MetricDefinition) Validate() error {
 	if m.OrgId == 0 {
-		return errInvalidOrgIdzero
+		return ErrInvalidOrgIdzero
 	}
 	if m.Interval == 0 {
-		return errInvalidIntervalzero
+		return ErrInvalidIntervalzero
 	}
 	if m.Name == "" {
-		return errInvalidEmptyName
+		return ErrInvalidEmptyName
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
-		return errInvalidMtype
+		return ErrInvalidMtype
 	}
 	if !ValidateTags(m.Tags) {
-		return errInvalidTagFormat
+		return ErrInvalidTagFormat
 	}
 	return nil
 }

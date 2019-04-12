@@ -672,14 +672,14 @@
   revision = "05a94bb32ad1f23f4b01edb2edd06862d4a484d2"
 
 [[projects]]
-  digest = "1:2abd7ec410ef331072982b46ca52ec87fcd51c8a7aebcae2bc779f3e2424d2f8"
+  digest = "1:a6300e32dba337da3ce4aeb902f1d3f533a92138a216d4c099bc500b1fe7951e"
   name = "github.com/raintank/schema"
   packages = [
     ".",
     "msg",
   ]
   pruneopts = "NUT"
-  revision = "dc8d31b5117ed606334858ae45319b022d233806"
+  revision = "053ee370fec98de3ea47b5793241575a8e8cbcf5"
 
 [[projects]]
   branch = "master"
