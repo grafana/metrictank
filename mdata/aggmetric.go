@@ -425,6 +425,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 			switch err {
 			case errMetricsTooOld:
 				reason = sampleOutOfOrder
+			default:
+				reason = "unknown"
 			}
 			PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 		}

@@ -117,6 +117,8 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 			reason = invalidMtype
 		case schema.ErrInvalidTagFormat:
 			reason = invalidTagFormat
+		default:
+			reason = "unknown"
 		}
 		mdata.PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(md.OrgId)).Inc()
 
