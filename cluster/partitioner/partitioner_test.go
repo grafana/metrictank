@@ -50,8 +50,8 @@ func testPartitioner(partitionerName string, p sarama.Partitioner, t *testing.T)
 			distributions[int(p)]++
 			total++
 		}
-		c := cov(distributions, t)
-		fmt.Printf("%20s/%-4d %10s %9d -> %f\n", partitionerName, shards, datasetName, total, c)
+		cov, pctDiff := stats(distributions, t)
+		fmt.Printf("%20s/%-4d %10s %9d -> cov=%.3f, diff=%.2f%%\n", partitionerName, shards, datasetName, total, cov, pctDiff)
 	}
 
 	for _, shards := range []int{8, 32, 128} {
@@ -68,13 +68,23 @@ func testPartitioner(partitionerName string, p sarama.Partitioner, t *testing.T)
 	}
 }
 
-// cov computes the coefficient of variation,
-// which is an excellent measure of relative variation.
-func cov(distributions []int, t *testing.T) float64 {
+// stats computes the stats of the distribution:
+// 1) coefficient of variation, which is an excellent measure of relative variation.
+// 2) percent difference between highest and lowest partition
+func stats(distributions []int, t *testing.T) (float64, float64) {
 	var sum int
+	min := math.MaxInt64
+	max := math.MinInt64
 	for i := 0; i < len(distributions); i++ {
 		// fmt.Printf("%6d", distributions[i])
-		sum += distributions[i]
+		size := distributions[i]
+		if size < min {
+			min = size
+		}
+		if size > max {
+			max = size
+		}
+		sum += size
 	}
 	mean := float64(sum) / float64(len(distributions))
 
@@ -84,7 +94,8 @@ func cov(distributions []int, t *testing.T) float64 {
 	}
 	stdev = math.Sqrt(stdev / float64(len(distributions)))
 	cov := stdev / mean
-	return cov
+	pctdiff := float64(100*(max-min)) / float64(min)
+	return cov, pctdiff
 }
 
 var p int32
