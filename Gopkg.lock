@@ -94,12 +94,12 @@
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 
 [[projects]]
-  digest = "1:ac52ddd069a36a6545ba4869aa169de501b2d9711437688a632cf9f8d8f5053c"
+  digest = "1:0c31fa2fb2c809d61d640e28cc400087fe205df6ec9623dd1eb91a7de8d4f5d6"
   name = "github.com/cespare/xxhash"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "5c37fe3735342a2e0d01c87a907579987c8936cc"
-  version = "v1.0.0"
+  revision = "3b82fb7d186719faeedd0c2864f868c74fbf79a1"
+  version = "v2.0.0"
 
 [[projects]]
   branch = "master"
@@ -1060,6 +1060,7 @@
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/Shopify/sarama",
     "github.com/alyu/configparser",
+    "github.com/cespare/xxhash",
     "github.com/davecgh/go-spew/spew",
     "github.com/dchest/siphash",
     "github.com/dgryski/go-jump",
