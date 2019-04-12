@@ -12,47 +12,34 @@ type Partitioner interface {
 }
 
 type Kafka struct {
-	PartitionBy string
-	Partitioner sarama.Partitioner
+	PartitionBy     string
+	Partitioner     sarama.Partitioner
+	GetPartitionKey func(schema.PartitionedMetric, []byte) []byte
 }
 
 func NewKafka(partitionBy string) (*Kafka, error) {
+	kafka := Kafka{
+		PartitionBy: partitionBy,
+	}
+
 	switch partitionBy {
 	case "byOrg":
+		kafka.Partitioner = sarama.NewHashPartitioner("")
+		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyByOrgId(b) }
 	case "bySeries":
+		kafka.Partitioner = sarama.NewHashPartitioner("")
+		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeries(b) }
 	case "bySeriesWithTags":
+		kafka.Partitioner = sarama.NewHashPartitioner("")
+		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeriesWithTags(b) }
 	default:
 		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)
 	}
-	return &Kafka{
-		PartitionBy: partitionBy,
-		Partitioner: sarama.NewHashPartitioner(""),
-	}, nil
+
+	return &kafka, nil
 }
 
 func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
-	key, err := k.GetPartitionKey(m, nil)
-	if err != nil {
-		return 0, err
-	}
+	key := k.GetPartitionKey(m, nil)
 	return k.Partitioner.Partition(&sarama.ProducerMessage{Key: sarama.ByteEncoder(key)}, numPartitions)
-}
-
-func (k *Kafka) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, error) {
-	switch k.PartitionBy {
-	case "byOrg":
-		// partition by organisation: metrics for the same org should go to the same
-		// partition/MetricTank (optimize for locality~performance)
-		return m.KeyByOrgId(b), nil
-	case "bySeries":
-		// partition by series: metrics are distrubted across all metrictank instances
-		// to allow horizontal scalability
-		return m.KeyBySeries(b), nil
-	case "bySeriesWithTags":
-		// partition by series: metrics are distrubted across all metrictank instances
-		// to allow horizontal scalability, the tags are also considered as a factor
-		// for the partitioner
-		return m.KeyBySeriesWithTags(b), nil
-	}
-	return b, fmt.Errorf("unknown partitionBy setting.")
 }
