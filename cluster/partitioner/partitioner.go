@@ -3,6 +3,7 @@ package partitioner
 import (
 	"encoding/binary"
 	"fmt"
+	"hash/fnv"
 
 	"github.com/Shopify/sarama"
 	jump "github.com/dgryski/go-jump"
@@ -68,5 +69,21 @@ func (p jumpPartitionerMauro) Partition(message *sarama.ProducerMessage, numPart
 }
 
 func (p jumpPartitionerMauro) RequiresConsistency() bool {
+	return true
+}
+
+type jumpPartitionerFnv struct{}
+
+func (p jumpPartitionerFnv) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
+	key, err := message.Key.Encode()
+	if err != nil {
+		return 0, err
+	}
+	hf := fnv.New64a()
+	_, _ = hf.Write(key)
+	return jump.Hash(hf.Sum64(), int(numPartitions)), nil
+}
+
+func (p jumpPartitionerFnv) RequiresConsistency() bool {
 	return true
 }
