@@ -26,3 +26,9 @@ scrape_configs:
     scrape_interval: 15s
     static_configs:
       - targets: ['localhost:9090']
+
+  - job_name: metrictank
+    metrics_path: /prometheus/metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['metrictank:6060']
