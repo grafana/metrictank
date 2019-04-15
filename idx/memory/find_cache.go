@@ -334,26 +334,34 @@ func (c *FindCache) processInvalidateQueue() {
 
 // PurgeFindCache purges the findCaches for all orgIds
 func (m *UnpartitionedMemoryIdx) PurgeFindCache() {
-	m.findCache.PurgeAll()
+	if m.findCache != nil {
+		m.findCache.PurgeAll()
+	}
 }
 
 // ForceInvalidationFindCache forces a full invalidation cycle of the find cache
 func (m *UnpartitionedMemoryIdx) ForceInvalidationFindCache() {
-	m.findCache.forceInvalidation()
+	if m.findCache != nil {
+		m.findCache.forceInvalidation()
+	}
 }
 
 // PurgeFindCache purges the findCaches for all orgIds
 // across all partitions
 func (p *PartitionedMemoryIdx) PurgeFindCache() {
 	for _, m := range p.Partition {
-		m.findCache.PurgeAll()
+		if m.findCache != nil {
+			m.findCache.PurgeAll()
+		}
 	}
 }
 
 // ForceInvalidationFindCache forces a full invalidation cycle of the find cache
 func (p *PartitionedMemoryIdx) ForceInvalidationFindCache() {
 	for _, m := range p.Partition {
-		m.findCache.forceInvalidation()
+		if m.findCache != nil {
+			m.findCache.forceInvalidation()
+		}
 	}
 }
 
