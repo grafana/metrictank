@@ -82,7 +82,7 @@ var (
 		Help:      "Current # of active metrics",
 	}, []string{"org"})
 
-	PromDiscardedSamples = prometheus.NewCounterVec(prometheus.CounterOpts{
+	PromDiscardedSamples = promauto.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "metrictank",
 		Name:      "discarded_samples_total",
 		Help:      "Total # of samples that were discarded",
