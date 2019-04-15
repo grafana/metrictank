@@ -47,7 +47,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "metrictank",
-      "decimals": null,
+      "decimals": 0,
       "description": "",
       "fill": 1,
       "gridPos": {
@@ -133,7 +133,7 @@
       },
       "yaxes": [
         {
-          "decimals": null,
+          "decimals": 0,
           "format": "none",
           "label": null,
           "logBase": 1,
@@ -161,6 +161,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "Prometheus",
+      "decimals": 0,
       "fill": 1,
       "gridPos": {
         "h": 8,
@@ -185,8 +186,8 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pointradius": 2,
-      "points": false,
+      "pointradius": 1,
+      "points": true,
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
@@ -223,6 +224,7 @@
       },
       "yaxes": [
         {
+          "decimals": 0,
           "format": "none",
           "label": null,
           "logBase": 1,
@@ -452,5 +454,5 @@
   "timezone": "utc",
   "title": "Fakemetrics - discarded samples",
   "uid": "rABS_bgZk",
-  "version": 34
+  "version": 1
 }
