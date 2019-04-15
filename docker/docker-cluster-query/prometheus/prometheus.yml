@@ -31,4 +31,4 @@ scrape_configs:
     metrics_path: /prometheus/metrics
     scrape_interval: 10s
     static_configs:
-      - targets: ['metrictank0:6060','metrictank1:6060','metrictank2:6060','metrictank3:6060']
+      - targets: ['metrictank0:6060','metrictank1:6060','metrictank2:6060','metrictank3:6060','metrictank-q0:6060']
