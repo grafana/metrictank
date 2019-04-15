@@ -974,6 +974,25 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdS
 	return query.Run(tags, m.defById)
 }
 
+func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
+
+	if m.findCache == nil {
+		return find(tree, pattern)
+	}
+
+	matchedNodes, ok := m.findCache.Get(orgId, pattern)
+	if ok {
+		return matchedNodes, nil
+	}
+
+	matchedNodes, err := find(tree, pattern)
+	if err != nil {
+		return nil, err
+	}
+	m.findCache.Add(orgId, pattern, matchedNodes)
+	return matchedNodes, nil
+}
+
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
 	var matchedNodes []*Node
@@ -984,42 +1003,19 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
 	} else {
-		if m.findCache != nil {
-			matchedNodes, ok = m.findCache.Get(orgId, pattern)
-			if !ok {
-				matchedNodes, err = find(tree, pattern)
-				if err != nil {
-					return nil, err
-				}
-				m.findCache.Add(orgId, pattern, matchedNodes)
-			}
-		} else {
-			matchedNodes, err = find(tree, pattern)
-			if err != nil {
-				return nil, err
-			}
+		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
 		tree, ok = m.tree[idx.OrgIdPublic]
 		if ok {
-			if m.findCache != nil {
-				publicNodes, ok := m.findCache.Get(idx.OrgIdPublic, pattern)
-				if !ok {
-					publicNodes, err = find(tree, pattern)
-					if err != nil {
-						return nil, err
-					}
-					m.findCache.Add(idx.OrgIdPublic, pattern, publicNodes)
-				}
-				matchedNodes = append(matchedNodes, publicNodes...)
-			} else {
-				publicNodes, err := find(tree, pattern)
-				if err != nil {
-					return nil, err
-				}
-				matchedNodes = append(matchedNodes, publicNodes...)
+			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
+			if err != nil {
+				return nil, err
 			}
+			matchedNodes = append(matchedNodes, publicNodes...)
 		}
 	}
 	log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
