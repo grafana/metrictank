@@ -1020,6 +1020,11 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 				idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
 				for _, id := range n.Defs {
 					def := m.defById[id]
+					if def == nil {
+						// def could be nil if items from the findCache have been deleted.
+						log.Debugf("memory-idx: Find: def with id=%s from node with path=%s does not exist anymore", id, n.Path)
+						continue
+					}
 					if from != 0 && atomic.LoadInt64(&def.LastUpdate) < from {
 						statFiltered.Inc()
 						log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
@@ -1219,7 +1224,21 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	var deletedDefs []idx.Archive
 	pre := time.Now()
 	m.Lock()
-	defer m.Unlock()
+	defer func() {
+		m.Unlock()
+		if len(deletedDefs) == 0 {
+			return
+		}
+		// asynchronously invalidate any findCache entries
+		// that match any of the deleted series.
+		if len(deletedDefs) > findCacheInvalidateQueueSize {
+			m.findCache.Purge(orgId)
+		} else {
+			for _, d := range deletedDefs {
+				m.findCache.InvalidateFor(orgId, d.NameWithTags())
+			}
+		}
+	}()
 	tree, ok := m.tree[orgId]
 	if !ok {
 		return nil, nil
@@ -1236,13 +1255,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 
 	statMetricsActive.Set(len(m.defById))
 	statDeleteDuration.Value(time.Since(pre))
-	if len(deletedDefs) > findCacheInvalidateQueueSize {
-		m.findCache.Purge(orgId)
-	} else {
-		for _, d := range deletedDefs {
-			m.findCache.InvalidateFor(orgId, d.NameWithTags())
-		}
-	}
+
 	return deletedDefs, nil
 }
 
