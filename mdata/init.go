@@ -16,8 +16,6 @@ import (
 )
 
 const (
-	discardReasonLabel = "reason"
-
 	sampleOutOfOrder = "sample-out-of-order"
 	receivedTooLate  = "received-too-late"
 )
@@ -86,7 +84,7 @@ var (
 		Namespace: "metrictank",
 		Name:      "discarded_samples_total",
 		Help:      "Total # of samples that were discarded",
-	}, []string{discardReasonLabel, "org"})
+	}, []string{"reason", "org"})
 )
 
 func ConfigSetup() {
