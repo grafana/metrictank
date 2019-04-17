@@ -70,7 +70,7 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org)")
+	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
 	memoryIdx.DurationVar(&findCacheInvalidateMaxWait, "find-cache-invalidate-max-wait", 5*time.Second, "max duration to wait building up a batch to invalidate")
@@ -255,13 +255,16 @@ type UnpartitionedMemoryIdx struct {
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
-	return &UnpartitionedMemoryIdx{
+	m := UnpartitionedMemoryIdx{
 		defById:     make(map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
-		findCache:   NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime),
 	}
+	if findCacheSize > 0 {
+		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
+	}
+	return &m
 }
 
 func (m *UnpartitionedMemoryIdx) Init() error {
@@ -477,9 +480,11 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		return *archive
 	}
 
-	defer func() {
-		go m.findCache.InvalidateFor(def.OrgId, path)
-	}()
+	if m.findCache != nil {
+		defer func() {
+			go m.findCache.InvalidateFor(def.OrgId, path)
+		}()
+	}
 
 	//first check to see if a tree has been created for this OrgId
 	tree, ok := m.tree[def.OrgId]
@@ -969,6 +974,25 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdS
 	return query.Run(tags, m.defById)
 }
 
+func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
+
+	if m.findCache == nil {
+		return find(tree, pattern)
+	}
+
+	matchedNodes, ok := m.findCache.Get(orgId, pattern)
+	if ok {
+		return matchedNodes, nil
+	}
+
+	matchedNodes, err := find(tree, pattern)
+	if err != nil {
+		return nil, err
+	}
+	m.findCache.Add(orgId, pattern, matchedNodes)
+	return matchedNodes, nil
+}
+
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
 	var matchedNodes []*Node
@@ -979,25 +1003,17 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
 	} else {
-		matchedNodes, ok = m.findCache.Get(orgId, pattern)
-		if !ok {
-			matchedNodes, err = find(tree, pattern)
-			if err != nil {
-				return nil, err
-			}
-			m.findCache.Add(orgId, pattern, matchedNodes)
+		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
 		tree, ok = m.tree[idx.OrgIdPublic]
 		if ok {
-			publicNodes, ok := m.findCache.Get(idx.OrgIdPublic, pattern)
-			if !ok {
-				publicNodes, err = find(tree, pattern)
-				if err != nil {
-					return nil, err
-				}
-				m.findCache.Add(idx.OrgIdPublic, pattern, publicNodes)
+			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
+			if err != nil {
+				return nil, err
 			}
 			matchedNodes = append(matchedNodes, publicNodes...)
 		}
@@ -1227,6 +1243,9 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	defer func() {
 		m.Unlock()
 		if len(deletedDefs) == 0 {
+			return
+		}
+		if m.findCache == nil {
 			return
 		}
 		// asynchronously invalidate any findCache entries
@@ -1481,11 +1500,13 @@ ORGS:
 			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
 		}
-		if len(paths) > findCacheInvalidateQueueSize {
-			m.findCache.Purge(org)
-		} else {
-			for path := range paths {
-				m.findCache.InvalidateFor(org, path)
+		if m.findCache != nil {
+			if len(paths) > findCacheInvalidateQueueSize {
+				m.findCache.Purge(org)
+			} else {
+				for path := range paths {
+					m.findCache.InvalidateFor(org, path)
+				}
 			}
 		}
 	}
