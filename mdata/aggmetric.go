@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -409,14 +410,26 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.add(ts, val)
 	} else {
 		// write through reorder buffer
-		res, accepted := a.rob.Add(ts, val)
+		res, err := a.rob.Add(ts, val)
 
-		if len(res) == 0 && accepted {
-			a.lastWrite = uint32(time.Now().Unix())
-		}
-
-		for _, p := range res {
-			a.add(p.Ts, p.Val)
+		if err == nil {
+			if len(res) == 0 {
+				a.lastWrite = uint32(time.Now().Unix())
+			} else {
+				for _, p := range res {
+					a.add(p.Ts, p.Val)
+				}
+			}
+		} else {
+			var reason string
+			switch err {
+			case errMetricTooOld:
+				reason = sampleOutOfOrder
+				metricsTooOld.Inc()
+			default:
+				reason = "unknown"
+			}
+			PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 		}
 	}
 }
@@ -457,12 +470,14 @@ func (a *AggMetric) add(ts uint32, val float64) {
 			// if we've already 'finished' the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
 			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
 			addToClosedChunk.Inc()
+			PromDiscardedSamples.WithLabelValues(receivedTooLate, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 			return
 		}
 
 		if err := currentChunk.Push(ts, val); err != nil {
 			log.Debugf("AM: failed to add metric to chunk for %s. %s", a.key, err)
 			metricsTooOld.Inc()
+			PromDiscardedSamples.WithLabelValues(sampleOutOfOrder, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 			return
 		}
 		totalPoints.Inc()
@@ -474,6 +489,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 	} else if t0 < currentChunk.Series.T0 {
 		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.Series.T0, currentChunk.Series.T)
 		metricsTooOld.Inc()
+		PromDiscardedSamples.WithLabelValues(sampleOutOfOrder, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 		return
 	} else {
 		// Data belongs in a new chunk.
