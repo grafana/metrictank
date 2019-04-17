@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Possible reason labels for Prometheus metric discarded_samples_total
 const (
 	sampleOutOfOrder = "sample-out-of-order"
 	receivedTooLate  = "received-too-late"
