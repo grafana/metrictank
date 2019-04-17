@@ -423,7 +423,7 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		} else {
 			var reason string
 			switch err {
-			case errMetricsTooOld:
+			case errMetricTooOld:
 				reason = sampleOutOfOrder
 				metricsTooOld.Inc()
 			default:

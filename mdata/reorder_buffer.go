@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	errMetricsTooOld = errors.New("metrics too old")
+	errMetricTooOld = errors.New("metric too old")
 )
 
 // ReorderBuffer keeps a window of data during which it is ok to send data out of order.
@@ -38,7 +38,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
-		return nil, errMetricsTooOld
+		return nil, errMetricTooOld
 	}
 
 	var res []schema.Point
