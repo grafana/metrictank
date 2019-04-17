@@ -182,6 +182,7 @@ func TestROBAddAndGetDuplicate(t *testing.T) {
 		{Ts: 1001, Val: 200},
 		{Ts: 1003, Val: 300},
 		{Ts: 1003, Val: 0},
+		{Ts: 1001, Val: 0},
 	}
 	expectedData := []schema.Point{
 		{Ts: 1001, Val: 100},
@@ -191,6 +192,7 @@ func TestROBAddAndGetDuplicate(t *testing.T) {
 		nil,
 		errors.ErrMetricNewValueForTimestamp,
 		nil,
+		errors.ErrMetricNewValueForTimestamp,
 		errors.ErrMetricNewValueForTimestamp,
 	}
 	testAddAndGet(t, 600, testData, expectedData, 2, expectedErrors, 0)
