@@ -17,8 +17,9 @@ import (
 
 // Possible reason labels for Prometheus metric discarded_samples_total
 const (
-	sampleOutOfOrder = "sample-out-of-order"
-	receivedTooLate  = "received-too-late"
+	sampleOutOfOrder     = "sample-out-of-order"
+	receivedTooLate      = "received-too-late"
+	newValueForTimestamp = "new-value-for-timestamp"
 )
 
 var (
@@ -43,6 +44,10 @@ var (
 	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
 	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
 	addToClosedChunk = stats.NewCounterRate32("tank.add_to_closed_chunk")
+
+	// metric tank.discarded.new_value_for_timestamp is points that have timestamps for which we already have data points.
+	// these points are discarded.
+	discardedNewValueForTimestamp = stats.NewCounterRate32("tank.discarded.new_value_for_timestamp")
 
 	// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
 	totalPoints = stats.NewGauge64("tank.total_points")

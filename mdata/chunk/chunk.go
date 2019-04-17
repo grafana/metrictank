@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/mdata/chunk/tsz"
+	"github.com/grafana/metrictank/mdata/errors"
 )
 
 // Chunk is a chunk of data. not concurrency safe.
@@ -39,8 +40,10 @@ func (c *Chunk) String() string {
 }
 
 func (c *Chunk) Push(t uint32, v float64) error {
-	if t <= c.Series.T {
-		return fmt.Errorf("Point must be newer than already added points. t:%d lastTs: %d", t, c.Series.T)
+	if t == c.Series.T {
+		return errors.ErrMetricNewValueForTimestamp
+	} else if t < c.Series.T {
+		return errors.ErrMetricTooOld
 	}
 	c.Series.Push(t, v)
 	c.NumPoints++

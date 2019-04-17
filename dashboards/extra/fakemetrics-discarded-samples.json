@@ -96,6 +96,11 @@
         },
         {
           "refCount": 0,
+          "refId": "F",
+          "target": "aliasByNode(metrictank.stats.$environment.default.tank.discarded.*.counter32, 4, 5, 6)"
+        },
+        {
+          "refCount": 0,
           "refId": "C",
           "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricdata.invalid.counter32, 4, 5, 6, 7)",
           "textEditor": false

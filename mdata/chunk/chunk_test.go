@@ -5,6 +5,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/grafana/metrictank/mdata/errors"
 	"github.com/raintank/schema"
 )
 
@@ -80,4 +81,41 @@ func equal(exp, got []schema.Point) bool {
 		}
 	}
 	return true
+}
+
+type expectedData struct {
+	NumPoints uint32
+	Err       error
+}
+
+func testPush(t *testing.T, points []schema.Point, expected []expectedData) {
+	chunk := New(0)
+	for i := range points {
+		err := chunk.Push(points[i].Ts, points[i].Val)
+		if chunk.NumPoints != expected[i].NumPoints {
+			t.Fatalf("Expected %d points pushed but had %d", expected[i].NumPoints, chunk.NumPoints)
+		}
+		if err != expected[i].Err {
+			t.Fatalf("Expected error %v but received %v", expected[i].Err, err)
+		}
+	}
+}
+
+func TestChunkPush(t *testing.T) {
+	points := []schema.Point{
+		{Ts: 1001, Val: 100},
+		{Ts: 1002, Val: 100},
+		{Ts: 1002, Val: 100},
+		{Ts: 1003, Val: 100},
+		{Ts: 999, Val: 100},
+	}
+	expected := []expectedData{
+		{1, nil},
+		{2, nil},
+		{2, errors.ErrMetricNewValueForTimestamp},
+		{3, nil},
+		{3, errors.ErrMetricTooOld},
+	}
+
+	testPush(t, points, expected)
 }

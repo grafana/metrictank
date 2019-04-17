@@ -4,26 +4,24 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/grafana/metrictank/mdata/errors"
 	"github.com/raintank/schema"
 )
 
-func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded, expectAddFail, expectReordered uint32) []schema.Point {
+func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded uint32, expectedErrors []error, expectReordered uint32) []schema.Point {
 	var flushed []schema.Point
 	b := NewReorderBuffer(reorderWindow, 1)
 	metricsReordered.SetUint32(0)
 	addedCount := uint32(0)
-	errorCount := uint32(0)
-	for _, point := range testData {
+	for i, point := range testData {
 		addRes, err := b.Add(point.Ts, point.Val)
 		flushed = append(flushed, addRes...)
+		if expectedErrors != nil && err != expectedErrors[i] {
+			t.Fatalf("Data point #%d: expected error '%v', but had '%v'", i, expectedErrors[i], err)
+		}
 		if err == nil {
 			addedCount++
-		} else {
-			errorCount++
 		}
-	}
-	if expectAddFail != errorCount {
-		t.Fatalf("Expected %d failures, but had %d", expectAddFail, errorCount)
 	}
 
 	if expectAdded != addedCount {
@@ -106,7 +104,7 @@ func TestROBAddAndGetInOrder(t *testing.T) {
 		{Ts: 1002, Val: 200},
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 3, 0, 0)
+	testAddAndGet(t, 600, testData, expectedData, 3, nil, 0)
 }
 
 func TestROBAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
@@ -118,7 +116,12 @@ func TestROBAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 	expectedData := []schema.Point{
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 1, testData, expectedData, 1, 2, 0)
+	expectedErrors := []error{
+		nil,
+		errors.ErrMetricTooOld,
+		errors.ErrMetricTooOld,
+	}
+	testAddAndGet(t, 1, testData, expectedData, 1, expectedErrors, 0)
 }
 
 func TestROBAddAndGetOutOfOrderInsideWindow(t *testing.T) {
@@ -144,7 +147,7 @@ func TestROBAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 9, 0, 2)
+	testAddAndGet(t, 600, testData, expectedData, 9, nil, 2)
 }
 
 func TestROBAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
@@ -170,7 +173,27 @@ func TestROBAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 9, 0, 3)
+	testAddAndGet(t, 600, testData, expectedData, 9, nil, 3)
+}
+
+func TestROBAddAndGetDuplicate(t *testing.T) {
+	testData := []schema.Point{
+		{Ts: 1001, Val: 100},
+		{Ts: 1001, Val: 200},
+		{Ts: 1003, Val: 300},
+		{Ts: 1003, Val: 0},
+	}
+	expectedData := []schema.Point{
+		{Ts: 1001, Val: 100},
+		{Ts: 1003, Val: 300},
+	}
+	expectedErrors := []error{
+		nil,
+		errors.ErrMetricNewValueForTimestamp,
+		nil,
+		errors.ErrMetricNewValueForTimestamp,
+	}
+	testAddAndGet(t, 600, testData, expectedData, 2, expectedErrors, 0)
 }
 
 func TestROBOmitFlushIfNotEnoughData(t *testing.T) {
@@ -208,7 +231,18 @@ func TestROBAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 		{Ts: 1003, Val: 300},
 		{Ts: 1004, Val: 400},
 	}
-	flushedData := testAddAndGet(t, 5, testData, expectedData, 8, 1, 2)
+	expectedErrors := []error{
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		errors.ErrMetricTooOld,
+	}
+	flushedData := testAddAndGet(t, 5, testData, expectedData, 8, expectedErrors, 2)
 	if !reflect.DeepEqual(flushedData, expectedFlushedData) {
 		t.Fatalf("Flushed data does not match expected flushed data:\n%+v\n%+v", flushedData, expectedFlushedData)
 	}

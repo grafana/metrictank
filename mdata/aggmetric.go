@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
+	mdataerrors "github.com/grafana/metrictank/mdata/errors"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -421,15 +422,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 				}
 			}
 		} else {
-			var reason string
-			switch err {
-			case errMetricTooOld:
-				reason = sampleOutOfOrder
-				metricsTooOld.Inc()
-			default:
-				reason = "unknown"
-			}
-			PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()
+			log.Debugf("AM: failed to add metric to reorder buffer for %s. %s", a.key, err)
+			a.discardedMetricsInc(err)
 		}
 	}
 }
@@ -476,8 +470,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 		if err := currentChunk.Push(ts, val); err != nil {
 			log.Debugf("AM: failed to add metric to chunk for %s. %s", a.key, err)
-			metricsTooOld.Inc()
-			PromDiscardedSamples.WithLabelValues(sampleOutOfOrder, strconv.Itoa(int(a.key.MKey.Org))).Inc()
+			a.discardedMetricsInc(err)
 			return
 		}
 		totalPoints.Inc()
@@ -630,4 +623,19 @@ func (a *AggMetric) gcAggregators(now, chunkMinTs, metricMinTs uint32) (uint32, 
 		stale = stale && s
 	}
 	return points, stale
+}
+
+func (a *AggMetric) discardedMetricsInc(err error) {
+	var reason string
+	switch err {
+	case mdataerrors.ErrMetricTooOld:
+		reason = sampleOutOfOrder
+		metricsTooOld.Inc()
+	case mdataerrors.ErrMetricNewValueForTimestamp:
+		reason = newValueForTimestamp
+		discardedNewValueForTimestamp.Inc()
+	default:
+		reason = "unknown"
+	}
+	PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 }
