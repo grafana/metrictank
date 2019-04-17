@@ -353,6 +353,9 @@ your (infrequent) updates.  Any points revcieved for a chunk that has already be
 a counter of how many chunks are cleared (replaced by new chunks)
 * `tank.chunk_operations.create`:  
 a counter of how many chunks are created
+* `tank.discarded.new_value_for_timestamp`:  
+points that have timestamps for which we already have data points.
+these points are discarded.
 * `tank.gc_metric`:  
 the number of times the metrics GC is about to inspect a metric (series)
 * `tank.metrics_active`:  
