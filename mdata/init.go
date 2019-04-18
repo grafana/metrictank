@@ -45,9 +45,9 @@ var (
 	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
 	addToClosedChunk = stats.NewCounterRate32("tank.add_to_closed_chunk")
 
-	// metric tank.discarded.new_value_for_timestamp is points that have timestamps for which we already have data points.
+	// metric tank.discarded.new-value-for-timestamp is points that have timestamps for which we already have data points.
 	// these points are discarded.
-	discardedNewValueForTimestamp = stats.NewCounterRate32("tank.discarded.new_value_for_timestamp")
+	discardedNewValueForTimestamp = stats.NewCounterRate32("tank.discarded.new-value-for-timestamp")
 
 	// metric tank.discarded.unknown is points that have been discarded for unknown reasons.
 	discardedUnknown = stats.NewCounterRate32("tank.discarded.unknown")
