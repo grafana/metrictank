@@ -47,6 +47,10 @@ var (
 
 	// metric tank.discarded.new-value-for-timestamp is points that have timestamps for which we already have data points.
 	// these points are discarded.
+	// data points can be incorrectly classified as metric tank.discarded.sample-out-of-order even when the timestamp
+	// has already been used. This happens in two cases:
+	// - when the reorder buffer is enabled, if the point is older than the reorder buffer retention window
+	// - when the reorder buffer is disabled, if the point is older than the last data point
 	discardedNewValueForTimestamp = stats.NewCounterRate32("tank.discarded.new-value-for-timestamp")
 
 	// metric tank.discarded.unknown is points that have been discarded for unknown reasons.
