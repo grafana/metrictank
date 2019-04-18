@@ -43,18 +43,22 @@ func NewKafka(partitionBy string) (*Kafka, error) {
 
 func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
 	key := k.GetPartitionKey(m, nil)
-	return k.Partitioner.Partition(&sarama.ProducerMessage{Key: sarama.ByteEncoder(key)}, numPartitions)
+	return k.Partitioner.PartitionKey(key, numPartitions)
 }
 
 type jumpPartitioner struct{}
+
+func (p jumpPartitioner) PartitionKey(key []byte, numPartitions int32) (int32, error) {
+	jumpKey := xxhash.Sum64(key)
+	return jump.Hash(jumpKey, int(numPartitions)), nil
+}
 
 func (p jumpPartitioner) Partition(message *sarama.ProducerMessage, numPartitions int32) (int32, error) {
 	key, err := message.Key.Encode()
 	if err != nil {
 		return 0, err
 	}
-	jumpKey := xxhash.Sum64(key)
-	return jump.Hash(jumpKey, int(numPartitions)), nil
+	return p.PartitionKey(key, numPartitions)
 
 }
 
