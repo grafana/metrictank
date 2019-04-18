@@ -212,15 +212,15 @@ the duration of successful memory idx prunes
 the duration of (successful) update of a metric to the memory idx
 * `idx.metrics_active`:  
 the number of currently known metrics in the index
-* `input.%s.metricdata.invalid`:  
+* `input.%s.metricdata.discarded.invalid`:  
 a count of times a metricdata was invalid by input plugin
 * `input.%s.metricdata.received`:  
 the count of metricdata datapoints received by input plugin
-* `input.%s.metricpoint.invalid`:  
+* `input.%s.metricpoint.discarded.invalid`:  
 a count of times a metricpoint was invalid by input plugin
 * `input.%s.metricpoint.received`:  
 the count of metricpoint datapoints received by input plugin
-* `input.%s.metricpoint.unknown`:  
+* `input.%s.metricpoint.discarded.unknown`:  
 the count of times the ID of a received metricpoint was not in the index, by input plugin
 * `input.%s.metricpoint_no_org.received`:  
 the count of metricpoint_no_org datapoints received by input plugin
