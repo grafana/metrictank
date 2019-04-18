@@ -218,10 +218,10 @@ a count of times a metricdata was invalid by input plugin
 the count of metricdata datapoints received by input plugin
 * `input.%s.metricpoint.discarded.invalid`:  
 a count of times a metricpoint was invalid by input plugin
-* `input.%s.metricpoint.received`:  
-the count of metricpoint datapoints received by input plugin
 * `input.%s.metricpoint.discarded.unknown`:  
 the count of times the ID of a received metricpoint was not in the index, by input plugin
+* `input.%s.metricpoint.received`:  
+the count of metricpoint datapoints received by input plugin
 * `input.%s.metricpoint_no_org.received`:  
 the count of metricpoint_no_org datapoints received by input plugin
 * `input.carbon.metrics_decode_err`:  
@@ -344,11 +344,6 @@ the duration of a put in the wait queue
 how many rows come per get response
 * `store.cassandra.to_iter`:  
 the duration of converting chunks to iterators
-* `tank.discarded.received-too-late`:  
-points received for the most recent chunk
-when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
-this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
-your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
 * `tank.chunk_operations.clear`:  
 a counter of how many chunks are cleared (replaced by new chunks)
 * `tank.chunk_operations.create`:  
@@ -356,6 +351,20 @@ a counter of how many chunks are created
 * `tank.discarded.new-value-for-timestamp`:  
 points that have timestamps for which we already have data points.
 these points are discarded.
+data points can be incorrectly classified as metric tank.discarded.sample-out-of-order even when the timestamp
+has already been used. This happens in two cases:
+- when the reorder buffer is enabled, if the point is older than the reorder buffer retention window
+- when the reorder buffer is disabled, if the point is older than the last data point
+* `tank.discarded.received-too-late`:  
+points received for the most recent chunk
+when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
+this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
+your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
+* `tank.discarded.sample-out-of-order`:  
+points that go back in time beyond the scope of the optional reorder window.
+these points will end up being dropped and lost.
+* `tank.discarded.unknown`:  
+points that have been discarded for unknown reasons.
 * `tank.gc_metric`:  
 the number of times the metrics GC is about to inspect a metric (series)
 * `tank.metrics_active`:  
@@ -365,9 +374,6 @@ the number of points received that are going back in time, but are still
 within the reorder window. in such a case they will be inserted in the correct order.
 E.g. if the reorder window is 60 (datapoints) then points may be inserted at random order as long as their
 ts is not older than the 60th datapoint counting from the newest.
-* `tank.discarded.sample-out-of-order`:  
-points that go back in time beyond the scope of the optional reorder window.
-these points will end up being dropped and lost.
 * `tank.persist`:  
 how long it takes to persist a chunk (and chunks preceding it)
 this is subject to backpressure from the store when the store's queue runs full
