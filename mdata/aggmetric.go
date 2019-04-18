@@ -463,7 +463,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		if currentChunk.Series.Finished {
 			// if we've already 'finished' the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
 			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
-			addToClosedChunk.Inc()
+			discardedReceivedTooLate.Inc()
 			PromDiscardedSamples.WithLabelValues(receivedTooLate, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 			return
 		}

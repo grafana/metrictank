@@ -39,11 +39,11 @@ var (
 	// these points will end up being dropped and lost.
 	discardedSampleOutOfOrder = stats.NewCounterRate32("tank.discarded.sample-out-of-order")
 
-	// metric tank.add_to_closed_chunk is points received for the most recent chunk
+	// metric tank.discarded.received-too-late is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
 	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
 	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
-	addToClosedChunk = stats.NewCounterRate32("tank.add_to_closed_chunk")
+	discardedReceivedTooLate = stats.NewCounterRate32("tank.discarded.received-too-late")
 
 	// metric tank.discarded.new-value-for-timestamp is points that have timestamps for which we already have data points.
 	// these points are discarded.

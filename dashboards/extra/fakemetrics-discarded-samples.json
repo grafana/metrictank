@@ -91,11 +91,6 @@
         },
         {
           "refCount": 0,
-          "refId": "B",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32, 4, 5)"
-        },
-        {
-          "refCount": 0,
           "refId": "F",
           "target": "aliasByNode(metrictank.stats.$environment.default.tank.discarded.*.counter32, 4, 5, 6)"
         },

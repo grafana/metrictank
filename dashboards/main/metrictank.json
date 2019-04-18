@@ -167,7 +167,7 @@
         },
         {
           "refId": "F",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)), 'add-to-saved')"
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.discarded.received-too-late.counter32)), 'add-to-saved')"
         },
         {
           "refId": "G",

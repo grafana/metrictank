@@ -344,7 +344,7 @@ the duration of a put in the wait queue
 how many rows come per get response
 * `store.cassandra.to_iter`:  
 the duration of converting chunks to iterators
-* `tank.add_to_closed_chunk`:  
+* `tank.discarded.received-too-late`:  
 points received for the most recent chunk
 when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
 this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
