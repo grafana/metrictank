@@ -32,7 +32,7 @@ func NewKafka(partitionBy string) (*Kafka, error) {
 		kafka.Partitioner = sarama.NewHashPartitioner("")
 		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeries(b) }
 	case "bySeriesWithTags":
-		kafka.Partitioner = sarama.NewHashPartitioner("")
+		kafka.Partitioner = sarama.NewManualPartitioner("")
 		kafka.GetPartitionKey = func(m schema.PartitionedMetric, b []byte) []byte { return m.KeyBySeriesWithTags(b) }
 	default:
 		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)

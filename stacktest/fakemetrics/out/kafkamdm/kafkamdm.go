@@ -141,11 +141,10 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 				Value:     sarama.ByteEncoder(data),
 			}
 		} else {
-			key := k.part.GetPartitionKey(metric, nil)
 			payload[i] = &sarama.ProducerMessage{
-				Key:   sarama.ByteEncoder(key),
-				Topic: k.topic,
-				Value: sarama.ByteEncoder(data),
+				Partition: k.part.Partition(metric),
+				Topic:     k.topic,
+				Value:     sarama.ByteEncoder(data),
 			}
 		}
 
