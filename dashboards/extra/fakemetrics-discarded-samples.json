@@ -86,11 +86,6 @@
       "targets": [
         {
           "refCount": 0,
-          "refId": "A",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.tank.discarded.sample-out-of-order.counter32, 4, 5)"
-        },
-        {
-          "refCount": 0,
           "refId": "F",
           "target": "aliasByNode(metrictank.stats.$environment.default.tank.discarded.*.counter32, 4, 5, 6)"
         },
