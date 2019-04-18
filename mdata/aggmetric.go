@@ -635,6 +635,7 @@ func (a *AggMetric) discardedMetricsInc(err error) {
 		reason = newValueForTimestamp
 		discardedNewValueForTimestamp.Inc()
 	default:
+		discardedUnknown.Inc()
 		reason = "unknown"
 	}
 	PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()

@@ -49,6 +49,9 @@ var (
 	// these points are discarded.
 	discardedNewValueForTimestamp = stats.NewCounterRate32("tank.discarded.new_value_for_timestamp")
 
+	// metric tank.discarded.unknown is points that have been discarded for unknown reasons.
+	discardedUnknown = stats.NewCounterRate32("tank.discarded.unknown")
+
 	// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
 	totalPoints = stats.NewGauge64("tank.total_points")
 
