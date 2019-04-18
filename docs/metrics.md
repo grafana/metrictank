@@ -365,7 +365,7 @@ the number of points received that are going back in time, but are still
 within the reorder window. in such a case they will be inserted in the correct order.
 E.g. if the reorder window is 60 (datapoints) then points may be inserted at random order as long as their
 ts is not older than the 60th datapoint counting from the newest.
-* `tank.metrics_too_old`:  
+* `tank.discarded.sample-out-of-order`:  
 points that go back in time beyond the scope of the optional reorder window.
 these points will end up being dropped and lost.
 * `tank.persist`:  

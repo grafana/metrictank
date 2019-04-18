@@ -29,7 +29,7 @@ this will give instant insights in all the performance metrics of Metrictank.
 * `metrictank.stats.$environment.$instance.input.*.metricpoint.unknown.counter32`: counter of MetricPoint messages for an unknown metric, will be dropped.
 * `metrictank.stats.$environment.$instance.input.*.metrics_decode_err.counter32`: counter of incoming data that could not be decoded.
 * `metrictank.stats.$environment.$instance.input.*.*.invalid.counter32`: counter of incoming data that could not be decoded.
-* `metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32`: counter of points that are too old and can't be added.
+* `metrictank.stats.$environment.$instance.tank.discarded.sample-out-of-order.counter32`: counter of points that are too old and can't be added.
 * `metrictank.stats.$environment.$instance.api.request.render.latency.*.gauge32`: shows how fast/slow metrictank responds to http queries
 * `metrictank.stats.$environment.$instance.api.request.render*.status.*.counter32`: counters per status code. make sure most, or all result in http-200's.
 * `metrictank.stats.$environment.$instance.store.cassandra.error.*`: shows erroring queries.  Queries that result in errors (or timeouts) will result in missing data in your charts.

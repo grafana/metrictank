@@ -35,9 +35,9 @@ var (
 	// ts is not older than the 60th datapoint counting from the newest.
 	metricsReordered = stats.NewCounter32("tank.metrics_reordered")
 
-	// metric tank.metrics_too_old is points that go back in time beyond the scope of the optional reorder window.
+	// metric tank.discarded.sample-out-of-order is points that go back in time beyond the scope of the optional reorder window.
 	// these points will end up being dropped and lost.
-	metricsTooOld = stats.NewCounterRate32("tank.metrics_too_old")
+	discardedSampleOutOfOrder = stats.NewCounterRate32("tank.discarded.sample-out-of-order")
 
 	// metric tank.add_to_closed_chunk is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.

@@ -163,7 +163,7 @@
         },
         {
           "refId": "E",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32)), 'too old')"
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.discarded.sample-out-of-order.counter32)), 'too old')"
         },
         {
           "refId": "F",

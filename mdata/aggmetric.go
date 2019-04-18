@@ -481,7 +481,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		}
 	} else if t0 < currentChunk.Series.T0 {
 		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.Series.T0, currentChunk.Series.T)
-		metricsTooOld.Inc()
+		discardedSampleOutOfOrder.Inc()
 		PromDiscardedSamples.WithLabelValues(sampleOutOfOrder, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 		return
 	} else {
@@ -630,7 +630,7 @@ func (a *AggMetric) discardedMetricsInc(err error) {
 	switch err {
 	case mdataerrors.ErrMetricTooOld:
 		reason = sampleOutOfOrder
-		metricsTooOld.Inc()
+		discardedSampleOutOfOrder.Inc()
 	case mdataerrors.ErrMetricNewValueForTimestamp:
 		reason = newValueForTimestamp
 		discardedNewValueForTimestamp.Inc()
