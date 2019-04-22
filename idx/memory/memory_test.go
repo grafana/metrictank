@@ -149,7 +149,12 @@ func printMemUsage(t *testing.T) {
 	t.Logf("TotalAlloc = \t\t%v MB\t\t %v KB\t %v B\n", (m.TotalAlloc / 1024 / 1024), (m.TotalAlloc / 1024), m.TotalAlloc)
 	t.Logf("Sys = \t\t\t%v MB\t\t %v KB\t %v B\n", (m.Sys / 1024 / 1024), (m.Sys / 1024), m.Sys)
 	t.Logf("Live Heap Objects = \t%v\n", (m.Mallocs - m.Frees))
-	t.Logf("NumGC = \t\t%v\n\n\n", m.NumGC)
+	t.Logf("NumGC = \t\t%v\n\n", m.NumGC)
+	memTotalObjectStore, err := idx.IdxIntern.MemStatsTotal()
+	if err == nil {
+		t.Logf("Total Memory Used By Object Store = \t\t%v MB\t\t %v KB\t %v B\n", (memTotalObjectStore / 1024 / 1024), (memTotalObjectStore / 1024), memTotalObjectStore)
+		t.Logf("Total Memory Used = \t\t\t\t%v MB\t\t %v KB\t %v B\n\n\n", ((memTotalObjectStore + m.HeapAlloc) / 1024 / 1024), ((memTotalObjectStore + m.HeapAlloc) / 1024), memTotalObjectStore+m.HeapAlloc)
+	}
 }
 
 // withAndWithoutTagSupport calls a test with the TagSupprt setting
@@ -1101,7 +1106,7 @@ func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 	// turn tag support on
 	TagSupport = true
 
-	globalMemoryIndex = New()
+	globalMemoryIndex = newTestIndex()
 	globalMemoryIndex.Init()
 	defer globalMemoryIndex.Stop()
 
