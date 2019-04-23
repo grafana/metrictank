@@ -257,10 +257,10 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 	c.Add(375, 375)
 	c.Verify(true, 120, 479, 121, 375)
 
-	metricsTooOld.SetUint32(0)
+	discardedSampleOutOfOrder.SetUint32(0)
 
 	// adds 10 entries that are out of order and the reorder buffer should order the first 9
-	// the last item (365) will be too old, so it increases metricsTooOld counter
+	// the last item (365) will be too old, so it increases discardedSampleOutOfOrder counter
 	for i := uint32(374); i > 364; i-- {
 		c.Add(i, float64(i))
 	}
@@ -270,8 +270,8 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 	c.Verify(true, 120, 380, 121, 375)
 
 	// one point has been added out of order and too old for the buffer to reorder
-	if metricsTooOld.Peek() != 1 {
-		t.Fatalf("Expected the out of order count to be 1, not %d", metricsTooOld.Peek())
+	if discardedSampleOutOfOrder.Peek() != 1 {
+		t.Fatalf("Expected the out of order count to be 1, not %d", discardedSampleOutOfOrder.Peek())
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
+	mdataerrors "github.com/grafana/metrictank/mdata/errors"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -421,15 +422,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 				}
 			}
 		} else {
-			var reason string
-			switch err {
-			case errMetricTooOld:
-				reason = sampleOutOfOrder
-				metricsTooOld.Inc()
-			default:
-				reason = "unknown"
-			}
-			PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()
+			log.Debugf("AM: failed to add metric to reorder buffer for %s. %s", a.key, err)
+			a.discardedMetricsInc(err)
 		}
 	}
 }
@@ -469,15 +463,14 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		if currentChunk.Series.Finished {
 			// if we've already 'finished' the chunk, it means it has the end-of-stream marker and any new points behind it wouldn't be read by an iterator
 			// you should monitor this metric closely, it indicates that maybe your GC settings don't match how you actually send data (too late)
-			addToClosedChunk.Inc()
+			discardedReceivedTooLate.Inc()
 			PromDiscardedSamples.WithLabelValues(receivedTooLate, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 			return
 		}
 
 		if err := currentChunk.Push(ts, val); err != nil {
 			log.Debugf("AM: failed to add metric to chunk for %s. %s", a.key, err)
-			metricsTooOld.Inc()
-			PromDiscardedSamples.WithLabelValues(sampleOutOfOrder, strconv.Itoa(int(a.key.MKey.Org))).Inc()
+			a.discardedMetricsInc(err)
 			return
 		}
 		totalPoints.Inc()
@@ -488,7 +481,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		}
 	} else if t0 < currentChunk.Series.T0 {
 		log.Debugf("AM: Point at %d has t0 %d, goes back into previous chunk. CurrentChunk t0: %d, LastTs: %d", ts, t0, currentChunk.Series.T0, currentChunk.Series.T)
-		metricsTooOld.Inc()
+		discardedSampleOutOfOrder.Inc()
 		PromDiscardedSamples.WithLabelValues(sampleOutOfOrder, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 		return
 	} else {
@@ -630,4 +623,20 @@ func (a *AggMetric) gcAggregators(now, chunkMinTs, metricMinTs uint32) (uint32, 
 		stale = stale && s
 	}
 	return points, stale
+}
+
+func (a *AggMetric) discardedMetricsInc(err error) {
+	var reason string
+	switch err {
+	case mdataerrors.ErrMetricTooOld:
+		reason = sampleOutOfOrder
+		discardedSampleOutOfOrder.Inc()
+	case mdataerrors.ErrMetricNewValueForTimestamp:
+		reason = newValueForTimestamp
+		discardedNewValueForTimestamp.Inc()
+	default:
+		discardedUnknown.Inc()
+		reason = "unknown"
+	}
+	PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 }

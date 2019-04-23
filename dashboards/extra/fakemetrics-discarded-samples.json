@@ -86,30 +86,25 @@
       "targets": [
         {
           "refCount": 0,
-          "refId": "A",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32, 4, 5)"
-        },
-        {
-          "refCount": 0,
-          "refId": "B",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32, 4, 5)"
+          "refId": "F",
+          "target": "aliasByNode(metrictank.stats.$environment.default.tank.discarded.*.counter32, 4, 5, 6)"
         },
         {
           "refCount": 0,
           "refId": "C",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricdata.invalid.counter32, 4, 5, 6, 7)",
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricdata.discarded.invalid.counter32, 4, 5, 6, 7, 8)",
           "textEditor": false
         },
         {
           "refCount": 0,
           "refId": "D",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricpoint.invalid.counter32, 4, 5, 6, 7)",
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricpoint.discarded.invalid.counter32, 4, 5, 6, 7, 8)",
           "textEditor": false
         },
         {
           "refCount": 0,
           "refId": "E",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricpoint.unknown.counter32, 4, 5, 6, 7)",
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.input.*.metricpoint.discarded.unknown.counter32, 4, 5, 6, 7, 8)",
           "textEditor": false
         }
       ],

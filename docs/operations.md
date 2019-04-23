@@ -26,14 +26,14 @@ this will give instant insights in all the performance metrics of Metrictank.
 * `metrictank.stats.$environment.$instance.cluster.primary.gauge1`: assure you have exactly 1 primary node (saving to cassandra) or as many as you have shardgroups, for sharded setups.
 * `metrictank.stats.$environment.$instance.input.kafka-mdm.partition.*.lag.gauge64`: kafka lag, depending on your throughput you can always expect some lag, but it should be in the thousands not millions.
 * `metrictank.stats.$environment.$instance.store.cassandra.write_queue.*.items.{min,max}.gauge32`: make sure the write queues are able to drain.  For primary nodes that are also used for qureies, assert the write queues don't reach capacity, otherwise ingest will block and data will lag behind in queries.
-* `metrictank.stats.$environment.$instance.input.*.metricpoint.unknown.counter32`: counter of MetricPoint messages for an unknown metric, will be dropped.
+* `metrictank.stats.$environment.$instance.input.*.metricpoint.discarded.unknown.counter32`: counter of MetricPoint messages for an unknown metric, will be dropped.
 * `metrictank.stats.$environment.$instance.input.*.metrics_decode_err.counter32`: counter of incoming data that could not be decoded.
-* `metrictank.stats.$environment.$instance.input.*.*.invalid.counter32`: counter of incoming data that could not be decoded.
-* `metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32`: counter of points that are too old and can't be added.
+* `metrictank.stats.$environment.$instance.input.*.*.discarded.invalid.counter32`: counter of incoming data that could not be decoded.
+* `metrictank.stats.$environment.$instance.tank.discarded.sample-out-of-order.counter32`: counter of points that are too old and can't be added.
 * `metrictank.stats.$environment.$instance.api.request.render.latency.*.gauge32`: shows how fast/slow metrictank responds to http queries
 * `metrictank.stats.$environment.$instance.api.request.render*.status.*.counter32`: counters per status code. make sure most, or all result in http-200's.
 * `metrictank.stats.$environment.$instance.store.cassandra.error.*`: shows erroring queries.  Queries that result in errors (or timeouts) will result in missing data in your charts.
-* `perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)`: Points dropped due to chunks being closed. Need to tune the chunk-max-stale setting or fix your data stream to not send old points so late.
+* `perSecond(metrictank.stats.$environment.$instance.tank.discarded.received-too-late.counter32)`: Points dropped due to chunks being closed. Need to tune the chunk-max-stale setting or fix your data stream to not send old points so late.
 * `metrictank.stats.$environment.$instance.recovered_errors.*.*.*` : any internal errors that were recovered from automatically (should be 0. If not, please create an issue)
 
 If you expect consistent or predictable load, you may also want to monitor:
@@ -164,7 +164,7 @@ For more information on profiling see the excellent [Profiling Go Programs](http
 * check if any points are being rejected, using the ingest chart on the dashboard (e.g. out of order, invalid)
 * can use debug logging to trace data throughout the pipeline. mt-store-cat to see what's in cassandra, mt-kafka-mdm-sniff, etc.
 * if it's old data, make sure you have a primary that can save data to cassandra, that the write queue can drain
-* check `metric-max-stale` and `chunk-max-stale` settings, make sure chunks are not being prematurely sealed (happens in some rare cases if you send data very infrequently. see `tank.add_to_closed_chunk` metric)
+* check `metric-max-stale` and `chunk-max-stale` settings, make sure chunks are not being prematurely sealed (happens in some rare cases if you send data very infrequently. see `tank.discarded.received-too-late` metric)
 * did you restart instances? if so: make sure your instances start replaying data within the allotted "overhead window". E.g. if your kafka retention is 7 hours and your largest chunks are 6 hours, then instances need to start replaying data within an hour after startup. (so make sure processing of metricpersist messages, index loading, etc doesn't take too long). Any subsequent restart (e.g. due to kafka removing a segment currently being consumed) starts the process from zero again, so watch out.   Increase kafka retention as needed.
 
 In the below example, we:

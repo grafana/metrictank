@@ -1,13 +1,8 @@
 package mdata
 
 import (
-	"errors"
-
+	"github.com/grafana/metrictank/mdata/errors"
 	"github.com/raintank/schema"
-)
-
-var (
-	errMetricTooOld = errors.New("metric too old")
 )
 
 // ReorderBuffer keeps a window of data during which it is ok to send data out of order.
@@ -38,13 +33,15 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
-		return nil, errMetricTooOld
+		return nil, errors.ErrMetricTooOld
 	}
 
 	var res []schema.Point
 	oldest := (rob.newest + 1) % uint32(cap(rob.buf))
 	index := (ts / rob.interval) % uint32(cap(rob.buf))
-	if ts > rob.buf[rob.newest].Ts {
+	if ts == rob.buf[index].Ts {
+		return nil, errors.ErrMetricNewValueForTimestamp
+	} else if ts > rob.buf[rob.newest].Ts {
 		flushCount := (ts - rob.buf[rob.newest].Ts) / rob.interval
 		if flushCount > uint32(cap(rob.buf)) {
 			flushCount = uint32(cap(rob.buf))

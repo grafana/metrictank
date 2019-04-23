@@ -17,8 +17,9 @@ import (
 
 // Possible reason labels for Prometheus metric discarded_samples_total
 const (
-	sampleOutOfOrder = "sample-out-of-order"
-	receivedTooLate  = "received-too-late"
+	sampleOutOfOrder     = "sample-out-of-order"
+	receivedTooLate      = "received-too-late"
+	newValueForTimestamp = "new-value-for-timestamp"
 )
 
 var (
@@ -34,15 +35,26 @@ var (
 	// ts is not older than the 60th datapoint counting from the newest.
 	metricsReordered = stats.NewCounter32("tank.metrics_reordered")
 
-	// metric tank.metrics_too_old is points that go back in time beyond the scope of the optional reorder window.
+	// metric tank.discarded.sample-out-of-order is points that go back in time beyond the scope of the optional reorder window.
 	// these points will end up being dropped and lost.
-	metricsTooOld = stats.NewCounterRate32("tank.metrics_too_old")
+	discardedSampleOutOfOrder = stats.NewCounterRate32("tank.discarded.sample-out-of-order")
 
-	// metric tank.add_to_closed_chunk is points received for the most recent chunk
+	// metric tank.discarded.received-too-late is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
 	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send
 	// your (infrequent) updates.  Any points revcieved for a chunk that has already been closed are discarded.
-	addToClosedChunk = stats.NewCounterRate32("tank.add_to_closed_chunk")
+	discardedReceivedTooLate = stats.NewCounterRate32("tank.discarded.received-too-late")
+
+	// metric tank.discarded.new-value-for-timestamp is points that have timestamps for which we already have data points.
+	// these points are discarded.
+	// data points can be incorrectly classified as metric tank.discarded.sample-out-of-order even when the timestamp
+	// has already been used. This happens in two cases:
+	// - when the reorder buffer is enabled, if the point is older than the reorder buffer retention window
+	// - when the reorder buffer is disabled, if the point is older than the last data point
+	discardedNewValueForTimestamp = stats.NewCounterRate32("tank.discarded.new-value-for-timestamp")
+
+	// metric tank.discarded.unknown is points that have been discarded for unknown reasons.
+	discardedUnknown = stats.NewCounterRate32("tank.discarded.unknown")
 
 	// metric tank.total_points is the number of points currently held in the in-memory ringbuffer
 	totalPoints = stats.NewGauge64("tank.total_points")

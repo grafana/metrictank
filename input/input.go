@@ -55,12 +55,12 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		receivedMP: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.received", input)),
 		// metric input.%s.metricpoint_no_org.received is the count of metricpoint_no_org datapoints received by input plugin
 		receivedMPNO: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint_no_org.received", input)),
-		// metric input.%s.metricdata.invalid is a count of times a metricdata was invalid by input plugin
-		invalidMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.invalid", input)),
-		// metric input.%s.metricpoint.invalid is a count of times a metricpoint was invalid by input plugin
-		invalidMP: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.invalid", input)),
-		// metric input.%s.metricpoint.unknown is the count of times the ID of a received metricpoint was not in the index, by input plugin
-		unknownMP: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.unknown", input)),
+		// metric input.%s.metricdata.discarded.invalid is a count of times a metricdata was invalid by input plugin
+		invalidMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid", input)),
+		// metric input.%s.metricpoint.discarded.invalid is a count of times a metricpoint was invalid by input plugin
+		invalidMP: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.discarded.invalid", input)),
+		// metric input.%s.metricpoint.discarded.unknown is the count of times the ID of a received metricpoint was not in the index, by input plugin
+		unknownMP: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint.discarded.unknown", input)),
 
 		metrics:     metrics,
 		metricIndex: metricIndex,

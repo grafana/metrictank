@@ -155,19 +155,19 @@
         },
         {
           "refId": "C",
-          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.invalid.counter32), 'sum', 5, 6, 7)"
+          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.discarded.invalid.counter32), 'sum', 5, 6, 7, 8)"
         },
         {
           "refId": "D",
-          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.unknown.counter32), 'sum', 5, 6, 7)"
+          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.discarded.unknown.counter32), 'sum', 5, 6, 7, 8)"
         },
         {
           "refId": "E",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_too_old.counter32)), 'too old')"
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.discarded.sample-out-of-order.counter32)), 'too old')"
         },
         {
           "refId": "F",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.add_to_closed_chunk.counter32)), 'add-to-saved')"
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.discarded.received-too-late.counter32)), 'add-to-saved')"
         },
         {
           "refId": "G",
