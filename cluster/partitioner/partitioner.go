@@ -12,7 +12,7 @@ import (
 
 type Partitioner interface {
 	Key(schema.PartitionedMetric, []byte) []byte
-	Partition(schema.PartitionedMetric, int32) (int32, error)
+	Partition(schema.PartitionedMetric, int32) int32
 }
 
 // NewKafka returns the appropriate kafka partitioner
@@ -42,17 +42,14 @@ func (k KafkaByOrg) Key(m schema.PartitionedMetric, b []byte) []byte {
 }
 
 // Partition partitions just like sarama.HashPartitioner but without needing a *sarama.ProducerMessage
-func (k KafkaByOrg) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
+func (k KafkaByOrg) Partition(m schema.PartitionedMetric, numPartitions int32) int32 {
 	k.hasher.Reset()
-	_, err := k.hasher.Write(k.Key(m, nil))
-	if err != nil {
-		return -1, err
-	}
+	k.hasher.Write(k.Key(m, nil)) // fnv can never return a non-nil error
 	partition := int32(k.hasher.Sum32()) % numPartitions
 	if partition < 0 {
 		partition = -partition
 	}
-	return partition, nil
+	return partition
 }
 
 // KafkaBySeries partitions a schema.PartitionedMetric by Series name, using hashing equivalent to sarama.HashPartitioner
@@ -65,17 +62,14 @@ func (k KafkaBySeries) Key(m schema.PartitionedMetric, b []byte) []byte {
 }
 
 // Partition partitions just like sarama.HashPartitioner but without needing a *sarama.ProducerMessage
-func (k KafkaBySeries) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
+func (k KafkaBySeries) Partition(m schema.PartitionedMetric, numPartitions int32) int32 {
 	k.hasher.Reset()
-	_, err := k.hasher.Write(k.Key(m, nil))
-	if err != nil {
-		return -1, err
-	}
+	k.hasher.Write(k.Key(m, nil)) // fnv can never return a non-nil error
 	partition := int32(k.hasher.Sum32()) % numPartitions
 	if partition < 0 {
 		partition = -partition
 	}
-	return partition, nil
+	return partition
 }
 
 // KafkaBySeriesWithTags partitions a schema.PartitionedMetric by nameWithTags, using a custom xxhash+jump hashing scheme
@@ -87,7 +81,7 @@ func (k KafkaBySeriesWithTags) Key(m schema.PartitionedMetric, b []byte) []byte 
 }
 
 // Partition partitions using a custom xxhash+jump hashing scheme
-func (k KafkaBySeriesWithTags) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
+func (k KafkaBySeriesWithTags) Partition(m schema.PartitionedMetric, numPartitions int32) int32 {
 	jumpKey := xxhash.Sum64(k.Key(m, nil))
-	return jump.Hash(jumpKey, int(numPartitions)), nil
+	return jump.Hash(jumpKey, int(numPartitions))
 }

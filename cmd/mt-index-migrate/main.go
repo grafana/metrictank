@@ -181,12 +181,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 		if *numPartitions == 1 {
 			mdef.Partition = 0
 		} else {
-			p, err := partitioner.Partition(&mdef, int32(*numPartitions))
-			if err != nil {
-				log.Fatalf("failed to get partition id of metric. %s", err.Error())
-			} else {
-				mdef.Partition = p
-			}
+			mdef.Partition = partitioner.Partition(&mdef, int32(*numPartitions))
 		}
 		defsChan <- &mdef
 	}

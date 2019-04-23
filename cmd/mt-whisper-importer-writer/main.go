@@ -238,11 +238,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		throwError(fmt.Sprintf("Invalid MetricData.Id: %s", err))
 	}
 
-	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
-	if err != nil {
-		throwError(fmt.Sprintf("Error partitioning: %q", err))
-		return
-	}
+	partition := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
 	s.Index.AddOrUpdate(mkey, &metric.MetricData, partition)
 
 	for archiveIdx, a := range metric.Archives {
