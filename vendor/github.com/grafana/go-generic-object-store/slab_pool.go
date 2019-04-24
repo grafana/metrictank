@@ -1,7 +1,6 @@
 package gos
 
 import (
-	"encoding/binary"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -11,7 +10,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	jump "github.com/dgryski/go-jump"
 	"github.com/willf/bitset"
 )
 
@@ -63,44 +61,6 @@ func (s *slabPool) memStats() uint64 {
 	return length * slabLength
 }
 
-func (s *slabPool) getNextSlabID(current, objHash uint) uint {
-	slabCount := uint(len(s.slabs))
-	if objHash >= slabCount {
-		return (current + 1) % slabCount
-	}
-
-	current = s.getNextID(current, objHash, slabCount)
-
-	return current
-}
-
-// getNextID generates the next ID to check foraccording to given parameters
-// those IDs are used to find slabs in slices and objects in slabs
-// current is the last used ID
-// objHash is a hash of the object we find an ID for, it must be > 0 and < max
-// max is the max value that we can accept as ID, exclusive
-func (s *slabPool) getNextID(current, objHash, max uint) uint {
-	var next uint
-
-	if objHash > max {
-		objHash = objHash % max
-	}
-
-	objHash++
-
-	next = current + objHash
-	if next >= max {
-		next = next % objHash
-		if next == 0 {
-			next = objHash - 1
-		} else {
-			next--
-		}
-	}
-
-	return next
-}
-
 // add adds an object to the pool
 // It will try to find a slab that has a free object slot to avoid
 // unnecessary allocations. If it can't find a free slot, it will add a
@@ -111,37 +71,21 @@ func (s *slabPool) getNextID(current, objHash, max uint) uint {
 // The third value is nil if there was no error, otherwise it is the error
 func (s *slabPool) add(obj []byte) (ObjAddr, SlabAddr, error) {
 	var currentSlab *slab
-	var objHash uint
-	var hashInput []byte
-
-	if len(obj) < 8 {
-		hashInput = append(make([]byte, 8-len(obj)), obj...)
-	} else {
-		hashInput = obj[len(obj)-8:]
-	}
+	var objIdx uint
 
 	slabCount := uint(len(s.slabs))
-	objHash = uint(jump.Hash(binary.LittleEndian.Uint64(hashInput), int(s.objsPerSlab)-1))
-	objHash++ // objHash must be >0
-
-	objIdx := objHash
 
 	found := false
+	exists := false
 	var slabIdx uint
 	if slabCount > 0 {
-		for i := uint(0); i < slabCount; i++ {
-			slabIdx = s.getNextSlabID(slabIdx, objHash)
-			if !s.freeSlabs.Test(slabIdx) {
-				slabBitSet := s.slabs[slabIdx].bitSet()
-				objIdx, found = slabBitSet.NextClear(objIdx)
-				if !found {
-					objIdx, found = slabBitSet.NextClear(0)
-				}
+		slabIdx, found = s.freeSlabs.NextClear(0)
 
-				if found {
-					currentSlab = s.slabs[slabIdx]
-					break
-				}
+		if found {
+			currentSlab = s.slabs[slabIdx]
+			objIdx, exists = currentSlab.bitSet().NextClear(0)
+			if !exists {
+				return 0, 0, fmt.Errorf("Add: Failed to add object into slab")
 			}
 		}
 	}
@@ -155,7 +99,7 @@ func (s *slabPool) add(obj []byte) (ObjAddr, SlabAddr, error) {
 		currentSlab = s.slabs[newIdx]
 		slabIdx = uint(newIdx)
 		newSlab = SlabAddr(unsafe.Pointer(currentSlab))
-		objIdx = objHash
+		objIdx = 0
 	}
 
 	objAddr, full, success := currentSlab.addObj(obj, objIdx)
@@ -277,20 +221,8 @@ func (s *slabPool) search(searching []byte) (ObjAddr, bool) {
 	slabIdxChan := make(chan uint, slabCount)
 
 	go func() {
-		var hashInput []byte
-		var objHash uint
-		if len(searching) < 8 {
-			hashInput = append(make([]byte, 8-len(searching)), searching...)
-		} else {
-			hashInput = searching[len(searching)-8:]
-		}
-		objHash = uint(jump.Hash(binary.LittleEndian.Uint64(hashInput), int(s.objsPerSlab)-1))
-		objHash++ // objHash must be >0
-
-		var slabIdx uint
-		for i := 0; i < slabCount; i++ {
-			slabIdx = s.getNextSlabID(slabIdx, objHash)
-			slabIdxChan <- slabIdx
+		for idx := range s.slabs {
+			slabIdxChan <- uint(idx)
 		}
 		close(slabIdxChan)
 	}()
