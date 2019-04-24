@@ -7,7 +7,7 @@ import (
 	"sync"
 	"unsafe"
 
-	gos "github.com/replay/go-generic-object-store"
+	gos "github.com/grafana/go-generic-object-store"
 	"github.com/tmthrgd/shoco"
 )
 
@@ -572,6 +572,7 @@ func (oi *ObjectIntern) joinStringsUncompressed(nodes []uintptr, sep string) (st
 		return "", fmt.Errorf("Could not find object in store")
 	}
 
+	oi.RLock()
 	totalSize := len(sep) * (len(nodes) - 1)
 	for _, length := range lengths {
 		totalSize += length
@@ -594,6 +595,7 @@ func (oi *ObjectIntern) joinStringsUncompressed(nodes []uintptr, sep string) (st
 		bld.WriteString(tmpString)
 	}
 
+	oi.RUnlock()
 	return bld.String(), nil
 }
 

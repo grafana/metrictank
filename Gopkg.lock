@@ -118,13 +118,6 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:3db74f0cf75d9759d2bdfb6cb55f7d7d372c01f847c5e1ab2fe03773dc2bf024"
-  name = "github.com/dgryski/go-jump"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "e1f439676b570800a863c37b78d1f868f51a85fc"
-
-[[projects]]
   branch = "master"
   digest = "1:07e80adc1161a63d37f382328ebabbf4f50e027cfaadf718515c3f39a65eb18f"
   name = "github.com/dgryski/go-linlog"
@@ -350,6 +343,14 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "7a1aae0695d90c7ce662097c9589dfe1ae3c4f47"
+
+[[projects]]
+  branch = "master"
+  digest = "1:e03c439efbb9b1c8e3d0e79f79009326ca7d0c5d87d018e4b1000ad284b6444e"
+  name = "github.com/grafana/go-generic-object-store"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "621898ab1f81b74f59b474c62a6ee76dc24f3e43"
 
 [[projects]]
   digest = "1:a191ed8e21025522d5857d14c3ec0a6513f83bea2ff45967f301fb701f3849dd"
@@ -731,19 +732,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:441eb37ed43d9bbb0016a616d03ec2e9e5b98374fdd607111656b231ea9eb383"
-  name = "github.com/replay/go-generic-object-store"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "8c52832c468de58c14cd3ac4223188ac523a569e"
-
-[[projects]]
-  branch = "master"
-  digest = "1:e26536c11bb945e55bf981514b0d0716570c299d57aab58168b1049c7ceb5ff3"
+  digest = "1:d66d5dd414213a32d34f8f654e8cba67f01f29d152253477eb5143e703a96b01"
   name = "github.com/robert-milan/go-object-interning"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "79ed8585eda3bf89a8abfffe81a3ddd4d5418109"
+  revision = "f2205247749b110fc9b7c150563bde47b4bbcae6"
 
 [[projects]]
   digest = "1:c5741d3d03a06220bcca801547f28de803103249b739eb5537e54b77e89f435a"
