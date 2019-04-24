@@ -553,7 +553,8 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				// populate cache and store according to pattern definition
 				var prevts uint32
 				for i := 0; i < len(tc.Pattern); i++ {
-					itgen, err := chunk.NewIterGen(chunks[i].Series.T0, 0, chunks[i].Encode(span))
+					encodedChunk := chunks[i].Encode(span)
+					itgen, err := chunk.NewIterGen(chunks[i].Series.T0, 0, encodedChunk)
 					if err != nil {
 						t.Fatalf("NewIterGen error: %s", err)
 					}
@@ -561,7 +562,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 						c.Add(metric, prevts, itgen)
 					}
 					if pattern[i] == 's' || pattern[i] == 'b' {
-						cwr := mdata.NewChunkWriteRequest(nil, metric, &chunks[i], 0, span, time.Now())
+						cwr := mdata.NewChunkWriteRequest(func() {}, metric, 0, chunks[i].Series.T0, encodedChunk, time.Now())
 						store.Add(&cwr)
 					}
 					prevts = chunks[i].Series.T0

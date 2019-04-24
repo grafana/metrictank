@@ -356,7 +356,16 @@ func (a *AggMetric) persist(pos int) {
 	// create an array of chunks that need to be sent to the writeQueue.
 	pending := make([]*ChunkWriteRequest, 1)
 	// add the current chunk to the list of chunks to send to the writeQueue
-	cwr := NewChunkWriteRequest(a, a.key, chunk, a.ttl, a.chunkSpan, time.Now())
+	cwr := NewChunkWriteRequest(func() {
+		a.SyncChunkSaveState(chunk.Series.T0)
+		SendPersistMessage(a.key.String(), chunk.Series.T0)
+	},
+		a.key,
+		a.ttl,
+		chunk.Series.T0,
+		chunk.Encode(a.chunkSpan),
+		time.Now(),
+	)
 	pending[0] = &cwr
 
 	// if we recently became the primary, there may be older chunks
@@ -369,7 +378,16 @@ func (a *AggMetric) persist(pos int) {
 	previousChunk := a.chunks[previousPos]
 	for (previousChunk.Series.T0 < chunk.Series.T0) && (a.lastSaveStart < previousChunk.Series.T0) {
 		log.Debugf("AM: persist(): old chunk needs saving. Adding %s:%d to writeQueue", a.key, previousChunk.Series.T0)
-		cwr := NewChunkWriteRequest(a, a.key, previousChunk, a.ttl, a.chunkSpan, time.Now())
+		cwr := NewChunkWriteRequest(func() {
+			a.SyncChunkSaveState(previousChunk.Series.T0)
+			SendPersistMessage(a.key.String(), previousChunk.Series.T0)
+		},
+			a.key,
+			a.ttl,
+			previousChunk.Series.T0,
+			previousChunk.Encode(a.chunkSpan),
+			time.Now(),
+		)
 		pending = append(pending, &cwr)
 		previousPos--
 		if previousPos < 0 {

@@ -40,7 +40,7 @@ func (c *MockStore) Items() int {
 func (c *MockStore) Add(cwr *ChunkWriteRequest) {
 	if !c.Drop {
 		intervalHint := cwr.Key.Archive.Span()
-		itgen, err := chunk.NewIterGen(cwr.Chunk.Series.T0, intervalHint, cwr.Chunk.Encode(cwr.Span))
+		itgen, err := chunk.NewIterGen(cwr.T0, intervalHint, cwr.Data)
 		if err != nil {
 			panic(err)
 		}

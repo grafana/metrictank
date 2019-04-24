@@ -3,21 +3,20 @@ package mdata
 import (
 	"time"
 
-	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/raintank/schema"
 )
 
 // ChunkWriteRequest is a request to write a chunk into a store
 type ChunkWriteRequest struct {
-	Metric    *AggMetric
+	Callback  func()
 	Key       schema.AMKey
-	Chunk     *chunk.Chunk
 	TTL       uint32
-	Span      uint32
+	T0        uint32
+	Data      []byte
 	Timestamp time.Time
 }
 
 // NewChunkWriteRequest creates a new ChunkWriteRequest
-func NewChunkWriteRequest(metric *AggMetric, key schema.AMKey, chunk *chunk.Chunk, ttl, span uint32, ts time.Time) ChunkWriteRequest {
-	return ChunkWriteRequest{metric, key, chunk, ttl, span, ts}
+func NewChunkWriteRequest(callback func(), key schema.AMKey, ttl, t0 uint32, data []byte, ts time.Time) ChunkWriteRequest {
+	return ChunkWriteRequest{callback, key, ttl, t0, data, ts}
 }
