@@ -70,7 +70,7 @@ func (s *Server) getClusterStatus(ctx *middleware.Context) {
 	status := models.ClusterStatus{
 		ClusterName: cluster.ClusterName,
 		NodeName:    cluster.Manager.ThisNode().GetName(),
-		Members:     cluster.Manager.MemberList(),
+		Members:     cluster.Manager.MemberList(false, false),
 	}
 	response.Write(ctx, response.NewJson(200, status, ""))
 }
@@ -79,7 +79,7 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 	memberNames := make(map[string]struct{})
 	var toJoin []string
 
-	for _, memberNode := range cluster.Manager.MemberList() {
+	for _, memberNode := range cluster.Manager.MemberList(false, false) {
 		memberNames[memberNode.GetName()] = struct{}{}
 	}
 
@@ -317,7 +317,7 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	var err error
 
 	if allPeers {
-		peers = cluster.Manager.MemberList()
+		peers = cluster.Manager.MemberList(false, false)
 	} else {
 		peers, err = cluster.MembersForQuery()
 		if err != nil {

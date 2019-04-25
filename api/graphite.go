@@ -513,7 +513,7 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {
-	peers := cluster.Manager.MemberList()
+	peers := cluster.Manager.MemberList(false, false)
 	peers = append(peers, cluster.Manager.ThisNode())
 	log.Debugf("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
 
