@@ -463,6 +463,12 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []tsz.Iter) []schema.P
 func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) {
 	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesAggMetrics")
 	defer span.Finish()
+
+	// this is a query node that for some reason received a request
+	if s.MemoryStore == nil {
+		return mdata.Result{}, nil
+	}
+
 	metric, ok := s.MemoryStore.Get(ctx.AMKey.MKey)
 	if !ok {
 		return mdata.Result{
@@ -480,6 +486,12 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) 
 
 // will only fetch until until, but uses ctx.To for debug logging
 func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.Iter, error) {
+
+	// this is a query node that for some reason received a data request
+	if s.BackendStore == nil {
+		return nil, nil
+	}
+
 	var iters []tsz.Iter
 	var prevts uint32
 
