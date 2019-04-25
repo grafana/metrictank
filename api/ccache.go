@@ -27,7 +27,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		}
 	}
 
-	// nothing to do on query nodes. they don't have any data in their chunk cache
+	// nothing to do on query nodes. they have no index or chunk cache
 	if s.MetricIndex == nil {
 		response.Write(ctx, response.NewJson(code, res, ""))
 		return
