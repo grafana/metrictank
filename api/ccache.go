@@ -91,7 +91,7 @@ func (s *Server) ccacheDeletePropagate(ctx context.Context, req *models.CCacheDe
 	// we never want to propagate more than once to avoid loops
 	req.Propagate = false
 
-	peers := cluster.Manager.MemberList(false, false)
+	peers := cluster.Manager.MemberList(false, true)
 	peerResults := make(map[string]models.CCacheDeleteResp)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
