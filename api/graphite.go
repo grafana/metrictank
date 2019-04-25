@@ -321,6 +321,12 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 }
 
 func (s *Server) listLocal(orgId uint32) []idx.Archive {
+
+	// query nodes have no data
+	if s.MetricIndex == nil {
+		return nil
+	}
+
 	return s.MetricIndex.List(orgId)
 }
 
@@ -586,6 +592,12 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 }
 
 func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
+
+	// nothing to do on query nodes.
+	if s.MetricIndex == nil {
+		return 0, nil
+	}
+
 	defs, err := s.MetricIndex.Delete(orgId, query)
 	return len(defs), err
 }
@@ -1084,14 +1096,18 @@ func (s *Server) graphiteFunctions(ctx *middleware.Context) {
 }
 
 func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.GraphiteTagDelSeries) {
-	deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, request.Paths)
-	if err != nil {
-		response.Write(ctx, response.WrapErrorForTagDB(err))
-		return
-	}
 
 	res := models.GraphiteTagDelSeriesResp{}
-	res.Count = len(deleted)
+
+	// nothing to do on query nodes.
+	if s.MetricIndex != nil {
+		deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, request.Paths)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+		res.Count = len(deleted)
+	}
 
 	if !request.Propagate {
 		response.Write(ctx, response.NewJson(200, res, ""))

@@ -27,6 +27,12 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		}
 	}
 
+	// nothing to do on query nodes. they don't have any data in their chunk cache
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewJson(code, res, ""))
+		return
+	}
+
 	fullFlush := false
 	for _, pattern := range req.Patterns {
 		if pattern == "**" {
