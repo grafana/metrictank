@@ -268,7 +268,9 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 						failedMutations = append(failedMutations, muts[i])
 						retryBuf = append(retryBuf, buf[i])
 					} else {
-						buf[i].Callback()
+						if buf[i].Callback != nil {
+							buf[i].Callback()
+						}
 						log.Debugf("btStore: save complete. %s:%d %v", buf[i].Key, buf[i].T0, buf[i].Data)
 						chunkSaveOk.Inc()
 					}
@@ -289,7 +291,9 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				chunkSaveOk.Add(len(rowKeys))
 				log.Debugf("btStore: %d chunks saved to bigtable.", len(rowKeys))
 				for _, cwr := range buf {
-					cwr.Callback()
+					if cwr.Callback != nil {
+						cwr.Callback()
+					}
 					log.Debugf("btStore: save complete. %s:%d %v", cwr.Key.String(), cwr.T0, cwr.Data)
 				}
 			}

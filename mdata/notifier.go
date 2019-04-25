@@ -101,7 +101,7 @@ func (dn DefaultNotifierHandler) Handle(data []byte) {
 				aggSpan := amkey.Archive.Span()
 				agg.(*AggMetric).SyncAggregatedChunkSaveState(c.T0, consolidator, aggSpan)
 			} else {
-				agg.(*AggMetric).SyncChunkSaveState(c.T0)
+				agg.(*AggMetric).SyncChunkSaveState(c.T0, false)()
 			}
 		}
 	} else {

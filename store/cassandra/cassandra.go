@@ -325,7 +325,9 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 
 				if err == nil {
 					success = true
-					cwr.Callback()
+					if cwr.Callback != nil {
+						cwr.Callback()
+					}
 					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
 					chunkSaveOk.Inc()
 				} else {

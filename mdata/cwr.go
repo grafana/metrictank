@@ -6,9 +6,11 @@ import (
 	"github.com/raintank/schema"
 )
 
+type ChunkSaveCallback func()
+
 // ChunkWriteRequest is a request to write a chunk into a store
 type ChunkWriteRequest struct {
-	Callback  func()
+	Callback  ChunkSaveCallback
 	Key       schema.AMKey
 	TTL       uint32
 	T0        uint32
