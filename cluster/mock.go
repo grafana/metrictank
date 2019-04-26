@@ -43,9 +43,10 @@ func (n *MockNode) GetName() string {
 	return n.name
 }
 
-func NewMockNode(isLocal bool, name string, postResponse []byte) *MockNode {
+func NewMockNode(isLocal bool, name string, partitions []int32, postResponse []byte) *MockNode {
 	return &MockNode{
 		isLocal:      isLocal,
+		partitions:   partitions,
 		name:         name,
 		postResponse: postResponse,
 	}
