@@ -306,25 +306,17 @@ type PeerResponse struct {
 }
 
 // peerQuery takes a request and the path to request it on, then fans it out
-// across the cluster, except to the local peer. If any peer fails requests to
+// across the cluster, except to the local peer or peers without data.
+// Note: unlike the other peerQuery methods, we include peers that are not ready
+// If any peer fails requests to
 // other peers are aborted.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string, allPeers bool) (map[string]PeerResponse, error) {
-	var peers []cluster.Node
-	var err error
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
 
-	if allPeers {
-		peers = cluster.Manager.MemberList(false, false)
-	} else {
-		peers, err = cluster.MembersForQuery()
-		if err != nil {
-			log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
-			return nil, err
-		}
-	}
+	peers := cluster.Manager.MemberList(false, true)
 	log.Debugf("HTTP %s across %d instances", name, len(peers)-1)
 
 	reqCtx, cancel := context.WithCancel(ctx)

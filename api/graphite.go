@@ -1115,7 +1115,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 	}
 
 	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
-	responses, err := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries", true) // note: needlessl hits query nodes with no data, but can be cleaned later
+	responses, err := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
