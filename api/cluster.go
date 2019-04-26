@@ -70,7 +70,7 @@ func (s *Server) getClusterStatus(ctx *middleware.Context) {
 	status := models.ClusterStatus{
 		ClusterName: cluster.ClusterName,
 		NodeName:    cluster.Manager.ThisNode().GetName(),
-		Members:     cluster.Manager.MemberList(),
+		Members:     cluster.Manager.MemberList(false, false),
 	}
 	response.Write(ctx, response.NewJson(200, status, ""))
 }
@@ -79,7 +79,7 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 	memberNames := make(map[string]struct{})
 	var toJoin []string
 
-	for _, memberNode := range cluster.Manager.MemberList() {
+	for _, memberNode := range cluster.Manager.MemberList(false, false) {
 		memberNames[memberNode.GetName()] = struct{}{}
 	}
 
@@ -114,6 +114,12 @@ func (s *Server) postClusterMembers(ctx *middleware.Context, req models.ClusterM
 func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	resp := models.NewIndexFindResp()
 
+	// query nodes don't own any data
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, resp))
+		return
+	}
+
 	for _, pattern := range req.Patterns {
 		nodes, err := s.MetricIndex.Find(req.OrgId, pattern, req.From)
 		if err != nil {
@@ -126,6 +132,13 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 }
 
 func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDetails) {
+
+	// query nodes don't own any data
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, &models.IndexTagDetailsResp{}))
+		return
+	}
+
 	values, err := s.MetricIndex.TagDetails(req.OrgId, req.Tag, req.Filter, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
@@ -135,6 +148,13 @@ func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDet
 }
 
 func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
+
+	// query nodes don't own any data
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{}))
+		return
+	}
+
 	tags, err := s.MetricIndex.Tags(req.OrgId, req.Filter, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
@@ -144,6 +164,13 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 }
 
 func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.IndexAutoCompleteTags) {
+
+	// query nodes don't own any data
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, models.StringList(nil)))
+		return
+	}
+
 	tags, err := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.Expr, req.From, req.Limit)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
@@ -153,6 +180,13 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 }
 
 func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.IndexAutoCompleteTagValues) {
+
+	// query nodes don't own any data
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, models.StringList(nil)))
+		return
+	}
+
 	tags, err := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.Expr, req.From, req.Limit)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
@@ -162,19 +196,34 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 }
 
 func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.IndexTagDelSeries) {
+
+	res := models.IndexTagDelSeriesResp{}
+
+	// nothing to do on query nodes.
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, res))
+		return
+	}
+
 	deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, request.Paths)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
 	}
 
-	res := models.IndexTagDelSeriesResp{}
 	res.Count = len(deleted)
 
 	response.Write(ctx, response.NewMsgp(200, res))
 }
 
 func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {
+
+	// query nodes don't own any data.
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, &models.IndexFindByTagResp{}))
+		return
+	}
+
 	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
@@ -185,6 +234,13 @@ func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByT
 
 // IndexGet returns a msgp encoded schema.MetricDefinition
 func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
+
+	// query nodes don't own any data.
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(404, nil))
+		return
+	}
+
 	def, ok := s.MetricIndex.Get(req.MKey)
 	if !ok {
 		response.Write(ctx, response.NewError(http.StatusNotFound, "Not Found"))
@@ -196,6 +252,13 @@ func (s *Server) indexGet(ctx *middleware.Context, req models.IndexGet) {
 
 // IndexList returns msgp encoded schema.MetricDefinition's
 func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
+
+	// query nodes don't own any data.
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgpArray(200, nil))
+		return
+	}
+
 	defs := s.MetricIndex.List(req.OrgId)
 	resp := make([]msgp.Marshaler, len(defs))
 	for i := range defs {
@@ -218,6 +281,12 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 }
 
 func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
+
+	// nothing to do on query nodes.
+	if s.MetricIndex == nil {
+		return
+	}
+
 	defs, err := s.MetricIndex.Delete(req.OrgId, req.Query)
 	if err != nil {
 		// errors can only be caused by bad request.
@@ -237,25 +306,17 @@ type PeerResponse struct {
 }
 
 // peerQuery takes a request and the path to request it on, then fans it out
-// across the cluster, except to the local peer. If any peer fails requests to
+// across the cluster, except to the local peer or peers without data.
+// Note: unlike the other peerQuery methods, we include peers that are not ready
+// If any peer fails requests to
 // other peers are aborted.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string, allPeers bool) (map[string]PeerResponse, error) {
-	var peers []cluster.Node
-	var err error
+func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
 
-	if allPeers {
-		peers = cluster.Manager.MemberList()
-	} else {
-		peers, err = cluster.MembersForQuery()
-		if err != nil {
-			log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
-			return nil, err
-		}
-	}
+	peers := cluster.Manager.MemberList(false, true)
 	log.Debugf("HTTP %s across %d instances", name, len(peers)-1)
 
 	reqCtx, cancel := context.WithCancel(ctx)

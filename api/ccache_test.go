@@ -183,7 +183,7 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 
 	respEncoded := response.NewJson(500, resp, "")
 	buf, _ := respEncoded.Body()
-	manager.Peers = append(manager.Peers, cluster.NewMockNode(false, "0", buf))
+	manager.Peers = append(manager.Peers, cluster.NewMockNode(false, "0", []int32{0}, buf))
 
 	// define how many series/archives are going to get deleted by this server
 	delSeries := 1
@@ -244,7 +244,7 @@ func TestMetricDeletePropagation(t *testing.T) {
 		expectedDeletedArchives += resp.DeletedArchives
 		respEncoded := response.NewJson(200, resp, "")
 		buf, _ := respEncoded.Body()
-		manager.Peers = append(manager.Peers, cluster.NewMockNode(false, peer, buf))
+		manager.Peers = append(manager.Peers, cluster.NewMockNode(false, peer, []int32{0}, buf))
 	}
 
 	// define how many series/archives are going to get deleted by this server

@@ -58,7 +58,7 @@ type ClusterManager interface {
 	SetReady()
 	SetState(NodeState)
 	ThisNode() Node
-	MemberList() []Node
+	MemberList(bool, bool) []Node
 	Join([]string) (int, error)
 	GetPartitions() []int32
 	SetPartitions([]int32)
@@ -160,17 +160,21 @@ func (c *MemberlistManager) thisNode() HTTPNode {
 	return c.members[c.nodeName]
 }
 
-func (c *MemberlistManager) MemberList() []Node {
-	return toIf(c.memberList())
+func (c *MemberlistManager) MemberList(isReady, hasData bool) []Node {
+	return toIf(c.memberList(isReady, hasData))
 }
 
-func (c *MemberlistManager) memberList() []HTTPNode {
+func (c *MemberlistManager) memberList(isReady, hasData bool) []HTTPNode {
 	c.RLock()
-	list := make([]HTTPNode, len(c.members), len(c.members))
-	i := 0
+	list := make([]HTTPNode, 0, len(c.members))
 	for _, p := range c.members {
-		list[i] = p
-		i++
+		if isReady && !p.IsReady() {
+			continue
+		}
+		if hasData && !p.HasData() {
+			continue
+		}
+		list = append(list, p)
 	}
 	c.RUnlock()
 	sort.Sort(HTTPNodesByName(list))
@@ -505,13 +509,19 @@ func (m *SingleNodeManager) ThisNode() Node {
 	return m.node
 }
 
-func (m *SingleNodeManager) MemberList() []Node {
-	return toIf(m.memberList())
+func (m *SingleNodeManager) MemberList(isReady, hasData bool) []Node {
+	return toIf(m.memberList(isReady, hasData))
 }
 
-func (m *SingleNodeManager) memberList() []HTTPNode {
+func (m *SingleNodeManager) memberList(isReady, hasData bool) []HTTPNode {
 	m.RLock()
 	defer m.RUnlock()
+	if isReady && !m.node.IsReady() {
+		return nil
+	}
+	if hasData && !m.node.HasData() {
+		return nil
+	}
 	return []HTTPNode{m.node}
 }
 

@@ -87,8 +87,8 @@ func MembersForQuery() ([]Node, error) {
 		}
 	}
 
-	for _, member := range Manager.MemberList() {
-		if !member.IsReady() || member.GetName() == thisNode.GetName() {
+	for _, member := range Manager.MemberList(true, true) {
+		if member.GetName() == thisNode.GetName() {
 			continue
 		}
 		for _, part := range member.GetPartitions() {
@@ -159,7 +159,7 @@ LOOP:
 // keyed by the first (lowest) partition of their shard group
 func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 	thisNode := Manager.ThisNode()
-	allNodes := Manager.MemberList()
+	allNodes := Manager.MemberList(true, true)
 	membersMap := make(map[int32][]Node)
 
 	// If we are running in dev mode, just return thisNode
@@ -172,13 +172,7 @@ func MembersForSpeculativeQuery() (map[int32][]Node, error) {
 
 	// store the available nodes for each partition group
 	for _, member := range allNodes {
-		if !member.IsReady() {
-			continue
-		}
 		partitions := member.GetPartitions()
-		if len(partitions) == 0 {
-			continue
-		}
 		memberStartPartition := partitions[0]
 
 		if _, ok := membersMap[memberStartPartition]; !ok {

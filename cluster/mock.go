@@ -27,6 +27,10 @@ func (n *MockNode) GetPartitions() []int32 {
 	return n.partitions
 }
 
+func (n *MockNode) HasData() bool {
+	return len(n.partitions) > 0
+}
+
 func (n *MockNode) GetPriority() int {
 	return n.priority
 }
@@ -39,9 +43,10 @@ func (n *MockNode) GetName() string {
 	return n.name
 }
 
-func NewMockNode(isLocal bool, name string, postResponse []byte) *MockNode {
+func NewMockNode(isLocal bool, name string, partitions []int32, postResponse []byte) *MockNode {
 	return &MockNode{
 		isLocal:      isLocal,
+		partitions:   partitions,
 		name:         name,
 		postResponse: postResponse,
 	}
@@ -55,8 +60,18 @@ type MockClusterManager struct {
 	partitions []int32
 }
 
-func (c *MockClusterManager) MemberList() []Node {
-	return mockToIf(c.Peers)
+func (c *MockClusterManager) MemberList(isReady, hasData bool) []Node {
+	var out []Node
+	for _, p := range c.Peers {
+		if isReady && !p.IsReady() {
+			continue
+		}
+		if hasData && !p.HasData() {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func (c *MockClusterManager) ThisNode() Node {
@@ -97,12 +112,4 @@ func InitMock() *MockClusterManager {
 	manager := &MockClusterManager{}
 	Manager = manager
 	return manager
-}
-
-func mockToIf(in []*MockNode) []Node {
-	out := make([]Node, len(in))
-	for i, m := range in {
-		out[i] = m
-	}
-	return out
 }

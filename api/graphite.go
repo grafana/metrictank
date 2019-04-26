@@ -321,6 +321,12 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 }
 
 func (s *Server) listLocal(orgId uint32) []idx.Archive {
+
+	// query nodes have no data
+	if s.MetricIndex == nil {
+		return nil
+	}
+
 	return s.MetricIndex.List(orgId)
 }
 
@@ -507,7 +513,7 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {
-	peers := cluster.Manager.MemberList()
+	peers := cluster.Manager.MemberList(false, true)
 	peers = append(peers, cluster.Manager.ThisNode())
 	log.Debugf("HTTP metricsDelete for %v across %d instances", req.Query, len(peers))
 
@@ -586,6 +592,12 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 }
 
 func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
+
+	// nothing to do on query nodes.
+	if s.MetricIndex == nil {
+		return 0, nil
+	}
+
 	defs, err := s.MetricIndex.Delete(orgId, query)
 	return len(defs), err
 }
@@ -1084,14 +1096,18 @@ func (s *Server) graphiteFunctions(ctx *middleware.Context) {
 }
 
 func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.GraphiteTagDelSeries) {
-	deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, request.Paths)
-	if err != nil {
-		response.Write(ctx, response.WrapErrorForTagDB(err))
-		return
-	}
 
 	res := models.GraphiteTagDelSeriesResp{}
-	res.Count = len(deleted)
+
+	// nothing to do on query nodes.
+	if s.MetricIndex != nil {
+		deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, request.Paths)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+		res.Count = len(deleted)
+	}
 
 	if !request.Propagate {
 		response.Write(ctx, response.NewJson(200, res, ""))
@@ -1099,7 +1115,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 	}
 
 	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
-	responses, err := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries", true)
+	responses, err := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return

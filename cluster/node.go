@@ -180,6 +180,10 @@ func (n HTTPNode) GetPartitions() []int32 {
 	return n.Partitions
 }
 
+func (n HTTPNode) HasData() bool {
+	return len(n.Partitions) > 0
+}
+
 func (n HTTPNode) IsLocal() bool {
 	return n.local
 }
