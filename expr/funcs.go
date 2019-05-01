@@ -48,6 +48,7 @@ var funcs map[string]funcDef
 func init() {
 	// keys must be sorted alphabetically. but functions with aliases can go together, in which case they are sorted by the first of their aliases
 	funcs = map[string]funcDef{
+		"absolute":              {NewAbsolute, false},
 		"alias":                 {NewAlias, true},
 		"aliasByTags":           {NewAliasByNode, true},
 		"aliasByNode":           {NewAliasByNode, true},
