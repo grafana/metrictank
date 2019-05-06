@@ -36,7 +36,7 @@ See also:
 
 | Function name and signature                                    | Alias        | Metrictank |
 | -------------------------------------------------------------- | ------------ | ---------- |
-| absolute                                                       |              | No         |
+| absolute                                                       |              | Stable     |
 | aggregate                                                      |              | No         |
 | aggregateLine                                                  |              | No         |
 | aggregateWithWildcards                                         |              | No         |
