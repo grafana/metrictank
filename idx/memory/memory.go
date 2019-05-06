@@ -346,10 +346,6 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 	statMetricsActive.Inc()
 	statAddDuration.Value(time.Since(pre))
 
-	if TagSupport {
-		m.indexTags(def)
-	}
-
 	return archive, 0, false
 }
 
@@ -441,10 +437,6 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 
 		m.add(def)
 
-		if TagSupport {
-			m.indexTags(def)
-		}
-
 		// as we are loading the metricDefs from a persistent store, set the lastSave
 		// to the lastUpdate timestamp.  This won't exactly match the true lastSave Timstamp,
 		// but it will be close enough and it will always be true that the lastSave was at
@@ -471,13 +463,20 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 		IrId:             irId,
 	}
 
-	if TagSupport && len(def.Tags) > 0 {
-		if _, ok := m.defById[def.Id]; !ok {
-			m.defById[def.Id] = archive
-			statAdd.Inc()
-			log.Debugf("memory-idx: adding %s to DefById", path)
+	if TagSupport {
+		// Even if there are no tags, index at least "name". It's important to use the definition
+		// in the archive pointer that we add to defById, because the pointers must reference the
+		// same underlying object in m.defById and m.defByTagSet
+		m.indexTags(&archive.MetricDefinition)
+
+		if len(def.Tags) > 0 {
+			if _, ok := m.defById[def.Id]; !ok {
+				m.defById[def.Id] = archive
+				statAdd.Inc()
+				log.Debugf("memory-idx: adding %s to DefById", path)
+			}
+			return *archive
 		}
-		return *archive
 	}
 
 	if m.findCache != nil {
@@ -1433,17 +1432,23 @@ DEFS:
 
 			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
 		} else {
-			defs := m.defByTagSet.defs(def.OrgId, def.NameWithTags())
+			defName := def.NameWithTags()
+			defs := m.defByTagSet.defs(def.OrgId, defName)
 			// if any other MetricDef with the same tag set is not expired yet,
 			// then we do not want to prune any of them
-			for def := range defs {
-				if atomic.LoadInt64(&def.LastUpdate) >= cutoff {
+			for sdef := range defs {
+				if atomic.LoadInt64(&sdef.LastUpdate) >= cutoff {
 					continue DEFS
 				}
 			}
 
-			for def := range defs {
-				toPruneTagged[def.OrgId][def.Id] = struct{}{}
+			for sdef := range defs {
+				if defName != sdef.NameWithTags() {
+					corruptIndex.Inc()
+					log.Errorf("Almost added bad def to prune list: def=%v, sdef=%v", def, sdef)
+				} else {
+					toPruneTagged[sdef.OrgId][sdef.Id] = struct{}{}
+				}
 			}
 		}
 	}
