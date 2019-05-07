@@ -219,6 +219,72 @@ Remove chunks from the cache for matching series, or wipe the entire cache
 curl -v -X POST -d '{"propagate": true, "orgId": 1, "patterns": ["**"]}' -H 'Content-Type: application/json' http://localhost:6060/ccache/delete
 ```
 
+## Get Meta Records
+
+```
+GET /metaTags
+```
+
+Returns the list of meta tag records that currently exist. At the moment these records
+have no effect, but in the future they will be used to associated "virtual" tags with
+metrics based on defined rules.
+
+## Adding, Updating, Deleting Meta Records
+
+```
+POST /metaTags/upsert
+```
+
+This route can be used to create, update and delete meta tag records. Each record is
+identified by its set of queries, if a record gets posted to this URL which has a set
+of queries that doesn't exist yet, a new meta record gets created. If this set of
+queries already exists, the existing meta record will be updated. If the new record
+has no meta tags associated with it, then an existing record with the same set of
+queries gets deleted.
+When an existing record gets updated the returned property `created` is `false`,
+otherwise it's `true`.
+
+## Example
+
+```
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
+[]
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": ["mytag=value"], "queries": ["a=b", "c=d"]}' | jq
+{
+  "metaTags": [
+    "mytag=value"
+  ],
+  "queries": [
+    "a=b",
+    "c=d"
+  ],
+  "created": true
+}
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
+[
+  {
+    "MetaTags": [
+      "mytag=value"
+    ],
+    "Queries": [
+      "a=b",
+      "c=d"
+    ]
+  }
+]
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": [], "queries": ["a=b", "c=d"]}' | jq
+{
+  "metaTags": [],
+  "queries": [
+    "a=b",
+    "c=d"
+  ],
+  "created": false
+}
+mst@mst-nb1:~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
+[]
+```
+
 ## Misc
 
 ### Tspec
