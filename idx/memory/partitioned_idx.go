@@ -560,6 +560,7 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.M
 	var record idx.MetaTagRecord
 	var created bool
 	for _, m := range p.Partition {
+		m := m
 		g.Go(func() error {
 			var err error
 			if i == 0 {
