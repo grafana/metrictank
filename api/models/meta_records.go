@@ -29,7 +29,6 @@ type MetaTagRecordUpsertResultByNode struct {
 type MetaTagRecordUpsertResult struct {
 	MetaTags []string `json:"metaTags"`
 	Queries  []string `json:"queries"`
-	ID       uint32   `json:"id"`
 	Created  bool     `json:"created"`
 }
 

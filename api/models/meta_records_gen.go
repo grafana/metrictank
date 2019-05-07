@@ -527,12 +527,6 @@ func (z *MetaTagRecordUpsertResult) DecodeMsg(dc *msgp.Reader) (err error) {
 					return
 				}
 			}
-		case "ID":
-			z.ID, err = dc.ReadUint32()
-			if err != nil {
-				err = msgp.WrapError(err, "ID")
-				return
-			}
 		case "Created":
 			z.Created, err = dc.ReadBool()
 			if err != nil {
@@ -552,9 +546,9 @@ func (z *MetaTagRecordUpsertResult) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *MetaTagRecordUpsertResult) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 4
+	// map header, size 3
 	// write "MetaTags"
-	err = en.Append(0x84, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
+	err = en.Append(0x83, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
 	if err != nil {
 		return
 	}
@@ -587,16 +581,6 @@ func (z *MetaTagRecordUpsertResult) EncodeMsg(en *msgp.Writer) (err error) {
 			return
 		}
 	}
-	// write "ID"
-	err = en.Append(0xa2, 0x49, 0x44)
-	if err != nil {
-		return
-	}
-	err = en.WriteUint32(z.ID)
-	if err != nil {
-		err = msgp.WrapError(err, "ID")
-		return
-	}
 	// write "Created"
 	err = en.Append(0xa7, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64)
 	if err != nil {
@@ -613,9 +597,9 @@ func (z *MetaTagRecordUpsertResult) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *MetaTagRecordUpsertResult) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 4
+	// map header, size 3
 	// string "MetaTags"
-	o = append(o, 0x84, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
+	o = append(o, 0x83, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.MetaTags)))
 	for za0001 := range z.MetaTags {
 		o = msgp.AppendString(o, z.MetaTags[za0001])
@@ -626,9 +610,6 @@ func (z *MetaTagRecordUpsertResult) MarshalMsg(b []byte) (o []byte, err error) {
 	for za0002 := range z.Queries {
 		o = msgp.AppendString(o, z.Queries[za0002])
 	}
-	// string "ID"
-	o = append(o, 0xa2, 0x49, 0x44)
-	o = msgp.AppendUint32(o, z.ID)
 	// string "Created"
 	o = append(o, 0xa7, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64)
 	o = msgp.AppendBool(o, z.Created)
@@ -691,12 +672,6 @@ func (z *MetaTagRecordUpsertResult) UnmarshalMsg(bts []byte) (o []byte, err erro
 					return
 				}
 			}
-		case "ID":
-			z.ID, bts, err = msgp.ReadUint32Bytes(bts)
-			if err != nil {
-				err = msgp.WrapError(err, "ID")
-				return
-			}
 		case "Created":
 			z.Created, bts, err = msgp.ReadBoolBytes(bts)
 			if err != nil {
@@ -725,7 +700,7 @@ func (z *MetaTagRecordUpsertResult) Msgsize() (s int) {
 	for za0002 := range z.Queries {
 		s += msgp.StringPrefixSize + len(z.Queries[za0002])
 	}
-	s += 3 + msgp.Uint32Size + 8 + msgp.BoolSize
+	s += 8 + msgp.BoolSize
 	return
 }
 

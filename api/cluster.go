@@ -529,7 +529,6 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{
 		MetaTags: result.MetaTags,
 		Queries:  result.Queries,
-		ID:       result.ID,
 		Created:  created,
 	}))
 }

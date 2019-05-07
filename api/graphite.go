@@ -1213,7 +1213,6 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 			response.Write(ctx, response.NewJson(200, models.MetaTagRecordUpsertResult{
 				MetaTags: localResult.MetaTags,
 				Queries:  localResult.Queries,
-				ID:       localResult.ID,
 				Created:  created,
 			}, ""))
 			return
@@ -1226,7 +1225,6 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 		Local: models.MetaTagRecordUpsertResult{
 			MetaTags: localResult.MetaTags,
 			Queries:  localResult.Queries,
-			ID:       localResult.ID,
 			Created:  created,
 		},
 	}

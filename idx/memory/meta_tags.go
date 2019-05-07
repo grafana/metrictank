@@ -25,21 +25,23 @@ type metaTagRecord struct {
 	queries  []expression
 }
 
+type recordId uint32
+
 // list of meta records keyed by a unique identifier used as ID
-type metaTagRecords map[uint32]metaTagRecord
+type metaTagRecords map[recordId]metaTagRecord
 
 // index structure keyed by tag -> value -> list of meta record IDs
-type metaTagValue map[string][]uint32
+type metaTagValue map[string][]recordId
 type metaTagIndex map[string]metaTagValue
 
-func (m metaTagIndex) deleteRecord(keyValue kv, recordId uint32) {
+func (m metaTagIndex) deleteRecord(keyValue kv, id recordId) {
 	if values, ok := m[keyValue.key]; ok {
-		if recordIds, ok := values[keyValue.value]; ok {
-			for i := 0; i < len(recordIds); i++ {
-				if recordIds[i] == recordId {
+		if ids, ok := values[keyValue.value]; ok {
+			for i := 0; i < len(ids); i++ {
+				if ids[i] == id {
 					// no need to keep the order
-					recordIds[i] = recordIds[len(recordIds)-1]
-					values[keyValue.value] = recordIds[:len(recordIds)-1]
+					ids[i] = ids[len(ids)-1]
+					values[keyValue.value] = ids[:len(ids)-1]
 
 					// no id should ever be present more than once
 					return
@@ -49,7 +51,7 @@ func (m metaTagIndex) deleteRecord(keyValue kv, recordId uint32) {
 	}
 }
 
-func (m metaTagIndex) insertRecord(keyValue kv, recordId uint32) {
+func (m metaTagIndex) insertRecord(keyValue kv, id recordId) {
 	var values metaTagValue
 	var ok bool
 
@@ -58,7 +60,7 @@ func (m metaTagIndex) insertRecord(keyValue kv, recordId uint32) {
 		m[keyValue.key] = values
 	}
 
-	values[keyValue.value] = append(values[keyValue.value], recordId)
+	values[keyValue.value] = append(values[keyValue.value], id)
 }
 
 // metaTagRecordFromStrings takes two slices of strings, parses them and returns a metaTagRecord
@@ -123,7 +125,7 @@ func (m *metaTagRecord) queryStrings(builder *strings.Builder) []string {
 }
 
 // hashQueries generates a hash of all the queries in the record
-func (m *metaTagRecord) hashQueries() uint32 {
+func (m *metaTagRecord) hashQueries() recordId {
 	builder := strings.Builder{}
 	for _, query := range m.queries {
 		query.stringIntoBuilder(&builder)
@@ -134,7 +136,7 @@ func (m *metaTagRecord) hashQueries() uint32 {
 
 	h := queryHash()
 	h.Write([]byte(builder.String()))
-	return h.Sum32()
+	return recordId(h.Sum32())
 }
 
 // sortQueries sorts all the queries first by key, then by value, then by
@@ -192,7 +194,7 @@ func (m *metaTagRecord) hasMetaTags() bool {
 // 3) The id of the record that has been replaced if an update was performed
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
-func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) (uint32, *metaTagRecord, uint32, *metaTagRecord, error) {
+func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) (recordId, *metaTagRecord, recordId, *metaTagRecord, error) {
 	record, err := metaTagRecordFromStrings(metaTags, tagQueryExpressions)
 	if err != nil {
 		return 0, nil, 0, nil, err
@@ -201,15 +203,15 @@ func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) 
 	record.sortQueries()
 	id := record.hashQueries()
 	var oldRecord *metaTagRecord
-	var oldId uint32
+	var oldId recordId
 
 	// loop over existing records, starting from id, trying to find one that has
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		if existingRecord, ok := m[id+i]; ok {
+		if existingRecord, ok := m[id+recordId(i)]; ok {
 			if record.matchesQueries(existingRecord) {
 				oldRecord = &existingRecord
-				oldId = id + i
+				oldId = id + recordId(i)
 				delete(m, oldId)
 				break
 			}

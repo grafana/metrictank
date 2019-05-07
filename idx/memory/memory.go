@@ -401,13 +401,12 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 		m.metaTags[orgId] = mti
 	}
 
-	hash, record, oldHash, oldRecord, err := mtr.upsert(rawRecord.MetaTags, rawRecord.Queries)
+	id, record, oldId, oldRecord, err := mtr.upsert(rawRecord.MetaTags, rawRecord.Queries)
 	if err != nil {
 		return res, false, err
 	}
 
 	builder := strings.Builder{}
-	res.ID = hash
 	res.MetaTags = record.metaTagStrings(&builder)
 	res.Queries = record.queryStrings(&builder)
 
@@ -415,17 +414,17 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 	// from the metaTagIndex before inserting the new ones
 	if oldRecord != nil {
 		for _, keyValue := range oldRecord.metaTags {
-			mti.deleteRecord(keyValue, oldHash)
+			mti.deleteRecord(keyValue, oldId)
 		}
 
 		for _, keyValue := range record.metaTags {
-			mti.insertRecord(keyValue, hash)
+			mti.insertRecord(keyValue, id)
 		}
 
 		return res, false, nil
 	} else {
 		for _, keyValue := range record.metaTags {
-			mti.insertRecord(keyValue, hash)
+			mti.insertRecord(keyValue, id)
 		}
 
 		return res, true, nil
@@ -444,9 +443,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRe
 		return res
 	}
 
-	for i, record := range metaTagRecords {
+	for _, record := range metaTagRecords {
 		res = append(res, idx.MetaTagRecord{
-			ID:       i,
 			MetaTags: record.metaTagStrings(&builder),
 			Queries:  record.queryStrings(&builder),
 		})

@@ -29,7 +29,6 @@ type Archive struct {
 type MetaTagRecord struct {
 	MetaTags []string
 	Queries  []string
-	ID       uint32
 }
 
 // used primarily by tests, for convenience

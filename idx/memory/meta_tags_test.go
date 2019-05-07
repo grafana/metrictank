@@ -15,10 +15,10 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 	metaTagRecords := make(metaTagRecords)
 
 	Convey("When adding a simple meta tag record", t, func() {
-		_, record, oldHash, oldRecord, err := metaTagRecords.upsert(metaTags, tagQueries)
+		_, record, oldId, oldRecord, err := metaTagRecords.upsert(metaTags, tagQueries)
 		So(err, ShouldBeNil)
 		So(record, ShouldNotBeNil)
-		So(oldHash, ShouldBeZeroValue)
+		So(oldId, ShouldBeZeroValue)
 		So(oldRecord, ShouldBeNil)
 
 		Convey("then it should exist in the meta tag records object", func() {
@@ -71,34 +71,34 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	metaTagRecords := make(metaTagRecords)
 
 	Convey("When adding two meta tag records", t, func() {
-		_, record, oldHash, oldRecord, err := metaTagRecords.upsert(metaTags1, tagQueries1)
+		_, record, oldId, oldRecord, err := metaTagRecords.upsert(metaTags1, tagQueries1)
 		So(err, ShouldBeNil)
 		So(record, ShouldNotBeNil)
-		So(oldHash, ShouldBeZeroValue)
+		So(oldId, ShouldBeZeroValue)
 		So(oldRecord, ShouldBeNil)
 
-		_, record, oldHash, oldRecord, err = metaTagRecords.upsert(metaTags2, tagQueries2)
+		_, record, oldId, oldRecord, err = metaTagRecords.upsert(metaTags2, tagQueries2)
 		So(err, ShouldBeNil)
 		So(record, ShouldNotBeNil)
-		So(oldHash, ShouldBeZeroValue)
+		So(oldId, ShouldBeZeroValue)
 		So(oldRecord, ShouldBeNil)
 
 		Convey("then they should exist", func() {
 			So(len(metaTagRecords), ShouldEqual, 2)
 
-			// the order of the records may have changed due to sorting by hash
+			// the order of the records may have changed due to sorting by id
 			var record1, record2 metaTagRecord
 			var found1, found2 bool
-			var recordIdToUpdate uint32
-			for hash, record := range metaTagRecords {
+			var recordIdToUpdate recordId
+			for id, record := range metaTagRecords {
 				So(len(record.queries), ShouldEqual, 2)
 				switch record.queries[0].value {
 				case "a":
-					record1 = metaTagRecords[hash]
+					record1 = metaTagRecords[id]
 					found1 = true
-					recordIdToUpdate = hash
+					recordIdToUpdate = id
 				case "c":
-					record2 = metaTagRecords[hash]
+					record2 = metaTagRecords[id]
 					found2 = true
 				}
 			}
@@ -115,26 +115,26 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 			So(record2.queries[1], ShouldResemble, expression{kv: kv{key: "tag2", value: "d"}, operator: MATCH})
 
 			Convey("when we then update one of the records", func() {
-				hash, record, oldHash, oldRecord, err := metaTagRecords.upsert(metaTagsUpdate, tagQueriesUpdate)
+				id, record, oldId, oldRecord, err := metaTagRecords.upsert(metaTagsUpdate, tagQueriesUpdate)
 				So(err, ShouldBeNil)
 				So(record, ShouldNotBeNil)
-				So(recordIdToUpdate, ShouldEqual, hash)
-				So(hash, ShouldEqual, oldHash)
+				So(recordIdToUpdate, ShouldEqual, id)
+				So(id, ShouldEqual, oldId)
 				So(oldRecord, ShouldNotBeNil)
 
 				Convey("then we should be able to see one old and one updated record", func() {
 					So(len(metaTagRecords), ShouldEqual, 2)
 
-					// the order of the records may have changed again due to sorting by hash
+					// the order of the records may have changed again due to sorting by id
 					var found1, found2 bool
-					for hash, record := range metaTagRecords {
+					for id, record := range metaTagRecords {
 						So(len(record.queries), ShouldEqual, 2)
 						switch record.queries[0].value {
 						case "a":
-							record1 = metaTagRecords[hash]
+							record1 = metaTagRecords[id]
 							found1 = true
 						case "c":
-							record2 = metaTagRecords[hash]
+							record2 = metaTagRecords[id]
 							found2 = true
 						}
 					}
@@ -209,21 +209,21 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 		So(len(metaTagRecords), ShouldEqual, 3)
 
 		Convey("When adding a 4th record with the same hash but different queries", func() {
-			hash, record, oldHash, oldRecord, err := metaTagRecords.upsert([]string{"metaTag4=value4"}, []string{"metricTag4=value4"})
+			id, record, oldId, oldRecord, err := metaTagRecords.upsert([]string{"metaTag4=value4"}, []string{"metricTag4=value4"})
 			So(err, ShouldNotBeNil)
-			So(hash, ShouldBeZeroValue)
+			So(id, ShouldBeZeroValue)
 			So(record, ShouldBeNil)
-			So(oldHash, ShouldBeZeroValue)
+			So(oldId, ShouldBeZeroValue)
 			So(oldRecord, ShouldBeNil)
 		})
 
 		Convey("When updating the third record with the same hash and equal queries", func() {
-			hash, record, oldHash, oldRecord, err := metaTagRecords.upsert([]string{"metaTag3=value4"}, []string{"metricTag3=value3"})
+			id, record, oldId, oldRecord, err := metaTagRecords.upsert([]string{"metaTag3=value4"}, []string{"metricTag3=value3"})
 			So(err, ShouldBeNil)
-			So(hash, ShouldEqual, 3)
+			So(id, ShouldEqual, 3)
 			So(record.metaTags[0], ShouldResemble, kv{key: "metaTag3", value: "value4"})
 			So(record.queries[0], ShouldResemble, expression{kv: kv{key: "metricTag3", value: "value3"}, operator: EQUAL})
-			So(oldHash, ShouldEqual, 3)
+			So(oldId, ShouldEqual, 3)
 			So(oldRecord.metaTags[0], ShouldResemble, kv{key: "metaTag3", value: "value3"})
 			So(oldRecord.queries[0], ShouldResemble, expression{kv: kv{key: "metricTag3", value: "value3"}, operator: EQUAL})
 		})
@@ -234,38 +234,38 @@ func TestDeletingMetaRecord(t *testing.T) {
 	Convey("When adding 2 meta records", t, func() {
 		metaTagRecords := make(metaTagRecords)
 
-		hash, record, oldHash, oldRecord, err := metaTagRecords.upsert([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
+		id, record, oldId, oldRecord, err := metaTagRecords.upsert([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
 		So(record.metaTags[0], ShouldResemble, kv{key: "metaTag1", value: "value1"})
 		So(record.queries[0], ShouldResemble, expression{kv: kv{key: "metricTag1", value: "value1"}, operator: EQUAL})
-		So(oldHash, ShouldBeZeroValue)
+		So(oldId, ShouldBeZeroValue)
 		So(oldRecord, ShouldBeNil)
 		So(err, ShouldBeNil)
 		So(len(metaTagRecords), ShouldEqual, 1)
-		_, ok := metaTagRecords[hash]
+		_, ok := metaTagRecords[id]
 		So(ok, ShouldBeTrue)
 
-		hash, record, oldHash, oldRecord, err = metaTagRecords.upsert([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
+		id, record, oldId, oldRecord, err = metaTagRecords.upsert([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
 		So(record.metaTags[0], ShouldResemble, kv{key: "metaTag2", value: "value2"})
 		So(record.queries[0], ShouldResemble, expression{kv: kv{key: "metricTag2", value: "value2"}, operator: EQUAL})
-		So(oldHash, ShouldBeZeroValue)
+		So(oldId, ShouldBeZeroValue)
 		So(oldRecord, ShouldBeNil)
 		So(err, ShouldBeNil)
 		So(len(metaTagRecords), ShouldEqual, 2)
-		_, ok = metaTagRecords[hash]
+		_, ok = metaTagRecords[id]
 		So(ok, ShouldBeTrue)
 
-		hashOfRecord2 := hash
+		idOfRecord2 := id
 
 		Convey("then we delete one record again", func() {
-			hash, record, oldHash, oldRecord, err = metaTagRecords.upsert([]string{}, []string{"metricTag2=value2"})
+			id, record, oldId, oldRecord, err = metaTagRecords.upsert([]string{}, []string{"metricTag2=value2"})
 			So(err, ShouldBeNil)
 			So(len(record.metaTags), ShouldEqual, 0)
 			So(record.queries[0], ShouldResemble, expression{kv: kv{key: "metricTag2", value: "value2"}, operator: EQUAL})
-			So(oldHash, ShouldEqual, hashOfRecord2)
+			So(oldId, ShouldEqual, idOfRecord2)
 			So(oldRecord.metaTags[0], ShouldResemble, kv{key: "metaTag2", value: "value2"})
 			So(oldRecord.queries[0], ShouldResemble, expression{kv: kv{key: "metricTag2", value: "value2"}, operator: EQUAL})
 			So(len(metaTagRecords), ShouldEqual, 1)
-			_, ok = metaTagRecords[hash]
+			_, ok = metaTagRecords[id]
 			So(ok, ShouldBeFalse)
 		})
 	})
