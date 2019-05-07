@@ -185,9 +185,13 @@ func (m *mockHash) BlockSize() (n int) {
 	return
 }
 
-// We use a hash collision window of 3, so up to 3 hash collisions are allowed per hash value
+// We set the hash collision window to 3, so up to 3 hash collisions are allowed per hash value
 // When more than 3 hash collisions are encountered for one hash value, new records are rejected
 func TestHashCollisionsOnInsert(t *testing.T) {
+	originalCollisionAvoidanceWindow := collisionAvoidanceWindow
+	defer func() { collisionAvoidanceWindow = originalCollisionAvoidanceWindow }()
+	collisionAvoidanceWindow = 3
+
 	originalHash := queryHash
 	defer func() { queryHash = originalHash }()
 

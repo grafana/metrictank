@@ -10,7 +10,7 @@ import (
 
 // the collision avoidance window defines how many times we try to find a higher
 // slot that's free if two record hashes collide
-const collisionAvoidanceWindow = 3
+var collisionAvoidanceWindow = uint32(1024)
 
 // the function we use to get the hash for hashing the meta records
 // it can be replaced for mocking in tests
