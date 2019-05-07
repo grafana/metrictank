@@ -131,11 +131,14 @@ type MetricIndex interface {
 	// DefById index.
 	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
 
-	// MetaTagRecordUpsert inserts or updates a meta record, depending on whether
-	// it already exists or is new. The identity of a record is determined by its
-	// queries. If the set of queries in the given record already exists in another
-	// record, then the existing record will be updated, otherwise a new one gets
-	// created.
+	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
+	// whether it already exists or is new. The identity of a record is determined
+	// by its queries.
+	// If the set of queries in the given record already exists in another record,
+	// then the existing record will be updated, otherwise a new one gets created.
+	// If an existing record is updated with one that has no meta tags
+	// associated, then this operation results in the deletion of the meta record
+	// because it has no effect without meta tags.
 	// The return values are:
 	// 1) The relevant meta record as it is after this operation
 	// 2) A bool that is true if the record has been created, or false if updated
