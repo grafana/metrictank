@@ -23,45 +23,7 @@ func init() {
 // list of meta records keyed by a unique identifier used as ID
 type metaTagRecords map[recordId]metaTagRecord
 
-type metaTagRecord struct {
-	metaTags []kv
-	queries  []expression
-}
-
 type recordId uint32
-
-// index structure keyed by tag -> value -> list of meta record IDs
-type metaTagValue map[string][]recordId
-type metaTagIndex map[string]metaTagValue
-
-func (m metaTagIndex) deleteRecord(keyValue kv, id recordId) {
-	if values, ok := m[keyValue.key]; ok {
-		if ids, ok := values[keyValue.value]; ok {
-			for i := 0; i < len(ids); i++ {
-				if ids[i] == id {
-					// no need to keep the order
-					ids[i] = ids[len(ids)-1]
-					values[keyValue.value] = ids[:len(ids)-1]
-
-					// no id should ever be present more than once
-					return
-				}
-			}
-		}
-	}
-}
-
-func (m metaTagIndex) insertRecord(keyValue kv, id recordId) {
-	var values metaTagValue
-	var ok bool
-
-	if values, ok = m[keyValue.key]; !ok {
-		values = make(metaTagValue)
-		m[keyValue.key] = values
-	}
-
-	values[keyValue.value] = append(values[keyValue.value], id)
-}
 
 // upsert inserts or updates a meta tag record according to the given specifications
 // it uses the set of tag query expressions as the identity of the record, if a record with the
@@ -114,6 +76,11 @@ func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) 
 	}
 
 	return 0, nil, 0, nil, fmt.Errorf("MetaTagRecordUpsert: Unable to find a slot to insert record")
+}
+
+type metaTagRecord struct {
+	metaTags []kv
+	queries  []expression
 }
 
 // metaTagRecordFromStrings takes two slices of strings, parses them and returns a metaTagRecord
@@ -237,4 +204,37 @@ func (m *metaTagRecord) matchesQueries(other metaTagRecord) bool {
 // meta tags, otherwise it returns false
 func (m *metaTagRecord) hasMetaTags() bool {
 	return len(m.metaTags) > 0
+}
+
+// index structure keyed by tag -> value -> list of meta record IDs
+type metaTagValue map[string][]recordId
+type metaTagIndex map[string]metaTagValue
+
+func (m metaTagIndex) deleteRecord(keyValue kv, id recordId) {
+	if values, ok := m[keyValue.key]; ok {
+		if ids, ok := values[keyValue.value]; ok {
+			for i := 0; i < len(ids); i++ {
+				if ids[i] == id {
+					// no need to keep the order
+					ids[i] = ids[len(ids)-1]
+					values[keyValue.value] = ids[:len(ids)-1]
+
+					// no id should ever be present more than once
+					return
+				}
+			}
+		}
+	}
+}
+
+func (m metaTagIndex) insertRecord(keyValue kv, id recordId) {
+	var values metaTagValue
+	var ok bool
+
+	if values, ok = m[keyValue.key]; !ok {
+		values = make(metaTagValue)
+		m[keyValue.key] = values
+	}
+
+	values[keyValue.value] = append(values[keyValue.value], id)
 }
