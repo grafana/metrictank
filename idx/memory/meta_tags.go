@@ -20,15 +20,15 @@ func init() {
 	queryHash = fnv.New32a
 }
 
+// list of meta records keyed by a unique identifier used as ID
+type metaTagRecords map[recordId]metaTagRecord
+
 type metaTagRecord struct {
 	metaTags []kv
 	queries  []expression
 }
 
 type recordId uint32
-
-// list of meta records keyed by a unique identifier used as ID
-type metaTagRecords map[recordId]metaTagRecord
 
 // index structure keyed by tag -> value -> list of meta record IDs
 type metaTagValue map[string][]recordId
@@ -61,6 +61,59 @@ func (m metaTagIndex) insertRecord(keyValue kv, id recordId) {
 	}
 
 	values[keyValue.value] = append(values[keyValue.value], id)
+}
+
+// upsert inserts or updates a meta tag record according to the given specifications
+// it uses the set of tag query expressions as the identity of the record, if a record with the
+// same identity is already present then its meta tags get updated to the specified ones.
+// If the new record contains no meta tags, then the update is equivalent to a delete.
+// Those are the return values:
+// 1) The id at which the new record got inserted
+// 2) Pointer to the inserted metaTagRecord
+// 3) The id of the record that has been replaced if an update was performed
+// 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
+// 5) Error if an error occurred, otherwise it's nil
+func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) (recordId, *metaTagRecord, recordId, *metaTagRecord, error) {
+	record, err := metaTagRecordFromStrings(metaTags, tagQueryExpressions)
+	if err != nil {
+		return 0, nil, 0, nil, err
+	}
+
+	record.sortQueries()
+	id := record.hashQueries()
+	var oldRecord *metaTagRecord
+	var oldId recordId
+
+	// loop over existing records, starting from id, trying to find one that has
+	// the exact same queries as the one we're upserting
+	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
+		if existingRecord, ok := m[id+recordId(i)]; ok {
+			if record.matchesQueries(existingRecord) {
+				oldRecord = &existingRecord
+				oldId = id + recordId(i)
+				delete(m, oldId)
+				break
+			}
+		}
+	}
+
+	if !record.hasMetaTags() {
+		return 0, &record, oldId, oldRecord, nil
+	}
+
+	// now find the best position to insert the new/updated record, starting from id
+	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
+		// if we find a free slot, then insert the new record there
+		if _, ok := m[id]; !ok {
+			m[id] = record
+
+			return id, &record, oldId, oldRecord, nil
+		}
+
+		id++
+	}
+
+	return 0, nil, 0, nil, fmt.Errorf("MetaTagRecordUpsert: Unable to find a slot to insert record")
 }
 
 // metaTagRecordFromStrings takes two slices of strings, parses them and returns a metaTagRecord
@@ -184,57 +237,4 @@ func (m *metaTagRecord) matchesQueries(other metaTagRecord) bool {
 // meta tags, otherwise it returns false
 func (m *metaTagRecord) hasMetaTags() bool {
 	return len(m.metaTags) > 0
-}
-
-// upsert inserts or updates a meta tag record according to the given specifications
-// it uses the set of tag query expressions as the identity of the record, if a record with the
-// same identity is already present then its meta tags get updated to the specified ones.
-// If the new record contains no meta tags, then the update is equivalent to a delete.
-// Those are the return values:
-// 1) The id at which the new record got inserted
-// 2) Pointer to the inserted metaTagRecord
-// 3) The id of the record that has been replaced if an update was performed
-// 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
-// 5) Error if an error occurred, otherwise it's nil
-func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) (recordId, *metaTagRecord, recordId, *metaTagRecord, error) {
-	record, err := metaTagRecordFromStrings(metaTags, tagQueryExpressions)
-	if err != nil {
-		return 0, nil, 0, nil, err
-	}
-
-	record.sortQueries()
-	id := record.hashQueries()
-	var oldRecord *metaTagRecord
-	var oldId recordId
-
-	// loop over existing records, starting from id, trying to find one that has
-	// the exact same queries as the one we're upserting
-	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		if existingRecord, ok := m[id+recordId(i)]; ok {
-			if record.matchesQueries(existingRecord) {
-				oldRecord = &existingRecord
-				oldId = id + recordId(i)
-				delete(m, oldId)
-				break
-			}
-		}
-	}
-
-	if !record.hasMetaTags() {
-		return 0, &record, oldId, oldRecord, nil
-	}
-
-	// now find the best position to insert the new/updated record, starting from id
-	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		// if we find a free slot, then insert the new record there
-		if _, ok := m[id]; !ok {
-			m[id] = record
-
-			return id, &record, oldId, oldRecord, nil
-		}
-
-		id++
-	}
-
-	return 0, nil, 0, nil, fmt.Errorf("MetaTagRecordUpsert: Unable to find a slot to insert record")
 }
