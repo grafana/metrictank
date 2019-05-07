@@ -433,7 +433,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
 	builder := strings.Builder{}
-	res := make([]idx.MetaTagRecord, 0, len(m.metaTagRecords))
+	var res []idx.MetaTagRecord
 
 	m.RLock()
 	defer m.RUnlock()
@@ -443,6 +443,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRe
 		return res
 	}
 
+	res = make([]idx.MetaTagRecord, 0, len(metaTagRecords))
 	for _, record := range metaTagRecords {
 		res = append(res, idx.MetaTagRecord{
 			MetaTags: record.metaTagStrings(&builder),
