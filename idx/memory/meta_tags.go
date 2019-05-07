@@ -6,6 +6,8 @@ import (
 	"hash/fnv"
 	"sort"
 	"strings"
+
+	"github.com/grafana/metrictank/errors"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -75,7 +77,7 @@ func (m metaTagRecords) upsert(metaTags []string, tagQueryExpressions []string) 
 		id++
 	}
 
-	return 0, nil, 0, nil, fmt.Errorf("MetaTagRecordUpsert: Unable to find a slot to insert record")
+	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
 }
 
 type metaTagRecord struct {
@@ -94,16 +96,16 @@ func metaTagRecordFromStrings(metaTags []string, tagQueryExpressions []string) (
 	}
 
 	if len(tagQueryExpressions) == 0 {
-		return record, fmt.Errorf("Requiring at least one tag query expression, 0 given")
+		return record, errors.NewBadRequest("Requiring at least one tag query expression, 0 given")
 	}
 
 	for _, tag := range metaTags {
 		tagSplits := strings.SplitN(tag, "=", 2)
 		if len(tagSplits) < 2 {
-			return record, fmt.Errorf("Missing \"=\" sign in tag %s", tag)
+			return record, errors.NewBadRequest(fmt.Sprintf("Missing \"=\" sign in tag %s", tag))
 		}
 		if len(tagSplits[0]) == 0 || len(tagSplits[1]) == 0 {
-			return record, fmt.Errorf("Tag/Value cannot be empty in %s", tag)
+			return record, errors.NewBadRequest(fmt.Sprintf("Tag/Value cannot be empty in %s", tag))
 		}
 
 		record.metaTags = append(record.metaTags, kv{key: tagSplits[0], value: tagSplits[1]})
@@ -112,7 +114,7 @@ func metaTagRecordFromStrings(metaTags []string, tagQueryExpressions []string) (
 	for _, query := range tagQueryExpressions {
 		parsed, err := parseExpression(query)
 		if err != nil {
-			return record, err
+			return record, errors.NewBadRequest(err.Error())
 		}
 		record.queries = append(record.queries, parsed)
 	}

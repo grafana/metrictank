@@ -381,7 +381,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return res, false, fmt.Errorf("Tag support is disabled")
+		return res, false, errors.NewInternal("Tag support is disabled")
 	}
 
 	var mtr metaTagRecords

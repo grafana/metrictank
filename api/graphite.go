@@ -1205,7 +1205,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 		var err error
 		localResult, created, err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
 		if err != nil {
-			response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+			response.Write(ctx, response.WrapError(err))
 			return
 		}
 
