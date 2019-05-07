@@ -140,7 +140,9 @@ func (m *metaTagRecord) hashQueries() recordId {
 }
 
 // sortQueries sorts all the queries first by key, then by value, then by
-// operator. The order doesn't matter, it only needs to be consistent
+// operator. The order itself is not relevant, we only need to guarantee
+// that the order is consistent for a given set of queries after every call
+// to this function, because the queries will then be used as hash input
 func (m *metaTagRecord) sortQueries() {
 	sort.Slice(m.queries, func(i, j int) bool {
 		if m.queries[i].key == m.queries[j].key {
