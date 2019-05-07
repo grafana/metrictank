@@ -6,7 +6,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/raintank/gziper"
-	macaron "gopkg.in/macaron.v1"
+	"gopkg.in/macaron.v1"
 )
 
 func (s *Server) RegisterRoutes() {
@@ -48,6 +48,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
 	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTagValues{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
 	r.Combo("/index/tags/delSeries", ready, bind(models.IndexTagDelSeries{})).Get(s.indexTagDelSeries).Post(s.indexTagDelSeries)
+	r.Combo("/index/metaTags/upsert", ready, bind(models.IndexMetaTagRecordUpsert{})).Get(s.indexMetaTagRecordUpsert).Post(s.indexMetaTagRecordUpsert)
 
 	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
 
@@ -74,7 +75,6 @@ func (s *Server) RegisterRoutes() {
 	// Meta Tags
 	r.Post("/metaTags/upsert", withOrg, ready, bind(models.MetaTagRecordUpsert{}), s.metaTagRecordUpsert)
 	r.Get("/metaTags", withOrg, ready, s.getMetaTagRecords)
-	r.Post("/index/metaTags/upsert", ready, bind(models.IndexMetaTagRecordUpsert{}), s.indexMetaTagRecordUpsert)
 
 	// Prometheus endpoints
 	r.Combo("/prometheus/api/v1/query_range", cBody, withOrg, ready, form(models.PrometheusRangeQuery{})).Get(s.prometheusQueryRange).Post(s.prometheusQueryRange)
