@@ -26,6 +26,11 @@ type Archive struct {
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
 }
 
+type MetaTagRecord struct {
+	MetaTags []string
+	Queries  []string
+}
+
 // used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
 	return Archive{
@@ -125,4 +130,22 @@ type MetricIndex interface {
 	// DeleteTagged deletes the specified series from the tag index and also the
 	// DefById index.
 	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
+
+	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
+	// whether it already exists or is new. The identity of a record is determined
+	// by its queries.
+	// If the set of queries in the given record already exists in another record,
+	// then the existing record will be updated, otherwise a new one gets created.
+	// If an existing record is updated with one that has no meta tags
+	// associated, then this operation results in the deletion of the meta record
+	// because it has no effect without meta tags.
+	// The return values are:
+	// 1) The relevant meta record as it is after this operation
+	// 2) A bool that is true if the record has been created, or false if updated
+	// 3) An error which is nil if no error has occurred
+	MetaTagRecordUpsert(orgId uint32, record MetaTagRecord) (MetaTagRecord, bool, error)
+
+	// MetaTagRecordList takes an org id and returns the list of all meta tag records
+	// of that given org.
+	MetaTagRecordList(orgId uint32) []MetaTagRecord
 }

@@ -248,18 +248,22 @@ type UnpartitionedMemoryIdx struct {
 	tree map[uint32]*Tree // by orgId
 
 	// used by tag index
-	defByTagSet defByTagSet
-	tags        map[uint32]TagIndex // by orgId
+	defByTagSet    defByTagSet
+	tags           map[uint32]TagIndex       // by orgId
+	metaTags       map[uint32]metaTagIndex   // by orgId
+	metaTagRecords map[uint32]metaTagRecords // by orgId
 
 	findCache *FindCache
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 	m := UnpartitionedMemoryIdx{
-		defById:     make(map[schema.MKey]*idx.Archive),
-		defByTagSet: make(defByTagSet),
-		tree:        make(map[uint32]*Tree),
-		tags:        make(map[uint32]TagIndex),
+		defById:        make(map[schema.MKey]*idx.Archive),
+		defByTagSet:    make(defByTagSet),
+		tree:           make(map[uint32]*Tree),
+		tags:           make(map[uint32]TagIndex),
+		metaTags:       make(map[uint32]metaTagIndex),
+		metaTagRecords: make(map[uint32]metaTagRecords),
 	}
 	if findCacheSize > 0 {
 		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
@@ -357,6 +361,93 @@ func (m *UnpartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
 		return
 	}
 	*(m.defById[archive.Id]) = archive
+}
+
+// MetaTagRecordUpsert inserts or updates a meta record, depending on whether
+// it already exists or is new. The identity of a record is determined by its
+// queries, if the set of queries in the given record already exists in another
+// record, then the existing record will be updated, otherwise a new one gets
+// created.
+// The return values are:
+// 1) The relevant meta record as it is after this operation
+// 2) A bool that is true if the record has been created, or false if updated
+// 3) An error which is nil if no error has occurred
+func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecord) (idx.MetaTagRecord, bool, error) {
+	res := idx.MetaTagRecord{}
+
+	if !TagSupport {
+		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
+		return res, false, errors.NewBadRequest("Tag support is disabled")
+	}
+
+	var mtr metaTagRecords
+	var mti metaTagIndex
+	var ok bool
+
+	m.Lock()
+	defer m.Unlock()
+
+	if mtr, ok = m.metaTagRecords[orgId]; !ok {
+		mtr = make(metaTagRecords)
+		m.metaTagRecords[orgId] = mtr
+	}
+
+	if mti, ok = m.metaTags[orgId]; !ok {
+		mti = make(metaTagIndex)
+		m.metaTags[orgId] = mti
+	}
+
+	id, record, oldId, oldRecord, err := mtr.upsert(rawRecord.MetaTags, rawRecord.Queries)
+	if err != nil {
+		return res, false, err
+	}
+
+	builder := strings.Builder{}
+	res.MetaTags = record.metaTagStrings(&builder)
+	res.Queries = record.queryStrings(&builder)
+
+	// if this upsert has updated a previously existing record, then we remove its entries
+	// from the metaTagIndex before inserting the new ones
+	if oldRecord != nil {
+		for _, keyValue := range oldRecord.metaTags {
+			mti.deleteRecord(keyValue, oldId)
+		}
+
+		for _, keyValue := range record.metaTags {
+			mti.insertRecord(keyValue, id)
+		}
+
+		return res, false, nil
+	} else {
+		for _, keyValue := range record.metaTags {
+			mti.insertRecord(keyValue, id)
+		}
+
+		return res, true, nil
+	}
+}
+
+func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
+	builder := strings.Builder{}
+	var res []idx.MetaTagRecord
+
+	m.RLock()
+	defer m.RUnlock()
+
+	metaTagRecords, ok := m.metaTagRecords[orgId]
+	if !ok {
+		return res
+	}
+
+	res = make([]idx.MetaTagRecord, 0, len(metaTagRecords))
+	for _, record := range metaTagRecords {
+		res = append(res, idx.MetaTagRecord{
+			MetaTags: record.metaTagStrings(&builder),
+			Queries:  record.queryStrings(&builder),
+		})
+	}
+
+	return res
 }
 
 // indexTags reads the tags of a given metric definition and creates the

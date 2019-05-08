@@ -1115,8 +1115,10 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 	}
 
 	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
-	responses, err := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
-	if err != nil {
+	responses, errors := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
+
+	// if there are any errors, write one of them and return
+	for _, err := range errors {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
 	}
@@ -1124,7 +1126,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 	res.Peers = make(map[string]int, len(responses))
 	peerResp := models.IndexTagDelSeriesResp{}
 	for peer, resp := range responses {
-		_, err = peerResp.UnmarshalMsg(resp.buf)
+		_, err := peerResp.UnmarshalMsg(resp.buf)
 		if err != nil {
 			response.Write(ctx, response.WrapErrorForTagDB(err))
 			return
@@ -1183,5 +1185,81 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 		response.Write(ctx, response.NewJson(200, plan, ""))
 	default:
 		response.Write(ctx, response.NewError(http.StatusBadRequest, "Unsupported response format requested: "+request.Format))
+	}
+}
+
+func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
+	metaTagRecords := s.MetricIndex.MetaTagRecordList(ctx.OrgId)
+	response.Write(ctx, response.NewJson(200, metaTagRecords, ""))
+}
+
+func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
+	record := idx.MetaTagRecord{
+		MetaTags: upsertRequest.MetaTags,
+		Queries:  upsertRequest.Queries,
+	}
+
+	var localResult idx.MetaTagRecord
+	var created bool
+	if s.MetricIndex != nil {
+		var err error
+		localResult, created, err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
+		if err != nil {
+			response.Write(ctx, response.WrapError(err))
+			return
+		}
+
+		if !upsertRequest.Propagate {
+			response.Write(ctx, response.NewJson(200, models.MetaTagRecordUpsertResult{
+				MetaTags: localResult.MetaTags,
+				Queries:  localResult.Queries,
+				Created:  created,
+			}, ""))
+			return
+		}
+	} else if !upsertRequest.Propagate {
+		return
+	}
+
+	res := models.MetaTagRecordUpsertResultByNode{
+		Local: models.MetaTagRecordUpsertResult{
+			MetaTags: localResult.MetaTags,
+			Queries:  localResult.Queries,
+			Created:  created,
+		},
+	}
+
+	indexUpsertRequest := models.IndexMetaTagRecordUpsert{
+		OrgId:    ctx.OrgId,
+		MetaTags: upsertRequest.MetaTags,
+		Queries:  upsertRequest.Queries,
+	}
+
+	results, errors := s.peerQuery(ctx.Req.Context(), indexUpsertRequest, "metaTagRecordUpsert", "/index/metaTags/upsert")
+
+	if len(errors) > 0 {
+		res.PeerErrors = make(map[string]string, len(errors))
+		for peer, err := range errors {
+			res.PeerErrors[peer] = err.Error()
+		}
+	}
+
+	if len(results) > 0 {
+		res.PeerResults = make(map[string]models.MetaTagRecordUpsertResult, len(results))
+		for peer, resp := range results {
+			peerResp := models.MetaTagRecordUpsertResult{}
+			_, err := peerResp.UnmarshalMsg(resp.buf)
+			if err != nil {
+				res.PeerErrors[peer] = fmt.Sprintf("Error when unmarshaling response: %s", err.Error())
+				continue
+			}
+			res.PeerResults[peer] = peerResp
+		}
+	}
+
+	if len(errors) > 0 {
+		response.Write(ctx, response.NewJson(500, res, ""))
+	} else {
+		response.Write(ctx, response.NewJson(200, res, ""))
 	}
 }
