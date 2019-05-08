@@ -1257,5 +1257,9 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 		}
 	}
 
-	response.Write(ctx, response.NewJson(200, res, ""))
+	if len(errors) > 0 {
+		response.Write(ctx, response.NewJson(500, res, ""))
+	} else {
+		response.Write(ctx, response.NewJson(200, res, ""))
+	}
 }
