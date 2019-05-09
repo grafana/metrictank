@@ -79,6 +79,8 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 	cons, queryCons := summarizeCons(series)
 	name := agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
+	commonTags["aggregatedBy"] = agg.name
+	commonTags["name"] = name
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
