@@ -8,21 +8,33 @@ import (
 )
 
 type FuncAggregate struct {
-	in  []GraphiteFunc
-	agg seriesAggregator
+	in   []GraphiteFunc
+	name string
 }
 
 // NewAggregateConstructor takes an agg string and returns a constructor function
-func NewAggregateConstructor(aggDescription string, aggFunc crossSeriesAggFunc) func() GraphiteFunc {
+func NewAggregateConstructor(name string) func() GraphiteFunc {
 	return func() GraphiteFunc {
-		return &FuncAggregate{agg: seriesAggregator{function: aggFunc, name: aggDescription}}
+		return &FuncAggregate{name: name}
 	}
 }
 
+func NewAggregate() GraphiteFunc {
+	return &FuncAggregate{}
+}
+
 func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
-	return []Arg{
-		ArgSeriesLists{val: &s.in},
-	}, []Arg{ArgSeries{}}
+	if s.name == "" {
+		return []Arg{
+			ArgSeriesLists{val: &s.in},
+			ArgString{val: &s.name, validator: []Validator{IsAggFunc}},
+		}, []Arg{ArgSeries{}}
+	} else {
+		return []Arg{
+			ArgSeriesLists{val: &s.in},
+		}, []Arg{ArgSeries{}}
+	}
+
 }
 
 func (s *FuncAggregate) Context(context Context) Context {
@@ -35,18 +47,20 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return nil, err
 	}
 
+	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
+
 	if len(series) == 0 {
 		return series, nil
 	}
 
 	if len(series) == 1 {
-		name := s.agg.name + "Series(" + series[0].QueryPatt + ")"
+		name := agg.name + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
 		series[0].QueryPatt = name
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
-	s.agg.function(series, &out)
+	agg.function(series, &out)
 
 	// The tags for the aggregated series is only the tags that are
 	// common to all input series
@@ -64,7 +78,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	cons, queryCons := summarizeCons(series)
-	name := s.agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
+	name := agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
