@@ -21,6 +21,7 @@ func TestAggregateIdentity(t *testing.T) {
 		},
 		getTargetSeries("averageSeries(single)", a),
 		t,
+		0,
 	)
 	testAggregate(
 		"identity",
@@ -32,6 +33,7 @@ func TestAggregateIdentity(t *testing.T) {
 		},
 		getTargetSeries("sumSeries(single)", a),
 		t,
+		0,
 	)
 }
 func TestAggregateQueryToSingle(t *testing.T) {
@@ -45,6 +47,7 @@ func TestAggregateQueryToSingle(t *testing.T) {
 		},
 		getTargetSeries("averageSeries(foo.*)", a),
 		t,
+		0,
 	)
 }
 func TestAggregateMultiple(t *testing.T) {
@@ -59,6 +62,7 @@ func TestAggregateMultiple(t *testing.T) {
 		},
 		getTargetSeries("averageSeries(foo.*)", avgab),
 		t,
+		0,
 	)
 	testAggregate(
 		"sum-multiple-series",
@@ -71,6 +75,7 @@ func TestAggregateMultiple(t *testing.T) {
 		},
 		getTargetSeries("sumSeries(foo.*)", sumab),
 		t,
+		0,
 	)
 	testAggregate(
 		"max-multiple-series",
@@ -83,6 +88,7 @@ func TestAggregateMultiple(t *testing.T) {
 		},
 		getTargetSeries("maxSeries(foo.*)", maxab),
 		t,
+		0,
 	)
 }
 func TestAggregateMultipleDiffQuery(t *testing.T) {
@@ -102,6 +108,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		input,
 		getTargetSeries("averageSeries(foo.*,movingAverage(bar, '1min'))", avgabc),
 		t,
+		0,
 	)
 	testAggregate(
 		"sum-multiple-serieslists",
@@ -109,6 +116,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		input,
 		getTargetSeries("sumSeries(foo.*,movingAverage(bar, '1min'))", sumabc),
 		t,
+		0,
 	)
 	testAggregate(
 		"max-multiple-serieslists",
@@ -116,6 +124,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		input,
 		getTargetSeries("maxSeries(foo.*,movingAverage(bar, '1min'))", maxabc),
 		t,
+		0,
 	)
 }
 
@@ -143,6 +152,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 		input,
 		getTargetSeries("averageSeries(foo.*,foo.*,a,a)", avg4a2b),
 		t,
+		0,
 	)
 	testAggregate(
 		"sum-multiple-times-same-input",
@@ -150,15 +160,113 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 		input,
 		getTargetSeries("sumSeries(foo.*,foo.*,a,a)", sum4a2b),
 		t,
+		0,
 	)
 }
 
-func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T) {
-	f := NewAggregateConstructor(agg, getCrossSeriesAggFunc(agg))()
+func TestAggregateXFilesFactor(t *testing.T) {
+	input := [][]models.Series{
+		{
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(a),
+			},
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(b),
+			},
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(c),
+			},
+		},
+	}
+
+	var avgabcxff05 = []schema.Point{
+		{Val: 0, Ts: 10},
+		{Val: math.MaxFloat64 / 3, Ts: 20},
+		{Val: (math.MaxFloat64 - 13.5) / 3, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: float64(1234567893) / 2, Ts: 50},
+		{Val: float64(1234567894) / 2, Ts: 60},
+	}
+
+	var avgabcxff075 = []schema.Point{
+		{Val: 0, Ts: 10},
+		{Val: math.MaxFloat64 / 3, Ts: 20},
+		{Val: (math.MaxFloat64 - 13.5) / 3, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN() / 2, Ts: 50},
+		{Val: math.NaN() / 2, Ts: 60},
+	}
+
+	testAggregate(
+		"xFilesFactor-0",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgabc),
+		},
+		t,
+		0,
+	)
+	testAggregate(
+		"xFilesFactor-0.25",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgabc),
+		},
+		t,
+		0.25,
+	)
+
+	testAggregate(
+		"xFilesFactor-0.5",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: avgabcxff05,
+		},
+		t,
+		0.5,
+	)
+
+	testAggregate(
+		"xFilesFactor-0.75",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: avgabcxff075,
+		},
+		t,
+		0.75,
+	)
+
+	testAggregate(
+		"xFilesFactor-1",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: avgabcxff075,
+		},
+		t,
+		1,
+	)
+}
+
+func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
+	f := NewAggregateConstructor(agg)()
 	avg := f.(*FuncAggregate)
 	for _, i := range in {
 		avg.in = append(avg.in, NewMock(i))
 	}
+	avg.xFilesFactor = xFilesFactor
 	got, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
@@ -237,7 +345,7 @@ func benchmarkAggregate(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	b.ResetTimer()
 	var err error
 	for i := 0; i < b.N; i++ {
-		f := NewAggregateConstructor("average", crossSeriesAvg)()
+		f := NewAggregateConstructor("average")()
 		avg := f.(*FuncAggregate)
 		avg.in = append(avg.in, NewMock(input))
 		results, err = f.Exec(make(map[Req][]models.Series))

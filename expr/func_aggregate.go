@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"math"
 	"strings"
 	"unsafe"
 
@@ -9,21 +10,35 @@ import (
 )
 
 type FuncAggregate struct {
-	in  []GraphiteFunc
-	agg seriesAggregator
+	in           []GraphiteFunc
+	name         string
+	xFilesFactor float64
 }
 
 // NewAggregateConstructor takes an agg string and returns a constructor function
-func NewAggregateConstructor(aggDescription string, aggFunc crossSeriesAggFunc) func() GraphiteFunc {
+func NewAggregateConstructor(name string) func() GraphiteFunc {
 	return func() GraphiteFunc {
-		return &FuncAggregate{agg: seriesAggregator{function: aggFunc, name: aggDescription}}
+		return &FuncAggregate{name: name}
 	}
 }
 
+func NewAggregate() GraphiteFunc {
+	return &FuncAggregate{}
+}
+
 func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
-	return []Arg{
-		ArgSeriesLists{val: &s.in},
-	}, []Arg{ArgSeries{}}
+	if s.name == "" {
+		return []Arg{
+			ArgSeriesLists{val: &s.in},
+			ArgString{val: &s.name, validator: []Validator{IsAggFunc}, key: "func"},
+			ArgFloat{val: &s.xFilesFactor, opt: true, key: "xFilesFactor"},
+		}, []Arg{ArgSeries{}}
+	} else {
+		return []Arg{
+			ArgSeriesLists{val: &s.in},
+		}, []Arg{ArgSeries{}}
+	}
+
 }
 
 func (s *FuncAggregate) Context(context Context) Context {
@@ -37,19 +52,37 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
+	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
+
+	output := aggregate(series, agg, s.xFilesFactor)
+
+	dataMap.Add(Req{}, output)
+
+	return []models.Series{output}, nil
+}
+
+func aggregate(series []models.Series, agg seriesAggregator, xFilesFactor float64) models.Series {
 	if len(series) == 0 {
-		return series, nil
+		return models.Series{}
 	}
 
 	if len(series) == 1 {
-		name := s.agg.name + "Series(" + series[0].QueryPatt + ")"
+		name := agg.name + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
 		series[0].QueryPatt = name
-		return series, nil
+		return series[0]
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 	series = Normalize(dataMap, series)
-	s.agg.function(series, &out)
+
+	agg.function(series, &out)
+
+	//remove values in accordance to xFilesFactor
+	for i := 0; i < len(series[0].Datapoints); i++ {
+		if !crossSeriesXff(series, i, xFilesFactor) {
+			out[i].Val = math.NaN()
+		}
+	}
 
 	// The tags for the aggregated series is only the tags that are
 	// common to all input series
@@ -67,7 +100,13 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	cons, queryCons := summarizeCons(series)
-	name := s.agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
+	name := agg.name + "Series(" + formatQueryPatts(series) + ")"
+
+	commonTags["aggregatedBy"] = agg.name
+	if _, ok := commonTags["name"]; !ok {
+		commonTags["name"] = name
+	}
+
 	output := series[0]
 	output.Target = name
 	output.QueryPatt = name
@@ -77,7 +116,5 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 	output.Consolidator = cons
 	output.Meta = meta
 
-	dataMap.Add(Req{}, output)
-
-	return []models.Series{output}, nil
+	return output
 }

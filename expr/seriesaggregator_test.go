@@ -23,6 +23,14 @@ func TestSeriesAggregatorsIdentity(t *testing.T) {
 			zeroOutput[i].Val = 0
 		}
 	}
+	countOutput := []schema.Point{
+		{Val: 1, Ts: 10},
+		{Val: 1, Ts: 20},
+		{Val: 1, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN(), Ts: 50},
+		{Val: 1, Ts: 60},
+	}
 	testSeriesAggregate("identity", "average", input, getCopy(a), t)
 	testSeriesAggregate("identity", "sum", input, getCopy(a), t)
 	testSeriesAggregate("identity", "max", input, getCopy(a), t)
@@ -33,6 +41,9 @@ func TestSeriesAggregatorsIdentity(t *testing.T) {
 	testSeriesAggregate("identity", "stddev", input, zeroOutput, t)
 	testSeriesAggregate("identity", "rangeOf", input, zeroOutput, t)
 	testSeriesAggregate("identity", "range", input, zeroOutput, t)
+	testSeriesAggregate("identity", "last", input, getCopy(a), t)
+	testSeriesAggregate("identity", "count", input, countOutput, t)
+	testSeriesAggregate("identity", "avg_zero", input, getCopy(aZero), t)
 }
 
 func TestSeriesAggregate2series(t *testing.T) {
@@ -47,6 +58,17 @@ func TestSeriesAggregate2series(t *testing.T) {
 		},
 	}
 
+	lastOutput := getCopy(b)
+	lastOutput[5] = a[5]
+
+	countOutput := []schema.Point{
+		{Val: 2, Ts: 10},
+		{Val: 2, Ts: 20},
+		{Val: 2, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: 1, Ts: 50},
+		{Val: 1, Ts: 60},
+	}
 	testSeriesAggregate("2Series", "average", input, getCopy(avgab), t)
 	testSeriesAggregate("2Series", "sum", input, getCopy(sumab), t)
 	testSeriesAggregate("2Series", "max", input, getCopy(maxab), t)
@@ -56,6 +78,10 @@ func TestSeriesAggregate2series(t *testing.T) {
 	testSeriesAggregate("2Series", "diff", input, getCopy(diffab), t)
 	testSeriesAggregate("2Series", "stddev", input, getCopy(stddevab), t)
 	testSeriesAggregate("2Series", "range", input, getCopy(rangeab), t)
+	testSeriesAggregate("2Series", "last", input, lastOutput, t)
+	testSeriesAggregate("2Series", "count", input, countOutput, t)
+	testSeriesAggregate("2Series", "avg_zero", input, getCopy(avgabZero), t)
+
 }
 
 func TestSeriesAggregate3series(t *testing.T) {
@@ -74,6 +100,14 @@ func TestSeriesAggregate3series(t *testing.T) {
 		},
 	}
 
+	countOutput := []schema.Point{
+		{Val: 3, Ts: 10},
+		{Val: 3, Ts: 20},
+		{Val: 3, Ts: 30},
+		{Val: 1, Ts: 40},
+		{Val: 2, Ts: 50},
+		{Val: 2, Ts: 60},
+	}
 	testSeriesAggregate("3Series", "average", input, getCopy(avgabc), t)
 	testSeriesAggregate("3Series", "sum", input, getCopy(sumabc), t)
 	testSeriesAggregate("3Series", "max", input, getCopy(maxabc), t)
@@ -83,6 +117,9 @@ func TestSeriesAggregate3series(t *testing.T) {
 	testSeriesAggregate("3Series", "diff", input, getCopy(diffabc), t)
 	testSeriesAggregate("3Series", "stddev", input, getCopy(stddevabc), t)
 	testSeriesAggregate("3Series", "range", input, getCopy(rangeabc), t)
+	testSeriesAggregate("3Series", "last", input, getCopy(c), t)
+	testSeriesAggregate("3Series", "count", input, countOutput, t)
+	testSeriesAggregate("3Series", "avg_zero", input, getCopy(avgabcZero), t)
 }
 
 func testSeriesAggregate(name, agg string, in []models.Series, out []schema.Point, t *testing.T) {
@@ -165,6 +202,20 @@ func BenchmarkSeriesAggregateRange10k_100NoNulls(b *testing.B) {
 }
 func BenchmarkSeriesAggregateRange10k_100WithNulls(b *testing.B) {
 	benchmarkSeriesAggregate(b, crossSeriesRange, 100, test.RandFloats10k, test.RandFloatsWithNulls10k)
+}
+
+func BenchmarkSeriesAggregateLast10k_100NoNulls(b *testing.B) {
+	benchmarkSeriesAggregate(b, crossSeriesLast, 100, test.RandFloats10k, test.RandFloats10k)
+}
+func BenchmarkSeriesAggregateLast10k_100WithNulls(b *testing.B) {
+	benchmarkSeriesAggregate(b, crossSeriesLast, 100, test.RandFloats10k, test.RandFloatsWithNulls10k)
+}
+
+func BenchmarkSeriesAggregateCount10k_100NoNulls(b *testing.B) {
+	benchmarkSeriesAggregate(b, crossSeriesCount, 100, test.RandFloats10k, test.RandFloats10k)
+}
+func BenchmarkSeriesAggregateCount10k_100WithNulls(b *testing.B) {
+	benchmarkSeriesAggregate(b, crossSeriesCount, 100, test.RandFloats10k, test.RandFloatsWithNulls10k)
 }
 
 func benchmarkSeriesAggregate(b *testing.B, aggFunc crossSeriesAggFunc, numSeries int, fn0, fn1 func() []schema.Point) {
