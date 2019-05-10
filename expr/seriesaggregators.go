@@ -36,6 +36,10 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 		return crossSeriesStddev
 	case "rangeOf", "range":
 		return crossSeriesRange
+	case "last":
+		return crossSeriesLast
+	case "count":
+		return crossSeriesCount
 	}
 	return nil
 }
@@ -213,5 +217,30 @@ func crossSeriesRange(in []models.Series, out *[]schema.Point) {
 
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		(*out)[i].Val -= mins[i].Val
+	}
+}
+
+func crossSeriesLast(in []models.Series, out *[]schema.Point) {
+	for i := 0; i < len(in[len(in)-1].Datapoints); i++ {
+		*out = append(*out, in[len(in)-1].Datapoints[i])
+	}
+}
+
+func crossSeriesCount(in []models.Series, out *[]schema.Point) {
+
+	for i := 0; i < len(in[0].Datapoints); i++ {
+		point := schema.Point{
+			Ts: in[0].Datapoints[i].Ts,
+		}
+		point.Val = 0
+		for j := 0; j < len(in); j++ {
+			if !math.IsNaN(in[j].Datapoints[i].Val) {
+				point.Val++
+			}
+		}
+		if point.Val == 0 {
+			point.Val = math.NaN()
+		}
+		*out = append(*out, point)
 	}
 }
