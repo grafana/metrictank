@@ -18,13 +18,13 @@ type crossSeriesAggFunc func(in []models.Series, out *[]schema.Point)
 
 func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 	switch c {
-	case "avg", "average":
+	case "average", "avg":
 		return crossSeriesAvg
 	case "min":
 		return crossSeriesMin
 	case "max":
 		return crossSeriesMax
-	case "sum":
+	case "sum", "total":
 		return crossSeriesSum
 	case "multiply":
 		return crossSeriesMultiply
@@ -36,7 +36,7 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 		return crossSeriesStddev
 	case "rangeOf", "range":
 		return crossSeriesRange
-	case "last":
+	case "last", "current":
 		return crossSeriesLast
 	case "count":
 		return crossSeriesCount
