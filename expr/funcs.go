@@ -58,6 +58,7 @@ func init() {
 		"averageSeries":         {NewAggregateConstructor("average", crossSeriesAvg), true},
 		"consolidateBy":         {NewConsolidateBy, true},
 		"countSeries":           {NewCountSeries, true},
+		"cumulative":            {NewConsolidateByConstructor("sum"), true},
 		"derivative":            {NewDerivative, true},
 		"diffSeries":            {NewAggregateConstructor("diff", crossSeriesDiff), true},
 		"divideSeries":          {NewDivideSeries, true},
