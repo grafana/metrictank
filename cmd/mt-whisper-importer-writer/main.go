@@ -5,62 +5,34 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/grafana/globalconf"
+	"github.com/raintank/dur"
+	"github.com/raintank/schema"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/idx/bigtable"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata"
 	bigTableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
-	"github.com/raintank/schema"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
-	globalFlags = flag.NewFlagSet("global config flags", flag.ExitOnError)
-
-	exitOnError = globalFlags.Bool(
-		"exit-on-error",
-		true,
-		"Exit with a message when there's an error",
-	)
-	verbose = globalFlags.Bool(
-		"verbose",
-		false,
-		"More detailed logging",
-	)
-	httpEndpoint = globalFlags.String(
-		"http-endpoint",
-		"127.0.0.1:8080",
-		"The http endpoint to listen on",
-	)
-	ttlsStr = globalFlags.String(
-		"ttls",
-		"35d",
-		"list of ttl strings used by MT separated by ','",
-	)
-	partitionScheme = globalFlags.String(
-		"partition-scheme",
-		"bySeries",
-		"method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)",
-	)
-	uriPath = globalFlags.String(
-		"uri-path",
-		"/chunks",
-		"the URI on which we expect chunks to get posted",
-	)
-	numPartitions = globalFlags.Int(
-		"num-partitions",
-		1,
-		"Number of Partitions",
-	)
-	overwriteChunks = globalFlags.Bool(
-		"overwrite-chunks",
-		true,
-		"If true existing chunks may be overwritten",
-	)
+	confFile        = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
+	exitOnError     = flag.Bool("exit-on-error", false, "Exit with a message when there's an error")
+	httpEndpoint    = flag.String("http-endpoint", "127.0.0.1:8080", "The http endpoint to listen on")
+	ttlsStr         = flag.String("ttls", "35d", "list of ttl strings used by MT separated by ','")
+	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
+	uriPath         = flag.String("uri-path", "/chunks", "the URI on which we expect chunks to get posted")
+	numPartitions   = flag.Int("num-partitions", 1, "Number of Partitions")
+	logLevel        = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
 	version = "(none)"
 )
@@ -80,73 +52,70 @@ func init() {
 }
 
 func main() {
-	storeConfig := cassandraStore.NewStoreConfig()
-	// we don't use the cassandraStore's writeQueue, so we hard code this to 0.
-	storeConfig.WriteQueueSize = 0
+	flag.Parse()
 
-	// flags from cassandra/config.go, Cassandra
-	globalFlags.StringVar(&storeConfig.Addrs, "cassandra-addrs", storeConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
-	globalFlags.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", storeConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
-	globalFlags.StringVar(&storeConfig.Consistency, "cassandra-consistency", storeConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
-	globalFlags.StringVar(&storeConfig.HostSelectionPolicy, "cassandra-host-selection-policy", storeConfig.HostSelectionPolicy, "")
-	globalFlags.StringVar(&storeConfig.Timeout, "cassandra-timeout", storeConfig.Timeout, "cassandra timeout")
-	globalFlags.IntVar(&storeConfig.ReadConcurrency, "cassandra-read-concurrency", storeConfig.ReadConcurrency, "max number of concurrent reads to cassandra.")
-	globalFlags.IntVar(&storeConfig.WriteConcurrency, "cassandra-write-concurrency", storeConfig.WriteConcurrency, "max number of concurrent writes to cassandra.")
-	globalFlags.IntVar(&storeConfig.ReadQueueSize, "cassandra-read-queue-size", storeConfig.ReadQueueSize, "max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel.")
-	//flag.IntVar(&storeConfig.WriteQueueSize, "write-queue-size", storeConfig.WriteQueueSize, "write queue size per cassandra worker. should be large engough to hold all at least the total number of series expected, divided by how many workers you have")
-	globalFlags.IntVar(&storeConfig.Retries, "cassandra-retries", storeConfig.Retries, "how many times to retry a query before failing it")
-	globalFlags.IntVar(&storeConfig.WindowFactor, "cassandra-window-factor", storeConfig.WindowFactor, "size of compaction window relative to TTL")
-	globalFlags.StringVar(&storeConfig.OmitReadTimeout, "cassandra-omit-read-timeout", storeConfig.OmitReadTimeout, "if a read is older than this, it will directly be omitted without executing")
-	globalFlags.IntVar(&storeConfig.CqlProtocolVersion, "cql-protocol-version", storeConfig.CqlProtocolVersion, "cql protocol version to use")
-	globalFlags.BoolVar(&storeConfig.CreateKeyspace, "cassandra-create-keyspace", storeConfig.CreateKeyspace, "enable the creation of the mdata keyspace and tables, only one node needs this")
-	globalFlags.BoolVar(&storeConfig.DisableInitialHostLookup, "cassandra-disable-initial-host-lookup", storeConfig.DisableInitialHostLookup, "instruct the driver to not attempt to get host info from the system.peers table")
-	globalFlags.BoolVar(&storeConfig.SSL, "cassandra-ssl", storeConfig.SSL, "enable SSL connection to cassandra")
-	globalFlags.StringVar(&storeConfig.CaPath, "cassandra-ca-path", storeConfig.CaPath, "cassandra CA certificate path when using SSL")
-	globalFlags.BoolVar(&storeConfig.HostVerification, "cassandra-host-verification", storeConfig.HostVerification, "host (hostname and server cert) verification when using SSL")
-	globalFlags.BoolVar(&storeConfig.Auth, "cassandra-auth", storeConfig.Auth, "enable cassandra authentication")
-	globalFlags.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
-	globalFlags.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
-	globalFlags.StringVar(&storeConfig.SchemaFile, "cassandra-schema-file", storeConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
-
-	cassFlags := cassandra.ConfigSetup()
-
-	flag.Usage = func() {
-		fmt.Println("mt-whisper-importer-writer")
-		fmt.Println()
-		fmt.Println("Opens an endpoint to send data to, which then gets stored in the MT internal DB(s)")
-		fmt.Println()
-		fmt.Printf("Usage:\n\n")
-		fmt.Printf("  mt-whisper-importer-writer [global config flags] <idxtype> [idx config flags] \n\n")
-		fmt.Printf("global config flags:\n\n")
-		globalFlags.PrintDefaults()
-		fmt.Println()
-		fmt.Printf("idxtype: only 'cass' supported for now\n\n")
-		fmt.Printf("cass config flags:\n\n")
-		cassFlags.PrintDefaults()
-		fmt.Println()
-		fmt.Println("EXAMPLES:")
-		fmt.Println("mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -cassandra-window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata")
+	// Only try and parse the conf file if it exists
+	path := ""
+	if _, err := os.Stat(*confFile); err == nil {
+		path = *confFile
 	}
-
-	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
-		flag.Usage()
-		os.Exit(0)
-	}
-
-	var cassI int
-	for i, v := range os.Args {
-		if v == "cass" {
-			cassI = i
-		}
-	}
-	if cassI == 0 {
-		fmt.Println("only indextype 'cass' supported")
-		flag.Usage()
+	config, err := globalconf.NewWithOptions(&globalconf.Options{
+		Filename:  path,
+		EnvPrefix: "MT_",
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "FATAL: configuration file error: %s", err)
 		os.Exit(1)
 	}
 
+	mdata.ConfigSetup()
+	cassandra.ConfigSetup()
+	cassandraStore.ConfigSetup()
+	bigtable.ConfigSetup()
+	bigTableStore.ConfigSetup()
+
+	config.ParseAll()
+
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	lvl, err := log.ParseLevel(*logLevel)
+	if err != nil {
+		log.Fatalf("failed to parse log-level, %s", err.Error())
+	}
+	log.SetLevel(lvl)
+	log.Infof("logging level set to '%s'", *logLevel)
+
+	// the specified port is not relevant as we don't use clustering with this tool
+	cluster.Init("mt-whisper-importer-writer", version, time.Now(), "http", int(80))
+
+	mdata.ConfigProcess()
+	cassandra.ConfigProcess()
+	bigtable.ConfigProcess()
+	bigTableStore.ConfigProcess(mdata.MaxChunkSpan())
+
+	splits := strings.Split(*ttlsStr, ",")
+	ttls := make([]uint32, 0)
+	for _, split := range splits {
+		ttls = append(ttls, dur.MustParseNDuration("ttl", split))
+	}
+
+	if (cassandraStore.CliConfig.Enabled && bigTableStore.CliConfig.Enabled) || !(cassandraStore.CliConfig.Enabled || bigTableStore.CliConfig.Enabled) {
+		log.Fatalf("exactly 1 backend store plugin must be enabled. cassandra: %t bigtable: %t", cassandraStore.CliConfig.Enabled, bigTableStore.CliConfig.Enabled)
+	}
+	if (cassandra.CliConfig.Enabled && bigtable.CliConfig.Enabled) || !(cassandra.CliConfig.Enabled || bigtable.CliConfig.Enabled) {
+		log.Fatalf("exactly 1 backend index plugin must be enabled. cassandra: %t bigtable: %t", cassandra.CliConfig.Enabled, bigtable.CliConfig.Enabled)
+	}
+
+	var index idx.MetricIndex
+	if cassandra.CliConfig.Enabled {
+		index = cassandra.New(cassandra.CliConfig)
+	}
+	if bigtable.CliConfig.Enabled {
+		index = bigtable.New(bigtable.CliConfig)
+	}
+
 	var store mdata.Store
-	var err error
 	if cassandraStore.CliConfig.Enabled {
 		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
 		if err != nil {
@@ -166,7 +135,6 @@ func main() {
 		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
-	var index idx.MetricIndex
 	index.Init()
 
 	server := &Server{

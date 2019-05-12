@@ -702,123 +702,22 @@ Usage of ./mt-whisper-importer-reader:
 ## mt-whisper-importer-writer
 
 ```
-mt-whisper-importer-writer
-
-Opens an endpoint to send data to, which then gets stored in the MT internal DB(s)
-
-Usage:
-
-  mt-whisper-importer-writer [global config flags] <idxtype> [idx config flags] 
-
-global config flags:
-
-  -cassandra-addrs string
-    	cassandra host (may be given multiple times as comma-separated list) (default "localhost")
-  -cassandra-auth
-    	enable cassandra authentication
-  -cassandra-ca-path string
-    	cassandra CA certificate path when using SSL (default "/etc/metrictank/ca.pem")
-  -cassandra-consistency string
-    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
-  -cassandra-create-keyspace
-    	enable the creation of the mdata keyspace and tables, only one node needs this (default true)
-  -cassandra-disable-initial-host-lookup
-    	instruct the driver to not attempt to get host info from the system.peers table
-  -cassandra-host-selection-policy string
-    	 (default "tokenaware,hostpool-epsilon-greedy")
-  -cassandra-host-verification
-    	host (hostname and server cert) verification when using SSL (default true)
-  -cassandra-keyspace string
-    	cassandra keyspace to use for storing the metric data table (default "metrictank")
-  -cassandra-omit-read-timeout string
-    	if a read is older than this, it will directly be omitted without executing (default "60s")
-  -cassandra-password string
-    	password for authentication (default "cassandra")
-  -cassandra-read-concurrency int
-    	max number of concurrent reads to cassandra. (default 20)
-  -cassandra-read-queue-size int
-    	max number of outstanding reads before reads will be dropped. This is important if you run queries that result in many reads in parallel. (default 200000)
-  -cassandra-retries int
-    	how many times to retry a query before failing it
-  -cassandra-schema-file string
-    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-store-cassandra.toml")
-  -cassandra-ssl
-    	enable SSL connection to cassandra
-  -cassandra-timeout string
-    	cassandra timeout (default "1s")
-  -cassandra-username string
-    	username for authentication (default "cassandra")
-  -cassandra-window-factor int
-    	size of compaction window relative to TTL (default 20)
-  -cassandra-write-concurrency int
-    	max number of concurrent writes to cassandra. (default 10)
-  -cql-protocol-version int
-    	cql protocol version to use (default 4)
+Usage of ./mt-whisper-importer-writer:
+  -config string
+    	configuration file path (default "/etc/metrictank/metrictank.ini")
   -exit-on-error
-    	Exit with a message when there's an error (default true)
+    	Exit with a message when there's an error
   -http-endpoint string
     	The http endpoint to listen on (default "127.0.0.1:8080")
+  -log-level string
+    	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
     	Number of Partitions (default 1)
-  -overwrite-chunks
-    	If true existing chunks may be overwritten (default true)
   -partition-scheme string
     	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries) (default "bySeries")
   -ttls string
     	list of ttl strings used by MT separated by ',' (default "35d")
   -uri-path string
     	the URI on which we expect chunks to get posted (default "/chunks")
-  -verbose
-    	More detailed logging
-
-idxtype: only 'cass' supported for now
-
-cass config flags:
-
-  -auth
-    	enable cassandra user authentication
-  -ca-path string
-    	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
-  -consistency string
-    	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
-  -create-keyspace
-    	enable the creation of the index keyspace and tables, only one node needs this (default true)
-  -disable-initial-host-lookup
-    	instruct the driver to not attempt to get host info from the system.peers table
-  -enabled
-    	 (default true)
-  -host-verification
-    	host (hostname and server cert) verification when using SSL (default true)
-  -hosts string
-    	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
-  -init-load-concurrency int
-    	Number of partitions to load concurrently on startup. (default 1)
-  -keyspace string
-    	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
-  -num-conns int
-    	number of concurrent connections to cassandra (default 10)
-  -password string
-    	password for authentication (default "cassandra")
-  -protocol-version int
-    	cql protocol version to use (default 4)
-  -prune-interval duration
-    	Interval at which the index should be checked for stale series. (default 3h0m0s)
-  -schema-file string
-    	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
-  -ssl
-    	enable SSL connection to cassandra
-  -timeout duration
-    	cassandra request timeout (default 1s)
-  -update-cassandra-index
-    	synchronize index changes to cassandra. not all your nodes need to do this. (default true)
-  -update-interval duration
-    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
-  -username string
-    	username for authentication (default "cassandra")
-  -write-queue-size int
-    	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
-
-EXAMPLES:
-mt-whisper-importer-writer -cassandra-addrs=192.168.0.1 -cassandra-keyspace=mydata -exit-on-error=true -fake-avg-aggregates=true -http-endpoint=0.0.0.0:8080 -num-partitions=8 -partition-scheme=bySeries -ttls=8d,2y -uri-path=/chunks -verbose=true -cassandra-window-factor=20 cass -hosts=192.168.0.1:9042 -keyspace=mydata
 ```
 
