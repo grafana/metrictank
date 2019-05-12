@@ -19,13 +19,26 @@ func NewFilterSeries() GraphiteFunc {
 	return &FuncFilterSeries{}
 }
 
+func NewFilterSeriesConstructor(fn string, operator string) func() GraphiteFunc {
+	return func() GraphiteFunc {
+		return &FuncFilterSeries{fn: fn, operator: operator}
+	}
+}
+
 func (s *FuncFilterSeries) Signature() ([]Arg, []Arg) {
+	if s.fn != "" && s.operator != "" {
+		return []Arg{
+			ArgSeriesList{val: &s.in},
+			ArgFloat{key: "threshold", val: &s.threshold},
+		}, []Arg{ArgSeriesList{}}
+	}
 	return []Arg{
 		ArgSeriesList{val: &s.in},
 		ArgString{key: "func", val: &s.fn, validator: []Validator{IsConsolFunc}},
 		ArgString{key: "operator", val: &s.operator, validator: []Validator{IsOperator}},
 		ArgFloat{key: "threshold", val: &s.threshold},
 	}, []Arg{ArgSeriesList{}}
+
 }
 
 func (s *FuncFilterSeries) Context(context Context) Context {

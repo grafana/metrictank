@@ -50,8 +50,8 @@ See also:
 | applyByNode                                                    |              | No         |
 | areaBetween                                                    |              | No         |
 | asPercent(seriesList, seriesList, nodeList) seriesList         |              | Stable     |
-| averageAbove                                                   |              | No         |
-| averageBelow                                                   |              | No         |
+| averageAbove                                                   |              | Stable     |
+| averageBelow                                                   |              | Stable     |
 | averageOutsidePercentile                                       |              | No         |
 | averageSeries(seriesLists) series                              | avg          | Stable     |
 | averageSeriesWithWildcards                                     |              | No         |
@@ -62,8 +62,8 @@ See also:
 | constantLine                                                   |              | No         |
 | countSeries(seriesLists) series                                |              | Stable     |
 | cumulative                                                     |              | No         |
-| currentAbove                                                   |              | No         |
-| currentBelow                                                   |              | No         |
+| currentAbove                                                   |              | Stable     |
+| currentBelow                                                   |              | Stable     |
 | dashed                                                         |              | No         |
 | delay                                                          |              | No         |
 | derivative(seriesLists) series                                 |              | Stable     |
@@ -106,11 +106,11 @@ See also:
 | lowestAverage(seriesList, n, func) seriesList                  |              | Stable     |
 | lowestCurrent(seriesList, n, func) seriesList                  |              | Stable     |
 | mapSeries                                                      | map          | No         |
-| maximumAbove                                                   |              | No         |
-| maximumBelow                                                   |              | No         |
+| maximumAbove                                                   |              | Stable     |
+| maximumBelow                                                   |              | Stable     |
 | maxSeries(seriesList) series                                   | max          | Stable     |
-| minimumAbove                                                   |              | No         |
-| minimumBelow                                                   |              | No         |
+| minimumAbove                                                   |              | Stable     |
+| minimumBelow                                                   |              | Stable     |
 | minMax                                                         |              | No         |
 | minSeries(seriesList) series                                   | min          | Stable     |
 | mostDeviant                                                    |              | No         |
