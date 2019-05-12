@@ -57,6 +57,9 @@ func TestSeriesAggregate2series(t *testing.T) {
 		},
 	}
 
+	lastOutput := getCopy(b)
+	lastOutput[5] = a[5]
+
 	countOutput := []schema.Point{
 		{Val: 2, Ts: 10},
 		{Val: 2, Ts: 20},
@@ -74,7 +77,7 @@ func TestSeriesAggregate2series(t *testing.T) {
 	testSeriesAggregate("2Series", "diff", input, getCopy(diffab), t)
 	testSeriesAggregate("2Series", "stddev", input, getCopy(stddevab), t)
 	testSeriesAggregate("2Series", "range", input, getCopy(rangeab), t)
-	testSeriesAggregate("2Series", "last", input, getCopy(b), t)
+	testSeriesAggregate("2Series", "last", input, lastOutput, t)
 	testSeriesAggregate("2Series", "count", input, countOutput, t)
 }
 
