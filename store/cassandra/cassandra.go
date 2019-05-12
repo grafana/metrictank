@@ -18,7 +18,7 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
 	"github.com/grafana/metrictank/util"
-	"github.com/hailocab/go-hostpool"
+	hostpool "github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	log "github.com/sirupsen/logrus"
@@ -312,28 +312,28 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
-			log.Debugf("CS: starting to save %s:%d %v", cwr.Key, cwr.Chunk.Series.T0, cwr.Chunk)
+			keyStr := cwr.Key.String()
+			log.Debugf("CS: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
-			buf := cwr.Chunk.Encode(cwr.Span)
-			chunkSizeAtSave.Value(len(buf))
+			chunkSizeAtSave.Value(len(cwr.Data))
 			success := false
 			attempts := 0
-			keyStr := cwr.Key.String()
 			for !success {
-				err := c.insertChunk(keyStr, cwr.Chunk.Series.T0, cwr.TTL, buf)
+				err := c.insertChunk(keyStr, cwr.T0, cwr.TTL, cwr.Data)
 
 				if err == nil {
 					success = true
-					cwr.Metric.SyncChunkSaveState(cwr.Chunk.Series.T0)
-					mdata.SendPersistMessage(keyStr, cwr.Chunk.Series.T0)
-					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.Chunk.Series.T0, cwr.Chunk)
+					if cwr.Callback != nil {
+						cwr.Callback()
+					}
+					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)
 					if (attempts % 20) == 0 {
-						log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Chunk, err)
+						log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
 					}
 					chunkSaveFail.Inc()
 					sleepTime := 100 * attempts

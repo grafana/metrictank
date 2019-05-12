@@ -1,25 +1,19 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
-	"math"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/gocql/gocql"
-	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/mdata/chunk/archive"
+	"github.com/grafana/metrictank/mdata"
+	bigTableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
-	"github.com/raintank/dur"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -72,10 +66,9 @@ var (
 )
 
 type Server struct {
-	Session     *gocql.Session
-	TTLTables   cassandraStore.TTLTables
-	Partitioner partitioner.Partitioner
-	Index       idx.MetricIndex
+	partitioner partitioner.Partitioner
+	store       mdata.Store
+	index       idx.MetricIndex
 	HTTPServer  *http.Server
 }
 
@@ -152,47 +145,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	globalFlags.Parse(os.Args[1:cassI])
-	cassFlags.Parse(os.Args[cassI+1 : len(os.Args)])
-	cassandra.CliConfig.Enabled = true
-	cassandra.ConfigProcess()
-
-	if *verbose {
-		log.SetLevel(log.DebugLevel)
-	} else {
-		log.SetLevel(log.InfoLevel)
+	var store mdata.Store
+	var err error
+	if cassandraStore.CliConfig.Enabled {
+		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
+		if err != nil {
+			log.Fatalf("failed to initialize cassandra backend store. %s", err)
+		}
 	}
-
-	store, err := cassandraStore.NewCassandraStore(storeConfig, nil)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize cassandra: %q", err))
+	if bigTableStore.CliConfig.Enabled {
+		schemaMaxChunkSpan := mdata.MaxChunkSpan()
+		store, err = bigTableStore.NewStore(bigTableStore.CliConfig, mdata.TTLs(), schemaMaxChunkSpan)
+		if err != nil {
+			log.Fatalf("failed to initialize bigtable backend store. %s", err)
+		}
 	}
-
-	splits := strings.Split(*ttlsStr, ",")
-	ttls := make([]uint32, 0)
-	for _, split := range splits {
-		ttls = append(ttls, dur.MustParseNDuration("ttl", split))
-	}
-	ttlTables := cassandraStore.GetTTLTables(ttls, storeConfig.WindowFactor, cassandraStore.Table_name_format)
 
 	p, err := partitioner.NewKafka(*partitionScheme)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate partitioner: %q", err))
 	}
 
-	cluster.Init("mt-whisper-importer-writer", version, time.Now(), "http", int(80))
+	var index idx.MetricIndex
+	index.Init()
 
 	server := &Server{
-		Session:     store.Session,
-		TTLTables:   ttlTables,
-		Partitioner: p,
-		Index:       cassandra.New(cassandra.CliConfig),
+		partitioner: p,
+		index:       index,
+		store:       store,
 		HTTPServer: &http.Server{
 			Addr:        *httpEndpoint,
 			ReadTimeout: 10 * time.Minute,
 		},
 	}
-	server.Index.Init()
 
 	http.HandleFunc(*uriPath, server.chunksHandler)
 	http.HandleFunc("/healthz", server.healthzHandler)
@@ -204,7 +189,9 @@ func main() {
 	}
 }
 
-func throwError(msg string) {
+func throwError(w http.ResponseWriter, msg string) {
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte(msg))
 	msg = fmt.Sprintf("%s\n", msg)
 	if *exitOnError {
 		log.Panic(msg)
@@ -218,100 +205,44 @@ func (s *Server) healthzHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
-	metric := &archive.Metric{}
-	err := metric.UnmarshalCompressed(req.Body)
+	data := mdata.ArchiveRequest{}
+	err := data.UnmarshalCompressed(req.Body)
 	if err != nil {
-		throwError(fmt.Sprintf("Error decoding metric stream: %q", err))
+		throwError(w, fmt.Sprintf("Error decoding cwr stream: %q", err))
+		return
+	}
+
+	if len(data.ChunkWriteRequests) == 0 {
+		log.Warn("Received empty list of cwrs")
 		return
 	}
 
 	log.Debugf(
-		"Receiving Id:%s OrgId:%d Name:%s AggMeth:%d ArchCnt:%d",
-		metric.MetricData.Id, metric.MetricData.OrgId, metric.MetricData.Name, metric.AggregationMethod, len(metric.Archives))
+		"Received %d cwrs for metric %s. The first has Key: %s, T0: %d, TTL: %d. The last has Key: %s, T0: %d, TTL: %d",
+		len(data.ChunkWriteRequests),
+		data.MetricData.Name,
+		data.ChunkWriteRequests[0].Key.String(),
+		data.ChunkWriteRequests[0].T0,
+		data.ChunkWriteRequests[0].TTL,
+		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].Key.String(),
+		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].T0,
+		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].TTL)
 
-	if len(metric.Archives) == 0 {
-		throwError("Metric has no archives")
+	partition, err := s.partitioner.Partition(&data.MetricData, int32(*numPartitions))
+	if err != nil {
+		throwError(w, fmt.Sprintf("Error partitioning: %q", err))
 		return
 	}
-	mkey, err := schema.MKeyFromString(metric.MetricData.Id)
-	if err != nil {
-		throwError(fmt.Sprintf("Invalid MetricData.Id: %s", err))
-	}
 
-	partition, err := s.Partitioner.Partition(&metric.MetricData, int32(*numPartitions))
+	mkey, err := schema.MKeyFromString(data.MetricData.Id)
 	if err != nil {
-		throwError(fmt.Sprintf("Error partitioning: %q", err))
+		throwError(w, fmt.Sprintf("Received invalid id: %s", data.MetricData.Id))
 		return
 	}
-	s.Index.AddOrUpdate(mkey, &metric.MetricData, partition)
 
-	for archiveIdx, a := range metric.Archives {
-		archiveTTL := a.SecondsPerPoint * a.Points
-		tableTTL, err := s.selectTableByTTL(archiveTTL)
-		if err != nil {
-			throwError(fmt.Sprintf("Failed to select table for ttl %d in %+v: %q", archiveTTL, s.TTLTables, err))
-			return
-		}
-		table, ok := s.TTLTables[tableTTL]
-		if !ok {
-			throwError(fmt.Sprintf("Failed to get selected table %d in %+v", tableTTL, s.TTLTables))
-			return
-		}
-		log.Debugf(
-			"inserting %d chunks of archive %d with ttl %d into table %s with ttl %d and key %s",
-			len(a.Chunks), archiveIdx, archiveTTL, table.Name, tableTTL, a.RowKey,
-		)
-		s.insertChunks(table.Name, a.RowKey, tableTTL, a.Chunks)
+	s.index.AddOrUpdate(mkey, &data.MetricData, partition)
+	for _, cwr := range data.ChunkWriteRequests {
+		cwr := cwr // important because we pass by reference and this var will get overwritten in the next loop
+		s.store.Add(&cwr)
 	}
-}
-
-func (s *Server) insertChunks(table, id string, ttl uint32, itergens []chunk.IterGen) {
-	var query string
-	if *overwriteChunks {
-		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) USING TTL %d", table, ttl)
-	} else {
-		query = fmt.Sprintf("INSERT INTO %s (key, ts, data) values (?,?,?) IF NOT EXISTS USING TTL %d", table, ttl)
-	}
-	log.Debug(query)
-	for _, ig := range itergens {
-		rowKey := fmt.Sprintf("%s_%d", id, ig.T0/cassandraStore.Month_sec)
-		success := false
-		attempts := 0
-		for !success {
-			err := s.Session.Query(query, rowKey, ig.T0, ig.B).Exec()
-			if err != nil {
-				if (attempts % 20) == 0 {
-					log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %s", attempts+1, err)
-				}
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-				attempts++
-			} else {
-				success = true
-			}
-		}
-	}
-}
-
-func (s *Server) selectTableByTTL(ttl uint32) (uint32, error) {
-	selectedTTL := uint32(math.MaxUint32)
-
-	// find the table with the smallest TTL that is at least equal to archiveTTL
-	for tableTTL := range s.TTLTables {
-		if tableTTL >= ttl {
-			if selectedTTL > tableTTL {
-				selectedTTL = tableTTL
-			}
-		}
-	}
-
-	// we have not found a table that can accommodate the requested ttl
-	if selectedTTL == math.MaxUint32 {
-		return 0, errors.New(fmt.Sprintf("No Table found that can hold TTL %d", ttl))
-	}
-
-	return selectedTTL, nil
 }

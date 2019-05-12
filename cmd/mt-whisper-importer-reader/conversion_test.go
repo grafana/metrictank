@@ -4,10 +4,13 @@ import (
 	"math"
 	"testing"
 
+	"github.com/grafana/metrictank/mdata/chunk"
+
 	"github.com/kisielk/whisper-go/whisper"
+	"github.com/raintank/schema"
 )
 
-func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, method string, inRes, outRes, rawRes uint32) {
+func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) {
 	t.Helper()
 	outData := incResolution(inData, method, inRes, outRes, rawRes)
 
@@ -38,16 +41,16 @@ func TestIncResolutionUpToTime(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{5, 50},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{5, 5},
 		},
 	}
 	*importUpTo = uint(5)
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
 	*importUpTo = math.MaxUint32
 }
 
@@ -60,8 +63,8 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 		{50, 14},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{3, 30},
 			{6, 30},
 			{9, 30},
@@ -79,7 +82,7 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 			{45, 42},
 			{48, 42},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{3, 3},
 			{6, 3},
 			{9, 3},
@@ -99,7 +102,7 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 3, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 3, 1)
 }
 
 func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
@@ -113,8 +116,8 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 		{0, 0},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{5, 50},
 			{10, 50},
 			{35, 65},
@@ -122,7 +125,7 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 			{45, 70},
 			{50, 70},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{5, 5},
 			{10, 5},
 			{35, 5},
@@ -132,7 +135,7 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
 }
 
 func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
@@ -142,8 +145,8 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 		{50, 14},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{5, 50},
 			{10, 50},
 			{35, 65},
@@ -151,7 +154,7 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 			{45, 70},
 			{50, 70},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{5, 5},
 			{10, 5},
 			{35, 5},
@@ -161,7 +164,7 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
 }
 
 func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
@@ -173,8 +176,8 @@ func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
 
 	aggFactor := float64(10) / float64(3)
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{10, 10 * aggFactor},
 			{20, 10 * aggFactor},
 			{30, 10 * aggFactor},
@@ -185,7 +188,7 @@ func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
 			{80, 12 * aggFactor},
 			{90, 12 * aggFactor},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{10, aggFactor},
 			{20, aggFactor},
 			{30, aggFactor},
@@ -198,7 +201,7 @@ func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "fakeavg", 30, 10, 3)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 30, 10, 3)
 }
 
 func TestIncResolutionSimpleMax(t *testing.T) {
@@ -207,15 +210,15 @@ func TestIncResolutionSimpleMax(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"max": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Max: {
 			{5, 10},
 			{10, 10},
 			{15, 11},
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "max", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1)
 }
 
 func TestIncResolutionSimpleLast(t *testing.T) {
@@ -224,15 +227,15 @@ func TestIncResolutionSimpleLast(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"lst": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Lst: {
 			{5, 10},
 			{10, 10},
 			{15, 11},
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "lst", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Lst, 10, 5, 1)
 }
 
 func TestIncResolutionSimpleMin(t *testing.T) {
@@ -241,15 +244,15 @@ func TestIncResolutionSimpleMin(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"min": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Min: {
 			{5, 10},
 			{10, 10},
 			{15, 11},
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "min", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Min, 10, 5, 1)
 }
 
 func TestIncResolutionSimpleAvg(t *testing.T) {
@@ -258,15 +261,15 @@ func TestIncResolutionSimpleAvg(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"avg": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{5, 10},
 			{10, 10},
 			{15, 11},
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "avg", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Avg, 10, 5, 1)
 }
 
 func TestIncResolutionSimpleFakeAvg(t *testing.T) {
@@ -275,21 +278,21 @@ func TestIncResolutionSimpleFakeAvg(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{5, 50},
 			{10, 50},
 			{15, 55},
 			{20, 55},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{5, 5},
 			{10, 5},
 			{15, 5},
 			{20, 5},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "fakeavg", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
 }
 
 func TestIncResolutionSimpleSum(t *testing.T) {
@@ -298,21 +301,21 @@ func TestIncResolutionSimpleSum(t *testing.T) {
 		{20, 11},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{5, 5},
 			{10, 5},
 			{15, 5.5},
 			{20, 5.5},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{5, 5},
 			{10, 5},
 			{15, 5},
 			{20, 5},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, "sum", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Sum, 10, 5, 1)
 }
 
 func TestIncResolutionNonFactorResolutions(t *testing.T) {
@@ -324,8 +327,8 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 		{50, 14},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"max": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Max: {
 			{3, 10},
 			{6, 10},
 			{9, 10},
@@ -345,7 +348,7 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "max", 10, 3, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 3, 1)
 }
 
 func TestIncResolutionWithGaps(t *testing.T) {
@@ -359,8 +362,8 @@ func TestIncResolutionWithGaps(t *testing.T) {
 		{0, 0},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"max": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Max: {
 			{5, 10},
 			{10, 10},
 			{35, 13},
@@ -370,7 +373,7 @@ func TestIncResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "max", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1)
 }
 
 func TestIncResolutionOutOfOrder(t *testing.T) {
@@ -380,8 +383,8 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 		{50, 14},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"max": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Max: {
 			{5, 10},
 			{10, 10},
 			{35, 13},
@@ -391,10 +394,10 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, "max", 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1)
 }
 
-func testDecResolution(t *testing.T, inData []whisper.Point, expectedResult map[string][]whisper.Point, method string, inRes, outRes, rawRes uint32) {
+func testDecResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) {
 	t.Helper()
 	outData := decResolution(inData, method, inRes, outRes, rawRes)
 
@@ -431,71 +434,71 @@ func getSimpleInData() []whisper.Point {
 }
 
 func TestDecResolutionSimpleAvg(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"avg": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{30, 11},
 			{60, 14},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, "avg", 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Avg, 10, 30, 1)
 }
 
 func TestDecResolutionSimpleFakeAvg(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{30, 330},
 			{60, 420},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{30, 30},
 			{60, 30},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, "fakeavg", 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, fakeAvg, 10, 30, 1)
 }
 
 func TestDecResolutionSimpleSum(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{30, 33},
 			{60, 42},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{30, 30},
 			{60, 30},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, "sum", 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Sum, 10, 30, 1)
 }
 
 func TestDecResolutionSimpleLast(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"lst": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Lst: {
 			{30, 12},
 			{60, 15},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, "lst", 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Lst, 10, 30, 1)
 }
 
 func TestDecResolutionSimpleMax(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"max": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Max: {
 			{30, 12},
 			{60, 15},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, "max", 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Max, 10, 30, 1)
 }
 
 func TestDecResolutionSimpleMin(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"min": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Min: {
 			{30, 10},
 			{60, 13},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, "min", 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Min, 10, 30, 1)
 }
 
 func TestDecResolutionUpToTime(t *testing.T) {
@@ -508,16 +511,16 @@ func TestDecResolutionUpToTime(t *testing.T) {
 		{60, 15},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{30, 33},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{30, 6},
 		},
 	}
 	*importUpTo = uint(40)
-	testDecResolution(t, inData, expectedResult, "sum", 10, 30, 5)
+	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 30, 5)
 	*importUpTo = math.MaxUint32
 }
 
@@ -531,13 +534,13 @@ func TestDecResolutionAvg(t *testing.T) {
 		{60, 15},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"avg": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{30, 11},
 			{60, 14},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, "avg", 10, 30, 1)
+	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 30, 1)
 }
 
 func TestDecNonFactorResolutions(t *testing.T) {
@@ -550,15 +553,15 @@ func TestDecNonFactorResolutions(t *testing.T) {
 		{60, 15},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"avg": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{15, 10},
 			{30, 11.5},
 			{45, 13},
 			{60, 14.5},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, "avg", 10, 15, 1)
+	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 15, 1)
 }
 
 func getGapData() []whisper.Point {
@@ -575,49 +578,49 @@ func getGapData() []whisper.Point {
 }
 
 func TestDecResolutionWithGapsAvg(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"avg": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{20, 10},
 			{40, 13},
 			{60, 14},
 		},
 	}
 
-	testDecResolution(t, getGapData(), expectedResult, "avg", 10, 20, 1)
+	testDecResolution(t, getGapData(), expectedResult, schema.Avg, 10, 20, 1)
 }
 
 func TestDecResolutionWithGapsFakeAvg(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{20, 100},
 			{40, 130},
 			{60, 140},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{20, 10},
 			{40, 10},
 			{60, 10},
 		},
 	}
 
-	testDecResolution(t, getGapData(), expectedResult, "fakeavg", 10, 20, 1)
+	testDecResolution(t, getGapData(), expectedResult, fakeAvg, 10, 20, 1)
 }
 
 func TestDecResolutionWithGapsSum(t *testing.T) {
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{20, 10},
 			{40, 13},
 			{60, 14},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{20, 10},
 			{40, 10},
 			{60, 10},
 		},
 	}
 
-	testDecResolution(t, getGapData(), expectedResult, "sum", 10, 20, 1)
+	testDecResolution(t, getGapData(), expectedResult, schema.Sum, 10, 20, 1)
 }
 
 func TestDecResolutionOutOfOrder(t *testing.T) {
@@ -630,13 +633,13 @@ func TestDecResolutionOutOfOrder(t *testing.T) {
 		{40, 14},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"avg": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{30, 11},
 			{60, 15},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, "avg", 10, 30, 1)
+	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 30, 1)
 }
 
 func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
@@ -649,21 +652,21 @@ func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
 		{60, 15},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{15, 10},
 			{30, 23},
 			{45, 13},
 			{60, 29},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{15, 10},
 			{30, 20},
 			{45, 10},
 			{60, 20},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, "sum", 10, 15, 1)
+	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 15, 1)
 }
 
 func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
@@ -676,17 +679,17 @@ func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
 		{40, 14},
 	}
 
-	expectedResult := map[string][]whisper.Point{
-		"sum": {
+	expectedResult := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{30, 33},
 			{60, 45},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{30, 30},
 			{60, 30},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, "sum", 10, 30, 1)
+	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 30, 1)
 }
 
 func generatePoints(ts, interval uint32, value float64, offset, count int, inc func(float64) float64) []whisper.Point {
@@ -717,10 +720,16 @@ func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
 
 	i := 0
 	for _, c := range chunks {
-		iter, err := c.Get()
+		iterGen, err := chunk.NewIterGen(c.Series.T0, 10, c.Encode(21600))
 		if err != nil {
 			t.Fatalf("Error getting iterator: %s", err)
 		}
+
+		iter, err := iterGen.Get()
+		if err != nil {
+			t.Fatalf("Error getting iterator: %s", err)
+		}
+
 		for iter.Next() {
 			ts, val := iter.Values()
 			if points[i].Timestamp != ts || points[i].Value != val {
@@ -747,10 +756,16 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 
 	i := 0
 	for _, c := range chunks {
-		iter, err := c.Get()
+		iterGen, err := chunk.NewIterGen(c.Series.T0, 10, c.Encode(21600))
 		if err != nil {
 			t.Fatalf("Error getting iterator: %s", err)
 		}
+
+		iter, err := iterGen.Get()
+		if err != nil {
+			t.Fatalf("Error getting iterator: %s", err)
+		}
+
 		for iter.Next() {
 			ts, val := iter.Values()
 			if points[i].Timestamp != ts || points[i].Value != val {
@@ -764,7 +779,7 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 	}
 }
 
-func verifyPointMaps(t *testing.T, points map[string][]whisper.Point, expected map[string][]whisper.Point) {
+func verifyPointMaps(t *testing.T, points map[schema.Method][]whisper.Point, expected map[schema.Method][]whisper.Point) {
 	t.Helper()
 	for meth, ep := range expected {
 		if _, ok := points[meth]; !ok {
@@ -802,11 +817,11 @@ func TestPointsConversionSum1(t *testing.T) {
 				{1503384104, 400},
 			},
 		},
-		method: "sum",
+		method: schema.Sum,
 	}
 
-	expectedPoints1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503384102, 100},
 			{1503384103, 100},
 			{1503384104, 100},
@@ -817,16 +832,16 @@ func TestPointsConversionSum1(t *testing.T) {
 			{1503384109, 100},
 		},
 	}
-	expectedPoints2 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints2 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503384102, 200},
 			{1503384104, 200},
 			{1503384106, 200},
 			{1503384108, 200},
 		},
 	}
-	expectedPoints3 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints3 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503384104, 400},
 			{1503384108, 200},
 		},
@@ -862,11 +877,11 @@ func TestPointsConversionLast1(t *testing.T) {
 				{1503475276, 5},
 			},
 		},
-		method: "lst",
+		method: schema.Lst,
 	}
 
-	expectedPoints1 := map[string][]whisper.Point{
-		"lst": {
+	expectedPoints1 := map[schema.Method][]whisper.Point{
+		schema.Lst: {
 			{1503475275, 5},
 			{1503475276, 5},
 			{1503475277, 8},
@@ -877,16 +892,16 @@ func TestPointsConversionLast1(t *testing.T) {
 			{1503475282, 8},
 		},
 	}
-	expectedPoints2 := map[string][]whisper.Point{
-		"lst": {
+	expectedPoints2 := map[schema.Method][]whisper.Point{
+		schema.Lst: {
 			{1503475276, 5},
 			{1503475278, 8},
 			{1503475280, 7},
 			{1503475282, 8},
 		},
 	}
-	expectedPoints3 := map[string][]whisper.Point{
-		"lst": {
+	expectedPoints3 := map[schema.Method][]whisper.Point{
+		schema.Lst: {
 			{1503475276, 5},
 			{1503475280, 8},
 		},
@@ -940,11 +955,11 @@ func TestPointsConversionSum2(t *testing.T) {
 				{1503331536, 400},
 			},
 		},
-		method: "sum",
+		method: schema.Sum,
 	}
 
-	expectedPoints1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503331509, 100},
 			{1503331510, 100},
 			{1503331511, 100},
@@ -980,8 +995,8 @@ func TestPointsConversionSum2(t *testing.T) {
 		},
 	}
 
-	expectedPoints2 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints2 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503331510, 200},
 			{1503331512, 200},
 			{1503331514, 200},
@@ -1001,8 +1016,8 @@ func TestPointsConversionSum2(t *testing.T) {
 		},
 	}
 
-	expectedPoints3 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints3 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503331512, 400},
 			{1503331516, 400},
 			{1503331520, 400},
@@ -1044,11 +1059,11 @@ func TestPointsConversionAvg1(t *testing.T) {
 				{1503407720, 3.5},
 			},
 		},
-		method: "avg",
+		method: schema.Avg,
 	}
 
-	expectedPoints1_0 := map[string][]whisper.Point{
-		"avg": {
+	expectedPoints1_0 := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{1503407719, 3.5},
 			{1503407720, 3.5},
 			{1503407721, 7.25},
@@ -1059,23 +1074,23 @@ func TestPointsConversionAvg1(t *testing.T) {
 			{1503407726, 8},
 		},
 	}
-	expectedPoints2_0 := map[string][]whisper.Point{
-		"avg": {
+	expectedPoints2_0 := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{1503407720, 3.5},
 			{1503407722, 7.25},
 			{1503407724, 6.5},
 			{1503407726, 8},
 		},
 	}
-	expectedPoints3_0 := map[string][]whisper.Point{
-		"avg": {
+	expectedPoints3_0 := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{1503407720, 3.5},
 			{1503407724, 7.25},
 		},
 	}
 
-	expectedPoints1_1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints1_1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503407719, 3.5},
 			{1503407720, 3.5},
 			{1503407721, 7.25},
@@ -1085,7 +1100,7 @@ func TestPointsConversionAvg1(t *testing.T) {
 			{1503407725, 7},
 			{1503407726, 8},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503407719, 1},
 			{1503407720, 1},
 			{1503407721, 1},
@@ -1096,33 +1111,33 @@ func TestPointsConversionAvg1(t *testing.T) {
 			{1503407726, 1},
 		},
 	}
-	expectedPoints2_1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints2_1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503407720, 3.5 * 2},
 			{1503407722, 7.25 * 2},
 			{1503407724, 6.5 * 2},
 			{1503407726, 8 * 2},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503407720, 2},
 			{1503407722, 2},
 			{1503407724, 2},
 			{1503407726, 2},
 		},
 	}
-	expectedPoints3_1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints3_1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503407720, 3.5 * 4},
 			{1503407724, 7.25 * 4},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503407720, 4},
 			{1503407724, 4},
 		},
 	}
 
-	expectedPoints1_2 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints1_2 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503407717, 3.5},
 			{1503407718, 3.5},
 			{1503407719, 3.5},
@@ -1131,7 +1146,7 @@ func TestPointsConversionAvg1(t *testing.T) {
 			{1503407722, 7.25},
 			{1503407723, 6.5},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503407717, 1},
 			{1503407718, 1},
 			{1503407719, 1},
@@ -1141,23 +1156,23 @@ func TestPointsConversionAvg1(t *testing.T) {
 			{1503407723, 1},
 		},
 	}
-	expectedPoints2_2 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints2_2 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503407718, 3.5 * 2},
 			{1503407720, 3.5 * 2},
 			{1503407722, 7.25 * 2},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503407718, 2},
 			{1503407720, 2},
 			{1503407722, 2},
 		},
 	}
-	expectedPoints3_2 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints3_2 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503407720, 3.5 * 4},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503407720, 1 * 4},
 		},
 	}
@@ -1213,11 +1228,11 @@ func TestPointsConversionAvg2(t *testing.T) {
 				{1503406143, 25.25},
 			},
 		},
-		method: "avg",
+		method: schema.Avg,
 	}
 
-	expectedPoints1_0 := map[string][]whisper.Point{
-		"avg": {
+	expectedPoints1_0 := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{1503406121, 9},
 			{1503406122, 9},
 			{1503406123, 9},
@@ -1248,8 +1263,8 @@ func TestPointsConversionAvg2(t *testing.T) {
 		},
 	}
 
-	expectedPoints1_1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints1_1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503406121, 9},
 			{1503406122, 9},
 			{1503406123, 9},
@@ -1278,7 +1293,7 @@ func TestPointsConversionAvg2(t *testing.T) {
 			{1503406146, 26},
 			{1503406147, 27},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503406121, 1},
 			{1503406122, 1},
 			{1503406123, 1},
@@ -1309,8 +1324,8 @@ func TestPointsConversionAvg2(t *testing.T) {
 		},
 	}
 
-	expectedPoints2_0 := map[string][]whisper.Point{
-		"avg": {
+	expectedPoints2_0 := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{1503406119, 9},
 			{1503406122, 9},
 			{1503406125, 9},
@@ -1324,8 +1339,8 @@ func TestPointsConversionAvg2(t *testing.T) {
 		},
 	}
 
-	expectedPoints2_1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints2_1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503406122, 9 * 3},
 			{1503406125, 9 * 3},
 			{1503406128, 18 * 3},
@@ -1336,7 +1351,7 @@ func TestPointsConversionAvg2(t *testing.T) {
 			{1503406143, 24 * 3},
 			{1503406146, 26.5 * 3},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503406122, 3},
 			{1503406125, 3},
 			{1503406128, 3},
@@ -1349,21 +1364,21 @@ func TestPointsConversionAvg2(t *testing.T) {
 		},
 	}
 
-	expectedPoints3_0 := map[string][]whisper.Point{
-		"avg": {
+	expectedPoints3_0 := map[schema.Method][]whisper.Point{
+		schema.Avg: {
 			{1503406125, 9},
 			{1503406134, 18},
 			{1503406143, 25.25},
 		},
 	}
 
-	expectedPoints3_1 := map[string][]whisper.Point{
-		"sum": {
+	expectedPoints3_1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
 			{1503406125, 9 * 9},
 			{1503406134, 18 * 9},
 			{1503406143, 25.25 * 9},
 		},
-		"cnt": {
+		schema.Cnt: {
 			{1503406125, 9},
 			{1503406134, 9},
 			{1503406143, 9},

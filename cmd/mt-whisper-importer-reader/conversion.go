@@ -3,15 +3,18 @@ package main
 import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/kisielk/whisper-go/whisper"
+	"github.com/raintank/schema"
 )
 
 type conversion struct {
 	archives []whisper.ArchiveInfo
 	points   map[int][]whisper.Point
-	method   string
+	method   schema.Method
 }
 
-func newConversion(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method string) *conversion {
+const fakeAvg schema.Method = 255
+
+func newConversion(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method) *conversion {
 	return &conversion{archives: arch, points: points, method: method}
 }
 
@@ -40,8 +43,8 @@ func (c *conversion) findSmallestLargestArchive(spp, nop uint32) (int, int) {
 }
 
 // generates points according to specified parameters by finding and using the best archives as input
-func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper.Point {
-	res := make(map[string][]whisper.Point)
+func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
+	res := make(map[schema.Method][]whisper.Point)
 
 	if len(c.points) == 0 {
 		return res
@@ -51,17 +54,17 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 	smallestArchiveIdx, largestArchiveIdx := c.findSmallestLargestArchive(spp, nop)
 	rawRes := c.archives[0].SecondsPerPoint
 
-	adjustedPoints := make(map[string]map[uint32]float64)
-	if retIdx > 0 && c.method == "avg" || c.method == "sum" {
-		adjustedPoints["cnt"] = make(map[uint32]float64)
-		adjustedPoints["sum"] = make(map[uint32]float64)
+	adjustedPoints := make(map[schema.Method]map[uint32]float64)
+	if retIdx > 0 && c.method == schema.Avg || c.method == schema.Sum {
+		adjustedPoints[schema.Cnt] = make(map[uint32]float64)
+		adjustedPoints[schema.Sum] = make(map[uint32]float64)
 	} else {
 		adjustedPoints[c.method] = make(map[uint32]float64)
 	}
 
 	method := c.method
-	if method == "avg" && retIdx > 0 {
-		method = "fakeavg"
+	if c.method == schema.Avg && retIdx > 0 {
+		method = fakeAvg
 	}
 
 	// Out of the input archives that we'll use, start with the lowest resolution one by converting
@@ -73,14 +76,14 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 		arch := c.archives[i]
 		if arch.SecondsPerPoint == spp {
 			rawFactor := float64(spp) / float64(rawRes)
-			if retIdx == 0 || c.method != "avg" {
+			if retIdx == 0 || c.method != schema.Avg {
 				for _, p := range in {
 					if p.Timestamp > uint32(*importUpTo) || p.Timestamp < uint32(*importAfter) {
 						continue
 					}
 					adjustedPoints[c.method][p.Timestamp] = p.Value
-					if c.method == "sum" {
-						adjustedPoints["cnt"][p.Timestamp] = rawFactor
+					if c.method == schema.Sum {
+						adjustedPoints[schema.Cnt][p.Timestamp] = rawFactor
 					}
 				}
 			} else {
@@ -88,8 +91,8 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 					if p.Timestamp > uint32(*importUpTo) || p.Timestamp < uint32(*importAfter) {
 						continue
 					}
-					adjustedPoints["sum"][p.Timestamp] = p.Value * rawFactor
-					adjustedPoints["cnt"][p.Timestamp] = rawFactor
+					adjustedPoints[schema.Sum][p.Timestamp] = p.Value * rawFactor
+					adjustedPoints[schema.Cnt][p.Timestamp] = rawFactor
 				}
 			}
 		} else if arch.SecondsPerPoint > spp {
@@ -105,7 +108,6 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 				}
 			}
 		}
-
 	}
 
 	// merge the results that are keyed by timestamp into a slice of points
@@ -132,8 +134,8 @@ func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[string][]whisper
 // additional datapoints to bridge the gaps between the given points. depending
 // on what aggregation method is specified, those datapoints may be generated in
 // slightly different ways.
-func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes uint32) map[string][]whisper.Point {
-	out := make(map[string][]whisper.Point)
+func incResolution(points []whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) map[schema.Method][]whisper.Point {
+	out := make(map[schema.Method][]whisper.Point)
 	resFactor := float64(outRes) / float64(rawRes)
 	for _, inPoint := range points {
 		if inPoint.Timestamp == 0 {
@@ -142,7 +144,8 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 
 		// inPoints are guaranteed to be quantized by whisper
 		// outRes is < inRes, otherwise this function should never be called
-		// rangeEnd is the the TS of the last datapoint that will be generated based on inPoint
+		// rangeEnd is the TS of the last datapoint that will be generated
+		// based on inPoint
 		rangeEnd := inPoint.Timestamp - (inPoint.Timestamp % outRes)
 
 		// generate datapoints based on inPoint in reverse order
@@ -155,31 +158,33 @@ func incResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 		}
 
 		for _, outPoint := range outPoints {
-			if method == "sum" {
+			if method == schema.Sum {
 				outPoint.Value = inPoint.Value / float64(len(outPoints))
-				out["sum"] = append(out["sum"], outPoint)
-				out["cnt"] = append(out["cnt"], whisper.Point{Timestamp: outPoint.Timestamp, Value: resFactor})
-			} else if method == "fakeavg" {
+				out[schema.Sum] = append(out[schema.Sum], outPoint)
+				out[schema.Cnt] = append(out[schema.Cnt], whisper.Point{Timestamp: outPoint.Timestamp, Value: resFactor})
+			} else if method == fakeAvg {
 				outPoint.Value = inPoint.Value * resFactor
-				out["sum"] = append(out["sum"], outPoint)
-				out["cnt"] = append(out["cnt"], whisper.Point{Timestamp: outPoint.Timestamp, Value: resFactor})
+				out[schema.Sum] = append(out[schema.Sum], outPoint)
+				out[schema.Cnt] = append(out[schema.Cnt], whisper.Point{Timestamp: outPoint.Timestamp, Value: resFactor})
 			} else {
 				outPoint.Value = inPoint.Value
 				out[method] = append(out[method], outPoint)
 			}
 		}
 	}
+
 	for m := range out {
 		out[m] = sortPoints(out[m])
 	}
+
 	return out
 }
 
 // decreases the resolution of given points by using the aggregation method specified
 // in the second argument. emulates the way metrictank aggregates data when it generates
 // rollups of the raw data.
-func decResolution(points []whisper.Point, method string, inRes, outRes, rawRes uint32) map[string][]whisper.Point {
-	out := make(map[string][]whisper.Point)
+func decResolution(points []whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) map[schema.Method][]whisper.Point {
+	out := make(map[schema.Method][]whisper.Point)
 	agg := mdata.NewAggregation()
 	currentBoundary := uint32(0)
 
@@ -190,32 +195,32 @@ func decResolution(points []whisper.Point, method string, inRes, outRes, rawRes 
 
 		var value float64
 		switch method {
-		case "min":
+		case schema.Min:
 			value = agg.Min
-		case "max":
+		case schema.Max:
 			value = agg.Max
-		case "lst":
+		case schema.Lst:
 			value = agg.Lst
-		case "avg":
+		case schema.Avg:
 			value = agg.Sum / agg.Cnt
-		case "sum":
-			out["cnt"] = append(out["cnt"], whisper.Point{
+		case schema.Sum:
+			out[schema.Cnt] = append(out[schema.Cnt], whisper.Point{
 				Timestamp: currentBoundary,
 				Value:     agg.Cnt * float64(inRes) / float64(rawRes),
 			})
-			out["sum"] = append(out["sum"], whisper.Point{
+			out[schema.Sum] = append(out[schema.Sum], whisper.Point{
 				Timestamp: currentBoundary,
 				Value:     agg.Sum,
 			})
 			agg.Reset()
 			return
-		case "fakeavg":
+		case fakeAvg:
 			cnt := agg.Cnt * float64(inRes) / float64(rawRes)
-			out["cnt"] = append(out["cnt"], whisper.Point{
+			out[schema.Cnt] = append(out[schema.Cnt], whisper.Point{
 				Timestamp: currentBoundary,
 				Value:     cnt,
 			})
-			out["sum"] = append(out["sum"], whisper.Point{
+			out[schema.Sum] = append(out[schema.Sum], whisper.Point{
 				Timestamp: currentBoundary,
 				Value:     (agg.Sum / agg.Cnt) * cnt,
 			})
