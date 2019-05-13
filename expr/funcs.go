@@ -61,7 +61,7 @@ func init() {
 		"consolidateBy":         {NewConsolidateBy, true},
 		"countSeries":           {NewCountSeries, true},
 		"cumulative":            {NewConsolidateByConstructor("sum"), true},
-    "currentAbove":          {NewFilterSeriesConstructor("last", ">"), true},
+		"currentAbove":          {NewFilterSeriesConstructor("last", ">"), true},
 		"currentBelow":          {NewFilterSeriesConstructor("last", "<="), true},
 		"derivative":            {NewDerivative, true},
 		"diffSeries":            {NewAggregateConstructor("diff", crossSeriesDiff), true},
