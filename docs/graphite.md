@@ -61,7 +61,7 @@ See also:
 | consolidateBy(seriesList, func) seriesList                     |              | Stable     |
 | constantLine                                                   |              | No         |
 | countSeries(seriesLists) series                                |              | Stable     |
-| cumulative                                                     |              | No         |
+| cumulative                                                     |              | Stable     |
 | currentAbove                                                   |              | No         |
 | currentBelow                                                   |              | No         |
 | dashed                                                         |              | No         |

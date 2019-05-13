@@ -16,7 +16,18 @@ func NewConsolidateBy() GraphiteFunc {
 	return &FuncConsolidateBy{}
 }
 
+func NewConsolidateByConstructor(by string) func() GraphiteFunc {
+	return func() GraphiteFunc {
+		return &FuncConsolidateBy{by: by}
+	}
+}
+
 func (s *FuncConsolidateBy) Signature() ([]Arg, []Arg) {
+	if s.by != "" {
+		return []Arg{
+			ArgSeriesList{val: &s.in},
+		}, []Arg{ArgSeriesList{}}
+	}
 	return []Arg{
 		ArgSeriesList{val: &s.in},
 		ArgString{val: &s.by, validator: []Validator{IsConsolFunc}},
