@@ -1,4 +1,4 @@
-# unreleased/master
+# v0.12.0: Query nodes, find cache and various performance tweaks. May 14, 2019
 
 ## Important changes that require your attention:
 
@@ -10,34 +10,23 @@ Also, regarding cluster.mode:
     - 'single' is now 'dev'
     - 'multi' is now 'shard'
 (The old values are still allowed for the time being)
+see #1243, #1292, #1295
 
 * since v0.11.0-169-g59ebb227, kafka-version now defaults to 2.0.0 instead of 0.10.0.0. Make sure to set
   this to a proper version if your brokers are not at least at version 2.0.0.
+  See #1221
 
 * since v0.11.0-233-gcf24c43a, if queries need rollup data, but asked for a consolidateBy() without matching rollup aggregation
   we pick the most approriate rollup from what is available.
 
-## Other changes
+* since v0.11.0-252-ga1e41192, remove log-min-dur flag, it was no longer used. #1275
 
-* Improve performance of SetTags #1158
-* speed up cross series aggregators by being more cache friendly #1164
-* Fix summarize crash #1170
-* groupByTags Performance improvements + fix setting consolidator per group #1165
-* document startup procedure #1186
-* fix dashboard render latency queries + remove old dashboards #1192
-* Dashboard: mem.to_iter fix and use UTC #1219
-* Dynamic GOGC based on ready state #1194
-* improve kafka-mdm stats/priority tracking #1200
-* tweak cluster priority calculation to be resilient against GC pauses #1022, #1218
-* Better document priority ready state #1223
-* update messagepack to v1.1 #1214
-* add the mt-index-prune utility #1231, #1235
+## index
+
+* cassandra index: load partitions in parallel. #1270
 * Add partitioned index (experimental and not recommended) #1232
-* Add find cache to speed up render requests #1233, #1236, #1263, #1265, #1266
-* fix decrement tank.total_points upon GC. fix #1239
-* update kafka docs and defaults to v2.0.0 #1221
-* add new 'query' cluster mode and better name for modes #1243
-* mt-index-cat should use NameWithTags() when listing series #1267
+* add the mt-index-prune utility #1231, #1235
+* fix index corruption: make sure defBy{Id,TagSet} use same pointers #1303
 
 ## api
 
@@ -45,15 +34,33 @@ Also, regarding cluster.mode:
 * speed up cross series aggregators by being more cache friendly #1164
 * Fix summarize crash #1170
 * groupByTags Performance improvements + fix setting consolidator per group + fix alias functions name tag setting #1165
+* Meta tags part 1: meta record data structures and corresponding CRUD api calls (experimental) #1301
+* Add absolute function #1300
+* Add find cache to speed up render requests #1233, #1236, #1263, #1265, #1266, #1285
+* Added 8 functions related to filterSeries #1308
+* Added cumulative function #1309
 
 ## docs
 
 * document startup procedure #1186
+* Better document priority ready state #1223
 
 ## monitoring
 
 * fix render latency queries + remove old dashboards #1192
+* Dashboard: mem.to_iter fix and use UTC #1219
+* refactor ingestion related metrics, in particular wrt drops. add prometheus stats.  #1278, #1288
+* fix decrement tank.total_points upon GC. fix #1239
 
+## Misc
+
+* Dynamic GOGC based on ready state #1194
+* improve kafka-mdm stats/priority tracking #1200
+* tweak cluster priority calculation to be resilient against GC pauses #1022, #1218
+* update messagepack to v1.1 #1214
+* mt-index-cat should use NameWithTags() when listing series #1267
+* improvement for reorder buffer. #1211
+* debug builds and images. #1187
 
 # v0.11.0 Bigtable, chunk formats, fixes and breaking changes. Dec 19, 2018
 
