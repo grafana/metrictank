@@ -59,7 +59,7 @@ During normal development, maintain CHANGELOG.md, and mark interesting - to user
 Grafana Labs regularly deploys the latest code from `master`, but cannot possibly do extensive testing of all functionality in production, so users are encouraged to run master also, and report any issues they hit.
 When significant changes have been merged to master, and they have had a chance to be tested or run in production for a while, we tag a release, as follows:
 
-* update CHANGELOG.md from `unreleased` to the version.
+* update CHANGELOG.md from `unreleased` to the version, and add the date.
 * create annotated git tag in the form `v<version>` and push to GitHub
 * wait for CircleCI to complete successfully.
 * create release on GitHub. copy entry from CHANGELOG.md to GitHub release page
