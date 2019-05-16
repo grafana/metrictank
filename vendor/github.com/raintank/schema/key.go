@@ -83,7 +83,7 @@ func (a *AMKey) ExtensionType() int8 {
 // Len is part of the msgp.Extension interface
 // It returns the length of the encoded byte slice representing this AMKey
 func (a *AMKey) Len() int {
-	return len(fmt.Sprintf("%d", a.MKey.Org)) + 33
+	return len(a.String())
 }
 
 // MarshalBinaryTo is part of the msgp.Extension interface
