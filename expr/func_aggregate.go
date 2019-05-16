@@ -8,8 +8,9 @@ import (
 )
 
 type FuncAggregate struct {
-	in   []GraphiteFunc
-	name string
+	in           []GraphiteFunc
+	name         string
+	xFilesFactor float64
 }
 
 // NewAggregateConstructor takes an agg string and returns a constructor function
@@ -27,7 +28,8 @@ func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
 	if s.name == "" {
 		return []Arg{
 			ArgSeriesLists{val: &s.in},
-			ArgString{val: &s.name, validator: []Validator{IsAggFunc}},
+			ArgString{val: &s.name, validator: []Validator{IsAggFunc}, key: "func"},
+			ArgFloat{val: &s.xFilesFactor, opt: true, key: "xFilesFactor"},
 		}, []Arg{ArgSeries{}}
 	} else {
 		return []Arg{
