@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"math"
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
@@ -62,6 +63,15 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
+
+	//remove values in accordance to xFilesFactor
+	for i := 0; i < len(series[0].Datapoints); i++ {
+		if !crossSeriesXff(series, i, s.xFilesFactor) {
+			for j := 0; j < len(series); j++ {
+				series[j].Datapoints[i].Val = math.NaN()
+			}
+		}
+	}
 	agg.function(series, &out)
 
 	// The tags for the aggregated series is only the tags that are
