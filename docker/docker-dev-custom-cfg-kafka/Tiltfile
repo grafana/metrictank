@@ -1,1 +1,13 @@
 docker_compose("./docker-compose.yml")
+
+# FIXME: would not be so complex if our Dockerfile did not rely on an external script (build_docker.sh) to copy the right binaries
+# It could then become docker_build('grafana/metrictank', '../../scripts/')
+# Additionally docker_build would not be needed at all if https://github.com/windmilleng/tilt/issues/1638 was implemented
+custom_build('grafana/metrictank',
+            'mkdir -p ../../scripts/build/ && cp ../../build/* ../../scripts/build/ && docker build -t $EXPECTED_REF ../../scripts/',
+            deps=['../../build/'],
+            live_update = [
+                # because /usr/bin/metrictank is a mount (specified in docker-compose.yml) we cannot overwrite it
+                sync('../../build/', '/tmp/'),
+                restart_container()
+])
