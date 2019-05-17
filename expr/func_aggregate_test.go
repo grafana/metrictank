@@ -27,6 +27,7 @@ func TestAggregateIdentity(t *testing.T) {
 			Datapoints: getCopy(a),
 		},
 		t,
+		0,
 	)
 	testAggregate(
 		"identity",
@@ -44,6 +45,7 @@ func TestAggregateIdentity(t *testing.T) {
 			Datapoints: getCopy(a),
 		},
 		t,
+		0,
 	)
 }
 func TestAggregateQueryToSingle(t *testing.T) {
@@ -63,6 +65,7 @@ func TestAggregateQueryToSingle(t *testing.T) {
 			Datapoints: getCopy(a),
 		},
 		t,
+		0,
 	)
 }
 func TestAggregateMultiple(t *testing.T) {
@@ -86,6 +89,7 @@ func TestAggregateMultiple(t *testing.T) {
 			Datapoints: getCopy(avgab),
 		},
 		t,
+		0,
 	)
 	testAggregate(
 		"sum-multiple-series",
@@ -107,6 +111,7 @@ func TestAggregateMultiple(t *testing.T) {
 			Datapoints: getCopy(sumab),
 		},
 		t,
+		0,
 	)
 	testAggregate(
 		"max-multiple-series",
@@ -128,6 +133,7 @@ func TestAggregateMultiple(t *testing.T) {
 			Datapoints: getCopy(maxab),
 		},
 		t,
+		0,
 	)
 }
 func TestAggregateMultipleDiffQuery(t *testing.T) {
@@ -159,6 +165,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 			Datapoints: getCopy(avgabc),
 		},
 		t,
+		0,
 	)
 	testAggregate(
 		"sum-multiple-serieslists",
@@ -169,6 +176,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 			Datapoints: getCopy(sumabc),
 		},
 		t,
+		0,
 	)
 	testAggregate(
 		"max-multiple-serieslists",
@@ -179,6 +187,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 			Datapoints: getCopy(maxabc),
 		},
 		t,
+		0,
 	)
 }
 
@@ -227,6 +236,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 			Datapoints: getCopy(avg4a2b),
 		},
 		t,
+		0,
 	)
 	testAggregate(
 		"sum-multiple-times-same-input",
@@ -237,15 +247,94 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 			Datapoints: getCopy(sum4a2b),
 		},
 		t,
+		0,
 	)
 }
 
-func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T) {
+func TestAggregateXFilesFactor(t *testing.T) {
+	input := [][]models.Series{
+		{
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(a),
+			},
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(b),
+			},
+			{
+				QueryPatt:  "foo.*",
+				Datapoints: getCopy(c),
+			},
+		},
+	}
+	testAggregate(
+		"xFilesFactor-0",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgab),
+		},
+		t,
+		0,
+	)
+	testAggregate(
+		"xFilesFactor-0.25",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgab),
+		},
+		t,
+		0.25,
+	)
+
+	testAggregate(
+		"xFilesFactor-0.5",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgab),
+		},
+		t,
+		0.5,
+	)
+
+	testAggregate(
+		"xFilesFactor-0.75",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgab),
+		},
+		t,
+		0.75,
+	)
+
+	testAggregate(
+		"xFilesFactor-1",
+		"average",
+		input,
+		models.Series{
+			Target:     "averageSeries(foo.*)",
+			Datapoints: getCopy(avgab),
+		},
+		t,
+		1,
+	)
+}
+
+func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
 	f := NewAggregateConstructor(agg)()
 	avg := f.(*FuncAggregate)
 	for _, i := range in {
 		avg.in = append(avg.in, NewMock(i))
 	}
+	avg.xFilesFactor = xFilesFactor
 	got, err := f.Exec(make(map[Req][]models.Series))
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
