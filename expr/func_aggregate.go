@@ -71,15 +71,14 @@ func aggregate(series []models.Series, agg seriesAggregator, xFilesFactor float6
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 
+	agg.function(series, &out)
+
 	//remove values in accordance to xFilesFactor
 	for i := 0; i < len(series[0].Datapoints); i++ {
 		if !crossSeriesXff(series, i, xFilesFactor) {
-			for j := 0; j < len(series); j++ {
-				series[j].Datapoints[i].Val = math.NaN()
-			}
+			out[i].Val = math.NaN()
 		}
 	}
-	agg.function(series, &out)
 
 	// The tags for the aggregated series is only the tags that are
 	// common to all input series

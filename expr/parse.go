@@ -434,6 +434,7 @@ func formatQueryPatts(series []models.Series) string {
 
 Loop:
 	for _, s := range series {
+
 		for _, qp := range queryPatts {
 			if s.QueryPatt == qp {
 				continue Loop

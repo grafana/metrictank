@@ -232,7 +232,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 		"average",
 		input,
 		models.Series{
-			Target:     "averageSeries(foo.*,foo.*,a,a)",
+			Target:     "averageSeries(foo.*,a)",
 			Datapoints: getCopy(avg4a2b),
 		},
 		t,
@@ -243,7 +243,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 		"sum",
 		input,
 		models.Series{
-			Target:     "sumSeries(foo.*,foo.*,a,a)",
+			Target:     "sumSeries(foo.*,a)",
 			Datapoints: getCopy(sum4a2b),
 		},
 		t,
@@ -268,13 +268,32 @@ func TestAggregateXFilesFactor(t *testing.T) {
 			},
 		},
 	}
+
+	var avgabcxff05 = []schema.Point{
+		{Val: 0, Ts: 10},
+		{Val: math.MaxFloat64 / 3, Ts: 20},
+		{Val: (math.MaxFloat64 - 13.5) / 3, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: float64(1234567893) / 2, Ts: 50},
+		{Val: float64(1234567894) / 2, Ts: 60},
+	}
+
+	var avgabcxff075 = []schema.Point{
+		{Val: 0, Ts: 10},
+		{Val: math.MaxFloat64 / 3, Ts: 20},
+		{Val: (math.MaxFloat64 - 13.5) / 3, Ts: 30},
+		{Val: math.NaN(), Ts: 40},
+		{Val: math.NaN() / 2, Ts: 50},
+		{Val: math.NaN() / 2, Ts: 60},
+	}
+
 	testAggregate(
 		"xFilesFactor-0",
 		"average",
 		input,
 		models.Series{
 			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgab),
+			Datapoints: getCopy(avgabc),
 		},
 		t,
 		0,
@@ -285,7 +304,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		input,
 		models.Series{
 			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgab),
+			Datapoints: getCopy(avgabc),
 		},
 		t,
 		0.25,
@@ -297,7 +316,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		input,
 		models.Series{
 			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgab),
+			Datapoints: avgabcxff05,
 		},
 		t,
 		0.5,
@@ -309,7 +328,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		input,
 		models.Series{
 			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgab),
+			Datapoints: avgabcxff075,
 		},
 		t,
 		0.75,
@@ -321,7 +340,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		input,
 		models.Series{
 			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgab),
+			Datapoints: avgabcxff075,
 		},
 		t,
 		1,

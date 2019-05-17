@@ -9,7 +9,7 @@ import (
 
 func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
 	nonNull := 0
-	for i := 1; i < len(in); i++ {
+	for i := 0; i < len(in); i++ {
 		if !math.IsNaN(in[i].Datapoints[index].Val) {
 			nonNull++
 		}
