@@ -428,3 +428,20 @@ func aggKey(serie models.Series, nodes []expr) string {
 	}
 	return strings.Join(name, ".")
 }
+
+func formatQueryPatts(series []models.Series) string {
+	queryPatts := make([]string, 0)
+
+Loop:
+	for _, s := range series {
+		for _, qp := range queryPatts {
+			if s.QueryPatt == qp {
+				continue Loop
+			}
+		}
+		queryPatts = append(queryPatts, s.QueryPatt)
+	}
+
+	return strings.Join(queryPatts, ",")
+
+}

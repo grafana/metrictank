@@ -2,7 +2,6 @@ package expr
 
 import (
 	"math"
-	"strings"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/raintank/schema"
@@ -45,28 +44,36 @@ func (s *FuncAggregate) Context(context Context) Context {
 }
 
 func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, queryPatts, err := consumeFuncs(cache, s.in)
+	series, _, err := consumeFuncs(cache, s.in)
 	if err != nil {
 		return nil, err
 	}
 
 	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
 
+	output := aggregate(series, agg, s.xFilesFactor)
+
+	cache[Req{}] = append(cache[Req{}], output)
+
+	return []models.Series{output}, nil
+}
+
+func aggregate(series []models.Series, agg seriesAggregator, xFilesFactor float64) models.Series {
 	if len(series) == 0 {
-		return series, nil
+		return models.Series{}
 	}
 
 	if len(series) == 1 {
 		name := agg.name + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
 		series[0].QueryPatt = name
-		return series, nil
+		return series[0]
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 
 	//remove values in accordance to xFilesFactor
 	for i := 0; i < len(series[0].Datapoints); i++ {
-		if !crossSeriesXff(series, i, s.xFilesFactor) {
+		if !crossSeriesXff(series, i, xFilesFactor) {
 			for j := 0; j < len(series); j++ {
 				series[j].Datapoints[i].Val = math.NaN()
 			}
@@ -90,9 +97,11 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	}
 
 	cons, queryCons := summarizeCons(series)
-	name := agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
+	name := agg.name + "Series(" + formatQueryPatts(series) + ")"
 	commonTags["aggregatedBy"] = agg.name
-	commonTags["name"] = name
+	if _, ok := commonTags["name"]; !ok {
+		commonTags["name"] = name
+	}
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
@@ -102,7 +111,6 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		Consolidator: cons,
 		QueryCons:    queryCons,
 	}
-	cache[Req{}] = append(cache[Req{}], output)
 
-	return []models.Series{output}, nil
+	return output
 }
