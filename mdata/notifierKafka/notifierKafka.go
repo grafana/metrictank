@@ -123,7 +123,16 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, currentO
 
 	messages := pc.Messages()
 	ticker := time.NewTicker(5 * time.Second)
-	startingUp := true
+
+	var startingUp bool
+	if bootTimeOffsets[partition] == 0 {
+		// no message in the partition queue; no backlog to process
+		startingUp = false
+		processBacklog.Done()
+	} else {
+		startingUp = true
+	}
+
 	// the bootTimeOffset is the next available offset. There may not be a message with that
 	// offset yet, so we subtract 1 to get the highest offset that we can fetch.
 	bootTimeOffset := bootTimeOffsets[partition] - 1
