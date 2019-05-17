@@ -18,9 +18,6 @@ BUILDDIR=$(pwd)/build
 # Make dir
 mkdir -p $BUILDDIR
 
-# Clean build bin dir
-rm -rf $BUILDDIR/*
-
 # disable cgo
 export CGO_ENABLED=0
 
