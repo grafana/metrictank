@@ -124,8 +124,6 @@ func ConfigProcess(instance string) {
 	partitionLogSize = make(map[int32]*stats.Gauge64)
 	partitionLag = make(map[int32]*stats.Gauge64)
 
-	// when booting up, we will delay consuming metrics until we have
-	// caught up to these offsets.
 	for _, part := range partitions {
 		// metric cluster.notifier.kafka.partition.%d.offset is the current offset for the partition (%d) that we have consumed
 		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part))
