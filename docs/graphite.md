@@ -164,7 +164,7 @@ See also:
 | stacked                                                        |              | No         |
 | stddevSeries(seriesList) series                                |              | Stable     |
 | stdev                                                          |              | No         |
-| substr                                                         |              | No         |
+| substr                                                         |              | Stable     |
 | summarize(seriesList) seriesList                               |              | Stable     |
 | sumSeries(seriesLists) series                                  | sum          | Stable     |
 | sumSeriesWithWildcards                                         |              | Stable     |
