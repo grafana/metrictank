@@ -302,6 +302,27 @@ func TestArgInIntPositional(t *testing.T) {
 	}
 }
 
+func TestArgInINFPositional(t *testing.T) {
+	fn := NewKeepLastValue()
+	e := &expr{
+		etype: etFunc,
+		str:   "keepLastValue",
+		args: []*expr{
+			{etype: etName, str: "in.*"},
+			{etype: etName, str: "INF"},
+		},
+		namedArgs: nil,
+	}
+	_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	klv := fn.(*FuncKeepLastValue)
+	if klv.limit != math.MaxInt64 {
+		t.Fatalf("limit should be INF. got %d", klv.limit)
+	}
+}
+
 func TestArgInSeriesKeyword(t *testing.T) {
 	fn := NewAsPercent()
 	e := &expr{

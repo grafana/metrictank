@@ -28,6 +28,7 @@ func (s *FuncKeepLastValue) Signature() ([]Arg, []Arg) {
 					// Treats any string as infinity. This matches Graphite's behavior
 					// (although intended bevahior is to let user specify "INF" as the limit)
 					ArgString{val: &stub},
+					ArgQuotelessString{val: &stub},
 				},
 			},
 		},

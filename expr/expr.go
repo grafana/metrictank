@@ -192,6 +192,16 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			*v.val = append(*v.val, *e.args[pos])
 		}
 		return pos, nil
+	case ArgQuotelessString:
+		if got.etype != etName {
+			return 0, ErrBadArgumentStr{"quoteless string", got.etype.String()}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, generateValidatorError(v.key, err)
+			}
+		}
+		*v.val = got.str
 	default:
 		return 0, fmt.Errorf("unsupported type %T for consumeBasicArg", exp)
 	}
@@ -221,6 +231,8 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 		pos++
 		return pos, reqs, nil
 	}
+
+Switch:
 	switch v := exp.(type) {
 	case ArgIn:
 		if got.etype == etName || got.etype == etFunc {
@@ -232,6 +244,9 @@ func (e expr) consumeSeriesArg(pos int, exp Arg, context Context, stable bool, r
 						return 0, nil, err
 					}
 					return p, reqs, err
+				case ArgQuotelessString:
+					break Switch
+				default:
 				}
 			}
 			expStr := []string{}
