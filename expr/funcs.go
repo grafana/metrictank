@@ -125,7 +125,7 @@ func init() {
 		"sortByName":                   {NewSortByName, true},
 		"sortByTotal":                  {NewSortByConstructor("sum", true), true},
 		"stddevSeries":                 {NewAggregateConstructor("stddev"), true},
-		"substr":                       {NewSubstr, false},
+		"substr":                       {NewSubstr, true},
 		"sum":                          {NewAggregateConstructor("sum"), true},
 		"sumSeries":                    {NewAggregateConstructor("sum"), true},
 		"sumSeriesWithWildcards":       {NewAggregateWithWildcardsConstructor("sum"), true},
