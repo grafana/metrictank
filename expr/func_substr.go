@@ -16,7 +16,16 @@ func NewSubstr() GraphiteFunc {
 	return &FuncSubstr{}
 }
 
+func NewAliasByMetric() GraphiteFunc {
+	return &FuncSubstr{start: -1, stop: 0}
+}
+
 func (s *FuncSubstr) Signature() ([]Arg, []Arg) {
+	if s.start != 0 || s.stop != 0 {
+		return []Arg{
+			ArgSeriesList{val: &s.in},
+		}, []Arg{ArgSeriesList{}}
+	}
 	return []Arg{
 		ArgSeriesList{val: &s.in},
 		ArgInt{val: &s.start, opt: true, key: "start"},
@@ -45,6 +54,23 @@ func (s *FuncSubstr) Exec(cache map[Req][]models.Series) ([]models.Series, error
 		cleanName = strings.SplitN(cleanName, ",", 2)[0]
 
 		var name string
+
+		numNodes := int64(strings.Count(cleanName, ".") + 1)
+		if s.start < 0 {
+			s.start += numNodes
+		}
+		if s.stop < 0 {
+			s.stop += numNodes
+		}
+		if s.stop < s.start && s.stop != 0 {
+			s.stop = s.start
+		}
+		if s.start > numNodes {
+			s.start = numNodes
+		}
+		if s.stop > numNodes {
+			s.stop = numNodes
+		}
 		if s.stop == 0 {
 			name = strings.Join(strings.Split(cleanName, ".")[s.start:], ".")
 		} else {
