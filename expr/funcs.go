@@ -105,7 +105,7 @@ func init() {
 		"sortByName":            {NewSortByName, true},
 		"sortByTotal":           {NewSortByConstructor("sum", true), true},
 		"stddevSeries":          {NewAggregateConstructor("stddev", crossSeriesStddev), true},
-		"substr":                {NewSubstr, false},
+		"substr":                {NewSubstr, true},
 		"sum":                   {NewAggregateConstructor("sum", crossSeriesSum), true},
 		"sumSeries":             {NewAggregateConstructor("sum", crossSeriesSum), true},
 		"summarize":             {NewSummarize, true},

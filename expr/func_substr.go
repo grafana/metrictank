@@ -52,7 +52,6 @@ func (s *FuncSubstr) Exec(cache map[Req][]models.Series) ([]models.Series, error
 		}
 
 		serie.Target = name
-		serie.QueryPatt = name
 		out[i] = serie
 		cache[Req{}] = append(cache[Req{}], serie)
 	}
