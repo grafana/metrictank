@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/raintank/schema"
 )
 
 func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
@@ -15,16 +14,6 @@ func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
 		}
 	}
 	return xff(nonNull, len(in), xFilesFactor)
-}
-
-func valuesXff(values []schema.Point, xFilesFactor float64) bool {
-	nonNull := 0
-	for _, v := range values {
-		if !math.IsNaN(v.Val) {
-			nonNull++
-		}
-	}
-	return xff(nonNull, len(values), xFilesFactor)
 }
 
 func xff(nonNull int, total int, xFilesFactor float64) bool {
