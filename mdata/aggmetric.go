@@ -80,16 +80,21 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 }
 
 // Sync the saved state of a chunk by its T0.
-func (a *AggMetric) SyncChunkSaveState(ts uint32) {
-	a.Lock()
-	defer a.Unlock()
-	if ts > a.lastSaveFinish {
-		a.lastSaveFinish = ts
+func (a *AggMetric) SyncChunkSaveState(ts uint32, sendPersist bool) ChunkSaveCallback {
+	return func() {
+		a.Lock()
+		if ts > a.lastSaveFinish {
+			a.lastSaveFinish = ts
+		}
+		if ts > a.lastSaveStart {
+			a.lastSaveStart = ts
+		}
+		a.Unlock()
+		log.Debugf("AM: metric %s at chunk T0=%d has been saved.", a.key, ts)
+		if sendPersist {
+			SendPersistMessage(a.key.String(), ts)
+		}
 	}
-	if ts > a.lastSaveStart {
-		a.lastSaveStart = ts
-	}
-	log.Debugf("AM: metric %s at chunk T0=%d has been saved.", a.key, ts)
 }
 
 // Sync the saved state of a chunk by its T0.
@@ -104,27 +109,27 @@ func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consoli
 				panic("avg consolidator has no matching Archive(). you need sum and cnt")
 			case consolidation.Cnt:
 				if a.cntMetric != nil {
-					a.cntMetric.SyncChunkSaveState(ts)
+					a.cntMetric.SyncChunkSaveState(ts, false)()
 				}
 				return
 			case consolidation.Min:
 				if a.minMetric != nil {
-					a.minMetric.SyncChunkSaveState(ts)
+					a.minMetric.SyncChunkSaveState(ts, false)()
 				}
 				return
 			case consolidation.Max:
 				if a.maxMetric != nil {
-					a.maxMetric.SyncChunkSaveState(ts)
+					a.maxMetric.SyncChunkSaveState(ts, false)()
 				}
 				return
 			case consolidation.Sum:
 				if a.sumMetric != nil {
-					a.sumMetric.SyncChunkSaveState(ts)
+					a.sumMetric.SyncChunkSaveState(ts, false)()
 				}
 				return
 			case consolidation.Lst:
 				if a.lstMetric != nil {
-					a.lstMetric.SyncChunkSaveState(ts)
+					a.lstMetric.SyncChunkSaveState(ts, false)()
 				}
 				return
 			default:
@@ -356,7 +361,14 @@ func (a *AggMetric) persist(pos int) {
 	// create an array of chunks that need to be sent to the writeQueue.
 	pending := make([]*ChunkWriteRequest, 1)
 	// add the current chunk to the list of chunks to send to the writeQueue
-	cwr := NewChunkWriteRequest(a, a.key, chunk, a.ttl, a.chunkSpan, time.Now())
+	cwr := NewChunkWriteRequest(
+		a.SyncChunkSaveState(chunk.Series.T0, true),
+		a.key,
+		a.ttl,
+		chunk.Series.T0,
+		chunk.Encode(a.chunkSpan),
+		time.Now(),
+	)
 	pending[0] = &cwr
 
 	// if we recently became the primary, there may be older chunks
@@ -369,7 +381,14 @@ func (a *AggMetric) persist(pos int) {
 	previousChunk := a.chunks[previousPos]
 	for (previousChunk.Series.T0 < chunk.Series.T0) && (a.lastSaveStart < previousChunk.Series.T0) {
 		log.Debugf("AM: persist(): old chunk needs saving. Adding %s:%d to writeQueue", a.key, previousChunk.Series.T0)
-		cwr := NewChunkWriteRequest(a, a.key, previousChunk, a.ttl, a.chunkSpan, time.Now())
+		cwr := NewChunkWriteRequest(
+			a.SyncChunkSaveState(previousChunk.Series.T0, true),
+			a.key,
+			a.ttl,
+			previousChunk.Series.T0,
+			previousChunk.Encode(a.chunkSpan),
+			time.Now(),
+		)
 		pending = append(pending, &cwr)
 		previousPos--
 		if previousPos < 0 {

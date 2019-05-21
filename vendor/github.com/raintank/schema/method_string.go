@@ -4,6 +4,18 @@ package schema
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[Avg-1]
+	_ = x[Sum-2]
+	_ = x[Lst-3]
+	_ = x[Max-4]
+	_ = x[Min-5]
+	_ = x[Cnt-6]
+}
+
 const _Method_name = "avgsumlstmaxmincnt"
 
 var _Method_index = [...]uint8{0, 3, 6, 9, 12, 15, 18}
