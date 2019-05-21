@@ -82,7 +82,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 
 * [Development and contributing](https://github.com/grafana/metrictank/blob/master/docs/CONTRIBUTING.md)
 * [Community](https://github.com/grafana/metrictank/blob/master/docs/community.md)
-* [Roadmap](https://github.com/grafana/metrictank/blob/master/docs/roadmap.md)
+* [Roadmap](https://github.com/grafana/metrictank/issues/1319)
 * [Faq](https://github.com/grafana/metrictank/blob/master/docs/faq.md)
 
 ## Releases and versioning
