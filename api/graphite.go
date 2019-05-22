@@ -653,14 +653,16 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		}
 		var err error
 		var series []Series
+		var exprs []string
 		const SeriesByTagIdent = "seriesByTag("
 		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
 			startPos := len(SeriesByTagIdent)
 			endPos := strings.LastIndex(r.Query, ")")
-			exprs := strings.Split(r.Query[startPos:endPos], ",")
-			for i, e := range exprs {
-				exprs[i] = strings.Trim(e, " '\"")
+			exprs, err = getTagQueryExpressions(r.Query[startPos:endPos])
+			if err != nil {
+				return nil, err
 			}
+
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs))
 		} else {
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
@@ -754,6 +756,117 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	out, err = plan.Run(data)
 	planRunDuration.Value(time.Since(preRun))
 	return out, err
+}
+
+func getTagQueryExpressions(expressions string) ([]string, error) {
+	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
+	var expressionStartEndPos []int
+	var needComma, insideExpression bool
+	var quoteChar byte
+
+	for i := 0; i < len(expressions); i++ {
+		char := expressions[i]
+		if insideExpression {
+			// checking for closing quote
+			if char == quoteChar {
+				insideExpression = false
+				needComma = true
+				expressionStartEndPos = append(expressionStartEndPos, i)
+				continue
+			}
+		} else {
+			// outside an expression spaces are ignored
+			if char == ' ' {
+				continue
+			}
+
+			if char == '\'' || char == '"' {
+				if needComma {
+					return nil, fmt.Errorf("Missing comma between quotes: %s", expressions)
+				}
+
+				insideExpression = true
+				quoteChar = char
+				expressionStartEndPos = append(expressionStartEndPos, i+1)
+				continue
+			}
+
+			if char == ',' {
+				if needComma {
+					needComma = false
+					continue
+				} else {
+					return nil, fmt.Errorf("Too many commas between quotes: %s", expressions)
+				}
+			}
+
+			return nil, fmt.Errorf("Invalid character outside quotes '%c': %s", char, expressions)
+		}
+	}
+
+	if insideExpression || len(expressionStartEndPos)%2 != 0 {
+		return nil, fmt.Errorf("Unclosed quotes in string: %s", expressions)
+	}
+
+	// extract all the sub strings according to expressionStartEndPos and validate them
+	results := make([]string, 0, len(expressionStartEndPos)/2)
+	for i := 0; i < len(expressionStartEndPos)/2; i++ {
+		expression := expressions[expressionStartEndPos[i*2]:expressionStartEndPos[i*2+1]]
+		err := validateTagQueryExpression(expression)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, expression)
+	}
+
+	return results, nil
+}
+
+func validateTagQueryExpression(expression string) error {
+	var operatorStartPos, operatorEndPos, equalPos int
+	equalPos = strings.Index(expression, "=")
+	if equalPos < 0 {
+		return fmt.Errorf("Missing equal sign: %s", expression)
+	}
+
+	if equalPos == 0 {
+		return fmt.Errorf("Empty tag name: %s", expression)
+	}
+
+	if expression[equalPos-1] == '!' || expression[equalPos-1] == '^' {
+		operatorStartPos = equalPos - 1
+	} else {
+		operatorStartPos = equalPos
+	}
+
+	if len(expression)-1 == equalPos {
+		operatorEndPos = equalPos
+	} else if expression[equalPos+1] == '~' {
+		operatorEndPos = equalPos + 1
+	} else {
+		operatorEndPos = equalPos
+	}
+
+	key := expression[:operatorStartPos]
+	for i := 0; i < len(key); i++ {
+		for _, char := range []string{";", "!", "^"} {
+			if strings.Index(key, char) >= 0 {
+				return fmt.Errorf("Invalid character %s in tag key %s of expression %s", char, key, expression)
+			}
+		}
+	}
+
+	value := expression[operatorEndPos+1:]
+	for i := 0; i < len(value); i++ {
+		for _, char := range []string{";", "~"} {
+			if strings.Index(value, char) >= 0 {
+				return fmt.Errorf("Invalid character %s in tag value %s of expression %s", char, value, expression)
+			}
+		}
+	}
+
+	return nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
