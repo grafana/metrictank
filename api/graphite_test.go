@@ -33,6 +33,36 @@ func TestExpressionParsing(t *testing.T) {
 			expectExpressions: nil,
 		},
 		{
+			inputValue:        "'a!=b','c='",
+			expectError:       true,
+			expectExpressions: nil,
+		},
+		{
+			inputValue:        "'a=~[a-z'",
+			expectError:       true,
+			expectExpressions: nil,
+		},
+		{
+			inputValue:        "'a=~'",
+			expectError:       true,
+			expectExpressions: nil,
+		},
+		{
+			inputValue:        "'a=~.*'",
+			expectError:       true,
+			expectExpressions: nil,
+		},
+		{
+			inputValue:        "'a!=~.*'",
+			expectError:       false,
+			expectExpressions: []string{"a!=~.*"},
+		},
+		{
+			inputValue:        "'a=~.+'",
+			expectError:       false,
+			expectExpressions: []string{"a=~.+"},
+		},
+		{
 			inputValue:        "",
 			expectError:       true,
 			expectExpressions: nil,

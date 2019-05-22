@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -848,39 +849,55 @@ func validateTagQueryExpression(expression string) (bool, error) {
 		return false, fmt.Errorf("Empty tag name: %s", expression)
 	}
 
-	isPositiveOperator := true
+	requiresNonEmptyValue := true
 	if expression[equalPos-1] == '!' {
 		operatorStartPos = equalPos - 1
-		isPositiveOperator = false
+		requiresNonEmptyValue = false
 	} else if expression[equalPos-1] == '^' {
 		operatorStartPos = equalPos - 1
 	} else {
 		operatorStartPos = equalPos
 	}
 
-	if len(expression)-1 == equalPos {
-		operatorEndPos = equalPos
-
-		// if value is empty, then the positivity of the operator gets negated
-		// f.e.
-		// tag1!= means there must be a tag "tag1", instead of there must not be
-		// tag1= means there must not be a "tag1", instead of there must be
-		isPositiveOperator = !isPositiveOperator
-	} else if expression[equalPos+1] == '~' {
-		operatorEndPos = equalPos + 1
-	} else {
-		operatorEndPos = equalPos
-	}
-
 	if strings.ContainsAny(expression[:operatorStartPos], ";!^") {
 		return false, fmt.Errorf("Invalid character in tag key %s of expression %s", expression[:operatorStartPos], expression)
 	}
 
-	if strings.ContainsAny(expression[operatorEndPos+1:], ";~") {
-		return false, fmt.Errorf("Invalid character in tag value %s of expression %s", expression[operatorEndPos+1:], expression)
+	isRegex := false
+	if len(expression)-1 == equalPos {
+		operatorEndPos = equalPos
+	} else if expression[equalPos+1] == '~' {
+		operatorEndPos = equalPos + 1
+		isRegex = true
+	} else {
+		operatorEndPos = equalPos
 	}
 
-	return isPositiveOperator, nil
+	value := expression[operatorEndPos+1:]
+	if strings.ContainsAny(value, ";~") {
+		return false, fmt.Errorf("Invalid character in tag value %s of expression %s", value, expression)
+	}
+
+	if isRegex {
+		matches, err := regexp.Match(value, nil)
+		if err != nil {
+			return false, fmt.Errorf("Invalid regular expression given as value %s in expression %s: %s", value, expression, err)
+		}
+		if matches {
+			// if value matches empty string, then requiresNonEmptyValue gets negated
+			requiresNonEmptyValue = !requiresNonEmptyValue
+		}
+	} else {
+		if len(value) == 0 {
+			// if value is empty, then requiresNonEmptyValue gets negated
+			// f.e.
+			// tag1!= means there must be a tag "tag1", instead of there must not be
+			// tag1= means there must not be a "tag1", instead of there must be
+			requiresNonEmptyValue = !requiresNonEmptyValue
+		}
+	}
+
+	return requiresNonEmptyValue, nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
