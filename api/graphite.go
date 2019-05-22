@@ -765,9 +765,13 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 // all expressions get validated and an error is returned if one or more are invalid
 func getTagQueryExpressions(expressions string) ([]string, error) {
 	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
-	var expressionStartEndPos []int
-	var needComma, insideExpression bool
+	var expressionStartPos int
+	var needComma, insideExpression, requiresNonEmptyValue bool
 	var quoteChar byte
+
+	// this might allocate a bit more than we need if a tag or value contains ,
+	// it's still better than having to grow the slice though
+	results := make([]string, 0, strings.Count(expressions, ",")+1)
 
 	for i := 0; i < len(expressions); i++ {
 		char := expressions[i]
@@ -776,7 +780,16 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 			if char == quoteChar {
 				insideExpression = false
 				needComma = true
-				expressionStartEndPos = append(expressionStartEndPos, i)
+				expression := expressions[expressionStartPos:i]
+				positive, err := validateTagQueryExpression(expression)
+				if err != nil {
+					return nil, err
+				}
+				if positive {
+					requiresNonEmptyValue = true
+				}
+
+				results = append(results, expression)
 				continue
 			}
 		} else {
@@ -792,7 +805,7 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 
 				insideExpression = true
 				quoteChar = char
-				expressionStartEndPos = append(expressionStartEndPos, i+1)
+				expressionStartPos = i + 1
 				continue
 			}
 
@@ -809,24 +822,8 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 		}
 	}
 
-	if insideExpression || len(expressionStartEndPos)%2 != 0 {
+	if insideExpression {
 		return nil, fmt.Errorf("Unclosed quotes in string: %s", expressions)
-	}
-
-	// extract all the sub strings according to expressionStartEndPos and validate them
-	results := make([]string, 0, len(expressionStartEndPos)/2)
-	requiresNonEmptyValue := false
-	for i := 0; i < len(expressionStartEndPos)/2; i++ {
-		expression := expressions[expressionStartEndPos[i*2]:expressionStartEndPos[i*2+1]]
-		positive, err := validateTagQueryExpression(expression)
-		if err != nil {
-			return nil, err
-		}
-		if positive {
-			requiresNonEmptyValue = true
-		}
-
-		results = append(results, expression)
 	}
 
 	if !requiresNonEmptyValue {
@@ -875,22 +872,12 @@ func validateTagQueryExpression(expression string) (bool, error) {
 		operatorEndPos = equalPos
 	}
 
-	key := expression[:operatorStartPos]
-	for i := 0; i < len(key); i++ {
-		for _, char := range []string{";", "!", "^"} {
-			if strings.Index(key, char) >= 0 {
-				return false, fmt.Errorf("Invalid character %s in tag key %s of expression %s", char, key, expression)
-			}
-		}
+	if strings.ContainsAny(expression[:operatorStartPos], ";!^") {
+		return false, fmt.Errorf("Invalid character in tag key %s of expression %s", expression[:operatorStartPos], expression)
 	}
 
-	value := expression[operatorEndPos+1:]
-	for i := 0; i < len(value); i++ {
-		for _, char := range []string{";", "~"} {
-			if strings.Index(value, char) >= 0 {
-				return false, fmt.Errorf("Invalid character %s in tag value %s of expression %s", char, value, expression)
-			}
-		}
+	if strings.ContainsAny(expression[operatorEndPos+1:], ";~") {
+		return false, fmt.Errorf("Invalid character in tag value %s of expression %s", expression[operatorEndPos+1:], expression)
 	}
 
 	return isPositiveOperator, nil
