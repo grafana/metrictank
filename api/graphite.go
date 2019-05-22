@@ -758,6 +758,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	return out, err
 }
 
+// getTagQueryExpressions takes a query string which includes multiple tag query expressions
+// example string: "'a=b', 'c=d', 'e!=~f.*'"
+// it then returns a slice of strings where each string is one of the queries, and an error
+// which is non-nil if there was an error in the expression validation
+// all expressions get validated and an error is returned if one or more are invalid
 func getTagQueryExpressions(expressions string) ([]string, error) {
 	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
 	var expressionStartEndPos []int
@@ -831,6 +836,10 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 	return results, nil
 }
 
+// validateTagQueryExpression takes a tag query expression as a string and validates it
+// the first return value is a boolean which indicates whether this expression requires
+// a non-empty value
+// the second return value is an error which is non-nil if there was any validation error
 func validateTagQueryExpression(expression string) (bool, error) {
 	var operatorStartPos, operatorEndPos, equalPos int
 	equalPos = strings.Index(expression, "=")
@@ -854,6 +863,11 @@ func validateTagQueryExpression(expression string) (bool, error) {
 
 	if len(expression)-1 == equalPos {
 		operatorEndPos = equalPos
+
+		// if value is empty, then the positivity of the operator gets negated
+		// f.e.
+		// tag1!= means there must be a tag "tag1", instead of there must not be
+		// tag1= means there must not be a "tag1", instead of there must be
 		isPositiveOperator = !isPositiveOperator
 	} else if expression[equalPos+1] == '~' {
 		operatorEndPos = equalPos + 1
