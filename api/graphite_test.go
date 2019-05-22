@@ -28,9 +28,14 @@ func TestExpressionParsing(t *testing.T) {
 			expectExpressions: []string{"a=b", "c=d"},
 		},
 		{
+			inputValue:        "'a!=b','c!=d',",
+			expectError:       true,
+			expectExpressions: nil,
+		},
+		{
 			inputValue:        "",
-			expectError:       false,
-			expectExpressions: []string{},
+			expectError:       true,
+			expectExpressions: nil,
 		},
 		{
 			inputValue:        "'a=b''c=d'",

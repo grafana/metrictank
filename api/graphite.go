@@ -810,31 +810,43 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 
 	// extract all the sub strings according to expressionStartEndPos and validate them
 	results := make([]string, 0, len(expressionStartEndPos)/2)
+	requiresNonEmptyValue := false
 	for i := 0; i < len(expressionStartEndPos)/2; i++ {
 		expression := expressions[expressionStartEndPos[i*2]:expressionStartEndPos[i*2+1]]
-		err := validateTagQueryExpression(expression)
+		positive, err := validateTagQueryExpression(expression)
 		if err != nil {
 			return nil, err
+		}
+		if positive {
+			requiresNonEmptyValue = true
 		}
 
 		results = append(results, expression)
 	}
 
+	if !requiresNonEmptyValue {
+		return nil, fmt.Errorf("At least one expression must require a non-empty value")
+	}
+
 	return results, nil
 }
 
-func validateTagQueryExpression(expression string) error {
+func validateTagQueryExpression(expression string) (bool, error) {
 	var operatorStartPos, operatorEndPos, equalPos int
 	equalPos = strings.Index(expression, "=")
 	if equalPos < 0 {
-		return fmt.Errorf("Missing equal sign: %s", expression)
+		return false, fmt.Errorf("Missing equal sign: %s", expression)
 	}
 
 	if equalPos == 0 {
-		return fmt.Errorf("Empty tag name: %s", expression)
+		return false, fmt.Errorf("Empty tag name: %s", expression)
 	}
 
-	if expression[equalPos-1] == '!' || expression[equalPos-1] == '^' {
+	isPositiveOperator := true
+	if expression[equalPos-1] == '!' {
+		operatorStartPos = equalPos - 1
+		isPositiveOperator = false
+	} else if expression[equalPos-1] == '^' {
 		operatorStartPos = equalPos - 1
 	} else {
 		operatorStartPos = equalPos
@@ -842,6 +854,7 @@ func validateTagQueryExpression(expression string) error {
 
 	if len(expression)-1 == equalPos {
 		operatorEndPos = equalPos
+		isPositiveOperator = !isPositiveOperator
 	} else if expression[equalPos+1] == '~' {
 		operatorEndPos = equalPos + 1
 	} else {
@@ -852,7 +865,7 @@ func validateTagQueryExpression(expression string) error {
 	for i := 0; i < len(key); i++ {
 		for _, char := range []string{";", "!", "^"} {
 			if strings.Index(key, char) >= 0 {
-				return fmt.Errorf("Invalid character %s in tag key %s of expression %s", char, key, expression)
+				return false, fmt.Errorf("Invalid character %s in tag key %s of expression %s", char, key, expression)
 			}
 		}
 	}
@@ -861,12 +874,12 @@ func validateTagQueryExpression(expression string) error {
 	for i := 0; i < len(value); i++ {
 		for _, char := range []string{";", "~"} {
 			if strings.Index(value, char) >= 0 {
-				return fmt.Errorf("Invalid character %s in tag value %s of expression %s", char, value, expression)
+				return false, fmt.Errorf("Invalid character %s in tag value %s of expression %s", char, value, expression)
 			}
 		}
 	}
 
-	return nil
+	return isPositiveOperator, nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
