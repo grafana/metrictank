@@ -24,7 +24,6 @@ var config *sarama.Config
 var offsetDuration time.Duration
 var partitionStr string
 var partitions []int32
-var bootTimeOffsets map[int32]int64
 var backlogProcessTimeout time.Duration
 var backlogProcessTimeoutStr string
 var partitionOffset map[int32]*stats.Gauge64
@@ -125,16 +124,7 @@ func ConfigProcess(instance string) {
 	partitionLogSize = make(map[int32]*stats.Gauge64)
 	partitionLag = make(map[int32]*stats.Gauge64)
 
-	// get the "newest" offset for all partitions.
-	// when booting up, we will delay consuming metrics until we have
-	// caught up to these offsets.
-	bootTimeOffsets = make(map[int32]int64)
 	for _, part := range partitions {
-		offset, err := client.GetOffset(topic, part, sarama.OffsetNewest)
-		if err != nil {
-			log.Fatalf("kafka-cluster: failed to get newest offset for topic %s part %d: %s", topic, part, err)
-		}
-		bootTimeOffsets[part] = offset
 		// metric cluster.notifier.kafka.partition.%d.offset is the current offset for the partition (%d) that we have consumed
 		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part))
 		// metric cluster.notifier.kafka.partition.%d.log_size is the size of the kafka partition (%d), aka the newest available offset.
