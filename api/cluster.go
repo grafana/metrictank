@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"net/http"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -140,11 +142,13 @@ func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDet
 		return
 	}
 
-	values, err := s.MetricIndex.TagDetails(req.OrgId, req.Tag, req.Filter, req.From)
+	re, err := compileRegexAnchored(req.Filter)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
+
+	values := s.MetricIndex.TagDetails(req.OrgId, req.Tag, re, req.From)
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagDetailsResp{Values: values}))
 }
 
@@ -156,12 +160,29 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 		return
 	}
 
-	tags, err := s.MetricIndex.Tags(req.OrgId, req.Filter, req.From)
+	re, err := compileRegexAnchored(req.Filter)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
+
+	tags := s.MetricIndex.Tags(req.OrgId, re, req.From)
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
+}
+
+func compileRegexAnchored(pattern string) (*regexp.Regexp, error) {
+	if len(pattern) == 0 {
+		return nil, nil
+	}
+
+	if pattern == "^.+" {
+		return nil, nil
+	}
+
+	if pattern[0] != '^' {
+		pattern = "^(?:" + pattern + ")"
+	}
+	return regexp.Compile(pattern)
 }
 
 func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.IndexAutoCompleteTags) {
@@ -172,12 +193,27 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 		return
 	}
 
-	tags, err := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.Expr, req.From, req.Limit)
+	// if there are no expressions given, we can shortcut the evaluation by not using a query
+	if len(req.Expr) == 0 {
+		tags := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.From, req.Limit)
+		response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
+		return
+	}
+
+	expressions := req.Expr
+	if len(req.Prefix) > 0 {
+		expressions = append(expressions, "__tag^="+req.Prefix)
+	}
+
+	query, err := tagQuery.NewQueryFromStrings(expressions, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
+
+	tags := s.MetricIndex.FindTagsWithQuery(req.OrgId, req.Prefix, query, req.Limit)
 	response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
+	return
 }
 
 func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.IndexAutoCompleteTagValues) {
@@ -188,11 +224,25 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 		return
 	}
 
-	tags, err := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.Expr, req.From, req.Limit)
+	// if there are no expressions given, we can shortcut the evaluation by not using a query
+	if len(req.Expr) == 0 {
+		values := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.From, req.Limit)
+		response.Write(ctx, response.NewMsgp(200, models.StringList(values)))
+		return
+	}
+
+	expressions := req.Expr
+	if len(req.Prefix) > 0 {
+		expressions = append(expressions, req.Tag+"^="+req.Prefix)
+	}
+
+	query, err := tagQuery.NewQueryFromStrings(expressions, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
+
+	tags := s.MetricIndex.FindTagValuesWithQuery(req.OrgId, req.Tag, req.Prefix, query, req.Limit)
 	response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
 }
 
@@ -206,13 +256,31 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 		return
 	}
 
-	deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, request.Paths)
-	if err != nil {
-		response.Write(ctx, response.WrapErrorForTagDB(err))
-		return
-	}
+	for _, path := range request.Paths {
+		tags, err := tagQuery.ParseTagsFromMetricName(path)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
 
-	res.Count = len(deleted)
+		expressions := make(tagQuery.Expressions, 0, len(tags))
+		for _, tag := range tags {
+			expressions = append(expressions, tagQuery.Expression{
+				Tag:                   tag,
+				Operator:              tagQuery.EQUAL,
+				RequiresNonEmptyValue: true,
+			})
+		}
+
+		query, err := tagQuery.NewQuery(expressions, 0)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+
+		deleted := s.MetricIndex.DeleteTagged(request.OrgId, query)
+		res.Count = len(deleted)
+	}
 
 	response.Write(ctx, response.NewMsgp(200, res))
 }
@@ -225,11 +293,13 @@ func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByT
 		return
 	}
 
-	metrics, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, req.From)
+	query, err := tagQuery.NewQueryFromStrings(req.Expr, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
+
+	metrics := s.MetricIndex.FindByTag(req.OrgId, query)
 	response.Write(ctx, response.NewMsgp(200, &models.IndexFindByTagResp{Metrics: metrics}))
 }
 
@@ -510,9 +580,21 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 		return
 	}
 
+	metaTags, err := tagQuery.ParseTags(req.MetaTags)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	queries, err := tagQuery.ParseExpressions(req.Queries)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
 	record := idx.MetaTagRecord{
-		MetaTags: req.MetaTags,
-		Queries:  req.Queries,
+		MetaTags: metaTags,
+		Queries:  queries,
 	}
 
 	result, created, err := s.MetricIndex.MetaTagRecordUpsert(req.OrgId, record)
@@ -522,8 +604,8 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 	}
 
 	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{
-		MetaTags: result.MetaTags,
-		Queries:  result.Queries,
+		MetaTags: result.MetaTags.Strings(),
+		Queries:  result.Queries.Strings(),
 		Created:  created,
 	}))
 }

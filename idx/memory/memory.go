@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -117,7 +118,7 @@ type MemoryIndex interface {
 	LoadPartition(int32, []schema.MetricDefinition) int
 	UpdateArchiveLastSave(schema.MKey, int32, uint32)
 	add(*idx.Archive)
-	idsByTagQuery(uint32, TagQuery) IdSet
+	idsByTagQuery(uint32, TagQueryContext) IdSet
 	PurgeFindCache()
 	ForceInvalidationFindCache()
 }
@@ -147,13 +148,13 @@ func (ids IdSet) String() string {
 
 }
 
-type TagValue map[string]IdSet    // value -> set of ids
-type TagIndex map[string]TagValue // key -> list of values
+type TagValues map[string]IdSet    // value -> set of ids
+type TagIndex map[string]TagValues // key -> list of values
 
 func (t *TagIndex) addTagId(name, value string, id schema.MKey) {
 	ti := *t
 	if _, ok := ti[name]; !ok {
-		ti[name] = make(TagValue)
+		ti[name] = make(TagValues)
 	}
 	if _, ok := ti[name][value]; !ok {
 		ti[name][value] = make(IdSet)
@@ -475,9 +476,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 		return res, false, err
 	}
 
-	builder := strings.Builder{}
-	res.MetaTags = record.metaTagStrings(&builder)
-	res.Queries = record.queryStrings(&builder)
+	res.MetaTags = record.metaTags
+	res.Queries = record.queries
 
 	// if this upsert has updated a previously existing record, then we remove its entries
 	// from the metaTagIndex before inserting the new ones
@@ -491,17 +491,16 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 		}
 
 		return res, false, nil
-	} else {
-		for _, keyValue := range record.metaTags {
-			mti.insertRecord(keyValue, id)
-		}
-
-		return res, true, nil
 	}
+
+	for _, keyValue := range record.metaTags {
+		mti.insertRecord(keyValue, id)
+	}
+
+	return res, true, nil
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
-	builder := strings.Builder{}
 	var res []idx.MetaTagRecord
 
 	m.RLock()
@@ -515,8 +514,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRe
 	res = make([]idx.MetaTagRecord, 0, len(metaTagRecords))
 	for _, record := range metaTagRecords {
 		res = append(res, idx.MetaTagRecord{
-			MetaTags: record.metaTagStrings(&builder),
-			Queries:  record.queryStrings(&builder),
+			MetaTags: record.metaTags,
+			Queries:  record.queries,
 		})
 	}
 
@@ -772,22 +771,10 @@ func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archiv
 	return archives
 }
 
-func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key, filter string, from int64) (map[string]uint64, error) {
+func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp, from int64) map[string]uint64 {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil, nil
-	}
-
-	var re *regexp.Regexp
-	if len(filter) > 0 {
-		if filter[0] != byte('^') {
-			filter = "^(?:" + filter + ")"
-		}
-		var err error
-		re, err = regexp.Compile(filter)
-		if err != nil {
-			return nil, err
-		}
+		return nil
 	}
 
 	m.RLock()
@@ -795,17 +782,17 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key, filter string, fr
 
 	tags, ok := m.tags[orgId]
 	if !ok {
-		return nil, nil
+		return nil
 	}
 
 	values, ok := tags[key]
 	if !ok {
-		return nil, nil
+		return nil
 	}
 
 	res := make(map[string]uint64)
 	for value, ids := range values {
-		if re != nil && !re.MatchString(value) {
+		if filter != nil && !filter.MatchString(value) {
 			continue
 		}
 
@@ -834,218 +821,19 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key, filter string, fr
 		}
 	}
 
-	return res, nil
+	return res
 }
 
 // FindTags returns tags matching the specified conditions
 // prefix:      prefix match
-// expressions: tagdb expressions in the same format as graphite
 // from:        tags must have at least one metric with LastUpdate >= from
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int64, limit uint) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil, nil
-	}
-	var res []string
-
-	// only if expressions are specified we need to build a tag query.
-	// otherwise, the generation of the result set is much simpler
-	if len(expressions) > 0 {
-		// incorporate the tag prefix into the tag query expressions
-		if len(prefix) > 0 {
-			expressions = append(expressions, "__tag^="+prefix)
-		}
-
-		query, err := NewTagQuery(expressions, from)
-		if err != nil {
-			return nil, err
-		}
-
-		// only acquire lock after we're sure the query is valid
-		m.RLock()
-		defer m.RUnlock()
-
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		resMap := query.RunGetTags(tags, m.defById)
-		for tag := range resMap {
-			res = append(res, tag)
-		}
-
-		sort.Strings(res)
-		if uint(len(res)) > limit {
-			res = res[:limit]
-		}
-	} else {
-		m.RLock()
-		defer m.RUnlock()
-
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		tagsSorted := make([]string, 0, len(tags))
-		for tag := range tags {
-			if !strings.HasPrefix(tag, prefix) {
-				continue
-			}
-
-			tagsSorted = append(tagsSorted, tag)
-		}
-
-		sort.Strings(tagsSorted)
-
-		for _, tag := range tagsSorted {
-			// only if from is specified we need to find at least one
-			// metric with LastUpdate >= from
-			if (from > 0 && m.hasOneMetricFrom(tags, tag, from)) || from == 0 {
-				res = append(res, tag)
-			}
-
-			// the tags are processed in sorted order, so once we have have "limit" results we can break
-			if uint(len(res)) >= limit {
-				break
-			}
-		}
-	}
-
-	return res, nil
-}
-
-// FindTagValues returns tag values matching the specified conditions
-// tag:         tag key match
-// prefix:      value prefix match
-// expressions: tagdb expressions in the same format as graphite
-// from:        tags must have at least one metric with LastUpdate >= from
-// limit:       the maximum number of results to return
-//
-// the results will always be sorted alphabetically for consistency
-func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
-	if !TagSupport {
-		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil, nil
-	}
-	var res []string
-
-	// only if expressions are specified we need to build a tag query.
-	// otherwise, the generation of the result set is much simpler
-	if len(expressions) > 0 {
-
-		// add the value prefix into the expressions as an additional condition
-		if len(prefix) > 0 {
-			expressions = append(expressions, tag+"^="+prefix)
-		} else {
-			// if no value prefix has been specified we still require that at
-			// least the given tag must be present
-			expressions = append(expressions, tag+"!=")
-		}
-
-		query, err := NewTagQuery(expressions, from)
-		if err != nil {
-			return nil, err
-		}
-
-		// only acquire lock after we're sure the query is valid
-		m.RLock()
-		defer m.RUnlock()
-
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		ids := query.Run(tags, m.defById)
-		valueMap := make(map[string]struct{})
-		prefix := tag + "="
-		for id := range ids {
-			var ok bool
-			var def *idx.Archive
-			if def, ok = m.defById[id]; !ok {
-				// should never happen because every ID in the tag index
-				// must be present in the byId lookup table
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: ID %q is in tag index but not in the byId lookup table", id)
-				continue
-			}
-
-			// special case if the tag to complete values for is "name"
-			if tag == "name" {
-				valueMap[def.Name] = struct{}{}
-			} else {
-				for _, t := range def.Tags {
-					if !strings.HasPrefix(t, prefix) {
-						continue
-					}
-
-					// keep the value after "=", that's why "+1"
-					valueMap[t[len(prefix):]] = struct{}{}
-				}
-			}
-		}
-
-		res = make([]string, 0, len(valueMap))
-		for v := range valueMap {
-			res = append(res, v)
-		}
-	} else {
-		m.RLock()
-		defer m.RUnlock()
-
-		tags, ok := m.tags[orgId]
-		if !ok {
-			return nil, nil
-		}
-
-		vals, ok := tags[tag]
-		if !ok {
-			return nil, nil
-		}
-
-		res = make([]string, 0, len(vals))
-		for val := range vals {
-			if !strings.HasPrefix(val, prefix) {
-				continue
-			}
-
-			res = append(res, val)
-		}
-	}
-
-	sort.Strings(res)
-	if uint(len(res)) > limit {
-		res = res[:limit]
-	}
-
-	return res, nil
-}
-
-// Tags returns a list of all tag keys associated with the metrics of a given
-// organization. The return values are filtered by the regex in the second parameter.
-// If the third parameter is >0 then only metrics will be accounted of which the
-// LastUpdate time is >= the given value.
-func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter string, from int64) ([]string, error) {
-	if !TagSupport {
-		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil, nil
-	}
-
-	var re *regexp.Regexp
-	if len(filter) > 0 {
-		if filter[0] != byte('^') {
-			filter = "^(?:" + filter + ")"
-		}
-		var err error
-		re, err = regexp.Compile(filter)
-		if err != nil {
-			return nil, err
-		}
+		return nil
 	}
 
 	m.RLock()
@@ -1053,69 +841,249 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter string, from int64) (
 
 	tags, ok := m.tags[orgId]
 	if !ok {
-		return nil, nil
+		return nil
 	}
 
-	var res []string
+	// probably allocating more than necessary, still better than growing
+	res := make([]string, 0, len(tags))
 
-	// if there is no filter/from given we know how much space we'll need
-	// and can preallocate it
-	if re == nil && from == 0 {
-		res = make([]string, 0, len(tags))
-	}
-
-	for tag := range tags {
-		// filter by pattern if one was given
-		if re != nil && !re.MatchString(tag) {
-			continue
-		}
-
-		// if from is > 0 we need to find at least one metric definition where
-		// LastUpdate >= from before we add the tag to the result set
-		if (from > 0 && m.hasOneMetricFrom(tags, tag, from)) || from == 0 {
+	for tag, values := range tags {
+		// a tag gets appended to the result set if:
+		// either the given prefix is empty or the tag has the given prefix, and
+		// either from is set to 0 or the tag has at least one metric with .LastUpdate higher or equal to from
+		if (len(prefix) == 0 || strings.HasPrefix(tag, prefix)) && (from == 0 || m.tagHasOneMetricFrom(values, from)) {
 			res = append(res, tag)
 		}
 	}
 
-	return res, nil
-}
+	sort.Strings(res)
 
-func (m *UnpartitionedMemoryIdx) hasOneMetricFrom(tags TagIndex, tag string, from int64) bool {
-	for _, ids := range tags[tag] {
-		for id := range ids {
-			def, ok := m.defById[id]
-			if !ok {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
-				continue
-			}
-
-			// as soon as we found one metric definition with LastUpdate >= from
-			// we can return true
-			if atomic.LoadInt64(&def.LastUpdate) >= from {
-				return true
-			}
-		}
+	if len(res) > int(limit) {
+		return res[:limit]
 	}
-	return false
+	return res
 }
 
-func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, expressions []string, from int64) ([]idx.Node, error) {
+// FindTagsWithQuery returns tags matching the specified conditions
+// query:       tagdb query to run on the index
+// limit:       the maximum number of results to return
+//
+// the results will always be sorted alphabetically for consistency
+func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, query tagQuery.Query, limit uint) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil, nil
+		return nil
 	}
 
-	query, err := NewTagQuery(expressions, from)
-	if err != nil {
-		return nil, err
+	queryCtx := NewTagQueryContext(query)
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	// probably allocating more than necessary, still better than growing
+	res := make([]string, 0, len(tags))
+
+	resMap := queryCtx.RunGetTags(tags, m.defById)
+	for tag := range resMap {
+		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
+			res = append(res, tag)
+		}
+	}
+
+	sort.Strings(res)
+
+	if len(res) > int(limit) {
+		return res[:limit]
+	}
+	return res
+}
+
+// FindTagValues returns tag values matching the specified conditions
+// tag:         tag key match
+// prefix:      value prefix match
+// from:        tags must have at least one metric with LastUpdate >= from
+// limit:       the maximum number of results to return
+//
+// the results will always be sorted alphabetically for consistency
+func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, from int64, limit uint) []string {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
 	}
 
 	m.RLock()
 	defer m.RUnlock()
 
+	values := m.tags[orgId][tag]
+	if len(values) == 0 {
+		return nil
+	}
+
+	res := make([]string, 0, len(values))
+	for value, ids := range values {
+		if (len(prefix) == 0 || strings.HasPrefix(value, prefix)) && (from == 0 || m.idSetHasOneMetricFrom(ids, from)) {
+			res = append(res, value)
+		}
+	}
+
+	sort.Strings(res)
+
+	if len(res) > int(limit) {
+		return res[:limit]
+	}
+	return res
+}
+
+func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagQuery.Query, limit uint) []string {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	queryCtx := NewTagQueryContext(query)
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	ids := queryCtx.Run(tags, m.defById)
+	valueMap := make(map[string]struct{})
+	tagPrefix := tag + "=" + prefix
+	for id := range ids {
+		var ok bool
+		var def *idx.Archive
+		if def, ok = m.defById[id]; !ok {
+			// should never happen because every ID in the tag index
+			// must be present in the byId lookup table
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: ID %q is in tag index but not in the byId lookup table", id)
+			continue
+		}
+
+		// special case if the tag to complete values for is "name"
+		if tag == "name" {
+			valueMap[def.Name] = struct{}{}
+		} else {
+			for _, tag := range def.Tags {
+				if !strings.HasPrefix(tag, tagPrefix) {
+					continue
+				}
+
+				tagValue := strings.SplitN(tag, "=", 2)
+				if len(tagValue) < 2 {
+					// should never happen because invalid tags should get rejected at ingestion
+					corruptIndex.Inc()
+					log.Errorf("memory-idx: tag \"%s\" is invalid because it has no \"=\"", tag)
+					continue
+				}
+
+				// keep the value after "=", that's why "+1"
+				valueMap[tagValue[1]] = struct{}{}
+			}
+		}
+	}
+
+	res := make([]string, 0, len(valueMap))
+	for v := range valueMap {
+		res = append(res, v)
+	}
+
+	sort.Strings(res)
+
+	if len(res) > int(limit) {
+		return res[:limit]
+	}
+	return res
+}
+
+// Tags returns a list of all tag keys associated with the metrics of a given
+// organization. The return values are filtered by the regex in the second parameter.
+// If the third parameter is >0 then only metrics will be accounted of which the
+// LastUpdate time is >= the given value.
+func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp, from int64) []string {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	var res []string
+
+	res = make([]string, 0, len(tags))
+
+	for tag, values := range tags {
+		// filter by pattern if one was given
+		if filter != nil && !filter.MatchString(tag) {
+			continue
+		}
+
+		// if from is > 0 we need to find at least one metric definition where
+		// LastUpdate >= from before we add the tag to the result set
+		if (from > 0 && m.tagHasOneMetricFrom(values, from)) || from == 0 {
+			res = append(res, tag)
+		}
+	}
+
+	return res
+}
+
+func (m *UnpartitionedMemoryIdx) tagHasOneMetricFrom(values TagValues, from int64) bool {
+	for _, ids := range values {
+		if m.idSetHasOneMetricFrom(ids, from) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *UnpartitionedMemoryIdx) idSetHasOneMetricFrom(ids IdSet, from int64) bool {
+	for id := range ids {
+		def, ok := m.defById[id]
+		if !ok {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
+			continue
+		}
+
+		// as soon as we found one metric definition with LastUpdate >= from
+		// we can return true
+		if atomic.LoadInt64(&def.LastUpdate) >= from {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagQuery.Query) []idx.Node {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	queryCtx := NewTagQueryContext(query)
+
+	m.RLock()
+	defer m.RUnlock()
+
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
-	ids := m.idsByTagQuery(orgId, query)
+	ids := m.idsByTagQuery(orgId, queryCtx)
 	byPath := make(map[string]*idx.Node)
 	for id := range ids {
 		def, ok := m.defById[id]
@@ -1143,10 +1111,10 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, expressions []string, f
 		results = append(results, *v)
 	}
 
-	return results, nil
+	return results
 }
 
-func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
+func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) IdSet {
 	tags, ok := m.tags[orgId]
 	if !ok {
 		return nil
@@ -1352,42 +1320,26 @@ func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	return defs
 }
 
-func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, paths []string) ([]idx.Archive, error) {
+func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagQuery.Query) []idx.Archive {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil, nil
+		return nil
 	}
 
-	queries := make([]TagQuery, 0, len(paths))
-	for _, path := range paths {
-		elements := strings.Split(path, ";")
-		if len(elements) < 2 {
-			continue
-		}
-		expressions := elements[1:]
-		expressions = append(expressions, "name="+elements[0])
+	queryCtx := NewTagQueryContext(query)
 
-		q, err := NewTagQuery(expressions, 0)
-		if err != nil {
-			return nil, err
-		}
-		queries = append(queries, q)
-	}
+	m.RLock()
+	idMap := m.idsByTagQuery(orgId, queryCtx)
+	m.RUnlock()
 
-	ids := make(IdSet)
-	for _, query := range queries {
-		m.RLock()
-		queryIds := m.idsByTagQuery(orgId, query)
-		m.RUnlock()
-
-		for id := range queryIds {
-			ids[id] = struct{}{}
-		}
+	ids := make(IdSet, len(idMap))
+	for id := range idMap {
+		ids[id] = struct{}{}
 	}
 
 	m.Lock()
 	defer m.Unlock()
-	return m.deleteTaggedByIdSet(orgId, ids), nil
+	return m.deleteTaggedByIdSet(orgId, ids)
 }
 
 // deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
