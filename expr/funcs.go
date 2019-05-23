@@ -75,7 +75,7 @@ func init() {
 		"highestAverage":        {NewHighestLowestConstructor("average", true), true},
 		"highestCurrent":        {NewHighestLowestConstructor("current", true), true},
 		"highestMax":            {NewHighestLowestConstructor("max", true), true},
-		"integral":              {NewIntegral, false},
+		"integral":              {NewIntegral, true},
 		"isNonNull":             {NewIsNonNull, true},
 		"keepLastValue":         {NewKeepLastValue, true},
 		"lowest":                {NewHighestLowestConstructor("", false), true},
