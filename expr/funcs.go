@@ -68,6 +68,7 @@ func init() {
 		"divideSeries":          {NewDivideSeries, true},
 		"divideSeriesLists":     {NewDivideSeriesLists, true},
 		"exclude":               {NewExclude, true},
+		"fallbackSeries":        {NewFallbackSeries, false},
 		"filterSeries":          {NewFilterSeries, true},
 		"grep":                  {NewGrep, true},
 		"groupByTags":           {NewGroupByTags, true},
