@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -653,14 +654,16 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		}
 		var err error
 		var series []Series
+		var exprs []string
 		const SeriesByTagIdent = "seriesByTag("
 		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
 			startPos := len(SeriesByTagIdent)
 			endPos := strings.LastIndex(r.Query, ")")
-			exprs := strings.Split(r.Query[startPos:endPos], ",")
-			for i, e := range exprs {
-				exprs[i] = strings.Trim(e, " '\"")
+			exprs, err = getTagQueryExpressions(r.Query[startPos:endPos])
+			if err != nil {
+				return nil, err
 			}
+
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs))
 		} else {
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
@@ -754,6 +757,147 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	out, err = plan.Run(data)
 	planRunDuration.Value(time.Since(preRun))
 	return out, err
+}
+
+// getTagQueryExpressions takes a query string which includes multiple tag query expressions
+// example string: "'a=b', 'c=d', 'e!=~f.*'"
+// it then returns a slice of strings where each string is one of the queries, and an error
+// which is non-nil if there was an error in the expression validation
+// all expressions get validated and an error is returned if one or more are invalid
+func getTagQueryExpressions(expressions string) ([]string, error) {
+	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
+	var expressionStartPos int
+	var needComma, insideExpression, requiresNonEmptyValue bool
+	var quoteChar byte
+
+	// this might allocate a bit more than we need if a tag or value contains ,
+	// it's still better than having to grow the slice though
+	results := make([]string, 0, strings.Count(expressions, ",")+1)
+
+	for i := 0; i < len(expressions); i++ {
+		char := expressions[i]
+		if insideExpression {
+			// checking for closing quote
+			if char == quoteChar {
+				insideExpression = false
+				needComma = true
+				expression := expressions[expressionStartPos:i]
+				positive, err := validateTagQueryExpression(expression)
+				if err != nil {
+					return nil, err
+				}
+				if positive {
+					requiresNonEmptyValue = true
+				}
+
+				results = append(results, expression)
+				continue
+			}
+		} else {
+			// outside an expression spaces are ignored
+			if char == ' ' {
+				continue
+			}
+
+			if char == '\'' || char == '"' {
+				if needComma {
+					return nil, fmt.Errorf("Missing comma between quotes: %s", expressions)
+				}
+
+				insideExpression = true
+				quoteChar = char
+				expressionStartPos = i + 1
+				continue
+			}
+
+			if char == ',' {
+				if needComma {
+					needComma = false
+					continue
+				} else {
+					return nil, fmt.Errorf("Too many commas between quotes: %s", expressions)
+				}
+			}
+
+			return nil, fmt.Errorf("Invalid character outside quotes '%c': %s", char, expressions)
+		}
+	}
+
+	if insideExpression {
+		return nil, fmt.Errorf("Unclosed quotes in string: %s", expressions)
+	}
+
+	if !requiresNonEmptyValue {
+		return nil, fmt.Errorf("At least one expression must require a non-empty value")
+	}
+
+	return results, nil
+}
+
+// validateTagQueryExpression takes a tag query expression as a string and validates it
+// the first return value is a boolean which indicates whether this expression requires
+// a non-empty value
+// the second return value is an error which is non-nil if there was any validation error
+func validateTagQueryExpression(expression string) (bool, error) {
+	var operatorStartPos, operatorEndPos, equalPos int
+	equalPos = strings.Index(expression, "=")
+	if equalPos < 0 {
+		return false, fmt.Errorf("Missing equal sign: %s", expression)
+	}
+
+	if equalPos == 0 {
+		return false, fmt.Errorf("Empty tag name: %s", expression)
+	}
+
+	requiresNonEmptyValue := true
+	if expression[equalPos-1] == '!' {
+		operatorStartPos = equalPos - 1
+		requiresNonEmptyValue = false
+	} else if expression[equalPos-1] == '^' {
+		operatorStartPos = equalPos - 1
+	} else {
+		operatorStartPos = equalPos
+	}
+
+	if strings.ContainsAny(expression[:operatorStartPos], ";!^") {
+		return false, fmt.Errorf("Invalid character in tag key %s of expression %s", expression[:operatorStartPos], expression)
+	}
+
+	isRegex := false
+	if len(expression)-1 == equalPos {
+		operatorEndPos = equalPos
+	} else if expression[equalPos+1] == '~' {
+		operatorEndPos = equalPos + 1
+		isRegex = true
+	} else {
+		operatorEndPos = equalPos
+	}
+
+	value := expression[operatorEndPos+1:]
+	if strings.ContainsAny(value, ";~") {
+		return false, fmt.Errorf("Invalid character in tag value %s of expression %s", value, expression)
+	}
+
+	if isRegex {
+		matches, err := regexp.Match(value, nil)
+		if err != nil {
+			return false, fmt.Errorf("Invalid regular expression given as value %s in expression %s: %s", value, expression, err)
+		}
+		if matches {
+			// if value matches empty string, then requiresNonEmptyValue gets negated
+			requiresNonEmptyValue = !requiresNonEmptyValue
+		}
+	} else {
+		if len(value) == 0 {
+			// if value is empty, then requiresNonEmptyValue gets negated
+			// f.e.
+			// tag1!= means there must be a tag "tag1", instead of there must not be
+			// tag1= means there must not be a "tag1", instead of there must be
+			requiresNonEmptyValue = !requiresNonEmptyValue
+		}
+	}
+
+	return requiresNonEmptyValue, nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
