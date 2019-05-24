@@ -82,6 +82,10 @@ func (c *NotifierKafka) start() {
 		if err != nil {
 			log.Fatalf("kafka-cluster: failed to get offset %d: %s", offsetTime, err)
 		}
+		if startOffset < 0 {
+			// happens when OffsetOldest or an offsetDuration was used and there is no message in the partition
+			startOffset = 0
+		}
 		processBacklog.Add(1)
 		go c.consumePartition(topic, partition, startOffset, processBacklog)
 	}
