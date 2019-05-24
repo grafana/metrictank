@@ -4,6 +4,15 @@ package cluster
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[ModeShard-0]
+	_ = x[ModeDev-1]
+	_ = x[ModeQuery-2]
+}
+
 const _NodeMode_name = "ShardDevQuery"
 
 var _NodeMode_index = [...]uint8{0, 5, 8, 13}
