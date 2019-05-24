@@ -4,6 +4,15 @@ package chunk
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[FormatStandardGoTsz-0]
+	_ = x[FormatStandardGoTszWithSpan-1]
+	_ = x[FormatGoTszLongWithSpan-2]
+}
+
 const _Format_name = "FormatStandardGoTszFormatStandardGoTszWithSpanFormatGoTszLongWithSpan"
 
 var _Format_index = [...]uint8{0, 19, 46, 69}
