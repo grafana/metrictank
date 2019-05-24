@@ -304,11 +304,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		metaTagRecords: make(map[uint32]metaTagRecords),
 		shutdown:       make(chan struct{}),
 	}
-	// instantiate strats for the interning layer/object store
-	for i := 0; i < 256; i++ {
-		statInternMemory[i] = stats.NewGauge64(fmt.Sprintf("idx.memory.intern.memory.%d", i))
-		statInternFragmentation[i] = stats.NewGauge32(fmt.Sprintf("idx.memory.intern.fragmentation.%d", i))
-	}
+
 	if findCacheSize > 0 {
 		umi.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
 	}
