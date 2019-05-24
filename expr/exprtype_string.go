@@ -4,18 +4,6 @@ package expr
 
 import "strconv"
 
-func _() {
-	// An "invalid array index" compiler error signifies that the constant values have changed.
-	// Re-run the stringer command to generate them again.
-	var x [1]struct{}
-	_ = x[etName-0]
-	_ = x[etBool-1]
-	_ = x[etFunc-2]
-	_ = x[etInt-3]
-	_ = x[etFloat-4]
-	_ = x[etString-5]
-}
-
 const _exprType_name = "etNameetBooletFuncetIntetFloatetString"
 
 var _exprType_index = [...]uint8{0, 6, 12, 18, 23, 30, 38}
