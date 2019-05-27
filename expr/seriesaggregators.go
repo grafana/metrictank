@@ -20,6 +20,8 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 	switch c {
 	case "average", "avg":
 		return crossSeriesAvg
+	case "avg_zero":
+		return crossSeriesAvgZero
 	case "min":
 		return crossSeriesMin
 	case "max":
@@ -62,6 +64,28 @@ func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 			point.Val = math.NaN()
 		} else {
 			point.Val = sum / float64(num)
+		}
+
+		*out = append(*out, point)
+	}
+}
+
+func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
+	for i := 0; i < len(in[0].Datapoints); i++ {
+		sum := float64(0)
+		for j := 0; j < len(in); j++ {
+			p := in[j].Datapoints[i].Val
+			if !math.IsNaN(p) {
+				sum += p
+			}
+		}
+		point := schema.Point{
+			Ts: in[0].Datapoints[i].Ts,
+		}
+		if len(in) == 0 {
+			point.Val = math.NaN()
+		} else {
+			point.Val = sum / float64(len(in))
 		}
 
 		*out = append(*out, point)
