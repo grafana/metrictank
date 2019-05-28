@@ -74,7 +74,7 @@ See also:
 | events                                                         |              | No         |
 | exclude(seriesList, pattern) seriesList                        |              | Stable     |
 | exponentialMovingAverage                                       |              | No         |
-| fallbackSeries                                                 |              | No         |
+| fallbackSeries                                                 |              | Stable     |
 | filterSeries(seriesList, func, operator, threshold) seriesList |              | Stable     |
 | grep(seriesList, pattern) seriesList                           |              | Stable     |
 | group                                                          |              | No         |
