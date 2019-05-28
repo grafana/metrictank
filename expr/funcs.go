@@ -71,6 +71,7 @@ func init() {
 		"fallbackSeries":        {NewFallbackSeries, true},
 		"filterSeries":          {NewFilterSeries, true},
 		"grep":                  {NewGrep, true},
+		"group":                 {NewGroup, true},
 		"groupByTags":           {NewGroupByTags, true},
 		"highest":               {NewHighestLowestConstructor("", true), true},
 		"highestAverage":        {NewHighestLowestConstructor("average", true), true},

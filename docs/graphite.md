@@ -77,7 +77,7 @@ See also:
 | fallbackSeries                                                 |              | Stable     |
 | filterSeries(seriesList, func, operator, threshold) seriesList |              | Stable     |
 | grep(seriesList, pattern) seriesList                           |              | Stable     |
-| group                                                          |              | No         |
+| group                                                          |              | Stable     |
 | groupByNode                                                    |              | No         |
 | groupByNodes                                                   |              | No         |
 | groupByTags(seriesList, func, tagList) seriesList              |              | Stable     |
