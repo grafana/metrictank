@@ -415,35 +415,30 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 		reqCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		originalPeers := make(map[string]struct{}, len(peerGroups))
-		receivedResponses := make(map[int32]struct{}, len(peerGroups))
-
-		responses := make(chan struct {
+		type response struct {
 			shardGroup int32
 			data       PeerResponse
 			err        error
-		}, 1)
+		}
+
+		responses := make(chan response)
+		originalPeers := make(map[string]struct{}, len(peerGroups))
+		receivedResponses := make(map[int32]struct{}, len(peerGroups))
 
 		askPeer := func(shardGroup int32, peer cluster.Node) {
 			log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
 			buf, err := peer.Post(reqCtx, name, path, data)
-
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				// Not canceled, continue
-			}
-
 			if err != nil {
 				cancel()
 				log.Errorf("HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
 			}
-			responses <- struct {
-				shardGroup int32
-				data       PeerResponse
-				err        error
-			}{shardGroup, PeerResponse{peer, buf}, err}
+
+			select {
+			case <-ctx.Done():
+				return
+			case responses <- response{shardGroup, PeerResponse{peer, buf}, err}:
+				return
+			}
 		}
 
 		for group, peers := range peerGroups {
