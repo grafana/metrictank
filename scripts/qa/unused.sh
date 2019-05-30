@@ -1,24 +1,18 @@
 #!/bin/bash
 
-# runs the tools unused, varcheck and structcheck
+# runs the tools varcheck, structcheck and deadcode
 # see their websites for more info.
 
 # find the dir we exist within...
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir
 cd ${DIR}/../..
-go get -u honnef.co/go/tools/cmd/unused
 go get -u github.com/opennota/check/cmd/varcheck
 go get -u github.com/opennota/check/cmd/structcheck
 # for https://github.com/remyoudompheng/go-misc/pull/14
 go get -u github.com/Dieterbe/go-misc/deadcode
 
 ret=0
-
-echo "## running unused"
-unused ./...
-r=$?
-[ $r -gt $ret ] && ret=$r
 
 echo "## running varcheck"
 varcheck ./...
