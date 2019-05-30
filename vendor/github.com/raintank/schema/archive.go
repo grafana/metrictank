@@ -14,6 +14,7 @@ import (
 // any non-zero value represents a certain
 // aggregation method (lower 8 bits) and
 // aggregation span (higher 8 bits)
+//go:generate msgp
 type Archive uint16
 
 // important: caller must make sure to call IsSpanValid first

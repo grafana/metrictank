@@ -673,7 +673,7 @@ Usage of ./mt-whisper-importer-reader:
   -http-auth string
     	The credentials used to authenticate in the format "user:password"
   -http-endpoint string
-    	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
+    	The http endpoint to send the data to (default "http://127.0.0.1:8080/metrics/import")
   -import-after uint
     	Only import after the specified timestamp
   -import-up-to uint
@@ -684,8 +684,6 @@ Usage of ./mt-whisper-importer-reader:
     	A regex pattern to be applied to all metric names, only matching ones will be imported
   -name-prefix string
     	Prefix to prepend before every metric name, should include the '.' if necessary
-  -orgid int
-    	Organization ID the data belongs to  (default 1)
   -position-file string
     	file to store position and load position from
   -threads int
@@ -707,8 +705,10 @@ Usage of ./mt-whisper-importer-writer:
     	configuration file path (default "/etc/metrictank/metrictank.ini")
   -exit-on-error
     	Exit with a message when there's an error
-  -http-endpoint string
-    	The http endpoint to listen on (default "127.0.0.1:8080")
+  -listen-address string
+    	The address to listen on (default "127.0.0.1")
+  -listen-port int
+    	The port to listen on (default 8080)
   -log-level string
     	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int

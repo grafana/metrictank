@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,7 +29,8 @@ import (
 var (
 	confFile        = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 	exitOnError     = flag.Bool("exit-on-error", false, "Exit with a message when there's an error")
-	httpEndpoint    = flag.String("http-endpoint", "127.0.0.1:8080", "The http endpoint to listen on")
+	listenAddress   = flag.String("listen-address", "127.0.0.1", "The address to listen on")
+	listenPort      = flag.Int("listen-port", 8080, "The port to listen on")
 	ttlsStr         = flag.String("ttls", "35d", "list of ttl strings used by MT separated by ','")
 	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
 	uriPath         = flag.String("uri-path", "/chunks", "the URI on which we expect chunks to get posted")
@@ -137,12 +140,13 @@ func main() {
 
 	index.Init()
 
+	httpEndpoint := fmt.Sprintf("%s:%d", *listenAddress, *listenPort)
 	server := &Server{
 		partitioner: p,
 		index:       index,
 		store:       store,
 		HTTPServer: &http.Server{
-			Addr:        *httpEndpoint,
+			Addr:        httpEndpoint,
 			ReadTimeout: 10 * time.Minute,
 		},
 	}
@@ -150,8 +154,8 @@ func main() {
 	http.HandleFunc(*uriPath, server.chunksHandler)
 	http.HandleFunc("/healthz", server.healthzHandler)
 
-	log.Infof("Listening on %q", *httpEndpoint)
-	err = http.ListenAndServe(*httpEndpoint, nil)
+	log.Infof("Listening on %q", httpEndpoint)
+	err = http.ListenAndServe(httpEndpoint, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating listener: %q", err))
 	}
@@ -173,8 +177,15 @@ func (s *Server) healthzHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
+	orgId, err := getOrgId(req)
+	if err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
 	data := mdata.ArchiveRequest{}
-	err := data.UnmarshalCompressed(req.Body)
+	err = data.UnmarshalCompressed(req.Body)
 	if err != nil {
 		throwError(w, fmt.Sprintf("Error decoding cwr stream: %q", err))
 		return
@@ -189,13 +200,15 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		"Received %d cwrs for metric %s. The first has Key: %s, T0: %d, TTL: %d. The last has Key: %s, T0: %d, TTL: %d",
 		len(data.ChunkWriteRequests),
 		data.MetricData.Name,
-		data.ChunkWriteRequests[0].Key.String(),
+		data.ChunkWriteRequests[0].Archive.String(),
 		data.ChunkWriteRequests[0].T0,
 		data.ChunkWriteRequests[0].TTL,
-		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].Key.String(),
+		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].Archive.String(),
 		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].T0,
 		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].TTL)
 
+	data.MetricData.OrgId = orgId
+	data.MetricData.SetId()
 	partition, err := s.partitioner.Partition(&data.MetricData, int32(*numPartitions))
 	if err != nil {
 		throwError(w, fmt.Sprintf("Error partitioning: %q", err))
@@ -210,7 +223,18 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 
 	s.index.AddOrUpdate(mkey, &data.MetricData, partition)
 	for _, cwr := range data.ChunkWriteRequests {
-		cwr := cwr // important because we pass by reference and this var will get overwritten in the next loop
-		s.store.Add(&cwr)
+		cwrWithOrg := cwr.GetChunkWriteRequest(nil, mkey)
+		s.store.Add(&cwrWithOrg)
 	}
+}
+
+func getOrgId(req *http.Request) (int, error) {
+	if orgIdStr := req.Header.Get("X-Org-Id"); len(orgIdStr) > 0 {
+		if orgId, err := strconv.Atoi(orgIdStr); err == nil {
+			return orgId, nil
+		} else {
+			return 0, fmt.Errorf("Invalid value in X-Org-Id header (%s): %s", orgIdStr, err)
+		}
+	}
+	return 0, errors.New("Missing X-Org-Id header")
 }

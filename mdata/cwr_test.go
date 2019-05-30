@@ -54,11 +54,7 @@ func TestArchiveRequestEncodingDecoding(t *testing.T) {
 	testData := getTestData(6000, 60, 100, 0)
 	chunks := chunksFromPoints(testData, 1800)
 
-	id := "98.12345678901234567890123456789012"
-	key, err := schema.AMKeyFromString(id + "_sum_3600")
-	if err != nil {
-		t.Fatalf("Expected no error when getting AMKey from string %q", err)
-	}
+	archive := schema.NewArchive(schema.Sum, 3600)
 	originalRequest := ArchiveRequest{
 		MetricData: schema.MetricData{
 			Id:       "98.12345678901234567890123456789012",
@@ -74,13 +70,14 @@ func TestArchiveRequestEncodingDecoding(t *testing.T) {
 	}
 
 	for i := 0; i < len(chunks); i++ {
-		originalRequest.ChunkWriteRequests = append(originalRequest.ChunkWriteRequests, ChunkWriteRequest{
-			Callback:  nil,
-			Key:       key,
-			TTL:       1,
-			T0:        chunks[i].Series.T0,
-			Data:      chunks[i].Encode(1800),
-			Timestamp: time.Unix(123, 456),
+		originalRequest.ChunkWriteRequests = append(originalRequest.ChunkWriteRequests, ChunkWriteRequestWithoutOrg{
+			ChunkWriteRequestPayload: ChunkWriteRequestPayload{
+				TTL:       1,
+				T0:        chunks[i].Series.T0,
+				Data:      chunks[i].Encode(1800),
+				Timestamp: time.Unix(123, 456),
+			},
+			Archive: archive,
 		})
 	}
 

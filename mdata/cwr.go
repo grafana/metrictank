@@ -13,30 +13,48 @@ import (
 	"github.com/raintank/schema"
 )
 
+//go:generate msgp
+//msgp:ignore ChunkWriteRequest
+
 type ChunkSaveCallback func()
 
 // ChunkWriteRequest is a request to write a chunk into a store
-//go:generate msgp
 type ChunkWriteRequest struct {
-	Callback  ChunkSaveCallback `msg:"-"`
-	Key       schema.AMKey      `msg:"key,extension"`
+	ChunkWriteRequestPayload
+	Callback ChunkSaveCallback
+	Key      schema.AMKey
+}
+
+func NewChunkWriteRequest(callback ChunkSaveCallback, key schema.AMKey, ttl, t0 uint32, data []byte, ts time.Time) ChunkWriteRequest {
+	return ChunkWriteRequest{ChunkWriteRequestPayload{ttl, t0, data, ts}, callback, key}
+}
+
+// ChunkWriteRequestWithoutOrg is used by the importer utility to send cwrs over the network
+type ChunkWriteRequestWithoutOrg struct {
+	ChunkWriteRequestPayload
+	Archive schema.Archive
+}
+
+func NewChunkWriteRequestWithoutOrg(archive schema.Archive, ttl, t0 uint32, data []byte, ts time.Time) ChunkWriteRequestWithoutOrg {
+	return ChunkWriteRequestWithoutOrg{ChunkWriteRequestPayload{ttl, t0, data, ts}, archive}
+}
+
+func (c *ChunkWriteRequestWithoutOrg) GetChunkWriteRequest(callback ChunkSaveCallback, key schema.MKey) ChunkWriteRequest {
+	return ChunkWriteRequest{c.ChunkWriteRequestPayload, callback, schema.AMKey{MKey: key, Archive: c.Archive}}
+}
+
+type ChunkWriteRequestPayload struct {
 	TTL       uint32
 	T0        uint32
 	Data      []byte
 	Timestamp time.Time
 }
 
-// NewChunkWriteRequest creates a new ChunkWriteRequest
-func NewChunkWriteRequest(callback ChunkSaveCallback, key schema.AMKey, ttl, t0 uint32, data []byte, ts time.Time) ChunkWriteRequest {
-	return ChunkWriteRequest{callback, key, ttl, t0, data, ts}
-}
-
 // ArchiveRequest is a complete representation of a Metric together with some
 // chunk write requests containing data that shall be written into this metric
-//go:generate msgp
 type ArchiveRequest struct {
 	MetricData         schema.MetricData
-	ChunkWriteRequests []ChunkWriteRequest
+	ChunkWriteRequests []ChunkWriteRequestWithoutOrg
 }
 
 func (a *ArchiveRequest) MarshalCompressed() (*bytes.Buffer, error) {

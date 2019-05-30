@@ -122,8 +122,8 @@ func BenchmarkDecodeArchiveRequest(b *testing.B) {
 	}
 }
 
-func TestMarshalUnmarshalChunkWriteRequest(t *testing.T) {
-	v := ChunkWriteRequest{}
+func TestMarshalUnmarshalChunkWriteRequestPayload(t *testing.T) {
+	v := ChunkWriteRequestPayload{}
 	bts, err := v.MarshalMsg(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -145,8 +145,8 @@ func TestMarshalUnmarshalChunkWriteRequest(t *testing.T) {
 	}
 }
 
-func BenchmarkMarshalMsgChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkMarshalMsgChunkWriteRequestPayload(b *testing.B) {
+	v := ChunkWriteRequestPayload{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -154,8 +154,8 @@ func BenchmarkMarshalMsgChunkWriteRequest(b *testing.B) {
 	}
 }
 
-func BenchmarkAppendMsgChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkAppendMsgChunkWriteRequestPayload(b *testing.B) {
+	v := ChunkWriteRequestPayload{}
 	bts := make([]byte, 0, v.Msgsize())
 	bts, _ = v.MarshalMsg(bts[0:0])
 	b.SetBytes(int64(len(bts)))
@@ -166,8 +166,8 @@ func BenchmarkAppendMsgChunkWriteRequest(b *testing.B) {
 	}
 }
 
-func BenchmarkUnmarshalChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkUnmarshalChunkWriteRequestPayload(b *testing.B) {
+	v := ChunkWriteRequestPayload{}
 	bts, _ := v.MarshalMsg(nil)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(bts)))
@@ -180,8 +180,8 @@ func BenchmarkUnmarshalChunkWriteRequest(b *testing.B) {
 	}
 }
 
-func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
-	v := ChunkWriteRequest{}
+func TestEncodeDecodeChunkWriteRequestPayload(t *testing.T) {
+	v := ChunkWriteRequestPayload{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 
@@ -190,7 +190,7 @@ func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
 		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
-	vn := ChunkWriteRequest{}
+	vn := ChunkWriteRequestPayload{}
 	err := msgp.Decode(&buf, &vn)
 	if err != nil {
 		t.Error(err)
@@ -204,8 +204,8 @@ func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
 	}
 }
 
-func BenchmarkEncodeChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkEncodeChunkWriteRequestPayload(b *testing.B) {
+	v := ChunkWriteRequestPayload{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))
@@ -218,8 +218,121 @@ func BenchmarkEncodeChunkWriteRequest(b *testing.B) {
 	en.Flush()
 }
 
-func BenchmarkDecodeChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkDecodeChunkWriteRequestPayload(b *testing.B) {
+	v := ChunkWriteRequestPayload{}
+	var buf bytes.Buffer
+	msgp.Encode(&buf, &v)
+	b.SetBytes(int64(buf.Len()))
+	rd := msgp.NewEndlessReader(buf.Bytes(), b)
+	dc := msgp.NewReader(rd)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := v.DecodeMsg(dc)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func TestMarshalUnmarshalChunkWriteRequestWithoutOrg(t *testing.T) {
+	v := ChunkWriteRequestWithoutOrg{}
+	bts, err := v.MarshalMsg(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	left, err := v.UnmarshalMsg(bts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) > 0 {
+		t.Errorf("%d bytes left over after UnmarshalMsg(): %q", len(left), left)
+	}
+
+	left, err = msgp.Skip(bts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(left) > 0 {
+		t.Errorf("%d bytes left over after Skip(): %q", len(left), left)
+	}
+}
+
+func BenchmarkMarshalMsgChunkWriteRequestWithoutOrg(b *testing.B) {
+	v := ChunkWriteRequestWithoutOrg{}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v.MarshalMsg(nil)
+	}
+}
+
+func BenchmarkAppendMsgChunkWriteRequestWithoutOrg(b *testing.B) {
+	v := ChunkWriteRequestWithoutOrg{}
+	bts := make([]byte, 0, v.Msgsize())
+	bts, _ = v.MarshalMsg(bts[0:0])
+	b.SetBytes(int64(len(bts)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bts, _ = v.MarshalMsg(bts[0:0])
+	}
+}
+
+func BenchmarkUnmarshalChunkWriteRequestWithoutOrg(b *testing.B) {
+	v := ChunkWriteRequestWithoutOrg{}
+	bts, _ := v.MarshalMsg(nil)
+	b.ReportAllocs()
+	b.SetBytes(int64(len(bts)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := v.UnmarshalMsg(bts)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func TestEncodeDecodeChunkWriteRequestWithoutOrg(t *testing.T) {
+	v := ChunkWriteRequestWithoutOrg{}
+	var buf bytes.Buffer
+	msgp.Encode(&buf, &v)
+
+	m := v.Msgsize()
+	if buf.Len() > m {
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+	}
+
+	vn := ChunkWriteRequestWithoutOrg{}
+	err := msgp.Decode(&buf, &vn)
+	if err != nil {
+		t.Error(err)
+	}
+
+	buf.Reset()
+	msgp.Encode(&buf, &v)
+	err = msgp.NewReader(&buf).Skip()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func BenchmarkEncodeChunkWriteRequestWithoutOrg(b *testing.B) {
+	v := ChunkWriteRequestWithoutOrg{}
+	var buf bytes.Buffer
+	msgp.Encode(&buf, &v)
+	b.SetBytes(int64(buf.Len()))
+	en := msgp.NewWriter(msgp.Nowhere)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v.EncodeMsg(en)
+	}
+	en.Flush()
+}
+
+func BenchmarkDecodeChunkWriteRequestWithoutOrg(b *testing.B) {
+	v := ChunkWriteRequestWithoutOrg{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))

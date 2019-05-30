@@ -30,7 +30,7 @@ import (
 var (
 	httpEndpoint = flag.String(
 		"http-endpoint",
-		"http://127.0.0.1:8080/chunks",
+		"http://127.0.0.1:8080/metrics/import",
 		"The http endpoint to send the data to",
 	)
 	namePrefix = flag.String(
@@ -47,11 +47,6 @@ var (
 		"write-unfinished-chunks",
 		false,
 		"Defines if chunks that have not completed their chunk span should be written",
-	)
-	orgId = flag.Int(
-		"orgid",
-		1,
-		"Organization ID the data belongs to ",
 	)
 	insecureSSL = flag.Bool(
 		"insecure-ssl",
@@ -305,14 +300,9 @@ func getMetric(w *whisper.Whisper, file, name string) (*mdata.ArchiveRequest, er
 			Time:     0,
 			Mtype:    "gauge",
 			Tags:     []string{},
-			OrgId:    *orgId,
 		},
 	}
 	res.MetricData.SetId()
-	mkey, err := schema.MKeyFromString(res.MetricData.Id)
-	if err != nil {
-		panic(err)
-	}
 
 	_, selectedSchema := schemas.Match(res.MetricData.Name, int(w.Header.Archives[0].SecondsPerPoint))
 	conversion := newConversion(w.Header.Archives, points, method)
@@ -323,18 +313,15 @@ func getMetric(w *whisper.Whisper, file, name string) (*mdata.ArchiveRequest, er
 				continue
 			}
 
-			var amkey schema.AMKey
-			if retIdx == 0 {
-				amkey = schema.AMKey{MKey: mkey}
-			} else {
-				amkey = schema.GetAMKey(mkey, m, retention.ChunkSpan)
+			var archive schema.Archive
+			if retIdx > 0 {
+				archive = schema.NewArchive(m, retention.ChunkSpan)
 			}
 
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			for _, chunk := range encodedChunks {
-				res.ChunkWriteRequests = append(res.ChunkWriteRequests, mdata.NewChunkWriteRequest(
-					nil,
-					amkey,
+				res.ChunkWriteRequests = append(res.ChunkWriteRequests, mdata.NewChunkWriteRequestWithoutOrg(
+					archive,
 					uint32(retention.MaxRetention()),
 					chunk.Series.T0,
 					chunk.Encode(retention.ChunkSpan),
