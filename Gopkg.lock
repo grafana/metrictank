@@ -102,14 +102,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:8ecb89af7dfe3ac401bdb0c9390b134ef96a97e85f732d2b0604fb7b3977839f"
-  name = "github.com/codahale/hdrhistogram"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "3a0bb77429bd3a61596f5e8a3172445844342120"
-
-[[projects]]
   digest = "1:a2c1d0e43bd3baaa071d1b9ed72c27d78169b2b269f71c105ac4ba34b1be4a39"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -788,13 +780,13 @@
   version = "v2.16.0"
 
 [[projects]]
-  digest = "1:0da2810678a062e0567c3215911869b0423da0e497c56683ff8e87e7a6952597"
+  digest = "1:c9d69a04f7fa171f50360bbcc32196b4de8ab8837ef772f6302d0140a1e3e7f6"
   name = "github.com/uber/jaeger-lib"
   packages = ["metrics"]
   pruneopts = "NUT"
-  revision = "c48167d9cae5887393dd5e61efd06a4a48b7fbb3"
+  revision = "0e30338a695636fe5bcf7301e8030ce8dd2a8530"
   source = "https://github.com/jaegertracing/jaeger-lib.git"
-  version = "v1.2.1"
+  version = "v2.0.0"
 
 [[projects]]
   digest = "1:d04de18a0e0bf8fcdb79e8dc755c9b15dbe7f1b2ea3f8fbf11e55ea2d26ac182"
