@@ -131,7 +131,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/uber/jaeger-client-go"
-  version = "2.15.0"
+  version = "2.16.0"
   source = "https://github.com/jaegertracing/jaeger-client-go.git"
 
 [[override]]
