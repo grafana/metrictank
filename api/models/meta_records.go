@@ -22,7 +22,7 @@ func (m MetaTagRecordUpsert) TraceDebug(span opentracing.Span) {
 type MetaTagRecordUpsertResultByNode struct {
 	Local       MetaTagRecordUpsertResult
 	PeerResults map[string]MetaTagRecordUpsertResult `json:"peerResults"`
-	PeerErrors  map[string]string                    `json:"peerErrors`
+	PeerErrors  map[string]string                    `json:"peerErrors"`
 }
 
 //go:generate msgp
