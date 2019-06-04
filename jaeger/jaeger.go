@@ -17,7 +17,7 @@ import (
 var (
 	Enabled                bool
 	addTagsRaw             string
-	addTagsParsed          map[string]string
+	addTagsParsed          []opentracing.Tag
 	samplerType            string
 	samplerParam           float64
 	samplerManagerAddr     string
@@ -52,7 +52,6 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
-	addTagsParsed = make(map[string]string)
 	addTagsRaw = strings.TrimSpace(addTagsRaw)
 	if len(addTagsRaw) == 0 {
 		return
@@ -63,7 +62,7 @@ func ConfigProcess() {
 		if len(split) != 2 {
 			log.Fatalf("cannot parse add-tags value %q", tagSpec)
 		}
-		addTagsParsed[split[0]] = split[1]
+		addTagsParsed = append(addTagsParsed, opentracing.Tag{Key: split[0], Value: split[1]})
 	}
 }
 
@@ -71,6 +70,7 @@ func ConfigProcess() {
 func Get() (opentracing.Tracer, io.Closer, error) {
 	cfg := jaegercfg.Configuration{
 		Disabled: !Enabled,
+		Tags:     addTagsParsed,
 		Sampler: &jaegercfg.SamplerConfig{
 			Type:                    samplerType,
 			Param:                   samplerParam,
@@ -92,9 +92,6 @@ func Get() (opentracing.Tracer, io.Closer, error) {
 	jLogger := jaegerlog.StdLogger
 	options := []jaegercfg.Option{
 		jaegercfg.Logger(jLogger),
-	}
-	for k, v := range addTagsParsed {
-		options = append(options, jaegercfg.Tag(k, v))
 	}
 
 	tracer, closer, err := cfg.New(
