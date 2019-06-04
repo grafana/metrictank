@@ -1,8 +1,9 @@
 package jaeger
 
 import (
+	"fmt"
 	"io"
-	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/grafana/globalconf"
 	opentracing "github.com/opentracing/opentracing-go"
+	log "github.com/sirupsen/logrus"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
 	jaegerlog "github.com/uber/jaeger-client-go/log"
 )
@@ -52,18 +54,51 @@ func ConfigSetup() {
 }
 
 func ConfigProcess() {
-	addTagsRaw = strings.TrimSpace(addTagsRaw)
-	if len(addTagsRaw) == 0 {
-		return
+	var err error
+	addTagsParsed, err = parseTags(addTagsRaw)
+	if err != nil {
+		log.Fatalf("jaeger: Config validation error. %s", err)
 	}
-	tagSpecs := strings.Split(addTagsRaw, ",")
-	for _, tagSpec := range tagSpecs {
-		split := strings.Split(tagSpec, "=")
-		if len(split) != 2 {
-			log.Fatalf("cannot parse add-tags value %q", tagSpec)
+}
+
+// parseTags parses the given string into a slice of opentracing.Tag.
+// the string must be a comma separated list of key=value pairs, where value
+// can be specified as ${key:default}, where `key` is an environment
+// variable and `default` is the value to use in case the env var is not set
+func parseTags(input string) ([]opentracing.Tag, error) {
+	pairs := strings.Split(input, ",")
+	var tags []opentracing.Tag
+	for _, pair := range pairs {
+		if pair == "" {
+			continue
 		}
-		addTagsParsed = append(addTagsParsed, opentracing.Tag{Key: split[0], Value: split[1]})
+
+		if !strings.Contains(pair, "=") {
+			return nil, fmt.Errorf("invalid tag specifier %q", pair)
+		}
+		kv := strings.SplitN(pair, "=", 2)
+		key, val := strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1])
+		if len(key) == 0 || len(val) == 0 {
+			return nil, fmt.Errorf("invalid tag specifier %q", pair)
+		}
+
+		if strings.HasPrefix(val, "${") && strings.HasSuffix(val, "}") {
+			spec := strings.SplitN(val[2:len(val)-1], ":", 2)
+			envVar := spec[0]
+			var envDefault string
+			if len(spec) == 2 {
+				envDefault = spec[1]
+			}
+			val = os.Getenv(envVar)
+			if val == "" && envDefault != "" {
+				val = envDefault
+			}
+		}
+
+		tags = append(tags, opentracing.Tag{Key: key, Value: val})
 	}
+
+	return tags, nil
 }
 
 // Get() returns a jaeger tracer
