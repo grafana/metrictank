@@ -1321,7 +1321,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 		delete(m.defById, idStr)
 	}
 
-	statMetricsActive.Set(len(m.defById))
+	statMetricsActive.DecUint32(uint32(len(deletedDefs)))
 
 	return deletedDefs
 }
@@ -1362,7 +1362,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 		deletedDefs = append(deletedDefs, deleted...)
 	}
 
-	statMetricsActive.Set(len(m.defById))
+	statMetricsActive.DecUint32(uint32(len(deletedDefs)))
 	statDeleteDuration.Value(time.Since(pre))
 
 	return deletedDefs, nil
@@ -1563,6 +1563,10 @@ DEFS:
 		pruned = append(pruned, defs...)
 	}
 
+	// need to capture how many were already deleted and decremented by using deleteTaggedByIdSet
+	// so we can subtract it later on before we decrement the active metrics stat
+	totalDeletedByTag := len(pruned)
+
 ORGS:
 	for org, paths := range toPruneUntagged {
 		if len(paths) == 0 {
@@ -1607,7 +1611,7 @@ ORGS:
 		}
 	}
 
-	statMetricsActive.Set(len(m.defById))
+	statMetricsActive.DecUint32(uint32(len(pruned) - totalDeletedByTag))
 
 	duration := time.Since(pre)
 	log.Infof("memory-idx: finished pruning of %d series in %s", len(pruned), duration)
