@@ -25,6 +25,8 @@ func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
+	defer metricIndex.Stop()
+
 	in := NewDefaultHandler(aggmetrics, metricIndex, "BenchmarkProcess")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())
@@ -62,6 +64,7 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
+	defer metricIndex.Stop()
 	in := NewDefaultHandler(aggmetrics, metricIndex, "BenchmarkProcess")
 
 	// timestamps start at 10 and go up from there. (we can't use 0, see AggMetric.Add())

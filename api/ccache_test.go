@@ -38,6 +38,7 @@ func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {
 	srv.BindCache(mockCache)
 
 	metricIndex := memory.New()
+	metricIndex.Init()
 	srv.BindMetricIndex(metricIndex)
 	return srv, mockCache
 }
@@ -51,6 +52,8 @@ func TestMetricDeleteWithPattern(t *testing.T) {
 	testId := test.GetMKey(12345)
 
 	srv, cache := newSrv(delSeries, delArchives)
+	defer srv.Stop()
+
 	srv.MetricIndex.AddOrUpdate(
 		testId,
 		&schema.MetricData{
@@ -103,6 +106,7 @@ func TestMetricDeleteWithTags(t *testing.T) {
 	testId := test.GetMKey(12345)
 
 	srv, cache := newSrv(delSeries, delArchives)
+	defer srv.Stop()
 	srv.MetricIndex.AddOrUpdate(
 		testId,
 		&schema.MetricData{
@@ -153,6 +157,7 @@ func TestMetricDeleteFullFlush(t *testing.T) {
 	})
 
 	srv, cache := newSrv(0, 0)
+	defer srv.Stop()
 	ts := httptest.NewServer(srv.Macaron)
 	defer ts.Close()
 
@@ -192,6 +197,7 @@ func TestMetricDeleteWithErrorInPropagation(t *testing.T) {
 	testId := test.GetMKey(12345)
 
 	srv, _ := newSrv(delSeries, delArchives)
+	defer srv.Stop()
 	srv.MetricIndex.AddOrUpdate(
 		testId,
 		&schema.MetricData{
@@ -258,6 +264,7 @@ func TestMetricDeletePropagation(t *testing.T) {
 	expectedDeletedArchives += delArchives
 
 	srv, cache := newSrv(delSeries, delArchives)
+	defer srv.Stop()
 	srv.MetricIndex.AddOrUpdate(
 		testId,
 		&schema.MetricData{

@@ -265,17 +265,19 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
 	}
-	if findCacheSize > 0 {
-		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
-	}
 	return &m
 }
 
 func (m *UnpartitionedMemoryIdx) Init() error {
+	if findCacheSize > 0 {
+		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
+	}
 	return nil
 }
 
 func (m *UnpartitionedMemoryIdx) Stop() {
+	m.findCache.Shutdown()
+	m.findCache = nil
 	return
 }
 
