@@ -146,6 +146,7 @@ func (s *Server) Run() {
 
 func (s *Server) Stop() {
 	close(s.shutdown)
+	s.MetricIndex.Stop()
 }
 
 func (s *Server) handleShutdown(l net.Listener) {

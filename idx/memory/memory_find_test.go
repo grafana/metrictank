@@ -177,6 +177,7 @@ func InitSmallIndex() {
 		currentIndex = 1
 	} else {
 		ix.PurgeFindCache()
+		ix.Init()
 		return
 	}
 
@@ -224,6 +225,7 @@ func InitLargeIndex() {
 		currentIndex = 2
 	} else {
 		ix.PurgeFindCache()
+		ix.Init()
 		return
 	}
 
@@ -315,6 +317,7 @@ func TestTagDetailsWithoutFilters(t *testing.T) {
 
 func testTagDetailsWithoutFilters(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := make(map[string]uint64)
 	expected["dc0"] = 33600
@@ -331,6 +334,7 @@ func TestTagDetailsWithFrom(t *testing.T) {
 
 func testTagDetailsWithFrom(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := make(map[string]uint64)
 	expected["dc3"] = 2500
@@ -345,6 +349,7 @@ func TestTagDetailsWithFilter(t *testing.T) {
 
 func testTagDetailsWithFilter(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := make(map[string]uint64)
 	expected["dc3"] = 33600
@@ -359,6 +364,7 @@ func TestTagDetailsWithFilterAndFrom(t *testing.T) {
 
 func testTagDetailsWithFilterAndFrom(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := make(map[string]uint64)
 	expected["dc4"] = 25600
@@ -391,6 +397,7 @@ func TestTagKeysWithoutFilters(t *testing.T) {
 
 func testTagKeysWithoutFilters(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
 	queryAndCompareTagKeys(t, "", 0, expected)
@@ -402,6 +409,7 @@ func TestTagKeysWithFrom(t *testing.T) {
 
 func testTagKeysWithFrom(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	// disk metrics should all have been added before ts 1000000
 	expected := []string{"dc", "host", "device", "cpu", "metric", "name"}
@@ -414,6 +422,7 @@ func TestTagKeysWithFilter(t *testing.T) {
 
 func testTagKeysWithFilter(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := []string{"dc", "device", "disk", "direction"}
 	queryAndCompareTagKeys(t, "d", 0, expected)
@@ -428,6 +437,7 @@ func TestTagKeysWithFromAndFilter(t *testing.T) {
 
 func testTagKeysWithFromAndFilter(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	expected := []string{"dc", "device"}
 	queryAndCompareTagKeys(t, "d", 100000, expected)
@@ -506,6 +516,7 @@ func TestAutoCompleteTag(t *testing.T) {
 
 func testAutoCompleteTag(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	type testCase struct {
 		prefix string
@@ -612,6 +623,7 @@ func TestAutoCompleteTagValues(t *testing.T) {
 
 func testAutoCompleteTagValues(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	type testCase struct {
 		tag    string
@@ -686,6 +698,7 @@ func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 
 func benchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -705,6 +718,7 @@ func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
 
 func benchmarkTagDetailsWithFromAndFilter(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 
 	filters := []string{"i", ".+rr", ".+t", "interrupt"}
 	expectedCounts := []uint64{158762, 158750, 158737, 158725}
@@ -727,6 +741,7 @@ func BenchmarkTagsWithFromAndFilter(b *testing.B) {
 
 func benchmarkTagsWithFromAndFilter(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	filters := []string{"d", "di", "c"}
 	expected := [][]string{
 		{"dc", "device", "direction", "disk"},
@@ -749,6 +764,7 @@ func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
 
 func benchmarkTagsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "name", "host"}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -779,6 +795,7 @@ func BenchmarkFind(b *testing.B) {
 
 func benchmarkFind(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	queryCount := len(queries)
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -806,6 +823,7 @@ func benchmarkConcurrent4Find(b *testing.B) {
 	}()
 
 	InitLargeIndex()
+	defer ix.Stop()
 	queryCount := len(queries)
 	var wg sync.WaitGroup
 	ch := make(chan testQ)
@@ -840,6 +858,7 @@ func benchmarkConcurrent8Find(b *testing.B) {
 		TagSupport = _tagSupport
 	}()
 	InitLargeIndex()
+	defer ix.Stop()
 	queryCount := len(queries)
 	var wg sync.WaitGroup
 	ch := make(chan testQ)
@@ -875,6 +894,7 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 	}()
 	findCacheInvalidateQueueSize = 10
 	InitLargeIndex()
+	defer ix.Stop()
 	queryCount := len(queries)
 	var wg sync.WaitGroup
 	ch := make(chan testQ)
@@ -950,6 +970,7 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 
 func benchmarkTagFindSimpleIntersect(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -965,6 +986,7 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 
 func benchmarkTagFindRegexIntersect(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -980,6 +1002,7 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 
 func benchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -995,6 +1018,7 @@ func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 
 func benchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -1041,6 +1065,7 @@ func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
 
 func benchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 
 	queries := make([]tagQuery, 0)
 	for _, expressions := range permutations([]string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}) {
@@ -1071,6 +1096,7 @@ func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 
 func benchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 
 	queries := make([]tagQuery, 0)
 	for _, expressions := range permutations([]string{"metric!=~.*_time$", "dc=~.*0$", "direction=~wri", "host=~host9[0-9]0", "disk!=~disk[5-9]{1}"}) {
@@ -1098,6 +1124,7 @@ func BenchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 
 func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 
 	type testCase struct {
 		prefix string
@@ -1127,6 +1154,7 @@ func BenchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 
 func benchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 	InitLargeIndex()
+	defer ix.Stop()
 
 	type testCase struct {
 		prefix string

@@ -387,6 +387,7 @@ func testGetByTag(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	idString := "1.000000000000000000000000000000%02x"
 	mds := make([]schema.MetricData, 20)

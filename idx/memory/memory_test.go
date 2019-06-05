@@ -194,6 +194,7 @@ func testGetAddKey(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
@@ -256,6 +257,8 @@ func testFind(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
+
 	for _, s := range getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.demo", false) {
 		s.Time = 10 * 86400
 		mkey, err := schema.MKeyFromString(s.Id)
@@ -407,6 +410,7 @@ func testDelete(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
@@ -437,6 +441,7 @@ func testDeleteTagged(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", true)
 	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", true)
@@ -482,6 +487,7 @@ func TestDeleteNodeWith100kChildren(t *testing.T) {
 func testDeleteNodeWith100kChildren(t *testing.T) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	var data *schema.MetricData
 	var key string
@@ -531,6 +537,7 @@ func TestMixedBranchLeaf(t *testing.T) {
 func testMixedBranchLeaf(t *testing.T) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	first := &schema.MetricData{
 		Name:     "foo.bar",
@@ -592,6 +599,8 @@ func TestMixedBranchLeafDelete(t *testing.T) {
 func testMixedBranchLeafDelete(t *testing.T) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
+
 	series := []*schema.MetricData{
 		{
 			Name:     "a.b.c",
@@ -698,6 +707,7 @@ func testPruneTaggedSeries(t *testing.T) {
 	}
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	// add old series
 	series := getMetricData(1, 2, 5, 10, "longterm.old", true)
@@ -815,6 +825,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	series := getMetricData(1, 2, 1, 10, "metric.bah", true)
 	serie2 := *series[0]
@@ -889,6 +900,7 @@ func testPrune(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	// add old series
 	for _, s := range getSeriesNames(2, 5, "metric.bah") {
@@ -972,6 +984,7 @@ func TestSingleNodeMetric(t *testing.T) {
 func testSingleNodeMetric(t *testing.T) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	data := &schema.MetricData{
 		Name:     "node1",
@@ -1015,6 +1028,7 @@ func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 
 	globalMemoryIndex = New()
 	globalMemoryIndex.Init()
+	defer globalMemoryIndex.Stop()
 
 	series := getMetricDataWithCustomTags(1, 2, count, 10, "somekindof.longereven.metricname.butinstead.ofashorterone.bunchofthingsandstuff", unique)
 
@@ -1061,6 +1075,7 @@ func BenchmarkIndexing(b *testing.B) {
 func benchmarkIndexing(b *testing.B) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	var series string
 	var data *schema.MetricData
@@ -1089,6 +1104,7 @@ func BenchmarkDeletes(b *testing.B) {
 func benchmarkDeletes(b *testing.B) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	var data *schema.MetricData
 	var key string
@@ -1119,6 +1135,7 @@ func BenchmarkPrune(b *testing.B) {
 func benchmarkPrune(b *testing.B) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	var data *schema.MetricData
 	var key string
@@ -1156,6 +1173,7 @@ func BenchmarkPruneLongSeriesNames(b *testing.B) {
 func benchmarkPruneLongSeriesNames(b *testing.B) {
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	var data *schema.MetricData
 	var key string
@@ -1207,6 +1225,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 
 	ix := New()
 	ix.Init()
+	defer ix.Stop()
 
 	data := make([]*schema.MetricDefinition, 10)
 	archives := make([]idx.Archive, 10)

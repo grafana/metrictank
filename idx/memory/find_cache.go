@@ -212,7 +212,7 @@ func (c *FindCache) forceInvalidation() {
 }
 
 func (c *FindCache) Shutdown() {
-	c.shutdown <- struct{}{}
+	close(c.shutdown)
 }
 
 func (c *FindCache) stats() {
