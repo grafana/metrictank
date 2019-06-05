@@ -226,7 +226,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	newctx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
 	defer span.Finish()
 	ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
-	out, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
+	out, meta, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
 	if err != nil {
 		err := response.WrapError(err)
 		if err.Code() != http.StatusBadRequest {
@@ -264,7 +264,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, models.SeriesByTarget(out)))
 	default:
-		response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
+		if request.Meta {
+			response.Write(ctx, response.NewFastJson(200, models.ResponseWithMeta{Series: models.SeriesByTarget(out), Meta: meta}))
+		} else {
+			response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
+		}
 	}
 	plan.Clean()
 }
@@ -635,8 +639,9 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
-// we will collect all the indidividual series from the peer, and then sum here. that could be optimized
-func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) ([]models.Series, error) {
+// we will collect all the individual series from the peer, and then sum here. that could be optimized
+func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) ([]models.Series, models.RenderMeta, error) {
+	var meta models.RenderMeta
 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
@@ -645,11 +650,12 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	// note that different patterns to query can have different from / to, so they require different index lookups
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
+	pre := time.Now()
 	for _, r := range plan.Reqs {
 		select {
 		case <-ctx.Done():
 			//request canceled
-			return nil, nil
+			return nil, meta, nil
 		default:
 		}
 		var err error
@@ -661,7 +667,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 			endPos := strings.LastIndex(r.Query, ")")
 			exprs, err = getTagQueryExpressions(r.Query[startPos:endPos])
 			if err != nil {
-				return nil, err
+				return nil, meta, err
 			}
 
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs))
@@ -669,7 +675,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		}
 		if err != nil {
-			return nil, err
+			return nil, meta, err
 		}
 
 		minFrom = util.Min(minFrom, r.From)
@@ -704,38 +710,46 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		}
 	}
 
+	meta.Stats.ResolveSeriesDuration = time.Since(pre)
+
 	select {
 	case <-ctx.Done():
 		//request canceled
-		return nil, nil
+		return nil, meta, nil
 	default:
 	}
 
 	reqRenderSeriesCount.Value(len(reqs))
 	if len(reqs) == 0 {
-		return nil, nil
+		return nil, meta, nil
 	}
 
+	meta.Stats.SeriesFetch = uint32(len(reqs))
+
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
-	reqs, pointsFetch, pointsReturn, err := alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	var err error
+	reqs, meta.Stats.PointsFetch, meta.Stats.PointsReturn, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
 	if err != nil {
 		log.Errorf("HTTP Render alignReq error: %s", err.Error())
-		return nil, err
+		return nil, meta, err
 	}
 	span := opentracing.SpanFromContext(ctx)
 	span.SetTag("num_reqs", len(reqs))
-	span.SetTag("points_fetch", pointsFetch)
-	span.SetTag("points_return", pointsReturn)
+	span.SetTag("points_fetch", meta.Stats.PointsFetch)
+	span.SetTag("points_return", meta.Stats.PointsReturn)
 
 	for _, req := range reqs {
 		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
 	}
 
+	a := time.Now()
 	out, err := s.getTargets(ctx, reqs)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
-		return nil, err
+		return nil, meta, err
 	}
+	b := time.Now()
+	meta.Stats.GetTargetsDuration = b.Sub(a)
 
 	out = mergeSeries(out)
 
@@ -752,11 +766,13 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	for k := range data {
 		sort.Sort(models.SeriesByTarget(data[k]))
 	}
+	meta.Stats.PrepareSeriesDuration = time.Since(b)
 
 	preRun := time.Now()
 	out, err = plan.Run(data)
-	planRunDuration.Value(time.Since(preRun))
-	return out, err
+	meta.Stats.PlanRunDuration = time.Since(preRun)
+	planRunDuration.Value(meta.Stats.PlanRunDuration)
+	return out, meta, err
 }
 
 // getTagQueryExpressions takes a query string which includes multiple tag query expressions
