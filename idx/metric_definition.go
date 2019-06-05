@@ -73,7 +73,6 @@ func (mn *MetricName) setMetricName(name string) error {
 	nodes := strings.Split(name, ".")
 	mn.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
-		// TODO: add error checking? Fail somehow
 		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
 		if err != nil {
 			log.Error("idx: Failed to acquire interned string for node name: ", err)
@@ -168,14 +167,15 @@ func (t TagKeyValue) createTagKeyValue() string {
 
 func parseTagKeyValue(tag string) TagKeyValue {
 	var tkv TagKeyValue
-	if strings.Contains(tag, ";") {
+	eqPos := strings.Index(tag, "=")
+	if eqPos < 0 {
 		log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
 		invalidTag.Inc()
 		return TagKeyValue{}
 	}
-	eqPos := strings.Index(tag, "=")
-	if eqPos < 0 {
-		log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
+
+	if strings.ContainsAny(tag[:eqPos], "; ! ^ =") {
+		log.Errorf("idx: Tag key %s has an invalid format, ignoring", tag[:eqPos])
 		invalidTag.Inc()
 		return TagKeyValue{}
 	}
@@ -187,10 +187,16 @@ func parseTagKeyValue(tag string) TagKeyValue {
 	}
 	tkv.Key = key
 
+	if strings.ContainsAny(tag[eqPos+1:], "; ~") {
+		log.Errorf("idx: Tag value %s has an invalid format, ignoring", tag[eqPos+1:])
+		invalidTag.Inc()
+		return TagKeyValue{}
+	}
 	value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]), true)
 	if err != nil {
 		log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 		internError.Inc()
+		IdxIntern.Delete(key)
 		return TagKeyValue{}
 	}
 	tkv.Value = value
@@ -229,7 +235,7 @@ func (t *TagKeyValues) ExtensionType() int8 {
 func (t *TagKeyValues) Len() int {
 	var total int
 	for _, kv := range t.Strings() {
-		if strings.HasPrefix(kv, "name") {
+		if strings.HasPrefix(kv, "name=") {
 			continue
 		}
 		total += len(kv) + 1
@@ -240,7 +246,7 @@ func (t *TagKeyValues) Len() int {
 func (t *TagKeyValues) MarshalBinaryTo(b []byte) error {
 	var total int
 	for _, kv := range t.Strings() {
-		if strings.HasPrefix(kv, "name") {
+		if strings.HasPrefix(kv, "name=") {
 			continue
 		}
 		if kv == "=" || kv == "" {
@@ -262,16 +268,11 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 	tmp := make([]TagKeyValue, len(tags))
 	t.KeyValues = tmp
 	for i, tag := range tags {
-		if strings.HasPrefix(tag, "name") {
+		if strings.HasPrefix(tag, "name=") {
 			continue
 		}
 		if tag == "=" || tag == "" {
 			log.Error("idx: Empty tag, ignoring: ", tag)
-			invalidTag.Inc()
-			continue
-		}
-		if strings.Contains(tag, ";") {
-			log.Errorf("idx: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
 			continue
 		}
@@ -281,23 +282,33 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 			invalidTag.Inc()
 			continue
 		}
+
+		if strings.ContainsAny(tag[:eqPos], "; ! ^ =") {
+			log.Errorf("idx: Tag key %s has an invalid format, ignoring", tag[:eqPos])
+			invalidTag.Inc()
+			continue
+		}
 		key, err := IdxIntern.AddOrGet([]byte(tag[:eqPos]), true)
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
 			continue
-		} else {
-			(*t).KeyValues[i].Key = key
 		}
+		(*t).KeyValues[i].Key = key
 
+		if strings.ContainsAny(tag[eqPos+1:], "; ~") {
+			log.Errorf("idx: Tag value %s has an invalid format, ignoring", tag[eqPos+1:])
+			invalidTag.Inc()
+			continue
+		}
 		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]), true)
 		if err != nil {
 			log.Errorf("idx: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
+			IdxIntern.Delete(key)
 			continue
-		} else {
-			(*t).KeyValues[i].Value = value
 		}
+		(*t).KeyValues[i].Value = value
 	}
 	return nil
 }
@@ -341,7 +352,7 @@ func (md *MetricDefinition) NameWithTags() string {
 // NameWithTagsHash returns an Md5Hash struct containing the
 // hashed md5 sum of a NameWithTags for the given MetricDefinition
 func (md *MetricDefinition) NameWithTagsHash() Md5Hash {
-	md5Sum := md5.Sum(bytes.NewBufferString(md.NameWithTags()).Bytes())
+	md5Sum := md5.Sum([]byte(md.NameWithTags()))
 	ret := Md5Hash{
 		Upper: binary.LittleEndian.Uint64(md5Sum[:8]),
 		Lower: binary.LittleEndian.Uint64(md5Sum[8:]),
@@ -409,7 +420,6 @@ func (md *MetricDefinition) SetMetricName(name string) error {
 	nodes := strings.Split(name, ".")
 	md.Name.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
-		// TODO: add error checking? Fail somehow
 		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
 		if err != nil {
 			log.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
@@ -439,14 +449,15 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			invalidTag.Inc()
 			continue
 		}
-		if strings.Contains(tag, ";") {
+		eqPos := strings.Index(tag, "=")
+		if eqPos < 0 {
 			log.Errorf("idx: SetTags: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
 			continue
 		}
-		eqPos := strings.Index(tag, "=")
-		if eqPos < 0 {
-			log.Errorf("idx: SetTags: Tag %q has an invalid format, ignoring", tag)
+
+		if strings.ContainsAny(tag[:eqPos], "; ! ^ =") {
+			log.Errorf("idx: Tag key %s has an invalid format, ignoring", tag[:eqPos])
 			invalidTag.Inc()
 			continue
 		}
@@ -455,18 +466,22 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			log.Errorf("idx: SetTags: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
 			continue
-		} else {
-			md.Tags.KeyValues[i].Key = key
 		}
+		md.Tags.KeyValues[i].Key = key
 
+		if strings.ContainsAny(tag[eqPos+1:], "; ~") {
+			log.Errorf("idx: Tag value %s has an invalid format, ignoring", tag[eqPos+1:])
+			invalidTag.Inc()
+			continue
+		}
 		value, err := IdxIntern.AddOrGet([]byte(tag[eqPos+1:]), true)
 		if err != nil {
 			log.Errorf("idx: SetTags: Failed to intern tag %q, %v", tag, err)
 			internError.Inc()
+			IdxIntern.Delete(key)
 			continue
-		} else {
-			md.Tags.KeyValues[i].Value = value
 		}
+		md.Tags.KeyValues[i].Value = value
 	}
 }
 
