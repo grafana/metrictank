@@ -12,7 +12,7 @@ type ResponseWithMeta struct {
 }
 
 func (rwm ResponseWithMeta) MarshalJSONFast(b []byte) ([]byte, error) {
-	b = append(b, `{"meta-version":"v0.1","meta":`...)
+	b = append(b, `{"version":"v0.1","meta":`...)
 	b, _ = rwm.Meta.MarshalJSONFast(b)
 	b = append(b, `,"series":`...)
 	b, _ = rwm.Series.MarshalJSONFast(b)
