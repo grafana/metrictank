@@ -1,3 +1,27 @@
+# master
+
+## breaking changes
+* refactor jaeger configuration + many more options #1341
+  the following config options have been renamed:
+  - `tracing-enabled -> jaeger.enabled`
+  - `tracing-addr -> jaeger.agent-addr`
+  - `tracing-add-tags -> jaeger.add-tags` (now also key=value instead of key:value)
+
+## other
+
+* bigtable importer #1291
+* fix kafka backlog processing to not get stuck/timeout if no messages #1315, #1328
+* memleak fix: Prevent blocked go routines to hang forever #1333, #1337
+* update jaeger client v2.15.0 -> v2.16.0, jaeger-lib v1.2.1 -> v2.0.0 #1339
+* Fix active series stats decrement #1336
+* render response metadata: stats #1334
+
+## new query api functions
+
+* fallbackSeries #1326
+* group #1324
+* integral #1325
+
 # v0.12.0: Query nodes, find cache and various performance tweaks. May 14, 2019
 
 ## Important changes that require your attention:
