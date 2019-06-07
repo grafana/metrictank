@@ -38,7 +38,6 @@ func (p *prometheusWriteHandler) Name() string {
 
 func (p *prometheusWriteHandler) Start(handler input.Handler, cancel context.CancelFunc) error {
 	p.Handler = handler
-	ConfigSetup()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/write", p.handle)
