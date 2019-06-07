@@ -120,18 +120,8 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 }
 
 // getInitialByEqual generates the initial resultset by executing the given equal expression
-func (q *TagQueryContext) getInitialByEqual(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
+func (q *TagQueryContext) getInitialByEqual(key, value uintptr, idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
-	key, err := idx.IdxIntern.GetPtrFromByte([]byte(expr.Key))
-	if err != nil {
-		log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-		internError.Inc()
-	}
-	value, err := idx.IdxIntern.GetPtrFromByte([]byte(expr.Value))
-	if err != nil {
-		log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
-		internError.Inc()
-	}
 
 KEYS:
 	for k := range q.index[key][value] {
@@ -146,13 +136,8 @@ KEYS:
 }
 
 // getInitialByPrefix generates the initial resultset by executing the given prefix match expression
-func (q *TagQueryContext) getInitialByPrefix(expr kv, idCh chan schema.MKey, stopCh chan struct{}) {
+func (q *TagQueryContext) getInitialByPrefix(key uintptr, exprvalue string, idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
-	key, err := idx.IdxIntern.GetPtrFromByte([]byte(expr.Key))
-	if err != nil {
-		log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-		internError.Inc()
-	}
 
 VALUES:
 	for v, ids := range q.index[key] {
@@ -160,8 +145,9 @@ VALUES:
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
+			break VALUES
 		}
-		if !strings.HasPrefix(value, expr.Value) {
+		if !strings.HasPrefix(value, exprvalue) {
 			continue
 		}
 
@@ -178,13 +164,8 @@ VALUES:
 }
 
 // getInitialByMatch generates the initial resultset by executing the given match expression
-func (q *TagQueryContext) getInitialByMatch(expr kvRe, idCh chan schema.MKey, stopCh chan struct{}) {
+func (q *TagQueryContext) getInitialByMatch(key uintptr, expr kvRe, idCh chan schema.MKey, stopCh chan struct{}) {
 	defer q.wg.Done()
-	key, err := idx.IdxIntern.GetPtrFromByte([]byte(expr.Key))
-	if err != nil {
-		log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-		internError.Inc()
-	}
 
 	// shortcut if Regex == nil.
 	// this will simply match any value, like ^.+. since we know that every value
@@ -210,6 +191,7 @@ VALUES2:
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
+			break VALUES2
 		}
 		if !expr.Regex.MatchString(value) {
 			continue
@@ -238,6 +220,7 @@ TAGS:
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			break TAGS
 		}
 		if !strings.HasPrefix(key, q.tagPrefix) {
 			continue
@@ -268,6 +251,7 @@ TAGS:
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			break TAGS
 		}
 		if q.tagMatch.Regex.MatchString(key) {
 			for _, ids := range values {
@@ -297,15 +281,44 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 	case tagquery.EQUAL:
 		query := q.equal[0]
 		q.equal = q.equal[1:]
-		go q.getInitialByEqual(query, idCh, stopCh)
+		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
+		if err != nil {
+			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
+			internError.Inc()
+			q.wg.Done()
+			return nil, nil
+		}
+		value, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Value))
+		if err != nil {
+			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
+			internError.Inc()
+			q.wg.Done()
+			return nil, nil
+		}
+		go q.getInitialByEqual(key, value, idCh, stopCh)
 	case tagquery.PREFIX:
+		var err error
 		query := q.prefix[0]
 		q.prefix = q.prefix[1:]
-		go q.getInitialByPrefix(query, idCh, stopCh)
+		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
+		if err != nil {
+			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
+			internError.Inc()
+			q.wg.Done()
+			return nil, nil
+		}
+		go q.getInitialByPrefix(key, query.Value, idCh, stopCh)
 	case tagquery.MATCH:
 		query := q.match[0]
 		q.match = q.match[1:]
-		go q.getInitialByMatch(query, idCh, stopCh)
+		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
+		if err != nil {
+			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
+			internError.Inc()
+			q.wg.Done()
+			return nil, nil
+		}
+		go q.getInitialByMatch(key, query, idCh, stopCh)
 	case tagquery.PREFIX_TAG:
 		go q.getInitialByTagPrefix(idCh, stopCh)
 	case tagquery.MATCH_TAG:
@@ -648,6 +661,9 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive)
 	q.sortByCost()
 
 	idCh, _ := q.getInitialIds()
+	if idCh == nil {
+		return make(IdSet)
+	}
 	resCh := make(chan schema.MKey)
 
 	// start the tag query workers. they'll consume the ids on the idCh and

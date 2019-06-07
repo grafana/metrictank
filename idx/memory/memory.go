@@ -76,7 +76,7 @@ var (
 )
 
 func init() {
-	// instantiate strats for the interning layer/object store
+	// instantiate stats for the interning layer/object store
 	for i := 0; i < 256; i++ {
 		statInternMemory[i] = stats.NewGauge64(fmt.Sprintf("idx.memory.intern.memory.%d", i))
 		statInternFragmentation[i] = stats.NewGauge32(fmt.Sprintf("idx.memory.intern.fragmentation.%d", i))
@@ -592,7 +592,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 	for _, tag := range def.Tags.KeyValues {
 		tags.addTagId(tag.Key, tag.Value, def.Id)
 	}
-	// TODO: add special case to handle name and intern the entire thing
+	// TODO: add special case to handle name and intern each node separately
 	nameKey, _ := idx.IdxIntern.AddOrGet([]byte("name"), false)
 	nameValue, _ := idx.IdxIntern.AddOrGet([]byte(schema.SanitizeNameAsTagValue(def.Name.String())), false)
 	tags.addTagId(nameKey, nameValue, def.Id)
@@ -610,8 +610,18 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefin
 		tags.delTagId(tag.Key, tag.Value, def.Id)
 	}
 
-	nameKey, _ := idx.IdxIntern.GetPtrFromByte([]byte("name"))
-	nameValue, _ := idx.IdxIntern.GetPtrFromByte([]byte(schema.SanitizeNameAsTagValue(def.Name.String())))
+	nameKey, err := idx.IdxIntern.GetPtrFromByte([]byte("name"))
+	if err != nil {
+		log.Error("memory-idx: Failed to retrieve interned string for tag key: ", err)
+		internError.Inc()
+		return true
+	}
+	nameValue, err := idx.IdxIntern.GetPtrFromByte([]byte(schema.SanitizeNameAsTagValue(def.Name.String())))
+	if err != nil {
+		log.Error("memory-idx: Failed to retrieve interned string for tag value: ", err)
+		internError.Inc()
+		return true
+	}
 	tags.delTagId(nameKey, nameValue, def.Id)
 
 	m.defByTagSet.del(def)
@@ -632,23 +642,14 @@ func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 	var pre time.Time
 	var num int
 	for i := range defs {
-		def := &defs[i]
-		nDef := *def
+		def := defs[i]
 		pre = time.Now()
 		if _, ok := m.defById[def.Id]; ok {
 			continue
 		}
 
-		m.add(createArchive(def))
+		m.add(createArchive(&def))
 
-		if TagSupport {
-			// create new def to avoid holding open the backing array of defs which is passed up from the persistent index
-			m.indexTags(&nDef)
-		}
-
-		// as we are loading the metricDefs from a persistent store, set the lastSave
-		// to the lastUpdate timestamp.  This won't exactly match the true lastSave Timstamp,
-		// but it will be close enough and it will always be true that the lastSave was at
 		// or after this time.  For metrics that are sent at or close to real time (the typical
 		// use case), then the value will be within a couple of seconds of the true lastSave.
 		m.defById[def.Id].LastSave = uint32(def.LastUpdate)
