@@ -29,11 +29,10 @@ import (
 var (
 	confFile        = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 	exitOnError     = flag.Bool("exit-on-error", false, "Exit with a message when there's an error")
-	listenAddress   = flag.String("listen-address", "127.0.0.1", "The address to listen on")
-	listenPort      = flag.Int("listen-port", 8080, "The port to listen on")
+	httpEndpoint    = flag.String("http-endpoint", "0.0.0.0:8080", "The http endpoint to listen on")
 	ttlsStr         = flag.String("ttls", "35d", "list of ttl strings used by MT separated by ','")
 	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
-	uriPath         = flag.String("uri-path", "/chunks", "the URI on which we expect chunks to get posted")
+	uriPath         = flag.String("uri-path", "/metrics/import", "the URI on which we expect chunks to get posted")
 	numPartitions   = flag.Int("num-partitions", 1, "Number of Partitions")
 	logLevel        = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
@@ -140,13 +139,12 @@ func main() {
 
 	index.Init()
 
-	httpEndpoint := fmt.Sprintf("%s:%d", *listenAddress, *listenPort)
 	server := &Server{
 		partitioner: p,
 		index:       index,
 		store:       store,
 		HTTPServer: &http.Server{
-			Addr:        httpEndpoint,
+			Addr:        *httpEndpoint,
 			ReadTimeout: 10 * time.Minute,
 		},
 	}
@@ -154,8 +152,8 @@ func main() {
 	http.HandleFunc(*uriPath, server.chunksHandler)
 	http.HandleFunc("/healthz", server.healthzHandler)
 
-	log.Infof("Listening on %q", httpEndpoint)
-	err = http.ListenAndServe(httpEndpoint, nil)
+	log.Infof("Listening on %q", *httpEndpoint)
+	err = http.ListenAndServe(*httpEndpoint, nil)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating listener: %q", err))
 	}
