@@ -245,7 +245,20 @@ func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefiniti
 		Lower: binary.LittleEndian.Uint64(md5Sum[8:]),
 	}
 
-	return orgDefs[hashedName]
+	ret := make(map[*idx.MetricDefinition]struct{})
+
+	//TODO: Possibly refactor by adding a method to compare
+	//		based on uintptrs instead of strings
+	for def := range orgDefs[hashedName] {
+		if fullName != def.NameWithTags() {
+			corruptIndex.Inc()
+			log.Errorf("There is a collision in HashedNames: def=%v, fullName=%v\n", def, fullName)
+		} else {
+			ret[def] = struct{}{}
+		}
+	}
+
+	return ret
 }
 
 type Node struct {
@@ -596,6 +609,11 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 	nameKey, _ := idx.IdxIntern.AddOrGet([]byte("name"), false)
 	nameValue, _ := idx.IdxIntern.AddOrGet([]byte(schema.SanitizeNameAsTagValue(def.Name.String())), false)
 	tags.addTagId(nameKey, nameValue, def.Id)
+
+	// Added sort here to accomodate a case where out of order tags are set after
+	// a call to SetId (which would sort it)
+	// e.g. the case where somebody sent us a MD with an id already set and out-of-order tags
+	sort.Sort(def.Tags.KeyValues)
 
 	m.defByTagSet.add(def)
 }
@@ -1693,12 +1711,7 @@ DEFS:
 			}
 
 			for sdef := range defs {
-				if defName != sdef.NameWithTags() {
-					corruptIndex.Inc()
-					log.Errorf("Almost added bad def to prune list: def=%v, sdef=%v", def, sdef)
-				} else {
-					toPruneTagged[sdef.OrgId][sdef.Id] = struct{}{}
-				}
+				toPruneTagged[sdef.OrgId][sdef.Id] = struct{}{}
 			}
 		}
 	}

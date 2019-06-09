@@ -334,7 +334,6 @@ func (md *MetricDefinition) NameWithTags() string {
 	var bld strings.Builder
 
 	md.Name.string(&bld)
-	sort.Sort(md.Tags.KeyValues)
 	for _, tag := range md.Tags.KeyValues {
 		key, err := IdxIntern.GetStringFromPtr(tag.Key)
 		if err != nil {
