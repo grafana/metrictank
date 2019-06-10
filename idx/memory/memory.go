@@ -610,7 +610,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 	nameValue, _ := idx.IdxIntern.AddOrGet([]byte(schema.SanitizeNameAsTagValue(def.Name.String())), false)
 	tags.addTagId(nameKey, nameValue, def.Id)
 
-	// Added sort here to accomodate a case where out of order tags are set after
+	// Added sort here to accommodate a case where out of order tags are set after
 	// a call to SetId (which would sort it)
 	// e.g. the case where somebody sent us a MD with an id already set and out-of-order tags
 	sort.Sort(def.Tags.KeyValues)
