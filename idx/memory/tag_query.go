@@ -396,6 +396,7 @@ EXPRS:
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
+				continue
 			}
 			if key != e.Key {
 				continue
@@ -420,6 +421,7 @@ EXPRS:
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 				internError.Inc()
+				continue
 			}
 			if e.Regex == nil || e.Regex.MatchString(value) {
 				if atomic.LoadInt32(&e.matchCacheSize) < int32(matchCacheSize) {
@@ -473,6 +475,7 @@ func (q *TagQueryContext) testByTagMatch(def *idx.Archive) bool {
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			continue
 		}
 		if _, ok := q.tagMatch.matchCache.Load(tag.Key); ok || q.tagMatch.Regex.MatchString(key) {
 			if !ok {
@@ -512,6 +515,7 @@ EXPRS:
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
+				continue
 			}
 			if e.Key != key {
 				continue
@@ -520,6 +524,7 @@ EXPRS:
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 				internError.Inc()
+				continue
 			}
 			if !strings.HasPrefix(value, e.Value) {
 				continue
@@ -553,11 +558,13 @@ func (q *TagQueryContext) testByEqual(id schema.MKey, exprs []kv, not bool) bool
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			continue
 		}
 		value, err := idx.IdxIntern.GetPtrFromByte([]byte(e.Value))
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
+			continue
 		}
 		indexIds := q.index[key][value]
 
@@ -616,11 +623,13 @@ func (q *TagQueryContext) sortByCost() {
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			continue
 		}
 		value, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Value))
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
+			continue
 		}
 		q.equal[i].cost = uint(len(q.index[key][value]))
 	}
@@ -633,6 +642,7 @@ func (q *TagQueryContext) sortByCost() {
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			continue
 		}
 		q.prefix[i].cost = uint(len(q.index[key]))
 	}
@@ -642,6 +652,7 @@ func (q *TagQueryContext) sortByCost() {
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
+			continue
 		}
 		q.match[i].cost = uint(len(q.index[key]))
 	}
@@ -703,6 +714,7 @@ func (q *TagQueryContext) getMaxTagCount() int {
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
+				continue
 			}
 			if !strings.HasPrefix(key, q.tagPrefix) {
 				continue
@@ -715,6 +727,7 @@ func (q *TagQueryContext) getMaxTagCount() int {
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
+				continue
 			}
 			if q.tagMatch.Regex.MatchString(key) {
 				maxTagCount++
@@ -757,6 +770,7 @@ IDS:
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
+				continue
 			}
 			// this tag has already been pushed into tagCh, so we can stop evaluating
 			if _, ok := resultsCache[key]; ok {
