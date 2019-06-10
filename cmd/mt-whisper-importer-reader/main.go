@@ -20,8 +20,8 @@ import (
 
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/mdata/importer"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -272,7 +272,7 @@ func convertWhisperMethod(whisperMethod whisper.AggregationMethod) (schema.Metho
 	}
 }
 
-func getMetric(w *whisper.Whisper, file, name string) (*mdata.ArchiveRequest, error) {
+func getMetric(w *whisper.Whisper, file, name string) (*importer.ArchiveRequest, error) {
 	if len(w.Header.Archives) == 0 {
 		return nil, fmt.Errorf("Whisper file contains no archives: %q", file)
 	}
@@ -291,7 +291,7 @@ func getMetric(w *whisper.Whisper, file, name string) (*mdata.ArchiveRequest, er
 		points[i] = p
 	}
 
-	res := &mdata.ArchiveRequest{
+	res := &importer.ArchiveRequest{
 		MetricData: schema.MetricData{
 			Name:     name,
 			Value:    0,
@@ -320,7 +320,7 @@ func getMetric(w *whisper.Whisper, file, name string) (*mdata.ArchiveRequest, er
 
 			encodedChunks := encodedChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan)
 			for _, chunk := range encodedChunks {
-				res.ChunkWriteRequests = append(res.ChunkWriteRequests, mdata.NewChunkWriteRequestWithoutOrg(
+				res.ChunkWriteRequests = append(res.ChunkWriteRequests, importer.NewChunkWriteRequest(
 					archive,
 					uint32(retention.MaxRetention()),
 					chunk.Series.T0,

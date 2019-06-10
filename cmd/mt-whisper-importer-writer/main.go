@@ -22,6 +22,7 @@ import (
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/importer"
 	bigTableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 )
@@ -182,7 +183,7 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	data := mdata.ArchiveRequest{}
+	data := importer.ArchiveRequest{}
 	err = data.UnmarshalCompressed(req.Body)
 	if err != nil {
 		throwError(w, fmt.Sprintf("Error decoding cwr stream: %q", err))
