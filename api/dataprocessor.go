@@ -64,7 +64,20 @@ func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 		// the requested range is too narrow for the requested interval
 		return []schema.Point{}
 	}
-	out := make([]schema.Point, (last-first)/interval+1)
+	// 3 attempts to get a sufficiently sized slice from the pool. if it fails, allocate a new one.
+	var out []schema.Point
+	neededCap := int((last-first)/interval + 1)
+	for attempt := 1; attempt < 4; attempt++ {
+		candidate := pointSlicePool.Get().([]schema.Point)
+		if cap(candidate) >= neededCap {
+			out = candidate[:neededCap]
+			break
+		}
+		pointSlicePool.Put(candidate)
+	}
+	if out == nil {
+		out = make([]schema.Point, neededCap)
+	}
 
 	// i iterates in. o iterates out. t is the ts we're looking to fill.
 	for t, i, o := first, 0, -1; t <= last; t += interval {
@@ -104,11 +117,13 @@ func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 			o -= 1
 		}
 	}
+	pointSlicePool.Put(in[:0])
 
 	return out
 }
 
 // divideContext wraps a Consolidate() call with a context.Context condition
+// important: pointsB will be released to the pool. do not keep a reference to it
 func divideContext(ctx context.Context, pointsA, pointsB []schema.Point) []schema.Point {
 	select {
 	case <-ctx.Done():
@@ -119,6 +134,8 @@ func divideContext(ctx context.Context, pointsA, pointsB []schema.Point) []schem
 	return divide(pointsA, pointsB)
 }
 
+// divide divides pointsA by pointsB - pointwise. pointsA will be reused for the output.
+// important: pointsB will be released to the pool. do not keep a reference to it
 func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	if len(pointsA) != len(pointsB) {
 		panic(fmt.Errorf("divide of a series with len %d by a series with len %d", len(pointsA), len(pointsB)))
@@ -126,6 +143,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	for i := range pointsA {
 		pointsA[i].Val /= pointsB[i].Val
 	}
+	pointSlicePool.Put(pointsB[:0])
 	return pointsA
 }
 
@@ -397,7 +415,10 @@ func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidato
 		return nil, nil
 	default:
 	}
-	res.Points = append(s.itersToPoints(rctx, res.Iters), res.Points...)
+	res.Points = append(s.itersToPoints(rctx, res.Iters), res.Points...) // TODO the output from s.itersToPoints is never released to the pool?
+	// note: Fix() returns res.Points back to the pool
+	// this is safe because nothing else is still using it
+	// you can confirm this by analyzing what happens in prior calls such as itertoPoints and s.getSeries()
 	return Fix(res.Points, req.From, req.To, req.ArchInterval), nil
 }
 
@@ -589,6 +610,9 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 }
 
 // check for duplicate series names for the same query. If found merge the results.
+// each first uniquely-identified series's backing datapoints slice is reused
+// any subsequent non-uniquely-identified series is merged into the former and has its
+// datapoints slice returned to the pool.
 func mergeSeries(in []models.Series) []models.Series {
 	type segment struct {
 		target string
@@ -625,6 +649,9 @@ func mergeSeries(in []models.Series) []models.Series {
 						break
 					}
 				}
+			}
+			for j := 1; j < len(series); j++ {
+				pointSlicePool.Put(series[j].Datapoints[:0])
 			}
 			merged[i] = series[0]
 		}
