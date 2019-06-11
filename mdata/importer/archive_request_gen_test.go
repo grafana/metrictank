@@ -9,8 +9,8 @@ import (
 	"github.com/tinylib/msgp/msgp"
 )
 
-func TestMarshalUnmarshalChunkWriteRequest(t *testing.T) {
-	v := ChunkWriteRequest{}
+func TestMarshalUnmarshalArchiveRequest(t *testing.T) {
+	v := ArchiveRequest{}
 	bts, err := v.MarshalMsg(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -32,8 +32,8 @@ func TestMarshalUnmarshalChunkWriteRequest(t *testing.T) {
 	}
 }
 
-func BenchmarkMarshalMsgChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkMarshalMsgArchiveRequest(b *testing.B) {
+	v := ArchiveRequest{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -41,8 +41,8 @@ func BenchmarkMarshalMsgChunkWriteRequest(b *testing.B) {
 	}
 }
 
-func BenchmarkAppendMsgChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkAppendMsgArchiveRequest(b *testing.B) {
+	v := ArchiveRequest{}
 	bts := make([]byte, 0, v.Msgsize())
 	bts, _ = v.MarshalMsg(bts[0:0])
 	b.SetBytes(int64(len(bts)))
@@ -53,8 +53,8 @@ func BenchmarkAppendMsgChunkWriteRequest(b *testing.B) {
 	}
 }
 
-func BenchmarkUnmarshalChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkUnmarshalArchiveRequest(b *testing.B) {
+	v := ArchiveRequest{}
 	bts, _ := v.MarshalMsg(nil)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(bts)))
@@ -67,8 +67,8 @@ func BenchmarkUnmarshalChunkWriteRequest(b *testing.B) {
 	}
 }
 
-func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
-	v := ChunkWriteRequest{}
+func TestEncodeDecodeArchiveRequest(t *testing.T) {
+	v := ArchiveRequest{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 
@@ -77,7 +77,7 @@ func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
 		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
-	vn := ChunkWriteRequest{}
+	vn := ArchiveRequest{}
 	err := msgp.Decode(&buf, &vn)
 	if err != nil {
 		t.Error(err)
@@ -91,8 +91,8 @@ func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
 	}
 }
 
-func BenchmarkEncodeChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkEncodeArchiveRequest(b *testing.B) {
+	v := ArchiveRequest{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))
@@ -105,8 +105,8 @@ func BenchmarkEncodeChunkWriteRequest(b *testing.B) {
 	en.Flush()
 }
 
-func BenchmarkDecodeChunkWriteRequest(b *testing.B) {
-	v := ChunkWriteRequest{}
+func BenchmarkDecodeArchiveRequest(b *testing.B) {
+	v := ArchiveRequest{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))

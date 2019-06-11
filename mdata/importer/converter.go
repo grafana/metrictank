@@ -9,7 +9,7 @@ import (
 	"github.com/raintank/schema"
 )
 
-type Converter struct {
+type converter struct {
 	archives []whisper.ArchiveInfo
 	points   map[int][]whisper.Point
 	method   schema.Method
@@ -19,12 +19,12 @@ type Converter struct {
 
 const fakeAvg schema.Method = 255
 
-func NewConverter(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method, from, until uint32) *Converter {
-	return &Converter{archives: arch, points: points, method: method, from: from, until: until}
+func newConverter(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method, from, until uint32) *converter {
+	return &converter{archives: arch, points: points, method: method, from: from, until: until}
 }
 
 // generates points according to specified parameters by finding and using the best archives as input
-func (c *Converter) GetPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
+func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
 	res := make(map[schema.Method][]whisper.Point)
 
 	if len(c.points) == 0 {
@@ -111,7 +111,7 @@ func (c *Converter) GetPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 	return res
 }
 
-func (c *Converter) findSmallestLargestArchive(spp, nop uint32) (int, int) {
+func (c *converter) findSmallestLargestArchive(spp, nop uint32) (int, int) {
 	// find smallest archive that still contains enough data to satisfy requested range
 	largestArchiveIdx := len(c.archives) - 1
 	for i := largestArchiveIdx; i >= 0; i-- {
@@ -282,7 +282,7 @@ func sortPoints(points pointSorter) pointSorter {
 	return points
 }
 
-func ConvertWhisperMethod(whisperMethod whisper.AggregationMethod) (schema.Method, error) {
+func convertWhisperMethod(whisperMethod whisper.AggregationMethod) (schema.Method, error) {
 	switch whisperMethod {
 	case whisper.AggregationAverage:
 		return schema.Avg, nil

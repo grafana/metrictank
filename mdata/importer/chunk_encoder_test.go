@@ -11,7 +11,7 @@ func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
 	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
 	expectedCount := 8640 // count including unfinished chunks
 
-	chunks := EncodeChunksFromPoints(points, 10, 21600, true)
+	chunks := encodeChunksFromPoints(points, 10, 21600, true)
 
 	if len(chunks) != 5 {
 		t.Fatalf("Expected to get 5 chunks, but got %d", len(chunks))
@@ -48,7 +48,7 @@ func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
 	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
 	expectedCount := 8640 - (2520 % 2160) // count minus what would end up in an unfinished chunk
 
-	chunks := EncodeChunksFromPoints(points, 10, 21600, false)
+	chunks := encodeChunksFromPoints(points, 10, 21600, false)
 
 	if len(chunks) != 4 {
 		t.Fatalf("Expected to get 4 chunks, but got %d", len(chunks))

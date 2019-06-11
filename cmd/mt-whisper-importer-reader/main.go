@@ -21,7 +21,6 @@ import (
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata/importer"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -160,7 +159,7 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 
 		name := getMetricName(file)
 		log.Debugf("Processing file %s (%s)", file, name)
-		data, err := getMetric(w, file, name)
+		data, err := importer.NewArchiveRequest(w, schemas, file, name, uint32(*importFrom), uint32(*importUntil), *writeUnfinishedChunks)
 		if err != nil {
 			log.Errorf("Failed to get metric: %q", err.Error())
 			continue
@@ -237,72 +236,6 @@ func getMetricName(file string) string {
 	}
 
 	return *namePrefix + strings.Replace(strings.TrimSuffix(file, ".wsp"), "/", ".", -1)
-}
-
-func getMetric(w *whisper.Whisper, file, name string) (*importer.ArchiveRequest, error) {
-	if len(w.Header.Archives) == 0 {
-		return nil, fmt.Errorf("Whisper file contains no archives: %q", file)
-	}
-
-	method, err := importer.ConvertWhisperMethod(w.Header.Metadata.AggregationMethod)
-	if err != nil {
-		return nil, err
-	}
-
-	points := make(map[int][]whisper.Point)
-	for i := range w.Header.Archives {
-		p, err := w.DumpArchive(i)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to dump archive %d from whisper file %s", i, file)
-		}
-		points[i] = p
-	}
-
-	res := &importer.ArchiveRequest{
-		MetricData: schema.MetricData{
-			Name:     name,
-			Value:    0,
-			Interval: int(w.Header.Archives[0].SecondsPerPoint),
-			Unit:     "unknown",
-			Time:     0,
-			Mtype:    "gauge",
-			Tags:     []string{},
-		},
-	}
-	res.MetricData.SetId()
-
-	_, selectedSchema := schemas.Match(res.MetricData.Name, int(w.Header.Archives[0].SecondsPerPoint))
-	converter := importer.NewConverter(w.Header.Archives, points, method, uint32(*importFrom), uint32(*importUntil))
-	for retIdx, retention := range selectedSchema.Retentions {
-		convertedPoints := converter.GetPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
-		for m, p := range convertedPoints {
-			if len(p) == 0 {
-				continue
-			}
-
-			var archive schema.Archive
-			if retIdx > 0 {
-				archive = schema.NewArchive(m, retention.ChunkSpan)
-			}
-
-			encodedChunks := importer.EncodeChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan, *writeUnfinishedChunks)
-			for _, chunk := range encodedChunks {
-				res.ChunkWriteRequests = append(res.ChunkWriteRequests, importer.NewChunkWriteRequest(
-					archive,
-					uint32(retention.MaxRetention()),
-					chunk.Series.T0,
-					chunk.Encode(retention.ChunkSpan),
-					time.Now(),
-				))
-			}
-
-			if res.MetricData.Time < int64(p[len(p)-1].Timestamp) {
-				res.MetricData.Time = int64(p[len(p)-1].Timestamp)
-			}
-		}
-	}
-
-	return res, nil
 }
 
 // scan a directory and feed the list of whisper files relative to base into the given channel

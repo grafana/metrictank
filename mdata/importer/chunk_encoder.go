@@ -7,7 +7,7 @@ import (
 	"github.com/kisielk/whisper-go/whisper"
 )
 
-func EncodeChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint32, writeUnfinishedChunks bool) []*chunk.Chunk {
+func encodeChunksFromPoints(points []whisper.Point, intervalIn, chunkSpan uint32, writeUnfinishedChunks bool) []*chunk.Chunk {
 	var point whisper.Point
 	var t0, prevT0 uint32
 	var c *chunk.Chunk
