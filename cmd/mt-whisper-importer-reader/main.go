@@ -239,29 +239,12 @@ func getMetricName(file string) string {
 	return *namePrefix + strings.Replace(strings.TrimSuffix(file, ".wsp"), "/", ".", -1)
 }
 
-func convertWhisperMethod(whisperMethod whisper.AggregationMethod) (schema.Method, error) {
-	switch whisperMethod {
-	case whisper.AggregationAverage:
-		return schema.Avg, nil
-	case whisper.AggregationSum:
-		return schema.Sum, nil
-	case whisper.AggregationLast:
-		return schema.Lst, nil
-	case whisper.AggregationMax:
-		return schema.Max, nil
-	case whisper.AggregationMin:
-		return schema.Min, nil
-	default:
-		return 0, fmt.Errorf("Unknown whisper method: %d", whisperMethod)
-	}
-}
-
 func getMetric(w *whisper.Whisper, file, name string) (*importer.ArchiveRequest, error) {
 	if len(w.Header.Archives) == 0 {
 		return nil, fmt.Errorf("Whisper file contains no archives: %q", file)
 	}
 
-	method, err := convertWhisperMethod(w.Header.Metadata.AggregationMethod)
+	method, err := importer.ConvertWhisperMethod(w.Header.Metadata.AggregationMethod)
 	if err != nil {
 		return nil, err
 	}
@@ -289,9 +272,9 @@ func getMetric(w *whisper.Whisper, file, name string) (*importer.ArchiveRequest,
 	res.MetricData.SetId()
 
 	_, selectedSchema := schemas.Match(res.MetricData.Name, int(w.Header.Archives[0].SecondsPerPoint))
-	conversion := importer.NewConversion(w.Header.Archives, points, method, uint32(*importFrom), uint32(*importUntil))
+	converter := importer.NewConverter(w.Header.Archives, points, method, uint32(*importFrom), uint32(*importUntil))
 	for retIdx, retention := range selectedSchema.Retentions {
-		convertedPoints := conversion.GetPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
+		convertedPoints := converter.GetPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		for m, p := range convertedPoints {
 			if len(p) == 0 {
 				continue

@@ -1,13 +1,15 @@
 package importer
 
 import (
+	"fmt"
+	"sort"
+
 	"github.com/grafana/metrictank/mdata"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
-	"sort"
 )
 
-type conversion struct {
+type Converter struct {
 	archives []whisper.ArchiveInfo
 	points   map[int][]whisper.Point
 	method   schema.Method
@@ -17,12 +19,12 @@ type conversion struct {
 
 const fakeAvg schema.Method = 255
 
-func NewConversion(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method, from, until uint32) *conversion {
-	return &conversion{archives: arch, points: points, method: method, from: from, until: until}
+func NewConverter(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method, from, until uint32) *Converter {
+	return &Converter{archives: arch, points: points, method: method, from: from, until: until}
 }
 
 // generates points according to specified parameters by finding and using the best archives as input
-func (c *conversion) GetPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
+func (c *Converter) GetPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
 	res := make(map[schema.Method][]whisper.Point)
 
 	if len(c.points) == 0 {
@@ -109,7 +111,7 @@ func (c *conversion) GetPoints(retIdx int, spp, nop uint32) map[schema.Method][]
 	return res
 }
 
-func (c *conversion) findSmallestLargestArchive(spp, nop uint32) (int, int) {
+func (c *Converter) findSmallestLargestArchive(spp, nop uint32) (int, int) {
 	// find smallest archive that still contains enough data to satisfy requested range
 	largestArchiveIdx := len(c.archives) - 1
 	for i := largestArchiveIdx; i >= 0; i-- {
@@ -278,4 +280,21 @@ func (a pointSorter) Less(i, j int) bool { return a[i].Timestamp < a[j].Timestam
 func sortPoints(points pointSorter) pointSorter {
 	sort.Sort(points)
 	return points
+}
+
+func ConvertWhisperMethod(whisperMethod whisper.AggregationMethod) (schema.Method, error) {
+	switch whisperMethod {
+	case whisper.AggregationAverage:
+		return schema.Avg, nil
+	case whisper.AggregationSum:
+		return schema.Sum, nil
+	case whisper.AggregationLast:
+		return schema.Lst, nil
+	case whisper.AggregationMax:
+		return schema.Max, nil
+	case whisper.AggregationMin:
+		return schema.Min, nil
+	default:
+		return 0, fmt.Errorf("Unknown whisper method: %d", whisperMethod)
+	}
 }
