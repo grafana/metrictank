@@ -94,6 +94,8 @@ idxtype: only 'cass' supported for now
 
 cass config flags:
 
+  -archive-table string
+    	Cassandra table to archive metricDefinitions in. (default "metric_idx_archive")
   -auth
     	enable cassandra user authentication
   -ca-path string
@@ -126,6 +128,8 @@ cass config flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
+  -table string
+    	Cassandra table to store metricDefinitions in. (default "metric_idx")
   -timeout duration
     	cassandra request timeout (default 1s)
   -update-cassandra-index
@@ -184,6 +188,8 @@ Flags:
     	Address of cassandra host to migrate to. (default "localhost")
   -dst-keyspace string
     	Cassandra keyspace in use on destination. (default "raintank")
+  -idx-table string
+    	index table name in Cassandra (default "metric_idx")
   -log-level string
     	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
@@ -227,6 +233,8 @@ idxtype: only 'cass' supported for now
 
 cass config flags:
 
+  -archive-table string
+    	Cassandra table to archive metricDefinitions in. (default "metric_idx_archive")
   -auth
     	enable cassandra user authentication
   -ca-path string
@@ -259,6 +267,8 @@ cass config flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
+  -table string
+    	Cassandra table to store metricDefinitions in. (default "metric_idx")
   -timeout duration
     	cassandra request timeout (default 1s)
   -update-cassandra-index
