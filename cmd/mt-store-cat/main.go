@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
+	cassandra_idx "github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/jaeger"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/store/cassandra"
@@ -51,6 +52,7 @@ func init() {
 
 func main() {
 	storeConfig := cassandra.NewStoreConfig()
+	idxConfig := cassandra_idx.NewIdxConfig()
 	// flags from cassandra/config.go, Cassandra
 	flag.StringVar(&storeConfig.Addrs, "cassandra-addrs", storeConfig.Addrs, "cassandra host (may be given multiple times as comma-separated list)")
 	flag.StringVar(&storeConfig.Keyspace, "cassandra-keyspace", storeConfig.Keyspace, "cassandra keyspace to use for storing the metric data table")
@@ -182,6 +184,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize cassandra. %s", err.Error())
 	}
+	idx := cassandra_idx.New(idxConfig)
 	tracer, traceCloser, err := jaeger.Get()
 	if err != nil {
 		log.Fatalf("Could not initialize jaeger tracer: %s", err.Error())
@@ -249,7 +252,7 @@ func main() {
 		// chunk-summary doesn't need an explicit listing. it knows if metrics is empty, to query all
 		// but the other two do need an explicit listing.
 		if format == "points" || format == "point-summary" {
-			metrics, err = getMetrics(store, "", "", "", archive)
+			metrics, err = getMetrics(idx, "", "", "", archive)
 			if err != nil {
 				log.Errorf("cassandra query error. %s", err.Error())
 				return
@@ -269,7 +272,7 @@ func main() {
 		if verbose {
 			fmt.Println("# Looking for these metrics:")
 		}
-		metrics, err = getMetrics(store, prefix, substr, glob, archive)
+		metrics, err = getMetrics(idx, prefix, substr, glob, archive)
 		if err != nil {
 			log.Errorf("cassandra query error. %s", err.Error())
 			return
@@ -290,7 +293,7 @@ func main() {
 			fmt.Println("# Looking for this metric:")
 		}
 
-		metrics, err = getMetric(store, amkey)
+		metrics, err = getMetric(idx, amkey)
 		if err != nil {
 			log.Errorf("cassandra query error. %s", err.Error())
 			return

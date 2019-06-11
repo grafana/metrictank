@@ -30,6 +30,8 @@ type IdxConfig struct {
 	createKeyspace           bool
 	schemaFile               string
 	keyspace                 string
+	Table                    string
+	archiveTable             string
 	hosts                    string
 	capath                   string
 	username                 string
@@ -48,6 +50,8 @@ func NewIdxConfig() *IdxConfig {
 		Enabled:                  true,
 		hosts:                    "localhost:9042",
 		keyspace:                 "metrictank",
+		Table:                    "metric_idx",
+		archiveTable:             "metric_idx_archive",
 		consistency:              "one",
 		timeout:                  time.Second,
 		numConns:                 10,
@@ -87,6 +91,8 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.BoolVar(&CliConfig.Enabled, "enabled", CliConfig.Enabled, "")
 	casIdx.StringVar(&CliConfig.hosts, "hosts", CliConfig.hosts, "comma separated list of cassandra addresses in host:port form")
 	casIdx.StringVar(&CliConfig.keyspace, "keyspace", CliConfig.keyspace, "Cassandra keyspace to store metricDefinitions in.")
+	casIdx.StringVar(&CliConfig.Table, "table", CliConfig.Table, "Cassandra table to store metricDefinitions in.")
+	casIdx.StringVar(&CliConfig.archiveTable, "archive-table", CliConfig.archiveTable, "Cassandra table to archive metricDefinitions in.")
 	casIdx.StringVar(&CliConfig.consistency, "consistency", CliConfig.consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&CliConfig.timeout, "timeout", CliConfig.timeout, "cassandra request timeout")
 	casIdx.IntVar(&CliConfig.numConns, "num-conns", CliConfig.numConns, "number of concurrent connections to cassandra")

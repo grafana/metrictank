@@ -22,6 +22,7 @@ var (
 	dstCassAddr     = flag.String("dst-cass-addr", "localhost", "Address of cassandra host to migrate to.")
 	srcKeyspace     = flag.String("src-keyspace", "raintank", "Cassandra keyspace in use on source.")
 	dstKeyspace     = flag.String("dst-keyspace", "raintank", "Cassandra keyspace in use on destination.")
+	idxTable        = flag.String("idx-table", "metric_idx", "index table name in Cassandra")
 	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
 	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
 	schemaFile      = flag.String("schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
@@ -76,30 +77,31 @@ func main() {
 
 	// ensure the dest table exists.
 	schemaTable := util.ReadEntry(*schemaFile, "schema_table").(string)
-	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace)).Exec()
+	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace, *idxTable)).Exec()
 	if err != nil {
 		log.Fatalf("cassandra-idx failed to initialize cassandra table. %s", err.Error())
 	}
 
 	wg.Add(1)
-	go writeDefs(dstSession, defsChan)
+	go writeDefs(dstSession, defsChan, *idxTable)
 	wg.Add(1)
-	go getDefs(srcSession, defsChan)
+	go getDefs(srcSession, defsChan, *idxTable)
 
 	wg.Wait()
 
 }
 
-func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
+func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, idxTable string) {
 	log.Info("starting write thread")
 	defer wg.Done()
 	counter := 0
 	pre := time.Now()
 	for def := range defsChan {
-		qry := `INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		qry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", idxTable)
 		if *dryRun {
 			fmt.Printf(
-				"INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES ('%s', '%d', '%d','%s', '%d', '%s','%s', '%v', '%d')\n",
+				"INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES ('%s', '%d', '%d','%s', '%d', '%s','%s', '%v', '%d')\n",
+				idxTable,
 				def.Id,
 				def.OrgId,
 				def.Partition,
@@ -145,7 +147,7 @@ func writeDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	log.Infof("Inserted %d metricDefs in %s", counter, time.Since(pre).String())
 }
 
-func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
+func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition, idxTable string) {
 	log.Info("starting read thread")
 	defer wg.Done()
 	defer close(defsChan)
@@ -153,7 +155,7 @@ func getDefs(session *gocql.Session, defsChan chan *schema.MetricDefinition) {
 	if err != nil {
 		log.Fatalf("failed to initialize partitioner. %s", err.Error())
 	}
-	iter := session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
+	iter := session.Query(fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s", idxTable)).Iter()
 
 	var id, name, unit, mtype string
 	var orgId, interval int

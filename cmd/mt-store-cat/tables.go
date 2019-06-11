@@ -20,7 +20,8 @@ func getTables(store *cassandra.CassandraStore, match string) ([]cassandra.Table
 	var tables []cassandra.Table
 	if match == "*" || match == "" {
 		for _, table := range store.TTLTables {
-			if table.Name == "metric_idx" || !strings.HasPrefix(table.Name, "metric_") {
+			// FIXME: exclusion logic feels unreliable and is copy/pasted from CassandraStore.FindExistingTables()
+			if strings.Contains(table.Name, "idx") || !strings.HasPrefix(table.Name, "metric_") {
 				continue
 			}
 			tables = append(tables, table)

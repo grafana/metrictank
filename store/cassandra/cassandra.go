@@ -266,7 +266,7 @@ func (c *CassandraStore) FindExistingTables(keyspace string) error {
 	c.TTLTables = make(TTLTables)
 
 	for _, table := range meta.Tables {
-		if table.Name == "metric_idx" || !strings.HasPrefix(table.Name, "metric_") {
+		if strings.Contains(table.Name, "idx") || !strings.HasPrefix(table.Name, "metric_") {
 			continue
 		}
 		fields := strings.Split(table.Name, "_")

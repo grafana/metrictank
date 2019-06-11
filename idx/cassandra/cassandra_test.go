@@ -437,7 +437,7 @@ func BenchmarkIndexing(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Query(fmt.Sprintf("TRUNCATE %s.%s", CliConfig.keyspace, CliConfig.Table)).Exec()
 	tmpSession.Close()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
@@ -489,7 +489,7 @@ func BenchmarkLoad(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Query(fmt.Sprintf("TRUNCATE %s.%s", CliConfig.keyspace, CliConfig.Table)).Exec()
 	tmpSession.Close()
 	err = ix.Init()
 	if err != nil {
@@ -524,7 +524,7 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Query(fmt.Sprintf("TRUNCATE %s.%s", CliConfig.keyspace, CliConfig.Table)).Exec()
 	tmpSession.Close()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
