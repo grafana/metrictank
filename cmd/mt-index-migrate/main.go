@@ -22,8 +22,8 @@ var (
 	dstCassAddr     = flag.String("dst-cass-addr", "localhost", "Address of cassandra host to migrate to.")
 	srcKeyspace     = flag.String("src-keyspace", "raintank", "Cassandra keyspace in use on source.")
 	dstKeyspace     = flag.String("dst-keyspace", "raintank", "Cassandra keyspace in use on destination.")
-	srcIdxTable     = flag.String("src-idx-table", "metric_idx", "Cassandra index table name in use on source.")
-	dstIdxTable     = flag.String("dst-idx-table", "metric_idx", "Cassandra index table name in use on destination.")
+	srcTable        = flag.String("src-table", "metric_idx", "Cassandra table name in use on source.")
+	dstTable        = flag.String("dst-table", "metric_idx", "Cassandra table name in use on destination.")
 	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries)")
 	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
 	schemaFile      = flag.String("schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
@@ -78,15 +78,15 @@ func main() {
 
 	// ensure the dest table exists.
 	schemaTable := util.ReadEntry(*schemaFile, "schema_table").(string)
-	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace, *dstIdxTable)).Exec()
+	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace, *dstTable)).Exec()
 	if err != nil {
 		log.Fatalf("cassandra-idx failed to initialize cassandra table. %s", err.Error())
 	}
 
 	wg.Add(1)
-	go writeDefs(dstSession, defsChan, *dstIdxTable)
+	go writeDefs(dstSession, defsChan, *dstTable)
 	wg.Add(1)
-	go getDefs(srcSession, defsChan, *srcIdxTable)
+	go getDefs(srcSession, defsChan, *srcTable)
 
 	wg.Wait()
 

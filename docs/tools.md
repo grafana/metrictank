@@ -186,10 +186,10 @@ Flags:
     	run in dry-run mode. No changes will be made. (default true)
   -dst-cass-addr string
     	Address of cassandra host to migrate to. (default "localhost")
-  -dst-idx-table string
-    	Cassandra index table name in use on destination. (default "metric_idx")
   -dst-keyspace string
     	Cassandra keyspace in use on destination. (default "raintank")
+  -dst-table string
+    	Cassandra table name in use on destination. (default "metric_idx")
   -log-level string
     	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
@@ -200,10 +200,10 @@ Flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -src-cass-addr string
     	Address of cassandra host to migrate from. (default "localhost")
-  -src-idx-table string
-    	Cassandra index table name in use on source. (default "metric_idx")
   -src-keyspace string
     	Cassandra keyspace in use on source. (default "raintank")
+  -src-table string
+    	Cassandra table name in use on source. (default "metric_idx")
 ```
 
 
