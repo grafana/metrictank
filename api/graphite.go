@@ -1311,24 +1311,13 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 }
 
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
-	metaTags, err := tagQuery.ParseTags(upsertRequest.MetaTags)
+	record, err := tagQuery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Queries)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	queries, err := tagQuery.ParseExpressions(upsertRequest.Queries)
-	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-		return
-	}
-
-	record := idx.MetaTagRecord{
-		MetaTags: metaTags,
-		Queries:  queries,
-	}
-
-	var localResult idx.MetaTagRecord
+	var localResult tagQuery.MetaTagRecord
 	var created bool
 	if s.MetricIndex != nil {
 		var err error

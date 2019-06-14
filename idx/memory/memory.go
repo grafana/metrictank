@@ -3,7 +3,6 @@ package memory
 import (
 	"flag"
 	"fmt"
-	"github.com/grafana/metrictank/expr/tagQuery"
 	"os"
 	"regexp"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -377,8 +377,8 @@ func (m *UnpartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
 // 1) The relevant meta record as it is after this operation
 // 2) A bool that is true if the record has been created, or false if updated
 // 3) An error which is nil if no error has occurred
-func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecord) (idx.MetaTagRecord, bool, error) {
-	res := idx.MetaTagRecord{}
+func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagQuery.MetaTagRecord) (tagQuery.MetaTagRecord, bool, error) {
+	res := tagQuery.MetaTagRecord{}
 
 	if !TagSupport {
 		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
@@ -402,37 +402,35 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx
 		m.metaTags[orgId] = mti
 	}
 
-	id, record, oldId, oldRecord, err := mtr.upsert(rawRecord.MetaTags, rawRecord.Queries)
+	id, record, oldId, oldRecord, err := mtr.upsert(upsertRecord)
 	if err != nil {
 		return res, false, err
 	}
-
-	res.MetaTags = record.metaTags
-	res.Queries = record.queries
+	res = *record
 
 	// if this upsert has updated a previously existing record, then we remove its entries
 	// from the metaTagIndex before inserting the new ones
 	if oldRecord != nil {
-		for _, keyValue := range oldRecord.metaTags {
+		for _, keyValue := range oldRecord.MetaTags {
 			mti.deleteRecord(keyValue, oldId)
 		}
 
-		for _, keyValue := range record.metaTags {
+		for _, keyValue := range record.MetaTags {
 			mti.insertRecord(keyValue, id)
 		}
 
 		return res, false, nil
 	}
 
-	for _, keyValue := range record.metaTags {
+	for _, keyValue := range record.MetaTags {
 		mti.insertRecord(keyValue, id)
 	}
 
 	return res, true, nil
 }
 
-func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
-	var res []idx.MetaTagRecord
+func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagQuery.MetaTagRecord {
+	var res []tagQuery.MetaTagRecord
 
 	m.RLock()
 	defer m.RUnlock()
@@ -442,12 +440,11 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRe
 		return res
 	}
 
-	res = make([]idx.MetaTagRecord, 0, len(metaTagRecords))
+	res = make([]tagQuery.MetaTagRecord, len(metaTagRecords))
+	i := 0
 	for _, record := range metaTagRecords {
-		res = append(res, idx.MetaTagRecord{
-			MetaTags: record.metaTags,
-			Queries:  record.queries,
-		})
+		res[i] = record
+		i++
 	}
 
 	return res
