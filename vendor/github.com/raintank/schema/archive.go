@@ -8,13 +8,14 @@ import (
 )
 
 //go:generate stringer -type=Method -linecomment
+//go:generate msgp
+//msgp:ignore Method
 
 // Archive represents a metric archive
 // the zero value represents a raw metric
 // any non-zero value represents a certain
 // aggregation method (lower 8 bits) and
 // aggregation span (higher 8 bits)
-//go:generate msgp
 type Archive uint16
 
 // important: caller must make sure to call IsSpanValid first
