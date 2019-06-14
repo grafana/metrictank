@@ -13,7 +13,7 @@ import (
 var OrgIdPublic = uint32(0)
 
 //go:generate msgp
-//msgp:ignore Archive MetaTagRecord
+//msgp:ignore Archive
 
 type Node struct {
 	Path        string
@@ -28,11 +28,6 @@ type Archive struct {
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
-}
-
-type MetaTagRecord struct {
-	MetaTags tagQuery.Tags
-	Queries  tagQuery.Expressions
 }
 
 // used primarily by tests, for convenience
@@ -164,9 +159,9 @@ type MetricIndex interface {
 	// 1) The relevant meta record as it is after this operation
 	// 2) A bool that is true if the record has been created, or false if updated
 	// 3) An error which is nil if no error has occurred
-	MetaTagRecordUpsert(orgId uint32, record MetaTagRecord) (MetaTagRecord, bool, error)
+	MetaTagRecordUpsert(orgId uint32, record tagQuery.MetaTagRecord) (tagQuery.MetaTagRecord, bool, error)
 
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
-	MetaTagRecordList(orgId uint32) []MetaTagRecord
+	MetaTagRecordList(orgId uint32) []tagQuery.MetaTagRecord
 }

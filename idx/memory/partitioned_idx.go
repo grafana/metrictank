@@ -577,7 +577,7 @@ func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext
 	return response
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagRecord {
+func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagQuery.MetaTagRecord {
 	for _, m := range p.Partition {
 		// all partitions should have all meta records
 		return m.MetaTagRecordList(orgId)
@@ -585,11 +585,11 @@ func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []idx.MetaTagReco
 	return nil
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord idx.MetaTagRecord) (idx.MetaTagRecord, bool, error) {
+func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagQuery.MetaTagRecord) (tagQuery.MetaTagRecord, bool, error) {
 	g, _ := errgroup.WithContext(context.Background())
 
 	var i int
-	var record idx.MetaTagRecord
+	var record tagQuery.MetaTagRecord
 	var created bool
 	for _, m := range p.Partition {
 		m := m

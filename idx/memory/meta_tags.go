@@ -1,12 +1,12 @@
 package memory
 
 import (
-	"github.com/grafana/metrictank/expr/tagQuery"
 	"hash"
 	"hash/fnv"
 	"strings"
 
 	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/expr/tagQuery"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -22,7 +22,7 @@ func init() {
 }
 
 // list of meta records keyed by a unique identifier used as ID
-type metaTagRecords map[recordId]metaTagRecord
+type metaTagRecords map[recordId]tagQuery.MetaTagRecord
 
 type recordId uint32
 
@@ -36,25 +36,16 @@ type recordId uint32
 // 3) The id of the record that has been replaced if an update was performed
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
-func (m metaTagRecords) upsert(metaTags []tagQuery.Tag, tagQueryExpressions tagQuery.Expressions) (recordId, *metaTagRecord, recordId, *metaTagRecord, error) {
-	record := metaTagRecord{
-		metaTags: metaTags,
-		queries:  tagQueryExpressions,
-	}
-
-	if len(record.queries) == 0 {
-		return 0, nil, 0, nil, errors.NewBadRequest("Requiring at least one tag query expression, 0 given")
-	}
-
-	id := record.hashQueries()
-	var oldRecord *metaTagRecord
+func (m metaTagRecords) upsert(record tagQuery.MetaTagRecord) (recordId, *tagQuery.MetaTagRecord, recordId, *tagQuery.MetaTagRecord, error) {
+	id := m.hashMetaTagRecord(record)
+	var oldRecord *tagQuery.MetaTagRecord
 	var oldId recordId
 
 	// loop over existing records, starting from id, trying to find one that has
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		if existingRecord, ok := m[id+recordId(i)]; ok {
-			if record.matchesQueries(existingRecord) {
+			if record.MatchesQueries(existingRecord) {
 				oldRecord = &existingRecord
 				oldId = id + recordId(i)
 				delete(m, oldId)
@@ -63,7 +54,7 @@ func (m metaTagRecords) upsert(metaTags []tagQuery.Tag, tagQueryExpressions tagQ
 		}
 	}
 
-	if !record.hasMetaTags() {
+	if !record.HasMetaTags() {
 		return 0, &record, oldId, oldRecord, nil
 	}
 
@@ -82,16 +73,11 @@ func (m metaTagRecords) upsert(metaTags []tagQuery.Tag, tagQueryExpressions tagQ
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
 }
 
-type metaTagRecord struct {
-	metaTags []tagQuery.Tag
-	queries  tagQuery.Expressions
-}
-
-// hashQueries generates a hash of all the queries in the record
-func (m *metaTagRecord) hashQueries() recordId {
-	m.queries.Sort()
+// hashMetaTagRecord generates a hash of all the queries in the record
+func (m *metaTagRecords) hashMetaTagRecord(record tagQuery.MetaTagRecord) recordId {
+	record.Queries.Sort()
 	builder := strings.Builder{}
-	for _, query := range m.queries {
+	for _, query := range record.Queries {
 		query.StringIntoBuilder(&builder)
 
 		// trailing ";" doesn't matter, this is only hash input
@@ -101,29 +87,6 @@ func (m *metaTagRecord) hashQueries() recordId {
 	h := queryHash()
 	h.Write([]byte(builder.String()))
 	return recordId(h.Sum32())
-}
-
-// matchesQueries compares another tag record's queries to this
-// one's queries. Returns true if they are equal, otherwise false.
-// It is assumed that all the queries are already sorted
-func (m *metaTagRecord) matchesQueries(other metaTagRecord) bool {
-	if len(m.queries) != len(other.queries) {
-		return false
-	}
-
-	for i, query := range m.queries {
-		if !query.IsEqualTo(other.queries[i]) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// hasMetaTags returns true if the meta tag record has one or more
-// meta tags, otherwise it returns false
-func (m *metaTagRecord) hasMetaTags() bool {
-	return len(m.metaTags) > 0
 }
 
 // index structure keyed by tag -> value -> list of meta record IDs

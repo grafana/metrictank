@@ -15,7 +15,6 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
@@ -580,21 +579,10 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 		return
 	}
 
-	metaTags, err := tagQuery.ParseTags(req.MetaTags)
+	record, err := tagQuery.ParseMetaTagRecord(req.MetaTags, req.Queries)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
-	}
-
-	queries, err := tagQuery.ParseExpressions(req.Queries)
-	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-		return
-	}
-
-	record := idx.MetaTagRecord{
-		MetaTags: metaTags,
-		Queries:  queries,
 	}
 
 	result, created, err := s.MetricIndex.MetaTagRecordUpsert(req.OrgId, record)

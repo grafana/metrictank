@@ -182,7 +182,7 @@ func TestExpressions_Strings(t *testing.T) {
 					Operator: PREFIX_TAG,
 				},
 			},
-			want: []string{"a=b", "ccc!=$@#@", "~=~!", "__tag=~d", "f!=~g", "h^=i", "__tag^=j"},
+			want: []string{"a=b", "ccc!=$@#@", "~=~!", "__tag=~e", "f!=~g", "h^=i", "__tag^=q"},
 		},
 	}
 	for _, tt := range tests {
