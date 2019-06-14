@@ -7,6 +7,19 @@ import (
 
 const QueryFmtRead = "SELECT ts, data FROM %s WHERE key IN ? AND ts < ?"
 const QueryFmtWrite = "INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL ?"
+const Table_name_format = `metric_%d`
+
+func IsStoreTable(name string) bool {
+	if name == fmt.Sprintf(Table_name_format, 0) {
+		return true
+	}
+	for num := 1; num <= 500000; num *= 2 {
+		if name == fmt.Sprintf(Table_name_format, num) {
+			return true
+		}
+	}
+	return false
+}
 
 // TTLTables stores table definitions keyed by their TTL
 type TTLTables map[uint32]Table

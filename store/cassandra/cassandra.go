@@ -28,8 +28,6 @@ import (
 
 const Month_sec = 60 * 60 * 24 * 28
 
-const Table_name_format = `metric_%d`
-
 var (
 	errChunkTooSmall = errors.New("impossibly small chunk in cassandra")
 	errInvalidRange  = errors.New("CassandraStore: invalid range: from must be less than to")
@@ -266,7 +264,7 @@ func (c *CassandraStore) FindExistingTables(keyspace string) error {
 	c.TTLTables = make(TTLTables)
 
 	for _, table := range meta.Tables {
-		if strings.Contains(table.Name, "idx") || !strings.HasPrefix(table.Name, "metric_") {
+		if !IsStoreTable(table.Name) {
 			continue
 		}
 		fields := strings.Split(table.Name, "_")
