@@ -159,7 +159,7 @@ For more information on profiling see the excellent [Profiling Go Programs](http
 
 ## data doesn't show up
 
-* make sure you specify a correct interval. sending minutely data with interval specified as 10s will result in 5 nulls for each point, which in combination with certain grafana display settings ("like nulls connected") may not show anything
+* make sure you specify a correct interval. sending minutely data with interval specified as 10s will result in 5 nulls for each point, which in combination with certain grafana display settings ("like nulls connected") may not show anything. Also note that[currently all series are normalized to the same resolution](https://github.com/grafana/metrictank/issues/926) so even when you fix intervals, if the query matches any older / lower-resolution data, the entire output will have a lower resolution (the lowest common denominator).
 * make sure consumption from input works fine and is not lagging (see dashboard)
 * check if any points are being rejected, using the ingest chart on the dashboard (e.g. out of order, invalid)
 * can use debug logging to trace data throughout the pipeline. mt-store-cat to see what's in cassandra, mt-kafka-mdm-sniff, etc.
