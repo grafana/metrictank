@@ -34,7 +34,7 @@ func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		name := fmt.Sprintf("fake.metric.%d", i)
 		metric := &schema.MetricData{
-			Id:       "some.id.of.a.metric",
+			Id:       "1.12345678901234567890123456789012",
 			OrgId:    500,
 			Name:     name,
 			Interval: 10,
@@ -42,12 +42,13 @@ func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {
 			Unit:     "ms",
 			Time:     int64((i + 1) * 10),
 			Mtype:    "gauge",
-			Tags:     []string{"some_tag", "ok"},
+			Tags:     []string{"some=tag", "ok=yes"},
 		}
 		datas[i] = metric
 	}
 
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		in.ProcessMetricData(datas[i], 1)
 	}
@@ -72,7 +73,7 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		name := "fake.metric.same"
 		metric := &schema.MetricData{
-			Id:       "some.id.of.a.metric",
+			Id:       "1.12345678901234567890123456789012",
 			OrgId:    500,
 			Name:     name,
 			Interval: 10,
@@ -80,12 +81,13 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 			Unit:     "ms",
 			Time:     int64((i + 1) * 10),
 			Mtype:    "gauge",
-			Tags:     []string{"some_tag", "ok"},
+			Tags:     []string{"some=tag", "ok=yes"},
 		}
 		datas[i] = metric
 	}
 
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		in.ProcessMetricData(datas[i], 1)
 	}
