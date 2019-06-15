@@ -465,7 +465,7 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 					err := c.addDefToArchive(*def)
 					if err != nil {
 						// If we failed to add the def to the archive table then just continue on to the next def.
-						// As we havnet yet removed the this def from the metric index table yet, the next time archiving
+						// As we haven't yet removed the this def from the metric index table yet, the next time archiving
 						// is performed the this def will be processed again. As no action is needed by an operator, we
 						// just log this as a warning.
 						log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
