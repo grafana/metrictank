@@ -6,22 +6,11 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/tinylib/msgp/msgp"
 )
 
 //go:generate msgp
 //msgp:ignore AMKey
 // don't ignore Key, MKey because it's used for MetricDefinition
-
-// A random number that does not conflict with any of the msgp internal
-// types, and which is also not the first one after the msgp internal types
-// to avoid accidental conflicts with other custom types
-const msgpExtensionId = 97
-
-func init() {
-	msgp.RegisterExtension(msgpExtensionId, func() msgp.Extension { return new(AMKey) })
-}
 
 var ErrStringTooShort = errors.New("string too short")
 var ErrInvalidFormat = errors.New("invalid format")
@@ -75,37 +64,6 @@ func (m MKey) String() string {
 type AMKey struct {
 	MKey    MKey
 	Archive Archive
-}
-
-// ExtensionType is part of the msgp.Extension interface
-func (a *AMKey) ExtensionType() int8 {
-	return msgpExtensionId
-}
-
-// Len is part of the msgp.Extension interface
-// It returns the length of the encoded byte slice representing this AMKey
-// Length is variable because the AMKey may include the span & method,
-// also the org id can have a varying number of digits
-func (a *AMKey) Len() int {
-	return len(a.String())
-}
-
-// MarshalBinaryTo is part of the msgp.Extension interface
-// It takes a buffer which must have the length returned by the Len() function
-// and writes the encoded version of this AMKey into it
-func (a *AMKey) MarshalBinaryTo(buf []byte) error {
-	copy(buf, a.String())
-
-	return nil
-}
-
-// UnmarshalBinary is part of the msgp.Extension interface
-// It takes a buffer containing an encoded AMKey and decodes it into this
-// AMKey instance
-func (a *AMKey) UnmarshalBinary(buf []byte) error {
-	var err error
-	*a, err = AMKeyFromString(string(buf))
-	return err
 }
 
 func (a AMKey) String() string {

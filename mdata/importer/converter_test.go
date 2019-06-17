@@ -1,18 +1,16 @@
-package main
+package importer
 
 import (
 	"math"
 	"testing"
 
-	"github.com/grafana/metrictank/mdata/chunk"
-
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
 )
 
-func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) {
+func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes, from, until uint32) {
 	t.Helper()
-	outData := incResolution(inData, method, inRes, outRes, rawRes)
+	outData := incResolution(inData, method, inRes, outRes, rawRes, from, until)
 
 	if len(expectedResult) != len(outData) {
 		t.Fatalf("Generated data is not as expected:\nExpected:\n%+v\nGot:\n%+v\n", expectedResult, outData)
@@ -24,7 +22,7 @@ func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[
 		if p, ok = outData[m]; !ok {
 			t.Fatalf("testIncResolution.\nExpected:\n%+v\nGot:\n%+v\n", expectedResult, outData)
 		}
-		if len(p) != len(outData[m]) {
+		if len(p) != len(ep) {
 			t.Fatalf("testIncResolution.\nExpected:\n%+v\nGot:\n%+v\n", expectedResult, outData)
 		}
 		for i := range p {
@@ -49,9 +47,7 @@ func TestIncResolutionUpToTime(t *testing.T) {
 			{5, 5},
 		},
 	}
-	*importUpTo = uint(5)
-	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
-	*importUpTo = math.MaxUint32
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1, 0, 5)
 }
 
 func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
@@ -102,7 +98,7 @@ func TestIncResolutionFakeAvgNonFactorResolutions(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 3, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 3, 1, 0, math.MaxUint32)
 }
 
 func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
@@ -135,7 +131,7 @@ func TestIncFakeAvgResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
@@ -164,7 +160,7 @@ func TestIncFakeAvgResolutionOutOfOrder(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
@@ -201,7 +197,7 @@ func TestIncFakeAvgResolutionStrangeRawRes(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, fakeAvg, 30, 10, 3)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 30, 10, 3, 0, math.MaxUint32)
 }
 
 func TestIncResolutionSimpleMax(t *testing.T) {
@@ -218,7 +214,7 @@ func TestIncResolutionSimpleMax(t *testing.T) {
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionSimpleLast(t *testing.T) {
@@ -235,7 +231,7 @@ func TestIncResolutionSimpleLast(t *testing.T) {
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, schema.Lst, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Lst, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionSimpleMin(t *testing.T) {
@@ -252,7 +248,7 @@ func TestIncResolutionSimpleMin(t *testing.T) {
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, schema.Min, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Min, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionSimpleAvg(t *testing.T) {
@@ -269,7 +265,7 @@ func TestIncResolutionSimpleAvg(t *testing.T) {
 			{20, 11},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, schema.Avg, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Avg, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionSimpleFakeAvg(t *testing.T) {
@@ -292,7 +288,7 @@ func TestIncResolutionSimpleFakeAvg(t *testing.T) {
 			{20, 5},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, fakeAvg, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionSimpleSum(t *testing.T) {
@@ -315,7 +311,7 @@ func TestIncResolutionSimpleSum(t *testing.T) {
 			{20, 5},
 		},
 	}
-	testIncResolution(t, inData, expectedResult, schema.Sum, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Sum, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionNonFactorResolutions(t *testing.T) {
@@ -348,7 +344,7 @@ func TestIncResolutionNonFactorResolutions(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, schema.Max, 10, 3, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 3, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionWithGaps(t *testing.T) {
@@ -373,7 +369,7 @@ func TestIncResolutionWithGaps(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1, 0, math.MaxUint32)
 }
 
 func TestIncResolutionOutOfOrder(t *testing.T) {
@@ -394,12 +390,12 @@ func TestIncResolutionOutOfOrder(t *testing.T) {
 		},
 	}
 
-	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1)
+	testIncResolution(t, inData, expectedResult, schema.Max, 10, 5, 1, 0, math.MaxUint32)
 }
 
-func testDecResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) {
+func testDecResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes, from, until uint32) {
 	t.Helper()
-	outData := decResolution(inData, method, inRes, outRes, rawRes)
+	outData := decResolution(inData, method, inRes, outRes, rawRes, from, until)
 
 	if len(expectedResult) != len(outData) {
 		t.Fatalf("Generated data has different length (%d) than expected (%d):\n%+v\n%+v", len(expectedResult), len(outData), outData, expectedResult)
@@ -440,7 +436,7 @@ func TestDecResolutionSimpleAvg(t *testing.T) {
 			{60, 14},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, schema.Avg, 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Avg, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionSimpleFakeAvg(t *testing.T) {
@@ -454,7 +450,7 @@ func TestDecResolutionSimpleFakeAvg(t *testing.T) {
 			{60, 30},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, fakeAvg, 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, fakeAvg, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionSimpleSum(t *testing.T) {
@@ -468,7 +464,7 @@ func TestDecResolutionSimpleSum(t *testing.T) {
 			{60, 30},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, schema.Sum, 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Sum, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionSimpleLast(t *testing.T) {
@@ -478,7 +474,7 @@ func TestDecResolutionSimpleLast(t *testing.T) {
 			{60, 15},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, schema.Lst, 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Lst, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionSimpleMax(t *testing.T) {
@@ -488,7 +484,7 @@ func TestDecResolutionSimpleMax(t *testing.T) {
 			{60, 15},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, schema.Max, 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Max, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionSimpleMin(t *testing.T) {
@@ -498,7 +494,7 @@ func TestDecResolutionSimpleMin(t *testing.T) {
 			{60, 13},
 		},
 	}
-	testDecResolution(t, getSimpleInData(), expectedResult, schema.Min, 10, 30, 1)
+	testDecResolution(t, getSimpleInData(), expectedResult, schema.Min, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionUpToTime(t *testing.T) {
@@ -519,9 +515,7 @@ func TestDecResolutionUpToTime(t *testing.T) {
 			{30, 6},
 		},
 	}
-	*importUpTo = uint(40)
-	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 30, 5)
-	*importUpTo = math.MaxUint32
+	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 30, 5, 0, 40)
 }
 
 func TestDecResolutionAvg(t *testing.T) {
@@ -540,7 +534,7 @@ func TestDecResolutionAvg(t *testing.T) {
 			{60, 14},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 30, 1)
+	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecNonFactorResolutions(t *testing.T) {
@@ -561,7 +555,7 @@ func TestDecNonFactorResolutions(t *testing.T) {
 			{60, 14.5},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 15, 1)
+	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 15, 1, 0, math.MaxUint32)
 }
 
 func getGapData() []whisper.Point {
@@ -586,7 +580,7 @@ func TestDecResolutionWithGapsAvg(t *testing.T) {
 		},
 	}
 
-	testDecResolution(t, getGapData(), expectedResult, schema.Avg, 10, 20, 1)
+	testDecResolution(t, getGapData(), expectedResult, schema.Avg, 10, 20, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionWithGapsFakeAvg(t *testing.T) {
@@ -603,7 +597,7 @@ func TestDecResolutionWithGapsFakeAvg(t *testing.T) {
 		},
 	}
 
-	testDecResolution(t, getGapData(), expectedResult, fakeAvg, 10, 20, 1)
+	testDecResolution(t, getGapData(), expectedResult, fakeAvg, 10, 20, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionWithGapsSum(t *testing.T) {
@@ -620,7 +614,7 @@ func TestDecResolutionWithGapsSum(t *testing.T) {
 		},
 	}
 
-	testDecResolution(t, getGapData(), expectedResult, schema.Sum, 10, 20, 1)
+	testDecResolution(t, getGapData(), expectedResult, schema.Sum, 10, 20, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionOutOfOrder(t *testing.T) {
@@ -639,7 +633,7 @@ func TestDecResolutionOutOfOrder(t *testing.T) {
 			{60, 15},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 30, 1)
+	testDecResolution(t, inData, expectedResult, schema.Avg, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
@@ -666,7 +660,7 @@ func TestDecFakeAvgNonFactorResolutions(t *testing.T) {
 			{60, 20},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 15, 1)
+	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 15, 1, 0, math.MaxUint32)
 }
 
 func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
@@ -689,94 +683,7 @@ func TestDecResolutionFakeAvgOutOfOrder(t *testing.T) {
 			{60, 30},
 		},
 	}
-	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 30, 1)
-}
-
-func generatePoints(ts, interval uint32, value float64, offset, count int, inc func(float64) float64) []whisper.Point {
-	res := make([]whisper.Point, count)
-	for i := 0; i < count; i++ {
-		res[(i+offset)%count] = whisper.Point{
-			Timestamp: ts,
-			Value:     value,
-		}
-		ts += interval
-		value = inc(value)
-	}
-	return res
-}
-
-func TestEncodedChunksFromPointsWithoutUnfinished(t *testing.T) {
-	// the actual data in these points doesn't matter, we just want to be sure
-	// that the chunks resulting from these points include the same data
-	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
-	expectedCount := 8640 - (2520 % 2160) // count minus what would end up in an unfinished chunk
-
-	*writeUnfinishedChunks = false
-	chunks := encodedChunksFromPoints(points, 10, 21600)
-
-	if len(chunks) != 4 {
-		t.Fatalf("Expected to get 4 chunks, but got %d", len(chunks))
-	}
-
-	i := 0
-	for _, c := range chunks {
-		iterGen, err := chunk.NewIterGen(c.Series.T0, 10, c.Encode(21600))
-		if err != nil {
-			t.Fatalf("Error getting iterator: %s", err)
-		}
-
-		iter, err := iterGen.Get()
-		if err != nil {
-			t.Fatalf("Error getting iterator: %s", err)
-		}
-
-		for iter.Next() {
-			ts, val := iter.Values()
-			if points[i].Timestamp != ts || points[i].Value != val {
-				t.Fatalf("Unexpected value at index %d:\nExpected: %d:%f\nGot: %d:%f\n", i, ts, val, points[i].Timestamp, points[i].Value)
-			}
-			i++
-		}
-	}
-	if i != expectedCount {
-		t.Fatalf("Unexpected number of datapoints in chunks:\nExpected: %d\nGot: %d\n", expectedCount, i)
-	}
-}
-
-func TestEncodedChunksFromPointsWithUnfinished(t *testing.T) {
-	points := generatePoints(25200, 10, 10, 0, 8640, func(i float64) float64 { return i + 1 })
-	expectedCount := 8640 // count including unfinished chunks
-
-	*writeUnfinishedChunks = true
-	chunks := encodedChunksFromPoints(points, 10, 21600)
-
-	if len(chunks) != 5 {
-		t.Fatalf("Expected to get 5 chunks, but got %d", len(chunks))
-	}
-
-	i := 0
-	for _, c := range chunks {
-		iterGen, err := chunk.NewIterGen(c.Series.T0, 10, c.Encode(21600))
-		if err != nil {
-			t.Fatalf("Error getting iterator: %s", err)
-		}
-
-		iter, err := iterGen.Get()
-		if err != nil {
-			t.Fatalf("Error getting iterator: %s", err)
-		}
-
-		for iter.Next() {
-			ts, val := iter.Values()
-			if points[i].Timestamp != ts || points[i].Value != val {
-				t.Fatalf("Unexpected value at index %d:\nExpected: %d:%f\nGot: %d:%f\n", i, ts, val, points[i].Timestamp, points[i].Value)
-			}
-			i++
-		}
-	}
-	if i != expectedCount {
-		t.Fatalf("Unexpected number of datapoints in chunks:\nExpected: %d\nGot: %d\n", expectedCount, i)
-	}
+	testDecResolution(t, inData, expectedResult, schema.Sum, 10, 30, 1, 0, math.MaxUint32)
 }
 
 func verifyPointMaps(t *testing.T, points map[schema.Method][]whisper.Point, expected map[schema.Method][]whisper.Point) {
@@ -797,7 +704,7 @@ func verifyPointMaps(t *testing.T, points map[schema.Method][]whisper.Point, exp
 }
 
 func TestPointsConversionSum1(t *testing.T) {
-	c := conversion{
+	c := converter{
 		archives: []whisper.ArchiveInfo{
 			{SecondsPerPoint: 1, Points: 2},
 			{SecondsPerPoint: 2, Points: 2},
@@ -818,6 +725,7 @@ func TestPointsConversionSum1(t *testing.T) {
 			},
 		},
 		method: schema.Sum,
+		until:  math.MaxUint32,
 	}
 
 	expectedPoints1 := map[schema.Method][]whisper.Point{
@@ -857,7 +765,7 @@ func TestPointsConversionSum1(t *testing.T) {
 }
 
 func TestPointsConversionLast1(t *testing.T) {
-	c := conversion{
+	c := converter{
 		archives: []whisper.ArchiveInfo{
 			{SecondsPerPoint: 1, Points: 2},
 			{SecondsPerPoint: 2, Points: 2},
@@ -878,6 +786,7 @@ func TestPointsConversionLast1(t *testing.T) {
 			},
 		},
 		method: schema.Lst,
+		until:  math.MaxUint32,
 	}
 
 	expectedPoints1 := map[schema.Method][]whisper.Point{
@@ -917,7 +826,7 @@ func TestPointsConversionLast1(t *testing.T) {
 }
 
 func TestPointsConversionSum2(t *testing.T) {
-	c := conversion{
+	c := converter{
 		archives: []whisper.ArchiveInfo{
 			{SecondsPerPoint: 1, Points: 8},
 			{SecondsPerPoint: 2, Points: 8},
@@ -956,6 +865,7 @@ func TestPointsConversionSum2(t *testing.T) {
 			},
 		},
 		method: schema.Sum,
+		until:  math.MaxUint32,
 	}
 
 	expectedPoints1 := map[schema.Method][]whisper.Point{
@@ -1039,7 +949,7 @@ func TestPointsConversionSum2(t *testing.T) {
 }
 
 func TestPointsConversionAvg1(t *testing.T) {
-	c := conversion{
+	c := converter{
 		archives: []whisper.ArchiveInfo{
 			{SecondsPerPoint: 1, Points: 2},
 			{SecondsPerPoint: 2, Points: 2},
@@ -1060,6 +970,7 @@ func TestPointsConversionAvg1(t *testing.T) {
 			},
 		},
 		method: schema.Avg,
+		until:  math.MaxUint32,
 	}
 
 	expectedPoints1_0 := map[schema.Method][]whisper.Point{
@@ -1185,11 +1096,11 @@ func TestPointsConversionAvg1(t *testing.T) {
 	points2_1 := c.getPoints(1, 2, 4)
 	points3_1 := c.getPoints(1, 4, 100)
 
-	*importUpTo = uint(1503407723)
+	c.until = 1503407723
 	points1_2 := c.getPoints(1, 1, 8)
 	points2_2 := c.getPoints(1, 2, 100)
 	points3_2 := c.getPoints(1, 4, 8)
-	*importUpTo = math.MaxUint32
+	c.until = math.MaxUint32
 
 	verifyPointMaps(t, points1_0, expectedPoints1_0)
 	verifyPointMaps(t, points2_0, expectedPoints2_0)
@@ -1205,7 +1116,7 @@ func TestPointsConversionAvg1(t *testing.T) {
 }
 
 func TestPointsConversionAvg2(t *testing.T) {
-	c := conversion{
+	c := converter{
 		archives: []whisper.ArchiveInfo{
 			{SecondsPerPoint: 1, Points: 3},
 			{SecondsPerPoint: 3, Points: 3},
@@ -1229,6 +1140,7 @@ func TestPointsConversionAvg2(t *testing.T) {
 			},
 		},
 		method: schema.Avg,
+		until:  math.MaxUint32,
 	}
 
 	expectedPoints1_0 := map[schema.Method][]whisper.Point{

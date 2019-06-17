@@ -673,19 +673,17 @@ Usage of ./mt-whisper-importer-reader:
   -http-auth string
     	The credentials used to authenticate in the format "user:password"
   -http-endpoint string
-    	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
-  -import-after uint
-    	Only import after the specified timestamp
-  -import-up-to uint
-    	Only import up to the specified timestamp (default 4294967295)
+    	The http endpoint to send the data to (default "http://127.0.0.1:8080/metrics/import")
+  -import-from uint
+    	Only import starting from the specified timestamp
+  -import-until uint
+    	Only import up to, but not including, the specified timestamp (default 4294967295)
   -insecure-ssl
     	Disables ssl certificate verification
   -name-filter string
     	A regex pattern to be applied to all metric names, only matching ones will be imported
   -name-prefix string
     	Prefix to prepend before every metric name, should include the '.' if necessary
-  -orgid int
-    	Organization ID the data belongs to  (default 1)
   -position-file string
     	file to store position and load position from
   -threads int
@@ -708,7 +706,7 @@ Usage of ./mt-whisper-importer-writer:
   -exit-on-error
     	Exit with a message when there's an error
   -http-endpoint string
-    	The http endpoint to listen on (default "127.0.0.1:8080")
+    	The http endpoint to listen on (default "0.0.0.0:8080")
   -log-level string
     	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
@@ -718,6 +716,6 @@ Usage of ./mt-whisper-importer-writer:
   -ttls string
     	list of ttl strings used by MT separated by ',' (default "35d")
   -uri-path string
-    	the URI on which we expect chunks to get posted (default "/chunks")
+    	the URI on which we expect chunks to get posted (default "/metrics/import")
 ```
 

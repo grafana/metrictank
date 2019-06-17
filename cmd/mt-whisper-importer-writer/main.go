@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/importer"
 	bigTableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
 )
@@ -27,10 +30,10 @@ import (
 var (
 	confFile        = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 	exitOnError     = flag.Bool("exit-on-error", false, "Exit with a message when there's an error")
-	httpEndpoint    = flag.String("http-endpoint", "127.0.0.1:8080", "The http endpoint to listen on")
+	httpEndpoint    = flag.String("http-endpoint", "0.0.0.0:8080", "The http endpoint to listen on")
 	ttlsStr         = flag.String("ttls", "35d", "list of ttl strings used by MT separated by ','")
 	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
-	uriPath         = flag.String("uri-path", "/chunks", "the URI on which we expect chunks to get posted")
+	uriPath         = flag.String("uri-path", "/metrics/import", "the URI on which we expect chunks to get posted")
 	numPartitions   = flag.Int("num-partitions", 1, "Number of Partitions")
 	logLevel        = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
@@ -173,8 +176,15 @@ func (s *Server) healthzHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
-	data := mdata.ArchiveRequest{}
-	err := data.UnmarshalCompressed(req.Body)
+	orgId, err := getOrgId(req)
+	if err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
+	data := importer.ArchiveRequest{}
+	err = data.UnmarshalCompressed(req.Body)
 	if err != nil {
 		throwError(w, fmt.Sprintf("Error decoding cwr stream: %q", err))
 		return
@@ -189,13 +199,15 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 		"Received %d cwrs for metric %s. The first has Key: %s, T0: %d, TTL: %d. The last has Key: %s, T0: %d, TTL: %d",
 		len(data.ChunkWriteRequests),
 		data.MetricData.Name,
-		data.ChunkWriteRequests[0].Key.String(),
+		data.ChunkWriteRequests[0].Archive.String(),
 		data.ChunkWriteRequests[0].T0,
 		data.ChunkWriteRequests[0].TTL,
-		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].Key.String(),
+		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].Archive.String(),
 		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].T0,
 		data.ChunkWriteRequests[len(data.ChunkWriteRequests)-1].TTL)
 
+	data.MetricData.OrgId = orgId
+	data.MetricData.SetId()
 	partition, err := s.partitioner.Partition(&data.MetricData, int32(*numPartitions))
 	if err != nil {
 		throwError(w, fmt.Sprintf("Error partitioning: %q", err))
@@ -210,7 +222,18 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 
 	s.index.AddOrUpdate(mkey, &data.MetricData, partition)
 	for _, cwr := range data.ChunkWriteRequests {
-		cwr := cwr // important because we pass by reference and this var will get overwritten in the next loop
-		s.store.Add(&cwr)
+		cwrWithOrg := cwr.GetChunkWriteRequest(nil, mkey)
+		s.store.Add(&cwrWithOrg)
 	}
+}
+
+func getOrgId(req *http.Request) (int, error) {
+	if orgIdStr := req.Header.Get("X-Org-Id"); len(orgIdStr) > 0 {
+		if orgId, err := strconv.Atoi(orgIdStr); err == nil {
+			return orgId, nil
+		} else {
+			return 0, fmt.Errorf("Invalid value in X-Org-Id header (%s): %s", orgIdStr, err)
+		}
+	}
+	return 0, errors.New("Missing X-Org-Id header")
 }
