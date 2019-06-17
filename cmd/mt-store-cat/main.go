@@ -76,6 +76,11 @@ func main() {
 	flag.StringVar(&storeConfig.Username, "cassandra-username", storeConfig.Username, "username for authentication")
 	flag.StringVar(&storeConfig.Password, "cassandra-password", storeConfig.Password, "password for authentication")
 	flag.StringVar(&storeConfig.SchemaFile, "cassandra-schema-file", storeConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
+	flag.StringVar(&idxConfig.Table, "index-table", idxConfig.Table, "Cassandra table to store metricDefinitions in.")
+	flag.StringVar(&idxConfig.ArchiveTable, "index-archive-table", idxConfig.ArchiveTable, "Cassandra table to archive metricDefinitions in.")
+	flag.DurationVar(&idxConfig.Timeout, "index-timeout", idxConfig.Timeout, "cassandra request timeout")
+	flag.IntVar(&idxConfig.InitLoadConcurrency, "index-init-load-concurrency", idxConfig.InitLoadConcurrency, "Number of partitions to load concurrently on startup.")
+	flag.StringVar(&idxConfig.SchemaFile, "index-schema-file", idxConfig.SchemaFile, "File containing the needed index schemas in case database needs initializing")
 
 	flag.Usage = func() {
 		fmt.Println("mt-store-cat")
@@ -184,7 +189,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize cassandra. %s", err.Error())
 	}
+
+	idxConfig.Hosts = storeConfig.Addrs
+	idxConfig.Keyspace = storeConfig.Keyspace
+	idxConfig.Consistency = storeConfig.Consistency
+	idxConfig.NumConns = storeConfig.ReadConcurrency
+	idxConfig.ProtoVer = storeConfig.CqlProtocolVersion
+	idxConfig.CreateKeyspace = storeConfig.CreateKeyspace
+	idxConfig.DisableInitialHostLookup = storeConfig.DisableInitialHostLookup
+	idxConfig.SSL = storeConfig.SSL
+	idxConfig.CaPath = storeConfig.CaPath
+	idxConfig.HostVerification = storeConfig.HostVerification
+	idxConfig.Auth = storeConfig.Auth
+	idxConfig.Username = storeConfig.Username
+	idxConfig.Password = storeConfig.Password
 	idx := cassandra_idx.New(idxConfig)
+	err = idx.InitBare()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 	tracer, traceCloser, err := jaeger.Get()
 	if err != nil {
 		log.Fatalf("Could not initialize jaeger tracer: %s", err.Error())

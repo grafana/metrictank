@@ -76,23 +76,23 @@ func New(cfg *IdxConfig) *CasIdx {
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("cassandra-idx: %s", err)
 	}
-	cluster := gocql.NewCluster(strings.Split(cfg.hosts, ",")...)
-	cluster.Consistency = gocql.ParseConsistency(cfg.consistency)
-	cluster.Timeout = cfg.timeout
+	cluster := gocql.NewCluster(strings.Split(cfg.Hosts, ",")...)
+	cluster.Consistency = gocql.ParseConsistency(cfg.Consistency)
+	cluster.Timeout = cfg.Timeout
 	cluster.ConnectTimeout = cluster.Timeout
-	cluster.NumConns = cfg.numConns
-	cluster.ProtoVersion = cfg.protoVer
-	cluster.DisableInitialHostLookup = cfg.disableInitialHostLookup
-	if cfg.ssl {
+	cluster.NumConns = cfg.NumConns
+	cluster.ProtoVersion = cfg.ProtoVer
+	cluster.DisableInitialHostLookup = cfg.DisableInitialHostLookup
+	if cfg.SSL {
 		cluster.SslOpts = &gocql.SslOptions{
-			CaPath:                 cfg.capath,
-			EnableHostVerification: cfg.hostverification,
+			CaPath:                 cfg.CaPath,
+			EnableHostVerification: cfg.HostVerification,
 		}
 	}
-	if cfg.auth {
+	if cfg.Auth {
 		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: cfg.username,
-			Password: cfg.password,
+			Username: cfg.Username,
+			Password: cfg.Password,
 		}
 	}
 
@@ -118,18 +118,18 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	// read templates
-	schemaKeyspace := util.ReadEntry(c.Config.schemaFile, "schema_keyspace").(string)
-	schemaTable := util.ReadEntry(c.Config.schemaFile, "schema_table").(string)
+	schemaKeyspace := util.ReadEntry(c.Config.SchemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(c.Config.SchemaFile, "schema_table").(string)
 
 	// create the keyspace or ensure it exists
-	if c.Config.createKeyspace {
-		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.Config.keyspace)
-		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.Config.keyspace)).Exec()
+	if c.Config.CreateKeyspace {
+		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.Config.Keyspace)
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.Config.Keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
 		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.Table)
-		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.Config.keyspace, c.Config.Table)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.Config.Keyspace, c.Config.Table)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
@@ -137,12 +137,12 @@ func (c *CasIdx) InitBare() error {
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
-			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(c.Config.keyspace)
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(c.Config.Keyspace)
 			if err != nil {
 				if attempt >= 5 {
-					return fmt.Errorf("cassandra keyspace %s not found. %d attempts", c.Config.keyspace, attempt)
+					return fmt.Errorf("cassandra keyspace %s not found. %d attempts", c.Config.Keyspace, attempt)
 				}
-				log.Warnf("cassandra-idx: cassandra keyspace %s not found. retrying in 5s. attempt: %d", c.Config.keyspace, attempt)
+				log.Warnf("cassandra-idx: cassandra keyspace %s not found. retrying in 5s. attempt: %d", c.Config.Keyspace, attempt)
 				time.Sleep(5 * time.Second)
 			} else {
 				if _, ok := keyspaceMetadata.Tables[c.Config.Table]; ok {
@@ -159,7 +159,7 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	tmpSession.Close()
-	c.cluster.Keyspace = c.Config.keyspace
+	c.cluster.Keyspace = c.Config.Keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
 		return fmt.Errorf("failed to create cassandra session: %s", err)
@@ -184,22 +184,22 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 		}
 	}
 
-	schemaArchiveTable := util.ReadEntry(c.Config.schemaFile, "schema_archive_table").(string)
+	schemaArchiveTable := util.ReadEntry(c.Config.SchemaFile, "schema_archive_table").(string)
 
-	if c.Config.createKeyspace {
-		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.archiveTable)
-		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.Config.keyspace, c.Config.archiveTable)).Exec()
+	if c.Config.CreateKeyspace {
+		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.ArchiveTable)
+		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.Config.Keyspace, c.Config.ArchiveTable)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
-		keyspaceMetadata, err = session.KeyspaceMetadata(c.Config.keyspace)
+		keyspaceMetadata, err = session.KeyspaceMetadata(c.Config.Keyspace)
 		if err != nil {
 			return fmt.Errorf("failed to read cassandra tables: %s", err)
 		}
-		if _, ok := keyspaceMetadata.Tables[c.Config.archiveTable]; !ok {
-			return fmt.Errorf("table %s does not exist", c.Config.archiveTable)
+		if _, ok := keyspaceMetadata.Tables[c.Config.ArchiveTable]; !ok {
+			return fmt.Errorf("table %s does not exist", c.Config.ArchiveTable)
 		}
 	}
 	return nil
@@ -208,7 +208,7 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 // Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (c *CasIdx) Init() error {
-	log.Infof("initializing cassandra-idx. Hosts=%s", c.Config.hosts)
+	log.Infof("initializing cassandra-idx. Hosts=%s", c.Config.Hosts)
 	if err := c.MemoryIndex.Init(); err != nil {
 		return err
 	}
@@ -218,11 +218,11 @@ func (c *CasIdx) Init() error {
 	}
 
 	if c.Config.updateCassIdx {
-		c.wg.Add(c.Config.numConns)
-		for i := 0; i < c.Config.numConns; i++ {
+		c.wg.Add(c.Config.NumConns)
+		for i := 0; i < c.Config.NumConns; i++ {
 			go c.processWriteQueue()
 		}
-		log.Infof("cassandra-idx: started %d writeQueue handlers", c.Config.numConns)
+		log.Infof("cassandra-idx: started %d writeQueue handlers", c.Config.NumConns)
 	}
 
 	//Rebuild the in-memory index.
@@ -344,7 +344,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	gate := make(chan struct{}, c.Config.initLoadConcurrency)
+	gate := make(chan struct{}, c.Config.InitLoadConcurrency)
 	var wg sync.WaitGroup
 	defPool := sync.Pool{
 		New: func() interface{} {
@@ -447,13 +447,13 @@ NAMES:
 // ArchiveDefs writes each of the provided defs to the archive table and
 // then deletes the defs from the metric index table.
 func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
-	defChan := make(chan *schema.MetricDefinition, c.Config.numConns)
+	defChan := make(chan *schema.MetricDefinition, c.Config.NumConns)
 	g, ctx := errgroup.WithContext(context.Background())
 
 	// keep track of how many defs were successfully archived.
-	success := make([]int, c.Config.numConns)
+	success := make([]int, c.Config.NumConns)
 
-	for i := 0; i < c.Config.numConns; i++ {
+	for i := 0; i < c.Config.NumConns; i++ {
 		i := i
 		g.Go(func() error {
 			for {
@@ -559,7 +559,7 @@ func (c *CasIdx) processWriteQueue() {
 }
 
 func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
-	insertQry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.archiveTable)
+	insertQry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.ArchiveTable)
 	maxAttempts := 5
 	now := time.Now().UTC().Unix()
 	var err error

@@ -515,6 +515,16 @@ Flags:
     	get data from (inclusive). only for points and point-summary format (default "-24h")
   -groupTTL string
     	group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format (default "d")
+  -index-archive-table string
+    	Cassandra table to archive metricDefinitions in. (default "metric_idx_archive")
+  -index-init-load-concurrency int
+    	Number of partitions to load concurrently on startup. (default 1)
+  -index-schema-file string
+    	File containing the needed index schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
+  -index-table string
+    	Cassandra table to store metricDefinitions in. (default "metric_idx")
+  -index-timeout duration
+    	cassandra request timeout (default 1s)
   -print-ts
     	print time stamps instead of formatted dates. only for points and point-summary format
   -time-zone string
