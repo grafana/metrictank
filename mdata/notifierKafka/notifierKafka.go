@@ -80,11 +80,8 @@ func (c *NotifierKafka) start() {
 		}
 		startOffset, err := c.client.GetOffset(topic, partition, offsetTime)
 		if err != nil {
-			log.Fatalf("kafka-cluster: failed to get offset %d: %s", offsetTime, err)
-		}
-		if startOffset < 0 {
-			// happens when OffsetOldest or an offsetDuration was used and there is no message in the partition
-			startOffset = 0
+			offsetTime = sarama.OffsetOldest
+			log.Warnf("kafkamdm: failed to get offset %s: %s -> will use oldest instead", offsetDuration, err)
 		}
 		processBacklog.Add(1)
 		go c.consumePartition(topic, partition, startOffset, processBacklog)
