@@ -121,6 +121,7 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		if err == schema.ErrInvalidTagFormat {
 			in.invalidTagMD.Inc()
 			if !rejectInvalidTags {
+				log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid tags is disabled: %s", md, err)
 				ignoreError = true
 			}
 		}
