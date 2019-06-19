@@ -118,6 +118,8 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		in.invalidMD.Inc()
 
 		ignoreError := false
+		// assuming that the tag format was the only issue found by Validate()
+		// better make sure that the tag format is the last check which Validate() checks, to not accidentally ignore a potential following error
 		if err == schema.ErrInvalidTagFormat {
 			in.invalidTagMD.Inc()
 			if !rejectInvalidTags {
