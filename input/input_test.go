@@ -2,12 +2,12 @@ package input
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/idx"
 	"testing"
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
@@ -15,49 +15,80 @@ import (
 	"github.com/raintank/schema"
 )
 
-func TestIngestValidTagAndValueWithRejection(t *testing.T) {
-	handler, index, reset := getDefaultHandler(t)
-	defer reset()
-
-	rejectInvalidTags = false
-	data := getTestMetricData()
-	data.Tags = []string{"valid=tag"}
-	testIngestMetricData(t, "valid_with_rejection_0", data, handler, index, 0, 0, 1)
-}
-
-func TestIngestValidTagAndValueWithoutRejection(t *testing.T) {
-	handler, index, reset := getDefaultHandler(t)
-	defer reset()
-
-	rejectInvalidTags = true
-	data := getTestMetricData()
-	data.Tags = []string{"valid=tag"}
-	testIngestMetricData(t, "valid_without_rejection_0", data, handler, index, 0, 0, 1)
-}
-
-func TestInvalidTagsWithRejection(t *testing.T) {
-	handler, index, reset := getDefaultHandler(t)
-	defer reset()
-	invalidTags := generateInvalidTags(t)
-
-	rejectInvalidTags = true
-	data := getTestMetricData()
-	for tc, invalidTag := range invalidTags {
-		data.Tags = []string{fmt.Sprintf("%s=value", invalidTag)}
-		testIngestMetricData(t, fmt.Sprintf("invalid_tags_with_rejection_%d", tc), data, handler, index, 1, 1, 0)
+func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T) {
+	type testCase struct {
+		name                    string
+		rejectInvalidTags       bool
+		tags                    []string
+		expectedInvalidMdInc    uint32
+		expectedInvalidTagMdInc uint32
+		expectedIndexSizeInc    uint32
 	}
-}
 
-func TestIngestInvalidTagsWithoutRejection(t *testing.T) {
-	handler, index, reset := getDefaultHandler(t)
-	defer reset()
-	invalidTags := generateInvalidTags(t)
+	testCases := []testCase{
+		{
+			name:                    "valid_with_rejection",
+			rejectInvalidTags:       true,
+			tags:                    []string{"valid=tag"},
+			expectedInvalidMdInc:    0,
+			expectedInvalidTagMdInc: 0,
+			expectedIndexSizeInc:    1,
+		}, {
+			name:                    "valid_without_rejection",
+			rejectInvalidTags:       false,
+			tags:                    []string{"valid=tag"},
+			expectedInvalidMdInc:    0,
+			expectedInvalidTagMdInc: 0,
+			expectedIndexSizeInc:    1,
+		}, {
+			name:                    "invalid_tags_with_rejection",
+			rejectInvalidTags:       true,
+			tags:                    generateInvalidTags(t),
+			expectedInvalidMdInc:    1,
+			expectedInvalidTagMdInc: 1,
+			expectedIndexSizeInc:    0,
+		}, {
+			name:                    "invalid_tags_without_rejection",
+			rejectInvalidTags:       false,
+			tags:                    generateInvalidTags(t),
+			expectedInvalidMdInc:    1,
+			expectedInvalidTagMdInc: 1,
+			expectedIndexSizeInc:    1,
+		}, {
+			name:                    "invalid_tag_values_with_rejection",
+			rejectInvalidTags:       true,
+			tags:                    generateInvalidTagValues(t),
+			expectedInvalidMdInc:    1,
+			expectedInvalidTagMdInc: 1,
+			expectedIndexSizeInc:    0,
+		}, {
+			name:                    "invalid_tag_values_without_rejection",
+			rejectInvalidTags:       false,
+			tags:                    generateInvalidTagValues(t),
+			expectedInvalidMdInc:    1,
+			expectedInvalidTagMdInc: 1,
+			expectedIndexSizeInc:    1,
+		},
+	}
 
-	rejectInvalidTags = false
-	data := getTestMetricData()
-	for tc, invalidTag := range invalidTags {
-		data.Tags = []string{fmt.Sprintf("%s=value", invalidTag)}
-		testIngestMetricData(t, fmt.Sprintf("invalid_tags_without_rejection_%d", tc), data, handler, index, 1, 1, 1)
+	for _, tc := range testCases {
+		handler, index, reset := getDefaultHandler(t)
+		rejectInvalidTags = tc.rejectInvalidTags
+		for i, tag := range tc.tags {
+			data := getTestMetricData()
+			data.Tags = []string{tag}
+			testIngestMetricData(
+				t,
+				fmt.Sprintf("%s_%d", tc.name, i),
+				data,
+				handler,
+				index,
+				tc.expectedInvalidMdInc,
+				tc.expectedInvalidTagMdInc,
+				tc.expectedIndexSizeInc,
+			)
+		}
+		reset()
 	}
 }
 
@@ -67,33 +98,12 @@ func generateInvalidTags(t *testing.T) []string {
 	invalidChars := ";!^"
 	validChar := "a"
 
-	return generateInvalidStrings(t, invalidChars, validChar)
-}
-
-func TestInvalidTagValuesWithRejection(t *testing.T) {
-	handler, index, reset := getDefaultHandler(t)
-	defer reset()
-	invalidTagValues := generateInvalidTagValues(t)
-
-	rejectInvalidTags = true
-	data := getTestMetricData()
-	for tc, invalidTagValue := range invalidTagValues {
-		data.Tags = []string{fmt.Sprintf("tag=%s", invalidTagValue)}
-		testIngestMetricData(t, fmt.Sprintf("invalid_tag_values_with_rejection_%d", tc), data, handler, index, 1, 1, 0)
+	tagKeys := generateInvalidStrings(t, invalidChars, validChar)
+	res := make([]string, 0, len(tagKeys))
+	for _, tagKey := range tagKeys {
+		res = append(res, fmt.Sprintf("%s=value", tagKey))
 	}
-}
-
-func TestIngestInvalidTagValuesWithoutRejection(t *testing.T) {
-	handler, index, reset := getDefaultHandler(t)
-	defer reset()
-	invalidTagValues := generateInvalidTagValues(t)
-
-	rejectInvalidTags = false
-	data := getTestMetricData()
-	for tc, invalidTagValue := range invalidTagValues {
-		data.Tags = []string{fmt.Sprintf("tag=%s", invalidTagValue)}
-		testIngestMetricData(t, fmt.Sprintf("invalid_tag_values_without_rejection_%d", tc), data, handler, index, 1, 1, 1)
-	}
+	return res
 }
 
 func generateInvalidTagValues(t *testing.T) []string {
@@ -102,19 +112,12 @@ func generateInvalidTagValues(t *testing.T) []string {
 	invalidChars := ";~"
 	validChar := "a"
 
-	return generateInvalidStrings(t, invalidChars, validChar)
-}
-
-func getTestMetricData() schema.MetricData {
-	return schema.MetricData{
-		Id:       "1.12345678901234567890123456789012",
-		OrgId:    1,
-		Name:     "abc",
-		Interval: 1,
-		Value:    2,
-		Time:     3,
-		Mtype:    "gauge",
+	tagValues := generateInvalidStrings(t, invalidChars, validChar)
+	res := make([]string, 0, len(tagValues))
+	for _, tagValue := range tagValues {
+		res = append(res, fmt.Sprintf("tag=%s", tagValue))
 	}
+	return res
 }
 
 func generateInvalidStrings(t *testing.T, invalidChars, validChar string) []string {
@@ -134,6 +137,18 @@ func generateInvalidStrings(t *testing.T, invalidChars, validChar string) []stri
 		res[i*4+3] = validChar + invalidCharStr + validChar
 	}
 	return res
+}
+
+func getTestMetricData() schema.MetricData {
+	return schema.MetricData{
+		Id:       "1.12345678901234567890123456789012",
+		OrgId:    1,
+		Name:     "abc",
+		Interval: 1,
+		Value:    2,
+		Time:     3,
+		Mtype:    "gauge",
+	}
 }
 
 func testIngestMetricData(t *testing.T, tc string, data schema.MetricData, handler DefaultHandler, index idx.MetricIndex, expectedInvalidMdInc, expectedInvalidTagMdInc, expectedIndexSizeInc uint32) {
