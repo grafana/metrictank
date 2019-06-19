@@ -1,6 +1,11 @@
 # master
 
 ## breaking changes
+* we now reject metrics with invalid tags on ingest by default, this can be disabled via the `input.reject-invalid-tags` flag.
+  if you're unsure whether you're currently sending invalid tags, it's a good idea to first disable the invalid tag rejection and watch the
+  new counter called `input.<input name>.metricdata.discarded.invalid_tag`, if invalid tags get ingested this counter will increase without
+  rejecting them. once you're sure that you don't ingest invalid tags you can enable rejection to enforce the validation.
+  more information on #1348
 * refactor jaeger configuration + many more options #1341
   the following config options have been renamed:
   - `tracing-enabled -> jaeger.enabled`
