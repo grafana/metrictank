@@ -66,16 +66,6 @@ func New(instance string, handler mdata.NotifierHandler) *NotifierKafka {
 }
 
 func (c *NotifierKafka) start() {
-	// offset is defined here because it is not used anywhere else
-	type offset struct {
-		// the actual kafka offset to use
-		offsetStart int64
-		// the time we use to attempt to get an offset (i.e. sarama.OffsetOldest)
-		offsetTime int64
-		// any errors returned from attempting to get an offset
-		offsetError error
-	}
-
 	pre := time.Now()
 	processBacklog := new(sync.WaitGroup)
 
@@ -87,80 +77,61 @@ func (c *NotifierKafka) start() {
 	// | existing with no messages  | error         | validOffset  | error
 	// ------------------------------------------------------------------------------------------------------------------------------
 
+	// getOffsetFor takes an offset string and a partition id, then it tries to get the according offset
+	// if the offset string is not either "oldest" or "newest" it uses the package-scope variable offsetDuration
+	getOffsetFor := func(offset string, partition int32) (int64, error) {
+		switch offset {
+		case "oldest":
+			return c.client.GetOffset(topic, partition, sarama.OffsetOldest)
+		case "newest":
+			return c.client.GetOffset(topic, partition, sarama.OffsetNewest)
+		default:
+			offsetFromDuration := time.Now().Add(-1*offsetDuration).UnixNano() / int64(time.Millisecond)
+			return c.client.GetOffset(topic, partition, offsetFromDuration)
+		}
+	}
+
 	for _, partition := range partitions {
 		var startOffset int64
-		var validOffset bool
-		var offsetFromDuration int64
 
-		// make sure we are using a custom time offset, otherwise leave
-		// offsetFromDuration at 0
-		if offsetStr != "oldest" && offsetStr != "newest" {
-			offsetFromDuration = time.Now().Add(-1*offsetDuration).UnixNano() / int64(time.Millisecond)
-		}
-
-		offsets := map[string]*offset{
-			"oldest": {offsetTime: sarama.OffsetOldest},
-			"newest": {offsetTime: sarama.OffsetNewest},
-			"custom": {offsetTime: offsetFromDuration},
-		}
-
-		// get all of the offsets
-		for _, name := range []string{"newest", "custom", "oldest"} {
-			tmpOffset, err := c.client.GetOffset(topic, partition, offsets[name].offsetTime)
-			offsets[name].offsetStart = tmpOffset
-			offsets[name].offsetError = err
-		}
-
-		switch offsetStr {
-		case "oldest":
-			if offsets[offsetStr].offsetError == nil {
-				validOffset = true
-				startOffset = offsets[offsetStr].offsetStart
-				break
-			}
+		startOffset, err := getOffsetFor(offsetStr, partition)
+		if err != nil {
 			log.Errorf("kafka-cluster: failed to find a valid offset for topic: %s with offset selector: %s for partition: %d -- %s\n",
-				topic, offsetStr, partition, offsets[offsetStr].offsetError)
-		case "newest":
-			if offsets[offsetStr].offsetError == nil {
-				validOffset = true
-				startOffset = offsets[offsetStr].offsetStart
-				break
-			}
-			log.Errorf("kafka-cluster: failed to find a valid offset for topic: %s with offset selector: %s for partition: %d -- %s\n",
-				topic, offsetStr, partition, offsets[offsetStr].offsetError)
-		default:
-			if offsets["custom"].offsetError == nil {
-				validOffset = true
-				startOffset = offsets["custom"].offsetStart
-				break
-			}
-			log.Errorf("kafka-cluster: failed to find a valid offset for topic: %s with offset selector: %s for partition: %d -- %s\n",
-				topic, offsetStr, partition, offsets["custom"].offsetError)
-		}
+				topic, offsetStr, partition, err)
 
-		// try to find a valid offset with priority for custom time, oldest, and then newest
-		if !validOffset {
-			for _, name := range []string{"custom", "oldest", "newest"} {
-				if offsets[name].offsetError == nil {
-					validOffset = true
-					startOffset = offsets[name].offsetStart
-					log.Warnf("kafka-cluster: using fallback offset for topic: %s fallback: %s offset: %d partition: %d\n",
-						topic, name, startOffset, partition)
+			// if the initial call to get the offset failed, then we try getting alternative fallback offsets.
+			// it is important that "newest" is the last one to be tried, because it comes with the highest
+			// chance of missing something in the backlog
+			var fallbackOffsets []string
+			switch offsetStr {
+			case "oldest":
+				fallbackOffsets = []string{"custom", "newest"}
+			case "newest":
+				fallbackOffsets = []string{"custom", "oldest"}
+			default:
+				fallbackOffsets = []string{"oldest", "newest"}
+			}
+
+			for _, fallbackOffset := range fallbackOffsets {
+				startOffset, err = getOffsetFor(fallbackOffset, partition)
+				if err == nil {
 					break
 				}
-				log.Warnf("kafka-cluster: fallback offset %s is invalid: %s\n", name, offsets[name].offsetError)
+				log.Errorf("kafka-cluster: failed to find a valid offset for topic: %s with offset selector: %s for partition: %d -- %s\n",
+					topic, fallbackOffset, partition, err)
 			}
-		}
 
-		// re-check to see if we have a valid offset now
-		if !validOffset {
-			log.Fatalf("kafka-cluster: tried all fallbacks, could not find a valid offset for topic: %s with offset selector: %s for partition: %d\n",
-				topic, offsetStr, partition)
+			// if err is not nil, then none of the calls to get a fallback offset have succeeded, there's nothing more we can try
+			if err != nil {
+				log.Fatalf("kafka-cluster: tried all fallbacks, could not find a valid offset for topic: %s with offset selector: %s for partition: %d\n",
+					topic, offsetStr, partition)
+			}
 		}
 
 		processBacklog.Add(1)
 		go c.consumePartition(topic, partition, startOffset, processBacklog)
 	}
+
 	// wait for our backlog to be processed before returning.  This will block metrictank from consuming metrics until
 	// we have processed old metricPersist messages. The end result is that we wont overwrite chunks in cassandra that
 	// have already been previously written.
