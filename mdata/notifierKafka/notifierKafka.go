@@ -79,12 +79,13 @@ func (c *NotifierKafka) start() {
 	pre := time.Now()
 	processBacklog := new(sync.WaitGroup)
 
-	// | scenario					| offsetOldest  | offsetNewest | offsetTime
-	// -------------------------------------------------------------------------------------------------------------------------------
-	// | new empty partition		| error	   		| 0			   | error
-	// | new with messages			| 0		   		| validOffset  | validOffset or error if offsetTime is earlier than first message
-	// | existing with messages		| validOffset	| validOffset  | validOffset
-	// | existing with no messages	| error			| validOffset  | error
+	// | scenario                   | offsetOldest  | offsetNewest | offsetTime
+	// ------------------------------------------------------------------------------------------------------------------------------
+	// | new empty partition        | error         | 0            | error
+	// | new with messages          | 0             | validOffset  | validOffset or error if offsetTime is earlier than first message
+	// | existing with messages     | validOffset   | validOffset  | validOffset
+	// | existing with no messages  | error         | validOffset  | error
+	// ------------------------------------------------------------------------------------------------------------------------------
 
 	for _, partition := range partitions {
 		var startOffset int64
