@@ -66,13 +66,13 @@ func (i *testIterator) Close() error {
 }
 
 func init() {
-	CliConfig.keyspace = "metrictank"
-	CliConfig.hosts = ""
-	CliConfig.consistency = "one"
-	CliConfig.timeout = time.Second
-	CliConfig.numConns = 1
+	CliConfig.Keyspace = "metrictank"
+	CliConfig.Hosts = ""
+	CliConfig.Consistency = "one"
+	CliConfig.Timeout = time.Second
+	CliConfig.NumConns = 1
 	CliConfig.writeQueueSize = 1000
-	CliConfig.protoVer = 4
+	CliConfig.ProtoVer = 4
 	CliConfig.updateCassIdx = false
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
@@ -423,13 +423,13 @@ func BenchmarkIndexing(b *testing.B) {
 		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
-	CliConfig.keyspace = "metrictank"
-	CliConfig.hosts = "localhost:9042"
-	CliConfig.consistency = "one"
-	CliConfig.timeout = time.Second
-	CliConfig.numConns = 10
+	CliConfig.Keyspace = "metrictank"
+	CliConfig.Hosts = "localhost:9042"
+	CliConfig.Consistency = "one"
+	CliConfig.Timeout = time.Second
+	CliConfig.NumConns = 10
 	CliConfig.writeQueueSize = 10
-	CliConfig.protoVer = 4
+	CliConfig.ProtoVer = 4
 	CliConfig.updateInterval = time.Hour
 	CliConfig.updateCassIdx = true
 	ix := New(CliConfig)
@@ -437,7 +437,7 @@ func BenchmarkIndexing(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Query(fmt.Sprintf("TRUNCATE %s.%s", CliConfig.Keyspace, CliConfig.Table)).Exec()
 	tmpSession.Close()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
@@ -474,13 +474,13 @@ func BenchmarkLoad(b *testing.B) {
 		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
-	CliConfig.keyspace = "metrictank"
-	CliConfig.hosts = "localhost:9042"
-	CliConfig.consistency = "one"
-	CliConfig.timeout = time.Second
-	CliConfig.numConns = 10
+	CliConfig.Keyspace = "metrictank"
+	CliConfig.Hosts = "localhost:9042"
+	CliConfig.Consistency = "one"
+	CliConfig.Timeout = time.Second
+	CliConfig.NumConns = 10
 	CliConfig.writeQueueSize = 10
-	CliConfig.protoVer = 4
+	CliConfig.ProtoVer = 4
 	CliConfig.updateInterval = time.Hour
 	CliConfig.updateCassIdx = true
 	ix := New(CliConfig)
@@ -489,7 +489,7 @@ func BenchmarkLoad(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Query(fmt.Sprintf("TRUNCATE %s.%s", CliConfig.Keyspace, CliConfig.Table)).Exec()
 	tmpSession.Close()
 	err = ix.Init()
 	if err != nil {
@@ -510,13 +510,13 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 		b.Skip("skipping " + b.Name() + " in short mode")
 	}
 	cluster.Manager.SetPartitions([]int32{1})
-	CliConfig.keyspace = "metrictank"
-	CliConfig.hosts = "localhost:9042"
-	CliConfig.consistency = "one"
-	CliConfig.timeout = time.Second
-	CliConfig.numConns = 10
+	CliConfig.Keyspace = "metrictank"
+	CliConfig.Hosts = "localhost:9042"
+	CliConfig.Consistency = "one"
+	CliConfig.Timeout = time.Second
+	CliConfig.NumConns = 10
 	CliConfig.writeQueueSize = 10
-	CliConfig.protoVer = 4
+	CliConfig.ProtoVer = 4
 	CliConfig.updateInterval = time.Hour
 	CliConfig.updateCassIdx = true
 	ix := New(CliConfig)
@@ -524,7 +524,7 @@ func BenchmarkIndexingWithUpdates(b *testing.B) {
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
 	}
-	tmpSession.Query("TRUNCATE metrictank.metric_idx").Exec()
+	tmpSession.Query(fmt.Sprintf("TRUNCATE %s.%s", CliConfig.Keyspace, CliConfig.Table)).Exec()
 	tmpSession.Close()
 	if err != nil {
 		b.Skipf("can't connect to cassandra: %s", err)
