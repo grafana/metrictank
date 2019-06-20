@@ -93,8 +93,8 @@ func (ms *AggMetrics) GC() {
 			}
 			ms.RLock()
 			orgActive := len(ms.Metrics[org])
-			orgActiveMetrics.Set(float64(orgActive))
 			ms.RUnlock()
+			orgActiveMetrics.Set(float64(orgActive))
 
 			// If this org has no keys, then delete the org from the map
 			if orgActive == 0 {
