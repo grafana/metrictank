@@ -18,11 +18,12 @@ type AggMetrics struct {
 	store          Store
 	cachePusher    cache.CachePusher
 	dropFirstChunk bool
-	sync.RWMutex
-	Metrics        map[uint32]map[schema.Key]*AggMetric
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	gcInterval     time.Duration
+
+	sync.RWMutex
+	Metrics map[uint32]map[schema.Key]*AggMetric
 }
 
 func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bool, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
@@ -66,8 +67,6 @@ func (ms *AggMetrics) GC() {
 		ms.RUnlock()
 		for _, org := range orgs {
 			orgActiveMetrics := promActiveMetrics.WithLabelValues(strconv.Itoa(int(org)))
-			// need to acquire lock here, otherwise can run into panic because
-			// GetOrCreate might be writing to ms.Metrics
 			ms.RLock()
 			keys := make([]schema.Key, 0, len(ms.Metrics[org]))
 			for k := range ms.Metrics[org] {
