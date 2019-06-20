@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 var ErrInvalidIntervalzero = errors.New("interval cannot be 0")
@@ -14,6 +15,10 @@ var ErrInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var ErrInvalidEmptyName = errors.New("name cannot be empty")
 var ErrInvalidMtype = errors.New("invalid mtype")
 var ErrInvalidTagFormat = errors.New("invalid tag format")
+
+// as defined in https://github.com/graphite-project/graphite-web/blob/master/docs/tags.rst#carbon
+const invalidTagKeyChars = ";!^="
+const invalidTagValueChars = ";~"
 
 type PartitionedMetric interface {
 	Validate() error
@@ -248,45 +253,44 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 
 // ValidateTags returns whether all tags are in a valid format.
 // a valid format is anything that looks like key=value,
-// the length of key and value must be >0 and both must not contain the ; character.
+// the length of key and value must be >0 and both cannot contain
+// the certain prohibited characters
 func ValidateTags(tags []string) bool {
 	for _, t := range tags {
-		if len(t) == 0 {
-			return false
-		}
-
-		if t[0] == '=' {
-			return false
-		}
-
-		foundEqual := false
-		for pos := 0; pos < len(t); pos++ {
-			if t[pos] == ';' {
-				return false
-			}
-
-			if !foundEqual {
-				// no ! allowed in key
-				if t[pos] == '!' {
-					return false
-				}
-
-				// found the first =, so this will be the separator between key & value
-				if t[pos] == '=' {
-					// first equal sign must not be the last character
-					if pos == len(t)-1 {
-						return false
-					}
-
-					foundEqual = true
-				}
-			}
-		}
-
-		if !foundEqual {
+		if !ValidateTag(t) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func ValidateTag(tag string) bool {
+	// a valid tag must have:
+	// - a key that's at least 1 char long
+	// - a = sign
+	// - a value that's at least 1 char long
+	if len(tag) < 3 {
+		return false
+	}
+
+	equal := strings.Index(tag, "=")
+	if equal == -1 {
+		return false
+	}
+
+	// first equal sign must not be the first nor last character
+	if equal == 0 || equal == len(tag)-1 {
+		return false
+	}
+
+	return ValidateTagKey(tag[:equal]) && ValidateTagValue(tag[equal+1:])
+}
+
+func ValidateTagKey(key string) bool {
+	return !strings.ContainsAny(key, invalidTagKeyChars)
+}
+
+func ValidateTagValue(value string) bool {
+	return !strings.ContainsAny(value, invalidTagValueChars)
 }

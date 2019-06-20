@@ -101,6 +101,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "FATAL: configuration file error: %s", err)
 		os.Exit(1)
 	}
+
+	// input handlers
+	input.ConfigSetup()
+
 	// load config for metric ingestors
 	inCarbon.ConfigSetup()
 	inKafkaMdm.ConfigSetup()

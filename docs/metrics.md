@@ -214,6 +214,9 @@ the duration of (successful) update of a metric to the memory idx
 the number of currently known metrics in the index
 * `input.%s.metricdata.discarded.invalid`:  
 a count of times a metricdata was invalid by input plugin
+* `input.%s.metricdata.discarded.invalid_tags`:  
+a count of times a metricdata was considered invalid due to
+invalid tags in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
 * `input.%s.metricdata.received`:  
 the count of metricdata datapoints received by input plugin
 * `input.%s.metricpoint.discarded.invalid`:  
