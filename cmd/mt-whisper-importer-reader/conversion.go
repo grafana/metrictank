@@ -1,30 +1,49 @@
-package importer
+package main
 
 import (
-	"fmt"
-	"sort"
-
 	"github.com/grafana/metrictank/mdata"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
 )
 
-type converter struct {
+type conversion struct {
 	archives []whisper.ArchiveInfo
 	points   map[int][]whisper.Point
 	method   schema.Method
-	from     uint32
-	until    uint32
 }
 
 const fakeAvg schema.Method = 255
 
-func newConverter(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method, from, until uint32) *converter {
-	return &converter{archives: arch, points: points, method: method, from: from, until: until}
+func newConversion(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method) *conversion {
+	return &conversion{archives: arch, points: points, method: method}
+}
+
+func (c *conversion) findSmallestLargestArchive(spp, nop uint32) (int, int) {
+	// find smallest archive that still contains enough data to satisfy requested range
+	largestArchiveIdx := len(c.archives) - 1
+	for i := largestArchiveIdx; i >= 0; i-- {
+		arch := c.archives[i]
+		if arch.Points*arch.SecondsPerPoint < nop*spp {
+			break
+		}
+		largestArchiveIdx = i
+	}
+
+	// find largest archive that still has a higher or equal resolution than requested
+	smallestArchiveIdx := 0
+	for i := 0; i < len(c.archives); i++ {
+		arch := c.archives[i]
+		if arch.SecondsPerPoint > spp {
+			break
+		}
+		smallestArchiveIdx = i
+	}
+
+	return smallestArchiveIdx, largestArchiveIdx
 }
 
 // generates points according to specified parameters by finding and using the best archives as input
-func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
+func (c *conversion) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
 	res := make(map[schema.Method][]whisper.Point)
 
 	if len(c.points) == 0 {
@@ -59,7 +78,7 @@ func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 			rawFactor := float64(spp) / float64(rawRes)
 			if retIdx == 0 || c.method != schema.Avg {
 				for _, p := range in {
-					if p.Timestamp > c.until || p.Timestamp < c.from {
+					if p.Timestamp > uint32(*importUpTo) || p.Timestamp < uint32(*importAfter) {
 						continue
 					}
 					adjustedPoints[c.method][p.Timestamp] = p.Value
@@ -69,7 +88,7 @@ func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 				}
 			} else {
 				for _, p := range in {
-					if p.Timestamp > c.until || p.Timestamp < c.from {
+					if p.Timestamp > uint32(*importUpTo) || p.Timestamp < uint32(*importAfter) {
 						continue
 					}
 					adjustedPoints[schema.Sum][p.Timestamp] = p.Value * rawFactor
@@ -77,13 +96,13 @@ func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 				}
 			}
 		} else if arch.SecondsPerPoint > spp {
-			for m, points := range incResolution(in, method, arch.SecondsPerPoint, spp, rawRes, c.from, c.until) {
+			for m, points := range incResolution(in, method, arch.SecondsPerPoint, spp, rawRes) {
 				for _, p := range points {
 					adjustedPoints[m][p.Timestamp] = p.Value
 				}
 			}
 		} else {
-			for m, points := range decResolution(in, method, arch.SecondsPerPoint, spp, rawRes, c.from, c.until) {
+			for m, points := range decResolution(in, method, arch.SecondsPerPoint, spp, rawRes) {
 				for _, p := range points {
 					adjustedPoints[m][p.Timestamp] = p.Value
 				}
@@ -94,7 +113,7 @@ func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 	// merge the results that are keyed by timestamp into a slice of points
 	for m, p := range adjustedPoints {
 		for t, v := range p {
-			if t <= c.until && t >= c.from {
+			if t <= uint32(*importUpTo) && t >= uint32(*importAfter) {
 				res[m] = append(res[m], whisper.Point{Timestamp: t, Value: v})
 			}
 		}
@@ -111,35 +130,11 @@ func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 	return res
 }
 
-func (c *converter) findSmallestLargestArchive(spp, nop uint32) (int, int) {
-	// find smallest archive that still contains enough data to satisfy requested range
-	largestArchiveIdx := len(c.archives) - 1
-	for i := largestArchiveIdx; i >= 0; i-- {
-		arch := c.archives[i]
-		if arch.Points*arch.SecondsPerPoint < nop*spp {
-			break
-		}
-		largestArchiveIdx = i
-	}
-
-	// find largest archive that still has a higher or equal resolution than requested
-	smallestArchiveIdx := 0
-	for i := 0; i < len(c.archives); i++ {
-		arch := c.archives[i]
-		if arch.SecondsPerPoint > spp {
-			break
-		}
-		smallestArchiveIdx = i
-	}
-
-	return smallestArchiveIdx, largestArchiveIdx
-}
-
 // increase resolution of given points according to defined specs by generating
 // additional datapoints to bridge the gaps between the given points. depending
 // on what aggregation method is specified, those datapoints may be generated in
 // slightly different ways.
-func incResolution(points []whisper.Point, method schema.Method, inRes, outRes, rawRes, from, until uint32) map[schema.Method][]whisper.Point {
+func incResolution(points []whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) map[schema.Method][]whisper.Point {
 	out := make(map[schema.Method][]whisper.Point)
 	resFactor := float64(outRes) / float64(rawRes)
 	for _, inPoint := range points {
@@ -156,7 +151,7 @@ func incResolution(points []whisper.Point, method schema.Method, inRes, outRes, 
 		// generate datapoints based on inPoint in reverse order
 		var outPoints []whisper.Point
 		for ts := rangeEnd; ts > inPoint.Timestamp-inRes; ts = ts - outRes {
-			if ts > until || ts < from {
+			if ts > uint32(*importUpTo) || ts < uint32(*importAfter) {
 				continue
 			}
 			outPoints = append(outPoints, whisper.Point{Timestamp: ts})
@@ -188,7 +183,7 @@ func incResolution(points []whisper.Point, method schema.Method, inRes, outRes, 
 // decreases the resolution of given points by using the aggregation method specified
 // in the second argument. emulates the way metrictank aggregates data when it generates
 // rollups of the raw data.
-func decResolution(points []whisper.Point, method schema.Method, inRes, outRes, rawRes, from, until uint32) map[schema.Method][]whisper.Point {
+func decResolution(points []whisper.Point, method schema.Method, inRes, outRes, rawRes uint32) map[schema.Method][]whisper.Point {
 	out := make(map[schema.Method][]whisper.Point)
 	agg := mdata.NewAggregation()
 	currentBoundary := uint32(0)
@@ -246,10 +241,10 @@ func decResolution(points []whisper.Point, method schema.Method, inRes, outRes, 
 			continue
 		}
 		boundary := mdata.AggBoundary(inPoint.Timestamp, outRes)
-		if boundary > until {
+		if boundary > uint32(*importUpTo) {
 			break
 		}
-		if boundary < from {
+		if boundary < uint32(*importAfter) {
 			continue
 		}
 
@@ -266,35 +261,4 @@ func decResolution(points []whisper.Point, method schema.Method, inRes, outRes, 
 	}
 
 	return out
-}
-
-// pointSorter sorts points by timestamp
-type pointSorter []whisper.Point
-
-func (a pointSorter) Len() int           { return len(a) }
-func (a pointSorter) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a pointSorter) Less(i, j int) bool { return a[i].Timestamp < a[j].Timestamp }
-
-// the whisper archives are organized like a ringbuffer. since we need to
-// insert the points into the chunks in order we first need to sort them
-func sortPoints(points pointSorter) pointSorter {
-	sort.Sort(points)
-	return points
-}
-
-func convertWhisperMethod(whisperMethod whisper.AggregationMethod) (schema.Method, error) {
-	switch whisperMethod {
-	case whisper.AggregationAverage:
-		return schema.Avg, nil
-	case whisper.AggregationSum:
-		return schema.Sum, nil
-	case whisper.AggregationLast:
-		return schema.Lst, nil
-	case whisper.AggregationMax:
-		return schema.Max, nil
-	case whisper.AggregationMin:
-		return schema.Min, nil
-	default:
-		return 0, fmt.Errorf("Unknown whisper method: %d", whisperMethod)
-	}
 }

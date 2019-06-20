@@ -3,7 +3,7 @@ CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 
 """
 
 schema_table = """
-CREATE TABLE IF NOT EXISTS %s.%s (
+CREATE TABLE IF NOT EXISTS %s.metric_idx (
     id text,
     orgid int,
     partition int,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS %s.%s (
 """
 
 schema_archive_table = """
-CREATE TABLE IF NOT EXISTS %s.%s (
+CREATE TABLE IF NOT EXISTS %s.metric_idx_archive (
     id text,
     orgid int,
     partition int,

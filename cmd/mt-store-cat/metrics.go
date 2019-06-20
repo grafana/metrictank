@@ -9,7 +9,7 @@ import (
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/store/cassandra"
 )
 
 type Metric struct {
@@ -50,9 +50,9 @@ func match(prefix, substr, glob string, metric Metric) bool {
 }
 
 // getMetrics lists all metrics from the store matching the given condition.
-func getMetrics(idx *cassandra.CasIdx, prefix, substr, glob string, archive schema.Archive) ([]Metric, error) {
+func getMetrics(store *cassandra.CassandraStore, prefix, substr, glob string, archive schema.Archive) ([]Metric, error) {
 	var metrics []Metric
-	iter := idx.Session.Query(fmt.Sprintf("select id, name from %s", idx.Config.Table)).Iter()
+	iter := store.Session.Query("select id, name from metric_idx").Iter()
 	var m Metric
 	var idString string
 	for iter.Scan(&idString, &m.name) {
@@ -77,11 +77,10 @@ func getMetrics(idx *cassandra.CasIdx, prefix, substr, glob string, archive sche
 }
 
 // getMetric returns the metric for the given AMKey
-func getMetric(idx *cassandra.CasIdx, amkey schema.AMKey) ([]Metric, error) {
+func getMetric(store *cassandra.CassandraStore, amkey schema.AMKey) ([]Metric, error) {
 	var metrics []Metric
 	// index only stores MKey's, not AMKey's.
-	iter := idx.Session.Query(fmt.Sprintf("select name from %s where id=? ALLOW FILTERING", idx.Config.Table), amkey.MKey.String()).Iter()
-
+	iter := store.Session.Query("select name from metric_idx where id=? ALLOW FILTERING", amkey.MKey.String()).Iter()
 	var m Metric
 	for iter.Scan(&m.name) {
 		m.AMKey = amkey

@@ -276,10 +276,8 @@ func (m *UnpartitionedMemoryIdx) Init() error {
 }
 
 func (m *UnpartitionedMemoryIdx) Stop() {
-	if m.findCache != nil {
-		m.findCache.Shutdown()
-		m.findCache = nil
-	}
+	m.findCache.Shutdown()
+	m.findCache = nil
 	return
 }
 

@@ -3,27 +3,18 @@
 package input
 
 import (
-	"flag"
 	"fmt"
 	"math"
 	"strconv"
 
-	"github.com/grafana/globalconf"
+	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
+
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
 	log "github.com/sirupsen/logrus"
 )
-
-var rejectInvalidTags bool
-
-func ConfigSetup() {
-	input := flag.NewFlagSet("input", flag.ExitOnError)
-	input.BoolVar(&rejectInvalidTags, "reject-invalid-tags", true, "reject received metrics that have invalid tags")
-	globalconf.Register("input", input, flag.ExitOnError)
-}
 
 type Handler interface {
 	ProcessMetricData(md *schema.MetricData, partition int32)
@@ -38,7 +29,6 @@ type DefaultHandler struct {
 	receivedMP   *stats.Counter32
 	receivedMPNO *stats.Counter32
 	invalidMD    *stats.CounterRate32
-	invalidTagMD *stats.CounterRate32
 	invalidMP    *stats.CounterRate32
 	unknownMP    *stats.Counter32
 
@@ -67,9 +57,6 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		receivedMPNO: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint_no_org.received", input)),
 		// metric input.%s.metricdata.discarded.invalid is a count of times a metricdata was invalid by input plugin
 		invalidMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid", input)),
-		// metric input.%s.metricdata.discarded.invalid_tags is a count of times a metricdata was considered invalid due to
-		// invalid tags in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
-		invalidTagMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_tag", input)),
 		// metric input.%s.metricpoint.discarded.invalid is a count of times a metricpoint was invalid by input plugin
 		invalidMP: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.discarded.invalid", input)),
 		// metric input.%s.metricpoint.discarded.unknown is the count of times the ID of a received metricpoint was not in the index, by input plugin
@@ -116,42 +103,27 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 	err := md.Validate()
 	if err != nil {
 		in.invalidMD.Inc()
+		log.Debugf("in: Invalid metric %v: %s", md, err)
 
-		ignoreError := false
-		// assuming that the tag format was the only issue found by Validate()
-		// better make sure that the tag format is the last check which Validate() checks, to not accidentally ignore a potential following error
-		if err == schema.ErrInvalidTagFormat {
-			in.invalidTagMD.Inc()
-			if !rejectInvalidTags {
-				log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid tags is disabled: %s", md, err)
-				ignoreError = true
-			}
+		var reason string
+		switch err {
+		case schema.ErrInvalidIntervalzero:
+			reason = invalidInterval
+		case schema.ErrInvalidOrgIdzero:
+			reason = invalidOrgId
+		case schema.ErrInvalidEmptyName:
+			reason = invalidName
+		case schema.ErrInvalidMtype:
+			reason = invalidMtype
+		case schema.ErrInvalidTagFormat:
+			reason = invalidTagFormat
+		default:
+			reason = "unknown"
 		}
+		mdata.PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(md.OrgId)).Inc()
 
-		if !ignoreError {
-			log.Debugf("in: Invalid metric %v: %s", md, err)
-
-			var reason string
-			switch err {
-			case schema.ErrInvalidIntervalzero:
-				reason = invalidInterval
-			case schema.ErrInvalidOrgIdzero:
-				reason = invalidOrgId
-			case schema.ErrInvalidEmptyName:
-				reason = invalidName
-			case schema.ErrInvalidMtype:
-				reason = invalidMtype
-			case schema.ErrInvalidTagFormat:
-				reason = invalidTagFormat
-			default:
-				reason = "unknown"
-			}
-			mdata.PromDiscardedSamples.WithLabelValues(reason, strconv.Itoa(md.OrgId)).Inc()
-
-			return
-		}
+		return
 	}
-
 	// in cassandra we store timestamps and interval as 32bit signed integers.
 	// math.MaxInt32 = Jan 19 03:14:07 UTC 2038
 	if md.Time <= 0 || md.Time >= math.MaxInt32 {

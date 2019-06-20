@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/grafana/metrictank/store/cassandra"
 	log "github.com/sirupsen/logrus"
@@ -19,7 +20,7 @@ func getTables(store *cassandra.CassandraStore, match string) ([]cassandra.Table
 	var tables []cassandra.Table
 	if match == "*" || match == "" {
 		for _, table := range store.TTLTables {
-			if !cassandra.IsStoreTable(table.Name) {
+			if table.Name == "metric_idx" || !strings.HasPrefix(table.Name, "metric_") {
 				continue
 			}
 			tables = append(tables, table)

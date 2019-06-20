@@ -59,9 +59,9 @@ type writeReq struct {
 // CasIdx implements the the "MetricIndex" interface
 type CasIdx struct {
 	memory.MemoryIndex
-	Config           *IdxConfig
+	cfg              *IdxConfig
 	cluster          *gocql.ClusterConfig
-	Session          *gocql.Session
+	session          *gocql.Session
 	writeQueue       chan writeReq
 	wg               sync.WaitGroup
 	updateInterval32 uint32
@@ -76,29 +76,29 @@ func New(cfg *IdxConfig) *CasIdx {
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("cassandra-idx: %s", err)
 	}
-	cluster := gocql.NewCluster(strings.Split(cfg.Hosts, ",")...)
-	cluster.Consistency = gocql.ParseConsistency(cfg.Consistency)
-	cluster.Timeout = cfg.Timeout
+	cluster := gocql.NewCluster(strings.Split(cfg.hosts, ",")...)
+	cluster.Consistency = gocql.ParseConsistency(cfg.consistency)
+	cluster.Timeout = cfg.timeout
 	cluster.ConnectTimeout = cluster.Timeout
-	cluster.NumConns = cfg.NumConns
-	cluster.ProtoVersion = cfg.ProtoVer
-	cluster.DisableInitialHostLookup = cfg.DisableInitialHostLookup
-	if cfg.SSL {
+	cluster.NumConns = cfg.numConns
+	cluster.ProtoVersion = cfg.protoVer
+	cluster.DisableInitialHostLookup = cfg.disableInitialHostLookup
+	if cfg.ssl {
 		cluster.SslOpts = &gocql.SslOptions{
-			CaPath:                 cfg.CaPath,
-			EnableHostVerification: cfg.HostVerification,
+			CaPath:                 cfg.capath,
+			EnableHostVerification: cfg.hostverification,
 		}
 	}
-	if cfg.Auth {
+	if cfg.auth {
 		cluster.Authenticator = gocql.PasswordAuthenticator{
-			Username: cfg.Username,
-			Password: cfg.Password,
+			Username: cfg.username,
+			Password: cfg.password,
 		}
 	}
 
 	idx := &CasIdx{
 		MemoryIndex:      memory.New(),
-		Config:           cfg,
+		cfg:              cfg,
 		cluster:          cluster,
 		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),
 	}
@@ -118,18 +118,18 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	// read templates
-	schemaKeyspace := util.ReadEntry(c.Config.SchemaFile, "schema_keyspace").(string)
-	schemaTable := util.ReadEntry(c.Config.SchemaFile, "schema_table").(string)
+	schemaKeyspace := util.ReadEntry(c.cfg.schemaFile, "schema_keyspace").(string)
+	schemaTable := util.ReadEntry(c.cfg.schemaFile, "schema_table").(string)
 
 	// create the keyspace or ensure it exists
-	if c.Config.CreateKeyspace {
-		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.Config.Keyspace)
-		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.Config.Keyspace)).Exec()
+	if c.cfg.createKeyspace {
+		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.cfg.keyspace)
+		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
-		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.Table)
-		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.Config.Keyspace, c.Config.Table)).Exec()
+		log.Info("cassandra-idx: ensuring that table metric_idx exists.")
+		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
@@ -137,21 +137,21 @@ func (c *CasIdx) InitBare() error {
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
-			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(c.Config.Keyspace)
+			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(c.cfg.keyspace)
 			if err != nil {
 				if attempt >= 5 {
-					return fmt.Errorf("cassandra keyspace %s not found. %d attempts", c.Config.Keyspace, attempt)
+					return fmt.Errorf("cassandra keyspace not found. %d attempts", attempt)
 				}
-				log.Warnf("cassandra-idx: cassandra keyspace %s not found. retrying in 5s. attempt: %d", c.Config.Keyspace, attempt)
+				log.Warnf("cassandra-idx: cassandra keyspace not found. retrying in 5s. attempt: %d", attempt)
 				time.Sleep(5 * time.Second)
 			} else {
-				if _, ok := keyspaceMetadata.Tables[c.Config.Table]; ok {
+				if _, ok := keyspaceMetadata.Tables["metric_idx"]; ok {
 					break
 				} else {
 					if attempt >= 5 {
-						return fmt.Errorf("cassandra table %s not found. %d attempts", c.Config.Table, attempt)
+						return fmt.Errorf("cassandra table not found. %d attempts", attempt)
 					}
-					log.Warnf("cassandra-idx: cassandra table %s not found. retrying in 5s. attempt: %d", c.Config.Table, attempt)
+					log.Warnf("cassandra-idx: cassandra table not found. retrying in 5s. attempt: %d", attempt)
 					time.Sleep(5 * time.Second)
 				}
 			}
@@ -159,13 +159,13 @@ func (c *CasIdx) InitBare() error {
 	}
 
 	tmpSession.Close()
-	c.cluster.Keyspace = c.Config.Keyspace
+	c.cluster.Keyspace = c.cfg.keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
 		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
-	c.Session = session
+	c.session = session
 
 	return nil
 }
@@ -184,22 +184,22 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 		}
 	}
 
-	schemaArchiveTable := util.ReadEntry(c.Config.SchemaFile, "schema_archive_table").(string)
+	schemaArchiveTable := util.ReadEntry(c.cfg.schemaFile, "schema_archive_table").(string)
 
-	if c.Config.CreateKeyspace {
-		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.ArchiveTable)
-		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.Config.Keyspace, c.Config.ArchiveTable)).Exec()
+	if c.cfg.createKeyspace {
+		log.Info("cassandra-idx: ensuring that table metric_idx_archive exists.")
+		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.cfg.keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
-		keyspaceMetadata, err = session.KeyspaceMetadata(c.Config.Keyspace)
+		keyspaceMetadata, err = session.KeyspaceMetadata(c.cfg.keyspace)
 		if err != nil {
 			return fmt.Errorf("failed to read cassandra tables: %s", err)
 		}
-		if _, ok := keyspaceMetadata.Tables[c.Config.ArchiveTable]; !ok {
-			return fmt.Errorf("table %s does not exist", c.Config.ArchiveTable)
+		if _, ok := keyspaceMetadata.Tables["metric_idx_archive"]; !ok {
+			return fmt.Errorf("table metric_idx_archive does not exist")
 		}
 	}
 	return nil
@@ -208,7 +208,7 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 // Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (c *CasIdx) Init() error {
-	log.Infof("initializing cassandra-idx. Hosts=%s", c.Config.Hosts)
+	log.Infof("initializing cassandra-idx. Hosts=%s", c.cfg.hosts)
 	if err := c.MemoryIndex.Init(); err != nil {
 		return err
 	}
@@ -217,12 +217,12 @@ func (c *CasIdx) Init() error {
 		return err
 	}
 
-	if c.Config.updateCassIdx {
-		c.wg.Add(c.Config.NumConns)
-		for i := 0; i < c.Config.NumConns; i++ {
+	if c.cfg.updateCassIdx {
+		c.wg.Add(c.cfg.numConns)
+		for i := 0; i < c.cfg.numConns; i++ {
 			go c.processWriteQueue()
 		}
-		log.Infof("cassandra-idx: started %d writeQueue handlers", c.Config.NumConns)
+		log.Infof("cassandra-idx: started %d writeQueue handlers", c.cfg.numConns)
 	}
 
 	//Rebuild the in-memory index.
@@ -239,11 +239,11 @@ func (c *CasIdx) Stop() {
 	c.MemoryIndex.Stop()
 
 	// if updateCassIdx is disabled then writeQueue should never have been initialized
-	if c.Config.updateCassIdx {
+	if c.cfg.updateCassIdx {
 		close(c.writeQueue)
 	}
 	c.wg.Wait()
-	c.Session.Close()
+	c.session.Close()
 }
 
 // Update updates an existing archive, if found.
@@ -253,7 +253,7 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive,
 
 	archive, oldPartition, inMemory := c.MemoryIndex.Update(point, partition)
 
-	if !c.Config.updateCassIdx {
+	if !c.cfg.updateCassIdx {
 		statUpdateDuration.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
@@ -287,7 +287,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 		stat = statAddDuration
 	}
 
-	if !c.Config.updateCassIdx {
+	if !c.cfg.updateCassIdx {
 		stat.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
@@ -344,7 +344,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 func (c *CasIdx) rebuildIndex() {
 	log.Info("cassandra-idx: Rebuilding Memory Index from metricDefinitions in Cassandra")
 	pre := time.Now()
-	gate := make(chan struct{}, c.Config.InitLoadConcurrency)
+	gate := make(chan struct{}, c.cfg.initLoadConcurrency)
 	var wg sync.WaitGroup
 	defPool := sync.Pool{
 		New: func() interface{} {
@@ -371,7 +371,7 @@ func (c *CasIdx) rebuildIndex() {
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
-	iter := c.Session.Query(fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s", c.Config.Table)).Iter()
+	iter := c.session.Query("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx").Iter()
 	return c.load(defs, iter, now)
 }
 
@@ -381,8 +381,8 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefiniti
 	for i, p := range partitions {
 		placeholders[i] = strconv.Itoa(int(p))
 	}
-	q := fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s where partition in (%s)", c.Config.Table, strings.Join(placeholders, ","))
-	iter := c.Session.Query(q).Iter()
+	q := fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from metric_idx where partition in (%s)", strings.Join(placeholders, ","))
+	iter := c.session.Query(q).Iter()
 	return c.load(defs, iter, now)
 }
 
@@ -445,15 +445,15 @@ NAMES:
 }
 
 // ArchiveDefs writes each of the provided defs to the archive table and
-// then deletes the defs from the metric index table.
+// then deletes the defs from the metric_idx table.
 func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
-	defChan := make(chan *schema.MetricDefinition, c.Config.NumConns)
+	defChan := make(chan *schema.MetricDefinition, c.cfg.numConns)
 	g, ctx := errgroup.WithContext(context.Background())
 
 	// keep track of how many defs were successfully archived.
-	success := make([]int, c.Config.NumConns)
+	success := make([]int, c.cfg.numConns)
 
-	for i := 0; i < c.Config.NumConns; i++ {
+	for i := 0; i < c.cfg.numConns; i++ {
 		i := i
 		g.Go(func() error {
 			for {
@@ -465,7 +465,7 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 					err := c.addDefToArchive(*def)
 					if err != nil {
 						// If we failed to add the def to the archive table then just continue on to the next def.
-						// As we haven't yet removed the this def from the metric index table yet, the next time archiving
+						// As we havnet yet removed the this def from the metric_idx table yet, the next time archiving
 						// is performed the this def will be processed again. As no action is needed by an operator, we
 						// just log this as a warning.
 						log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
@@ -477,7 +477,7 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 						// The next time archiving is performed this def will be processed again. Re-adding the def to the archive
 						// table will just be treated like an update with only the archived_at field changing. As no action is needed
 						// by an operator, we just log this as a warning.
-						log.Warnf("cassandra-idx: Failed to remove archived def from %s table. error=%s. def=%+v", c.Config.Table, err, *def)
+						log.Warnf("cassandra-idx: Failed to remove archived def from metric_idx table. error=%s. def=%+v", err, *def)
 						continue
 					}
 
@@ -511,7 +511,7 @@ func (c *CasIdx) processWriteQueue() {
 	var attempts int
 	var err error
 	var req writeReq
-	qry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.Table)
+	qry := `INSERT INTO metric_idx (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	for req = range c.writeQueue {
 		if err != nil {
 			log.Errorf("Failed to marshal metricDef: %s. value was: %+v", err, *req.def)
@@ -523,7 +523,7 @@ func (c *CasIdx) processWriteQueue() {
 		attempts = 0
 
 		for !success {
-			if err := c.Session.Query(
+			if err := c.session.Query(
 				qry,
 				req.def.Id.String(),
 				req.def.OrgId,
@@ -559,7 +559,7 @@ func (c *CasIdx) processWriteQueue() {
 }
 
 func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
-	insertQry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.ArchiveTable)
+	insertQry := `INSERT INTO metric_idx_archive (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	maxAttempts := 5
 	now := time.Now().UTC().Unix()
 	var err error
@@ -573,7 +573,7 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 		}
 
-		err := c.Session.Query(
+		err := c.session.Query(
 			insertQry,
 			def.Id.String(),
 			def.OrgId,
@@ -605,7 +605,7 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	if err != nil {
 		return defs, err
 	}
-	if c.Config.updateCassIdx {
+	if c.cfg.updateCassIdx {
 		for _, def := range defs {
 			err = c.deleteDef(def.Id, def.Partition)
 			if err != nil {
@@ -623,7 +623,7 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 	keyStr := key.String()
 	for attempts < 5 {
 		attempts++
-		err := c.Session.Query(fmt.Sprintf("DELETE FROM %s where partition=? AND id=?", c.Config.Table), part, keyStr).Exec()
+		err := c.session.Query("DELETE FROM metric_idx where partition=? AND id=?", part, keyStr).Exec()
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
@@ -660,7 +660,7 @@ func (c *CasIdx) Prune(now time.Time) ([]idx.Archive, error) {
 }
 
 func (c *CasIdx) prune() {
-	ticker := time.NewTicker(c.Config.pruneInterval)
+	ticker := time.NewTicker(c.cfg.pruneInterval)
 	for now := range ticker.C {
 		c.Prune(now)
 	}

@@ -286,13 +286,6 @@ speculation-threshold = 1
 ```
 
 ## metric data inputs ##
-
-```
-[input]
-# reject received metrics that have invalid tags
-reject-invalid-tags = true
-```
-
 ### carbon input (optional)
 
 ```
@@ -457,10 +450,6 @@ backlog-process-timeout = 60s
 enabled = true
 # Cassandra keyspace to store metricDefinitions in.
 keyspace = metrictank
-# Cassandra table to store metricDefinitions in.
-table = metric_idx
-# Cassandra table to archive metricDefinitions in.
-archive-table = metric_idx_archive
 # comma separated list of cassandra addresses in host:port form
 hosts = localhost:9042
 #cql protocol version to use

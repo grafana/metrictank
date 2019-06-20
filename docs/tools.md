@@ -94,8 +94,6 @@ idxtype: only 'cass' supported for now
 
 cass config flags:
 
-  -archive-table string
-    	Cassandra table to archive metricDefinitions in. (default "metric_idx_archive")
   -auth
     	enable cassandra user authentication
   -ca-path string
@@ -128,8 +126,6 @@ cass config flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
-  -table string
-    	Cassandra table to store metricDefinitions in. (default "metric_idx")
   -timeout duration
     	cassandra request timeout (default 1s)
   -update-cassandra-index
@@ -188,8 +184,6 @@ Flags:
     	Address of cassandra host to migrate to. (default "localhost")
   -dst-keyspace string
     	Cassandra keyspace in use on destination. (default "raintank")
-  -dst-table string
-    	Cassandra table name in use on destination. (default "metric_idx")
   -log-level string
     	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
@@ -202,8 +196,6 @@ Flags:
     	Address of cassandra host to migrate from. (default "localhost")
   -src-keyspace string
     	Cassandra keyspace in use on source. (default "raintank")
-  -src-table string
-    	Cassandra table name in use on source. (default "metric_idx")
 ```
 
 
@@ -235,8 +227,6 @@ idxtype: only 'cass' supported for now
 
 cass config flags:
 
-  -archive-table string
-    	Cassandra table to archive metricDefinitions in. (default "metric_idx_archive")
   -auth
     	enable cassandra user authentication
   -ca-path string
@@ -269,8 +259,6 @@ cass config flags:
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -ssl
     	enable SSL connection to cassandra
-  -table string
-    	Cassandra table to store metricDefinitions in. (default "metric_idx")
   -timeout duration
     	cassandra request timeout (default 1s)
   -update-cassandra-index
@@ -515,16 +503,6 @@ Flags:
     	get data from (inclusive). only for points and point-summary format (default "-24h")
   -groupTTL string
     	group chunks in TTL buckets: s (second. means unbucketed), m (minute), h (hour) or d (day). only for chunk-summary format (default "d")
-  -index-archive-table string
-    	Cassandra table to archive metricDefinitions in. (default "metric_idx_archive")
-  -index-init-load-concurrency int
-    	Number of partitions to load concurrently on startup. (default 1)
-  -index-schema-file string
-    	File containing the needed index schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
-  -index-table string
-    	Cassandra table to store metricDefinitions in. (default "metric_idx")
-  -index-timeout duration
-    	cassandra request timeout (default 1s)
   -print-ts
     	print time stamps instead of formatted dates. only for points and point-summary format
   -time-zone string
@@ -695,17 +673,19 @@ Usage of ./mt-whisper-importer-reader:
   -http-auth string
     	The credentials used to authenticate in the format "user:password"
   -http-endpoint string
-    	The http endpoint to send the data to (default "http://127.0.0.1:8080/metrics/import")
-  -import-from uint
-    	Only import starting from the specified timestamp
-  -import-until uint
-    	Only import up to, but not including, the specified timestamp (default 4294967295)
+    	The http endpoint to send the data to (default "http://127.0.0.1:8080/chunks")
+  -import-after uint
+    	Only import after the specified timestamp
+  -import-up-to uint
+    	Only import up to the specified timestamp (default 4294967295)
   -insecure-ssl
     	Disables ssl certificate verification
   -name-filter string
     	A regex pattern to be applied to all metric names, only matching ones will be imported
   -name-prefix string
     	Prefix to prepend before every metric name, should include the '.' if necessary
+  -orgid int
+    	Organization ID the data belongs to  (default 1)
   -position-file string
     	file to store position and load position from
   -threads int
@@ -728,7 +708,7 @@ Usage of ./mt-whisper-importer-writer:
   -exit-on-error
     	Exit with a message when there's an error
   -http-endpoint string
-    	The http endpoint to listen on (default "0.0.0.0:8080")
+    	The http endpoint to listen on (default "127.0.0.1:8080")
   -log-level string
     	log level. panic|fatal|error|warning|info|debug (default "info")
   -num-partitions int
@@ -738,6 +718,6 @@ Usage of ./mt-whisper-importer-writer:
   -ttls string
     	list of ttl strings used by MT separated by ',' (default "35d")
   -uri-path string
-    	the URI on which we expect chunks to get posted (default "/metrics/import")
+    	the URI on which we expect chunks to get posted (default "/chunks")
 ```
 
