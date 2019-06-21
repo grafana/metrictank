@@ -802,9 +802,8 @@ func getTagQueryExpressions(expressions string) (tagQuery.Expressions, error) {
 				if err != nil {
 					return nil, err
 				}
-				if expression.RequiresNonEmptyValue {
-					requiresNonEmptyValue = true
-				}
+
+				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue
 
 				results = append(results, expression)
 				continue
