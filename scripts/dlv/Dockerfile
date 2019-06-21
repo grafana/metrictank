@@ -5,7 +5,7 @@ ENV CGO_ENABLED 0
 RUN apk add --no-cache git
 RUN go get github.com/derekparker/delve/cmd/dlv
 
-FROM alpine
+FROM alpine:3.10.0
 MAINTAINER Dieter Plaetinck dieter@grafana.com
 
 RUN apk add -U tzdata
