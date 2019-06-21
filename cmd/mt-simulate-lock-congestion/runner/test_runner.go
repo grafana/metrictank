@@ -77,7 +77,7 @@ func (t *TestRun) Run() {
 
 	startedWg.Wait()
 
-	log.Print("Starting the benchmark")
+	log.Printf("Starting the benchmark with %d add-threads and %d query-threads", t.addThreads, t.queryThreads)
 
 	// as soon as all routines have started, we start the timer
 	<-time.After(t.runDuration)
