@@ -22,5 +22,7 @@ func (r *replaceRandomNodeWithAsterisk) getPattern(name string) string {
 	nodes := strings.Split(name, ".")
 	replaceNode := int(callNumber) % len(nodes)
 	nodes[replaceNode] = "*"
+	nodes[replaceNode/2] = "*"
+	nodes[(replaceNode*2)%len(nodes)] = "*"
 	return strings.Join(nodes, ".")
 }

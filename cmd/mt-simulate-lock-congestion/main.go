@@ -16,11 +16,14 @@ import (
 )
 
 var (
-	addsPerSec           = flag.Int("adds-per-sec", 100, "Metric add operations per second")
-	addThreads           = flag.Int("add-threads", 8, "Number of threads to concurrently try adding metrics into the index")
+	addsPerSec           = flag.Int("adds-per-sec", 100000, "Metric add operations per second")
+	addThreads           = flag.Int("add-threads", 10, "Number of threads to concurrently try adding metrics into the index")
+	addSampleFactor      = flag.Int("add-sample-factor", 100000, "how often to print a sample metric name that we added")
+	initialIndexSize     = flag.Int("initial-index-size", 1000000, "prepopulate the index with the defined number of metrics before starting the benchmark")
 	queriesPerSec        = flag.Int("queries-per-sec", 100, "Index queries per second")
 	queryThreads         = flag.Int("query-threads", 2, "Number of threads to concurrently query the index")
-	runDuration          = flag.Duration("run-duration", time.Minute, "How long we want the test to run")
+	querySampleFactor    = flag.Int("query-sample-factor", 100, "how often to print a sample query")
+	runDuration          = flag.Duration("run-duration", time.Second*10, "How long we want the test to run")
 	profileNamePrefix    = flag.String("profile-name-prefix", "profile", "Prefix to prepend before profile file names")
 	blockProfileRate     = flag.Int("block-profile-rate", 0, "Sampling rate of block profile, 0 means disabled")
 	mutexProfileFraction = flag.Int("mutex-profile-rate", 0, "Fraction of mutex samples, 0 means disabled")
@@ -56,7 +59,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	testRun := runner.NewTestRun(uint32(*addsPerSec), uint32(*addThreads), uint32(*queriesPerSec), uint32(*queryThreads), *runDuration)
+	testRun := runner.NewTestRun(uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*queryThreads), uint32(*querySampleFactor), *runDuration)
 	testRun.Run()
 	testRun.PrintStats()
 
