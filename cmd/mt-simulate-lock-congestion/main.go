@@ -58,6 +58,7 @@ func main() {
 
 	testRun := runner.NewTestRun(uint32(*addsPerSec), uint32(*addThreads), uint32(*queriesPerSec), uint32(*queryThreads), *runDuration)
 	testRun.Run()
+	testRun.PrintStats()
 
 	if *blockProfileRate > 0 {
 		filenamePrefix := *profileNamePrefix + ".block."
@@ -84,7 +85,6 @@ func main() {
 			log.Fatalf("Failed to write into mutex profile: %s", err.Error())
 		}
 	}
-
 }
 
 func findFreeFileName(prefix string) string {

@@ -3,7 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/grafana/metrictank/idx"
@@ -17,11 +17,10 @@ type TestRun struct {
 	index                 idx.MetricIndex
 	metricNameGenerator   metricNameGenerator
 	queryPatternGenerator queryPatternGenerator
+	stats                 runStats
 	addsPerSec            uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
-	addsSkipped           uint32 // counter that keeps track how many adds got skipped because the index wasn't fast enough
 	addThreads            uint32 // number of concurrent add threads
 	queriesPerSec         uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
-	queriesSkipped        uint32 // counter that keeps track of how many queries got skipped because the index wasn't fast enough
 	queryThreads          uint32 // number of concurrent query threads
 	runDuration           time.Duration
 }
@@ -31,6 +30,7 @@ const orgID = 1
 // NewTestRun Instantiates a new test run
 func NewTestRun(addsPerSec, addThreads, queriesPerSec, queryThreads uint32, runDuration time.Duration) *TestRun {
 	runner := TestRun{
+		stats:                 runStats{queryTimes: make([]uint32, queriesPerSec*uint32(runDuration.Seconds()))},
 		index:                 memory.New(),
 		metricNameGenerator:   newMetricNameGenerator(),
 		queryPatternGenerator: newQueryPatternGenerator(),
@@ -47,21 +47,36 @@ func NewTestRun(addsPerSec, addThreads, queriesPerSec, queryThreads uint32, runD
 // Run executes the run
 func (t *TestRun) Run() {
 	mainCtx, cancel := context.WithCancel(context.Background())
+
+	// wait group to wait until all routines have been started
+	startedWg := sync.WaitGroup{}
+
 	addThreads, addCtx := errgroup.WithContext(mainCtx)
+	startedWg.Add(int(t.addThreads))
 	for i := uint32(0); i < t.addThreads; i++ {
-		addThreads.Go(t.addRoutine(addCtx, i))
+		addThreads.Go(t.addRoutine(addCtx, &startedWg, i))
 	}
 
 	queryThreads, queryCtx := errgroup.WithContext(mainCtx)
+	queryRoutine := t.queryRoutine(queryCtx, &startedWg)
+	startedWg.Add(int(t.queryThreads))
 	for i := uint32(0); i < t.queryThreads; i++ {
-		queryThreads.Go(t.queryRoutine(queryCtx))
+		queryThreads.Go(queryRoutine)
 	}
 
+	startedWg.Wait()
+
+	// as soon as all routines have started, we start the timer
 	<-time.After(t.runDuration)
 	cancel()
 }
 
-func (t *TestRun) addRoutine(ctx context.Context, routineID uint32) func() error {
+// PrintStats writes all the statistics in human readable format into stdout
+func (t *TestRun) PrintStats() {
+	t.stats.Print(uint32(t.runDuration.Seconds()))
+}
+
+func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, routineID uint32) func() error {
 	partitionID := int32(routineID)
 
 	addEntryToIndex := func(time int) error {
@@ -74,11 +89,12 @@ func (t *TestRun) addRoutine(ctx context.Context, routineID uint32) func() error
 		}
 
 		t.index.AddOrUpdate(key, &md, partitionID)
+		t.stats.incAddsCompleted()
 		return nil
 	}
 
 	if t.addsPerSec > 0 {
-		interval := time.Second / time.Duration(t.addsPerSec) / time.Duration(t.addThreads)
+		interval := time.Duration(int64(1000000000) * int64(t.addThreads) / int64(t.addsPerSec))
 
 		return func() error {
 			ticker := time.NewTicker(interval)
@@ -87,20 +103,12 @@ func (t *TestRun) addRoutine(ctx context.Context, routineID uint32) func() error
 				ticker.Stop()
 			}()
 
-			var previousTick time.Time
-
+			startedWg.Done()
 			for {
 				select {
 				case <-ctx.Done():
 					return nil
 				case tick := <-ticker.C:
-					if !previousTick.IsZero() {
-						if previousTick.Add(interval).Before(tick) {
-							atomic.AddUint32(&t.addsSkipped, uint32(tick.Sub(previousTick)/interval))
-						}
-					}
-					previousTick = tick
-
 					if err := addEntryToIndex(tick.Second()); err != nil {
 						return err
 					}
@@ -123,15 +131,18 @@ func (t *TestRun) addRoutine(ctx context.Context, routineID uint32) func() error
 	}
 }
 
-func (t *TestRun) queryRoutine(ctx context.Context) func() error {
+func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) func() error {
 	queryIndex := func() error {
 		pattern := t.queryPatternGenerator.getPattern(t.metricNameGenerator.getExistingMetricName())
+		pre := time.Now()
 		_, err := t.index.Find(orgID, pattern, 0)
+		t.stats.addQueryTime(uint32(time.Now().Sub(pre).Nanoseconds() / int64(1000000)))
+		t.stats.incQueriesCompleted()
 		return err
 	}
 
 	if t.queriesPerSec > 0 {
-		interval := time.Second / time.Duration(t.queriesPerSec) / time.Duration(t.queryThreads)
+		interval := time.Duration(int64(1000000000) * int64(t.queryThreads) / int64(t.queriesPerSec))
 
 		return func() error {
 			ticker := time.NewTicker(interval)
@@ -140,20 +151,12 @@ func (t *TestRun) queryRoutine(ctx context.Context) func() error {
 				ticker.Stop()
 			}()
 
-			var previousTick time.Time
-
+			startedWg.Done()
 			for {
 				select {
 				case <-ctx.Done():
 					return nil
-				case tick := <-ticker.C:
-					if !previousTick.IsZero() {
-						if previousTick.Add(interval).Before(tick) {
-							atomic.AddUint32(&t.addsSkipped, uint32(tick.Sub(previousTick)/interval))
-						}
-					}
-					previousTick = tick
-
+				case <-ticker.C:
 					if err := queryIndex(); err != nil {
 						return err
 					}
