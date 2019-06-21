@@ -18,11 +18,12 @@ type AggMetrics struct {
 	store          Store
 	cachePusher    cache.CachePusher
 	dropFirstChunk bool
-	sync.RWMutex
-	Metrics        map[uint32]map[schema.Key]*AggMetric
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	gcInterval     time.Duration
+
+	sync.RWMutex
+	Metrics map[uint32]map[schema.Key]*AggMetric
 }
 
 func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bool, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
@@ -66,8 +67,8 @@ func (ms *AggMetrics) GC() {
 		ms.RUnlock()
 		for _, org := range orgs {
 			orgActiveMetrics := promActiveMetrics.WithLabelValues(strconv.Itoa(int(org)))
-			keys := make([]schema.Key, 0, len(ms.Metrics[org]))
 			ms.RLock()
+			keys := make([]schema.Key, 0, len(ms.Metrics[org]))
 			for k := range ms.Metrics[org] {
 				keys = append(keys, k)
 			}
@@ -92,8 +93,8 @@ func (ms *AggMetrics) GC() {
 			}
 			ms.RLock()
 			orgActive := len(ms.Metrics[org])
-			orgActiveMetrics.Set(float64(orgActive))
 			ms.RUnlock()
+			orgActiveMetrics.Set(float64(orgActive))
 
 			// If this org has no keys, then delete the org from the map
 			if orgActive == 0 {
