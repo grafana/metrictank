@@ -13,14 +13,14 @@ type runStats struct {
 }
 
 func (r *runStats) Print(runSeconds uint32) {
-	fmt.Println(fmt.Sprintf("Adds Completed: %d (%d / sec)", r.addsCompleted, r.addsCompleted/runSeconds))
-	fmt.Println(fmt.Sprintf("Queries Completed: %d (%d / sec)", r.queriesCompleted, r.queriesCompleted/runSeconds))
+	fmt.Printf("Adds Completed: %d (%d / sec)", r.addsCompleted, r.addsCompleted/runSeconds)
+	fmt.Printf("Queries Completed: %d (%d / sec)", r.queriesCompleted, r.queriesCompleted/runSeconds)
 
 	var queryTimeSum uint64
 	for _, queryTime := range r.queryTimes {
 		queryTimeSum += uint64(queryTime)
 	}
-	fmt.Println(fmt.Sprintf("Average query time: %d ns", queryTimeSum/uint64(r.queryTimeCursor)))
+	fmt.Printf("Average query time: %d ns", queryTimeSum/uint64(r.queryTimeCursor))
 }
 
 func (r *runStats) incAddsCompleted() uint32 {
