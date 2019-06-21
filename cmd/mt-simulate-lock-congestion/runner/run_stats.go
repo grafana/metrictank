@@ -1,7 +1,7 @@
 package runner
 
 import (
-	"fmt"
+	"log"
 	"sync/atomic"
 )
 
@@ -13,14 +13,14 @@ type runStats struct {
 }
 
 func (r *runStats) Print(runSeconds uint32) {
-	fmt.Printf("Adds Completed: %d (%d / sec)", r.addsCompleted, r.addsCompleted/runSeconds)
-	fmt.Printf("Queries Completed: %d (%d / sec)", r.queriesCompleted, r.queriesCompleted/runSeconds)
+	log.Printf("Adds Completed: %d (%d / sec)", r.addsCompleted, r.addsCompleted/runSeconds)
+	log.Printf("Queries Completed: %d (%d / sec)", r.queriesCompleted, r.queriesCompleted/runSeconds)
 
 	var queryTimeSum uint64
 	for _, queryTime := range r.queryTimes {
 		queryTimeSum += uint64(queryTime)
 	}
-	fmt.Printf("Average query time: %d ns", queryTimeSum/uint64(r.queryTimeCursor))
+	log.Printf("Average query time: %d ns", queryTimeSum/uint64(r.queryTimeCursor))
 }
 
 func (r *runStats) incAddsCompleted() uint32 {
