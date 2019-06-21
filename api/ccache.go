@@ -51,10 +51,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 			for _, pattern := range req.Patterns {
 				nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
 				if err != nil {
-					if res.Errors == 0 {
-						res.FirstError = err.Error()
-					}
-					res.Errors++
+					res.AddError(err)
 					code = http.StatusInternalServerError
 				} else {
 					toClear = append(toClear, nodes...)
@@ -63,24 +60,14 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		}
 
 		if len(req.Expr) > 0 {
-			var parsingError bool
 			expressions, err := tagQuery.ParseExpressions(req.Expr)
 			if err != nil {
-				parsingError = true
-				if res.Errors == 0 {
-					res.FirstError = err.Error()
-				}
-				res.Errors++
-				code = http.StatusInternalServerError
-			}
-
-			if !parsingError {
+				res.AddError(err)
+				code = http.StatusBadRequest
+			} else {
 				query, err := tagQuery.NewQuery(expressions, 0)
 				if err != nil {
-					if res.Errors == 0 {
-						res.FirstError = err.Error()
-					}
-					res.Errors++
+					res.AddError(err)
 					code = http.StatusInternalServerError
 				} else {
 					nodes := s.MetricIndex.FindByTag(req.OrgId, query)
