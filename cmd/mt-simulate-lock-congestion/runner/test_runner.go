@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -20,24 +21,30 @@ type TestRun struct {
 	stats                 runStats
 	addsPerSec            uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
 	addThreads            uint32 // number of concurrent add threads
+	addSampleFactor       uint32 // how often to print info about a completed add
+	initialIndexSize      uint32 // prepopulate the index with the defined number of entries before starting the actual test run
 	queriesPerSec         uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
 	queryThreads          uint32 // number of concurrent query threads
+	querySampleFactor     uint32 // how often to print info about a completed query
 	runDuration           time.Duration
 }
 
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(addsPerSec, addThreads, queriesPerSec, queryThreads uint32, runDuration time.Duration) *TestRun {
+func NewTestRun(addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, queryThreads, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	runner := TestRun{
 		stats:                 runStats{queryTimes: make([]uint32, queriesPerSec*uint32(runDuration.Seconds()))},
 		index:                 memory.New(),
-		metricNameGenerator:   newMetricNameGenerator(),
+		metricNameGenerator:   newIncreasingNumberNameGenerator(),
 		queryPatternGenerator: newQueryPatternGenerator(),
 		addsPerSec:            addsPerSec,
 		addThreads:            addThreads,
+		addSampleFactor:       addSampleFactor,
+		initialIndexSize:      initialIndexSize,
 		queriesPerSec:         queriesPerSec,
 		queryThreads:          queryThreads,
+		querySampleFactor:     querySampleFactor,
 		runDuration:           runDuration,
 	}
 
@@ -47,6 +54,10 @@ func NewTestRun(addsPerSec, addThreads, queriesPerSec, queryThreads uint32, runD
 // Run executes the run
 func (t *TestRun) Run() {
 	mainCtx, cancel := context.WithCancel(context.Background())
+	t.metricNameGenerator.start(mainCtx, t.addThreads)
+
+	log.Printf("Prepopulating the index with %d entries", t.initialIndexSize)
+	t.prepopulateIndex()
 
 	// wait group to wait until all routines have been started
 	startedWg := sync.WaitGroup{}
@@ -66,14 +77,32 @@ func (t *TestRun) Run() {
 
 	startedWg.Wait()
 
+	log.Print("Starting the benchmark")
+
 	// as soon as all routines have started, we start the timer
 	<-time.After(t.runDuration)
 	cancel()
+	addThreads.Wait()
+	queryThreads.Wait()
 }
 
 // PrintStats writes all the statistics in human readable format into stdout
 func (t *TestRun) PrintStats() {
 	t.stats.Print(uint32(t.runDuration.Seconds()))
+}
+
+func (t *TestRun) prepopulateIndex() {
+	for i := uint32(0); i < t.initialIndexSize; i++ {
+		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time.Now().Unix()), Mtype: "gauge"}
+		md.Name = t.metricNameGenerator.getNewMetricName()
+		md.SetId()
+		key, err := schema.MKeyFromString(md.Id)
+		if err != nil {
+			log.Fatalf("Unexpected error when generating MKey from ID string: %s", err)
+		}
+
+		t.index.AddOrUpdate(key, &md, int32(i%t.addThreads))
+	}
 }
 
 func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, routineID uint32) func() error {
@@ -89,7 +118,11 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 		}
 
 		t.index.AddOrUpdate(key, &md, partitionID)
-		t.stats.incAddsCompleted()
+		adds := t.stats.incAddsCompleted()
+		if adds%t.addSampleFactor == 0 {
+			log.Printf("Sample: added metric name to index %s", md.Name)
+		}
+
 		return nil
 	}
 
@@ -118,6 +151,8 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 	}
 
 	return func() error {
+		startedWg.Done()
+
 		for i := 0; ; i++ {
 			select {
 			case <-ctx.Done():
@@ -137,7 +172,10 @@ func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) f
 		pre := time.Now()
 		_, err := t.index.Find(orgID, pattern, 0)
 		t.stats.addQueryTime(uint32(time.Now().Sub(pre).Nanoseconds() / int64(1000000)))
-		t.stats.incQueriesCompleted()
+		queries := t.stats.incQueriesCompleted()
+		if queries%t.querySampleFactor == 0 {
+			log.Printf("Sample: queried for pattern %s", pattern)
+		}
 		return err
 	}
 
@@ -166,6 +204,8 @@ func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) f
 	}
 
 	return func() error {
+		startedWg.Done()
+
 		for {
 			select {
 			case <-ctx.Done():

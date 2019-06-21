@@ -23,12 +23,12 @@ func (r *runStats) Print(runSeconds uint32) {
 	fmt.Println(fmt.Sprintf("Average query time: %d ns", queryTimeSum/uint64(r.queryTimeCursor)))
 }
 
-func (r *runStats) incAddsCompleted() {
-	atomic.AddUint32(&r.addsCompleted, 1)
+func (r *runStats) incAddsCompleted() uint32 {
+	return atomic.AddUint32(&r.addsCompleted, 1)
 }
 
-func (r *runStats) incQueriesCompleted() {
-	atomic.AddUint32(&r.queriesCompleted, 1)
+func (r *runStats) incQueriesCompleted() uint32 {
+	return atomic.AddUint32(&r.queriesCompleted, 1)
 }
 
 func (r *runStats) addQueryTime(time uint32) {
