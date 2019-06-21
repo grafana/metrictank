@@ -71,10 +71,10 @@ func (c *NotifierKafka) start() {
 
 	// | scenario                   | offsetOldest  | offsetNewest | offsetTime
 	// ------------------------------------------------------------------------------------------------------------------------------
-	// | new empty partition        | error         | 0            | error
-	// | new with messages          | 0             | validOffset  | validOffset or error if offsetTime is earlier than first message
-	// | existing with messages     | validOffset   | validOffset  | validOffset
-	// | existing with no messages  | error         | validOffset  | error
+	// | new empty partition        | 0             | 0            | -1
+	// | new with messages          | 0             | validOffset  | validOffset
+	// | existing with messages     | 0             | validOffset  | validOffset
+	// | existing with no messages  | 0             | 0            | -1
 	// ------------------------------------------------------------------------------------------------------------------------------
 
 	// getOffsetFor takes an offset string and a partition id, then it tries to get the according offset
@@ -197,7 +197,13 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, startOff
 	messages := pc.Messages()
 	ticker := time.NewTicker(5 * time.Second)
 
-	lastReadOffset := startOffset - 1
+	var lastReadOffset int64
+	if startOffset < 0 {
+		log.Infof("kafka-cluster: empty partition")
+		lastReadOffset = -1
+	} else {
+		lastReadOffset = startOffset - 1
+	}
 	lastAvailableOffsetAtStartup, err := c.getLastAvailableOffset(topic, partition)
 	if err != nil {
 		log.Fatalf("kafka-cluster: failed to get newest offset for topic %s part %d: %s", topic, partition, err)
