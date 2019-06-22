@@ -199,7 +199,7 @@ func (c *NotifierKafka) consumePartition(topic string, partition int32, startOff
 
 	var lastReadOffset int64
 	if startOffset < 0 {
-		log.Infof("kafka-cluster: empty partition")
+		log.Infof("kafka-cluster: empty partition: %d topic: %s\n", partition, topic)
 		lastReadOffset = -1
 	} else {
 		lastReadOffset = startOffset - 1
