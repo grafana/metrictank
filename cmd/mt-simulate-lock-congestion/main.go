@@ -10,12 +10,16 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/metricname"
+
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/runner"
 	"github.com/grafana/metrictank/idx/memory"
 )
 
 var (
+	nameGeneratorType    = flag.String("name-generator", "increasing-number", "select name generator (increasing-number|file)")
+	nameGeneratorArgs    = flag.String("name-generator-args", "", "args to pass to the name generator")
 	addsPerSec           = flag.Int("adds-per-sec", 100000, "Metric add operations per second")
 	addThreads           = flag.Int("add-threads", 10, "Number of threads to concurrently try adding metrics into the index")
 	addSampleFactor      = flag.Int("add-sample-factor", 100000, "how often to print a sample metric name that we added")
@@ -59,7 +63,23 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	testRun := runner.NewTestRun(uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*queryThreads), uint32(*querySampleFactor), *runDuration)
+	var nameGenerator metricname.NameGenerator
+	switch *nameGeneratorType {
+	case "increasingNumber":
+		nameGenerator = metricname.NewIncreasingNumberGenerator()
+	case "file":
+		if len(*nameGeneratorArgs) == 0 {
+			log.Fatalf("Requiring the file name")
+		}
+		nameGenerator, err = metricname.NewFileGenerator(*nameGeneratorArgs)
+	default:
+		log.Fatalf("Unknown name generator: %s", *nameGeneratorType)
+	}
+	if err != nil {
+		log.Fatalf("Error when instantiating name generator: %s", err)
+	}
+
+	testRun := runner.NewTestRun(nameGenerator, uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*queryThreads), uint32(*querySampleFactor), *runDuration)
 	testRun.Run()
 	testRun.PrintStats()
 
