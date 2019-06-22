@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/metricname"
+
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/raintank/schema"
@@ -16,7 +18,7 @@ import (
 // TestRun represents one test run, including all the structures used for the test
 type TestRun struct {
 	index                 idx.MetricIndex
-	metricNameGenerator   metricNameGenerator
+	metricNameGenerator   metricname.NameGenerator
 	queryPatternGenerator queryPatternGenerator
 	stats                 runStats
 	addsPerSec            uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
@@ -32,11 +34,11 @@ type TestRun struct {
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, queryThreads, querySampleFactor uint32, runDuration time.Duration) *TestRun {
+func NewTestRun(nameGenerator metricname.NameGenerator, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, queryThreads, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	runner := TestRun{
 		stats:                 runStats{queryTimes: make([]uint32, queriesPerSec*uint32(runDuration.Seconds()))},
 		index:                 memory.New(),
-		metricNameGenerator:   newIncreasingNumberNameGenerator(),
+		metricNameGenerator:   nameGenerator,
 		queryPatternGenerator: newQueryPatternGenerator(),
 		addsPerSec:            addsPerSec,
 		addThreads:            addThreads,
@@ -54,7 +56,9 @@ func NewTestRun(addsPerSec, addThreads, addSampleFactor, initialIndexSize, queri
 // Run executes the run
 func (t *TestRun) Run() {
 	mainCtx, cancel := context.WithCancel(context.Background())
-	t.metricNameGenerator.start(mainCtx, t.addThreads)
+
+	log.Printf("Starting the metric name generator")
+	t.metricNameGenerator.Start(mainCtx, t.addThreads)
 
 	log.Printf("Prepopulating the index with %d entries", t.initialIndexSize)
 	t.prepopulateIndex()
@@ -76,7 +80,6 @@ func (t *TestRun) Run() {
 	}
 
 	startedWg.Wait()
-
 	log.Printf("Starting the benchmark with %d add-threads and %d query-threads", t.addThreads, t.queryThreads)
 
 	// as soon as all routines have started, we start the timer
@@ -94,7 +97,7 @@ func (t *TestRun) PrintStats() {
 func (t *TestRun) prepopulateIndex() {
 	for i := uint32(0); i < t.initialIndexSize; i++ {
 		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time.Now().Unix()), Mtype: "gauge"}
-		md.Name = t.metricNameGenerator.getNewMetricName()
+		md.Name = t.metricNameGenerator.GetNewMetricName()
 		md.SetId()
 		key, err := schema.MKeyFromString(md.Id)
 		if err != nil {
@@ -110,7 +113,7 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 
 	addEntryToIndex := func(time int) error {
 		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time), Mtype: "gauge"}
-		md.Name = t.metricNameGenerator.getNewMetricName()
+		md.Name = t.metricNameGenerator.GetNewMetricName()
 		md.SetId()
 		key, err := schema.MKeyFromString(md.Id)
 		if err != nil {
@@ -168,7 +171,7 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 
 func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) func() error {
 	queryIndex := func() error {
-		pattern := t.queryPatternGenerator.getPattern(t.metricNameGenerator.getExistingMetricName())
+		pattern := t.queryPatternGenerator.getPattern(t.metricNameGenerator.GetExistingMetricName())
 		pre := time.Now()
 		_, err := t.index.Find(orgID, pattern, 0)
 		t.stats.addQueryTime(uint32(time.Now().Sub(pre).Nanoseconds() / int64(1000000)))
