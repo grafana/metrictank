@@ -37,7 +37,7 @@ const orgID = 1
 
 // NewTestRun Instantiates a new test run
 func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addDelay, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
-	totalQueryCount := queriesPerSec * uint32(runDuration.Seconds())
+	totalQueryCount := (queriesPerSec + addDelay) * uint32(runDuration.Seconds())
 
 	runner := TestRun{
 		stats:                 newRunStats(totalQueryCount),
