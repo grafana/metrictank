@@ -25,6 +25,7 @@ type TestRun struct {
 	addsPerSec            uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
 	addThreads            uint32 // number of concurrent add threads
 	addSampleFactor       uint32 // how often to print info about a completed add
+	addDelay              uint32 // once the benchmark starts the querying threads start, if addDelay is >0 then the adding into the index is delayed by the given number of seconds
 	initialIndexSize      uint32 // prepopulate the index with the defined number of entries before starting the actual test run
 	queriesPerSec         uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
 	querySampleFactor     uint32 // how often to print info about a completed query
@@ -35,7 +36,7 @@ type TestRun struct {
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
+func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addDelay, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	totalQueryCount := queriesPerSec * uint32(runDuration.Seconds())
 
 	runner := TestRun{
@@ -47,6 +48,7 @@ func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.Que
 		addsPerSec:            addsPerSec,
 		addThreads:            addThreads,
 		addSampleFactor:       addSampleFactor,
+		addDelay:              addDelay,
 		initialIndexSize:      initialIndexSize,
 		queriesPerSec:         queriesPerSec,
 		querySampleFactor:     querySampleFactor,
@@ -71,16 +73,17 @@ func (t *TestRun) Run() {
 
 	// wait group to wait until all routines have been started
 	startedWg := sync.WaitGroup{}
-
 	workerThreads, workerCtx := errgroup.WithContext(mainCtx)
-	startedWg.Add(int(t.addThreads))
-	for i := uint32(0); i < t.addThreads; i++ {
-		workerThreads.Go(t.addRoutine(workerCtx, &startedWg, i))
-	}
 
 	startedWg.Add(1)
 	workerThreads.Go(t.queryRoutine(workerCtx, &startedWg))
 
+	<-time.After(time.Second * time.Duration(t.addDelay))
+
+	startedWg.Add(int(t.addThreads))
+	for i := uint32(0); i < t.addThreads; i++ {
+		workerThreads.Go(t.addRoutine(workerCtx, &startedWg, i))
+	}
 	startedWg.Wait()
 	log.Printf("Benchmark has started")
 
