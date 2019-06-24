@@ -25,7 +25,6 @@ var (
 	addSampleFactor      = flag.Int("add-sample-factor", 100000, "how often to print a sample metric name that we added")
 	initialIndexSize     = flag.Int("initial-index-size", 1000000, "prepopulate the index with the defined number of metrics before starting the benchmark")
 	queriesPerSec        = flag.Int("queries-per-sec", 100, "Index queries per second")
-	queryThreads         = flag.Int("query-threads", 2, "Number of threads to concurrently query the index")
 	querySampleFactor    = flag.Int("query-sample-factor", 100, "how often to print a sample query")
 	runDuration          = flag.Duration("run-duration", time.Second*10, "How long we want the test to run")
 	profileNamePrefix    = flag.String("profile-name-prefix", "profile", "Prefix to prepend before profile file names")
@@ -79,7 +78,7 @@ func main() {
 		log.Fatalf("Error when instantiating name generator: %s", err)
 	}
 
-	testRun := runner.NewTestRun(nameGenerator, uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*queryThreads), uint32(*querySampleFactor), *runDuration)
+	testRun := runner.NewTestRun(nameGenerator, uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*querySampleFactor), *runDuration)
 	testRun.Run()
 	testRun.PrintStats()
 
