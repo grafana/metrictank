@@ -61,6 +61,9 @@ var (
 	findCacheInvalidateMaxSize   = 100
 	findCacheInvalidateMaxWait   = 5 * time.Second
 	findCacheBackoffTime         = time.Minute
+	writeQueueEnabled            = false
+	writeQueueDelay              = 30 * time.Second
+	writeMaxBatchSize            = 5000
 )
 
 func ConfigSetup() {
@@ -73,6 +76,9 @@ func ConfigSetup() {
 	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
+	memoryIdx.BoolVar(&writeQueueEnabled, "write-queue-enabled", false, "enable buffering new metricDefinitions and writing them to the index in batches")
+	memoryIdx.DurationVar(&writeQueueDelay, "write-queue-delay", 30*time.Second, "maximum delay between flushing buffered metric writes to the index")
+	memoryIdx.IntVar(&writeMaxBatchSize, "write-max-batch-size", 5000, "maximum number of metricDefinitions that can be added to the index in a single batch")
 	memoryIdx.DurationVar(&findCacheInvalidateMaxWait, "find-cache-invalidate-max-wait", 5*time.Second, "max duration to wait building up a batch to invalidate")
 	memoryIdx.DurationVar(&findCacheBackoffTime, "find-cache-backoff-time", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
@@ -109,8 +115,8 @@ func ConfigProcess() {
 type MemoryIndex interface {
 	idx.MetricIndex
 	LoadPartition(int32, []schema.MetricDefinition) int
-	UpdateArchive(idx.Archive)
-	add(*schema.MetricDefinition) idx.Archive
+	UpdateArchiveLastSave(schema.MKey, int32, uint32)
+	add(*idx.Archive)
 	idsByTagQuery(uint32, TagQuery) IdSet
 	PurgeFindCache()
 	ForceInvalidationFindCache()
@@ -254,10 +260,12 @@ type UnpartitionedMemoryIdx struct {
 	metaTagRecords map[uint32]metaTagRecords // by orgId
 
 	findCache *FindCache
+
+	writeQueue *WriteQueue
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
-	m := UnpartitionedMemoryIdx{
+	m := &UnpartitionedMemoryIdx{
 		defById:        make(map[schema.MKey]*idx.Archive),
 		defByTagSet:    make(defByTagSet),
 		tree:           make(map[uint32]*Tree),
@@ -265,12 +273,15 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
 	}
-	return &m
+	return m
 }
 
 func (m *UnpartitionedMemoryIdx) Init() error {
 	if findCacheSize > 0 {
 		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
+	}
+	if writeQueueEnabled {
+		m.writeQueue = NewWriteQueue(m, writeQueueDelay, writeMaxBatchSize)
 	}
 	return nil
 }
@@ -279,6 +290,10 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 	if m.findCache != nil {
 		m.findCache.Shutdown()
 		m.findCache = nil
+	}
+	if m.writeQueue != nil {
+		m.writeQueue.Stop()
+		m.writeQueue = nil
 	}
 	return
 }
@@ -303,7 +318,6 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 	pre := time.Now()
 
 	m.RLock()
-	defer m.RUnlock()
 
 	existing, ok := m.defById[point.MKey]
 	if ok {
@@ -316,7 +330,44 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 		oldPart := atomic.SwapInt32(&existing.Partition, partition)
 		statUpdate.Inc()
 		statUpdateDuration.Value(time.Since(pre))
+		m.RUnlock()
 		return *existing, oldPart, true
+	}
+	m.RUnlock()
+
+	if m.writeQueue != nil {
+		// if we are using the writeQueue, then the archive for this MKey might be queued
+		// and not yet flushed to the index yet.
+		existing, ok := m.writeQueue.Get(point.MKey)
+		if ok {
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("memory-idx: metricDef with id %v is in the writeQueue", point.MKey)
+			}
+
+			bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
+
+			oldPart := atomic.SwapInt32(&existing.Partition, partition)
+			statUpdate.Inc()
+			statUpdateDuration.Value(time.Since(pre))
+			return *existing, oldPart, true
+		}
+
+		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
+		// when we released m.RLock() and when the call to m.writeQueue.Get() as able to obtain its own lock.
+		existing, ok = m.defById[point.MKey]
+		if ok {
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
+			}
+
+			bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
+
+			oldPart := atomic.SwapInt32(&existing.Partition, partition)
+			statUpdate.Inc()
+			statUpdateDuration.Value(time.Since(pre))
+			m.RUnlock()
+			return *existing, oldPart, true
+		}
 	}
 
 	return idx.Archive{}, 0, false
@@ -345,26 +396,34 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 	}
 
 	m.RUnlock()
-	m.Lock()
-	defer m.Unlock()
-
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	archive := m.add(def)
-	statMetricsActive.Inc()
-	statAddDuration.Value(time.Since(pre))
+	archive := getArchive(def)
+	if m.writeQueue == nil {
+		m.Lock()
+		m.add(archive)
+		m.Unlock()
+		statMetricsActive.Inc()
+		statAddDuration.Value(time.Since(pre))
+	} else {
+		// push the new archive into the writeQueue
+		m.writeQueue.Queue(archive)
+	}
 
-	return archive, 0, false
+	return *archive, 0, false
 }
 
-// UpdateArchive updates the archive information
-func (m *UnpartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
-	m.Lock()
-	defer m.Unlock()
-	if _, ok := m.defById[archive.Id]; !ok {
+// UpdateArchiveLastSave updates the LastSave timestamp of the archive
+func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition int32, lastSave uint32) {
+	m.RLock()
+	if _, ok := m.defById[id]; !ok {
+		// This will happen if the metricDefinition was saved to a backend store
+		// before the archive was added to the index.
+		m.RUnlock()
 		return
 	}
-	*(m.defById[archive.Id]) = archive
+	atomic.StoreUint32(&m.defById[id].LastSave, lastSave)
+	m.RUnlock()
 }
 
 // MetaTagRecordUpsert inserts or updates a meta record, depending on whether
@@ -530,7 +589,7 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 			continue
 		}
 
-		m.add(def)
+		m.add(getArchive(def))
 
 		// as we are loading the metricDefs from a persistent store, set the lastSave
 		// to the lastUpdate timestamp.  This won't exactly match the true lastSave Timstamp,
@@ -545,24 +604,38 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 	return num
 }
 
-func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
+func getArchive(def *schema.MetricDefinition) *idx.Archive {
 	path := def.NameWithTags()
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
 	irId, _ := IndexRules.Match(path)
 
-	archive := &idx.Archive{
+	return &idx.Archive{
 		MetricDefinition: *def,
 		SchemaId:         schemaId,
 		AggId:            aggId,
 		IrId:             irId,
 	}
+}
+
+func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
+	// there is a race condition that can lead to an archive being added
+	// to the writeQueue just after a queued copy of the archive was flushed.
+	// If that happens, we update the contents of the passed 'archive' to be
+	// the contents of the 'existing' archive found.
+	if existing, ok := m.defById[archive.Id]; ok {
+		*archive = *existing
+		return
+	}
+
+	def := &archive.MetricDefinition
+	path := def.NameWithTags()
 
 	if TagSupport {
 		// Even if there are no tags, index at least "name". It's important to use the definition
 		// in the archive pointer that we add to defById, because the pointers must reference the
 		// same underlying object in m.defById and m.defByTagSet
-		m.indexTags(&archive.MetricDefinition)
+		m.indexTags(def)
 
 		if len(def.Tags) > 0 {
 			if _, ok := m.defById[def.Id]; !ok {
@@ -570,7 +643,7 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 				statAdd.Inc()
 				log.Debugf("memory-idx: adding %s to DefById", path)
 			}
-			return *archive
+			return
 		}
 	}
 
@@ -602,7 +675,7 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 			node.Defs = append(node.Defs, def.Id)
 			m.defById[def.Id] = archive
 			statAdd.Inc()
-			return *archive
+			return
 		}
 	}
 
@@ -649,7 +722,7 @@ func (m *UnpartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
 	m.defById[def.Id] = archive
 	statAdd.Inc()
 
-	return *archive
+	return
 }
 
 func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
@@ -1140,7 +1213,10 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 						log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
 						continue
 					}
-					log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, def.LastSave)
+					if log.IsLevelEnabled(log.DebugLevel) {
+						lastSave := atomic.LoadUint32(&def.LastSave)
+						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
+					}
 					idxNode.Defs = append(idxNode.Defs, *def)
 				}
 				if len(idxNode.Defs) == 0 {

@@ -1228,7 +1228,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 	defer ix.Stop()
 
 	data := make([]*schema.MetricDefinition, 10)
-	archives := make([]idx.Archive, 10)
+	archives := make([]*idx.Archive, 10)
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &schema.MetricDefinition{
@@ -1239,7 +1239,8 @@ func testMatchSchemaWithTags(t *testing.T) {
 			Partition: getPartitionFromName(name),
 		}
 		data[i].SetId()
-		archives[i] = ix.add(data[i])
+		archives[i] = getArchive(data[i])
+		ix.add(archives[i])
 	}
 
 	// only those MDs with tag1=value3 or tag1=value5 should get the first schema id
