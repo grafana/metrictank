@@ -26,17 +26,17 @@ type TestRun struct {
 	addSampleFactor       uint32 // how often to print info about a completed add
 	initialIndexSize      uint32 // prepopulate the index with the defined number of entries before starting the actual test run
 	queriesPerSec         uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
-	queryThreads          uint32 // number of concurrent query threads
 	querySampleFactor     uint32 // how often to print info about a completed query
+	totalQueryCount       uint32 // the total number of queries we will start
 	runDuration           time.Duration
 }
 
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(nameGenerator metricname.NameGenerator, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, queryThreads, querySampleFactor uint32, runDuration time.Duration) *TestRun {
+func NewTestRun(nameGenerator metricname.NameGenerator, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	runner := TestRun{
-		stats:                 newRunStats(queriesPerSec * uint32(runDuration.Seconds())),
+		totalQueryCount:       queriesPerSec * uint32(runDuration.Seconds()),
 		index:                 memory.New(),
 		metricNameGenerator:   nameGenerator,
 		queryPatternGenerator: newQueryPatternGenerator(),
@@ -45,10 +45,10 @@ func NewTestRun(nameGenerator metricname.NameGenerator, addsPerSec, addThreads, 
 		addSampleFactor:       addSampleFactor,
 		initialIndexSize:      initialIndexSize,
 		queriesPerSec:         queriesPerSec,
-		queryThreads:          queryThreads,
 		querySampleFactor:     querySampleFactor,
 		runDuration:           runDuration,
 	}
+	runner.stats = newRunStats(runner.totalQueryCount)
 
 	return &runner
 }
@@ -66,27 +66,22 @@ func (t *TestRun) Run() {
 	// wait group to wait until all routines have been started
 	startedWg := sync.WaitGroup{}
 
-	addThreads, addCtx := errgroup.WithContext(mainCtx)
+	workerThreads, workerCtx := errgroup.WithContext(mainCtx)
 	startedWg.Add(int(t.addThreads))
 	for i := uint32(0); i < t.addThreads; i++ {
-		addThreads.Go(t.addRoutine(addCtx, &startedWg, i))
+		workerThreads.Go(t.addRoutine(workerCtx, &startedWg, i))
 	}
 
-	queryThreads, queryCtx := errgroup.WithContext(mainCtx)
-	queryRoutine := t.queryRoutine(queryCtx, &startedWg)
-	startedWg.Add(int(t.queryThreads))
-	for i := uint32(0); i < t.queryThreads; i++ {
-		queryThreads.Go(queryRoutine)
-	}
+	startedWg.Add(1)
+	workerThreads.Go(t.queryRoutine(workerCtx, &startedWg))
 
 	startedWg.Wait()
-	log.Printf("Starting the benchmark with %d add-threads and %d query-threads", t.addThreads, t.queryThreads)
+	log.Printf("Benchmark has started")
 
 	// as soon as all routines have started, we start the timer
 	<-time.After(t.runDuration)
 	cancel()
-	addThreads.Wait()
-	queryThreads.Wait()
+	workerThreads.Wait()
 }
 
 // PrintStats writes all the statistics in human readable format into stdout
@@ -170,54 +165,37 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 }
 
 func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) func() error {
-	queryIndex := func() error {
-		pattern := t.queryPatternGenerator.getPattern(t.metricNameGenerator.GetExistingMetricName())
-		pre := time.Now()
-		_, err := t.index.Find(orgID, pattern, 0)
-		t.stats.addQueryTime(time.Now().Sub(pre))
-		queries := t.stats.incQueriesCompleted()
-		if queries%t.querySampleFactor == 0 {
-			log.Printf("Sample: queried for pattern %s", pattern)
-		}
-		return err
-	}
-
-	if t.queriesPerSec > 0 {
-		interval := time.Duration(int64(1000000000) * int64(t.queryThreads) / int64(t.queriesPerSec))
-
-		return func() error {
-			ticker := time.NewTicker(interval)
-			go func() {
-				<-ctx.Done()
-				ticker.Stop()
-			}()
-
-			startedWg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-ticker.C:
-					if err := queryIndex(); err != nil {
-						return err
-					}
-				}
-			}
-		}
-	}
-
 	return func() error {
+		ticker := time.NewTicker(time.Duration(int64(float64(1000000000) / float64(t.queriesPerSec))))
 		startedWg.Done()
-
 		for {
 			select {
 			case <-ctx.Done():
 				return nil
-			default:
-				if err := queryIndex(); err != nil {
-					return err
-				}
+			case <-ticker.C:
+				go t.runQuery()
 			}
 		}
+	}
+}
+
+func (t *TestRun) runQuery() {
+	pattern := t.queryPatternGenerator.getPattern(t.metricNameGenerator.GetExistingMetricName())
+	pre := time.Now()
+
+	queryStartedID := t.stats.incQueriesStarted()
+	if queryStartedID > t.totalQueryCount {
+		return
+	}
+
+	_, err := t.index.Find(orgID, pattern, 0)
+	if err != nil {
+		log.Printf("Warning: Query failed with error: %s", err)
+	}
+
+	queryCompletedID := t.stats.incQueriesCompleted()
+	t.stats.addQueryTime(queryCompletedID, time.Now().Sub(pre))
+	if queryCompletedID%t.querySampleFactor == 0 {
+		log.Printf("Sample: queried for pattern %s", pattern)
 	}
 }
