@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/query"
+	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/reader"
+
 	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/metricname"
 
 	"github.com/grafana/globalconf"
@@ -20,6 +23,8 @@ import (
 var (
 	nameGeneratorType    = flag.String("name-generator", "increasing-number", "select name generator (increasing-number|file)")
 	nameGeneratorArgs    = flag.String("name-generator-args", "", "args to pass to the name generator")
+	queryGeneratorType   = flag.String("query-generator", "increasing-number", "select query generator (node-replacer|file)")
+	queryGeneratorArgs   = flag.String("query-generator-args", "", "args to pass to the query generator")
 	addsPerSec           = flag.Int("adds-per-sec", 100000, "Metric add operations per second")
 	addThreads           = flag.Int("add-threads", 10, "Number of threads to concurrently try adding metrics into the index")
 	addSampleFactor      = flag.Int("add-sample-factor", 100000, "how often to print a sample metric name that we added")
@@ -67,10 +72,11 @@ func main() {
 	case "increasingNumber":
 		nameGenerator = metricname.NewIncreasingNumberGenerator()
 	case "file":
-		if len(*nameGeneratorArgs) == 0 {
-			log.Fatalf("Requiring the file name")
+		reader, err := reader.NewFileReader(*nameGeneratorArgs)
+		if err != nil {
+			log.Fatalf("Failed to instantiate file reader: %s", err)
 		}
-		nameGenerator, err = metricname.NewFileGenerator(*nameGeneratorArgs)
+		nameGenerator, err = metricname.NewFileGenerator(reader)
 	default:
 		log.Fatalf("Unknown name generator: %s", *nameGeneratorType)
 	}
@@ -78,7 +84,26 @@ func main() {
 		log.Fatalf("Error when instantiating name generator: %s", err)
 	}
 
-	testRun := runner.NewTestRun(nameGenerator, uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*querySampleFactor), *runDuration)
+	var queryGenerator query.QueryGenerator
+	switch *queryGeneratorType {
+	case "nodeReplacer":
+		valueBuffer := metricname.NewReturnedNamesBuffer(nameGenerator, 1000)
+		queryGenerator = query.NewNodeReplacer(valueBuffer.GetReturnedValue)
+		nameGenerator = valueBuffer
+	case "file":
+		reader, err := reader.NewFileReader(*queryGeneratorArgs)
+		if err != nil {
+			log.Fatalf("Failed to instantiate file reader: %s", err)
+		}
+		queryGenerator, err = query.NewQueriesFromFile(reader)
+	default:
+		log.Fatalf("Unknown query generator: %s", *queryGeneratorType)
+	}
+	if err != nil {
+		log.Fatalf("Error when instantiating query generator: %s", err)
+	}
+
+	testRun := runner.NewTestRun(nameGenerator, queryGenerator, uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*querySampleFactor), *runDuration)
 	testRun.Run()
 	testRun.PrintStats()
 
