@@ -10,9 +10,6 @@ type NameGenerator interface {
 	// writes a new metric name into the builder which has not been used yet
 	GetNewMetricName() string
 
-	// writes a metric name into the builder which has already been returned by getNewMetricName()
-	GetExistingMetricName() string
-
 	// starts the metric name generator
 	Start(ctx context.Context, threadCount uint32)
 }

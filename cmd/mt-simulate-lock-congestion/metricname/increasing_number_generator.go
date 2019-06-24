@@ -10,9 +10,8 @@ import (
 )
 
 type increasingNumberGenerator struct {
-	lastUsedID    uint64
-	lastUsedValue atomic.Value
-	nameChan      chan string
+	lastUsedID uint64
+	nameChan   chan string
 }
 
 func NewIncreasingNumberGenerator() NameGenerator {
@@ -21,12 +20,7 @@ func NewIncreasingNumberGenerator() NameGenerator {
 
 func (s *increasingNumberGenerator) GetNewMetricName() string {
 	name := <-s.nameChan
-	s.lastUsedValue.Store(name)
 	return name
-}
-
-func (s *increasingNumberGenerator) GetExistingMetricName() string {
-	return <-s.nameChan
 }
 
 func (s *increasingNumberGenerator) Start(ctx context.Context, threadCount uint32) {
