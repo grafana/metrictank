@@ -43,14 +43,13 @@ func (s *FuncSubstr) Exec(cache map[Req][]models.Series) ([]models.Series, error
 		return nil, err
 	}
 
-	out := make([]models.Series, len(series))
-	for i, serie := range series {
-		left := strings.LastIndex(serie.Target, "(") + 1
-		right := strings.Index(serie.Target, ")")
+	for i := range series {
+		left := strings.LastIndex(series[i].Target, "(") + 1
+		right := strings.Index(series[i].Target, ")")
 		if right < 0 {
-			right = len(serie.Target)
+			right = len(series[i].Target)
 		}
-		cleanName := serie.Target[left:right]
+		cleanName := series[i].Target[left:right]
 		cleanName = strings.SplitN(cleanName, ",", 2)[0]
 
 		var name string
@@ -77,10 +76,8 @@ func (s *FuncSubstr) Exec(cache map[Req][]models.Series) ([]models.Series, error
 			name = strings.Join(strings.Split(cleanName, ".")[s.start:s.stop], ".")
 		}
 
-		serie.Target = name
-		out[i] = serie
-		cache[Req{}] = append(cache[Req{}], serie)
+		series[i].Target = name
 	}
 
-	return out, nil
+	return series, nil
 }
