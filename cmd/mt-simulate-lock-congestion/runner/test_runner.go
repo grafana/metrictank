@@ -36,7 +36,7 @@ const orgID = 1
 // NewTestRun Instantiates a new test run
 func NewTestRun(nameGenerator metricname.NameGenerator, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, queryThreads, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	runner := TestRun{
-		stats:                 runStats{queryTimes: make([]uint32, queriesPerSec*uint32(runDuration.Seconds()))},
+		stats:                 newRunStats(queriesPerSec * uint32(runDuration.Seconds())),
 		index:                 memory.New(),
 		metricNameGenerator:   nameGenerator,
 		queryPatternGenerator: newQueryPatternGenerator(),
@@ -174,7 +174,7 @@ func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) f
 		pattern := t.queryPatternGenerator.getPattern(t.metricNameGenerator.GetExistingMetricName())
 		pre := time.Now()
 		_, err := t.index.Find(orgID, pattern, 0)
-		t.stats.addQueryTime(uint32(time.Now().Sub(pre).Nanoseconds() / int64(1000000)))
+		t.stats.addQueryTime(time.Now().Sub(pre))
 		queries := t.stats.incQueriesCompleted()
 		if queries%t.querySampleFactor == 0 {
 			log.Printf("Sample: queried for pattern %s", pattern)
