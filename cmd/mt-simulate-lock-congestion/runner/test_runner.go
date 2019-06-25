@@ -2,13 +2,15 @@ package runner
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/metricname"
 	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/query"
+	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/input"
+	"github.com/grafana/metrictank/mdata"
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
@@ -19,6 +21,7 @@ import (
 // TestRun represents one test run, including all the structures used for the test
 type TestRun struct {
 	index                 idx.MetricIndex
+	handler               input.Handler
 	metricNameGenerator   metricname.NameGenerator
 	queryPatternGenerator query.QueryGenerator
 	stats                 runStats
@@ -39,10 +42,17 @@ const orgID = 1
 func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addDelay, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	totalQueryCount := (queriesPerSec + addDelay) * uint32(runDuration.Seconds())
 
+	index := memory.New()
+	// initializing with a `nil` store, that's a bit risky but good enough for the moment
+	mdata.Schemas = conf.NewSchemas(nil)
+	metrics := mdata.NewAggMetrics(nil, nil, false, 3600, 7200, 3600)
+	handler := input.NewDefaultHandler(metrics, index, "lock-congestion-simulator")
+
 	runner := TestRun{
+		index:                 index,
+		handler:               handler,
 		stats:                 newRunStats(totalQueryCount),
 		totalQueryCount:       totalQueryCount,
-		index:                 memory.New(),
 		metricNameGenerator:   nameGenerator,
 		queryPatternGenerator: queryGenerator,
 		addsPerSec:            addsPerSec,
@@ -119,12 +129,13 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time), Mtype: "gauge"}
 		md.Name = t.metricNameGenerator.GetNewMetricName()
 		md.SetId()
-		key, err := schema.MKeyFromString(md.Id)
-		if err != nil {
-			return fmt.Errorf("Unexpected error when generating MKey from ID string: %s", err)
-		}
+		// key, err := schema.MKeyFromString(md.Id)
+		// if err != nil {
+		// 	return fmt.Errorf("Unexpected error when generating MKey from ID string: %s", err)
+		// }
 
-		t.index.AddOrUpdate(key, &md, partitionID)
+		//t.index.AddOrUpdate(key, &md, partitionID)
+		t.handler.ProcessMetricData(&md, partitionID)
 		adds := t.stats.incAddsCompleted()
 		if adds%t.addSampleFactor == 0 {
 			log.Printf("Sample: added metric name to index %s", md.Name)
@@ -165,7 +176,7 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 			case <-ctx.Done():
 				return nil
 			default:
-				if err := addEntryToIndex(i); err != nil {
+				if err := addEntryToIndex(int(time.Now().Unix())); err != nil {
 					return err
 				}
 			}
