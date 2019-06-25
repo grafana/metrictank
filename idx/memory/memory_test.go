@@ -1239,7 +1239,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 			Partition: getPartitionFromName(name),
 		}
 		data[i].SetId()
-		archives[i] = getArchive(data[i])
+		archives[i] = createArchive(data[i])
 		ix.add(archives[i])
 	}
 

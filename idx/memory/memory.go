@@ -312,28 +312,32 @@ func bumpLastUpdate(loc *int64, newVal int64) {
 	}
 }
 
+// updates the partition and lastUpdate ts in an archive. Returns the previously set partition
+func updateExisting(existing *idx.Archive, partition int32, lastUpdate int64, pre time.Time) int32 {
+	bumpLastUpdate(&existing.LastUpdate, lastUpdate)
+
+	oldPart := atomic.SwapInt32(&existing.Partition, partition)
+	statUpdate.Inc()
+	statUpdateDuration.Value(time.Since(pre))
+	return oldPart
+}
+
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
 func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	m.RLock()
-
 	existing, ok := m.defById[point.MKey]
+	m.RUnlock()
 	if ok {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
 		}
 
-		bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
-
-		oldPart := atomic.SwapInt32(&existing.Partition, partition)
-		statUpdate.Inc()
-		statUpdateDuration.Value(time.Since(pre))
-		m.RUnlock()
-		return *existing, oldPart, true
+		oldPart := updateExisting(existing, partition, int64(point.Time), pre)
+		return CloneArchive(existing), oldPart, true
 	}
-	m.RUnlock()
 
 	if m.writeQueue != nil {
 		// if we are using the writeQueue, then the archive for this MKey might be queued
@@ -343,30 +347,21 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 			if log.IsLevelEnabled(log.DebugLevel) {
 				log.Debugf("memory-idx: metricDef with id %v is in the writeQueue", point.MKey)
 			}
-
-			bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
-
-			oldPart := atomic.SwapInt32(&existing.Partition, partition)
-			statUpdate.Inc()
-			statUpdateDuration.Value(time.Since(pre))
-			return *existing, oldPart, true
+			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
+			return CloneArchive(existing), oldPart, true
 		}
 
 		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
-		// when we released m.RLock() and when the call to m.writeQueue.Get() as able to obtain its own lock.
+		// when we released m.RLock() and when the call to m.writeQueue.Get() was able to obtain its own lock.
+		m.RLock()
 		existing, ok = m.defById[point.MKey]
+		m.RUnlock()
 		if ok {
 			if log.IsLevelEnabled(log.DebugLevel) {
 				log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
 			}
-
-			bumpLastUpdate(&existing.LastUpdate, int64(point.Time))
-
-			oldPart := atomic.SwapInt32(&existing.Partition, partition)
-			statUpdate.Inc()
-			statUpdateDuration.Value(time.Since(pre))
-			m.RUnlock()
-			return *existing, oldPart, true
+			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
+			return CloneArchive(existing), oldPart, true
 		}
 	}
 
@@ -379,51 +374,64 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	// Optimistically read lock
+	// we only need to a lock while reading the map. All future operations
 	m.RLock()
-
 	existing, ok := m.defById[mkey]
+	m.RUnlock()
 	if ok {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("memory-idx: metricDef with id %s already in index.", mkey)
 		}
-		bumpLastUpdate(&existing.LastUpdate, data.Time)
-		oldPart := atomic.SwapInt32(&existing.Partition, partition)
-		statUpdate.Inc()
-		statUpdateDuration.Value(time.Since(pre))
-		m.RUnlock()
-		return *existing, oldPart, ok
+		oldPart := updateExisting(existing, partition, data.Time, pre)
+		return CloneArchive(existing), oldPart, ok
 	}
-
-	m.RUnlock()
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
-	archive := getArchive(def)
+	archive := createArchive(def)
 	if m.writeQueue == nil {
+		// writeQueuing not enabled, so acquire a wlock and immediately add to the index.
 		m.Lock()
 		m.add(archive)
 		m.Unlock()
-		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
 	} else {
 		// push the new archive into the writeQueue
 		m.writeQueue.Queue(archive)
 	}
 
-	return *archive, 0, false
+	return CloneArchive(archive), 0, false
 }
 
 // UpdateArchiveLastSave updates the LastSave timestamp of the archive
 func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition int32, lastSave uint32) {
 	m.RLock()
-	if _, ok := m.defById[id]; !ok {
-		// This will happen if the metricDefinition was saved to a backend store
-		// before the archive was added to the index.
-		m.RUnlock()
+	existing, ok := m.defById[id]
+	m.RUnlock()
+	if ok {
+		atomic.StoreUint32(&existing.LastSave, lastSave)
 		return
 	}
-	atomic.StoreUint32(&m.defById[id].LastSave, lastSave)
-	m.RUnlock()
+	// The index may not have an entry for the id for the following reasons
+	// - the MetricDef has just been deleted from the index
+	// - the metricDef is waiting in the writeQueue and hasnt been added yet
+	if m.writeQueue != nil {
+		// if we are using the writeQueue, then the archive for this MKey might be queued
+		// and not yet flushed to the index yet.
+		existing, ok = m.writeQueue.Get(id)
+		if ok {
+			atomic.StoreUint32(&existing.LastSave, lastSave)
+			return
+		}
+		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
+		// when we released m.RLock() and when the call to m.writeQueue.Get() was able to obtain its own lock.
+		m.RLock()
+		existing, ok = m.defById[id]
+		m.RUnlock()
+		if ok {
+			atomic.StoreUint32(&existing.LastSave, lastSave)
+			return
+		}
+	}
 }
 
 // MetaTagRecordUpsert inserts or updates a meta record, depending on whether
@@ -589,7 +597,7 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 			continue
 		}
 
-		m.add(getArchive(def))
+		m.add(createArchive(def))
 
 		// as we are loading the metricDefs from a persistent store, set the lastSave
 		// to the lastUpdate timestamp.  This won't exactly match the true lastSave Timstamp,
@@ -598,13 +606,12 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 		// use case), then the value will be within a couple of seconds of the true lastSave.
 		m.defById[def.Id].LastSave = uint32(def.LastUpdate)
 		num++
-		statMetricsActive.Inc()
 		statAddDuration.Value(time.Since(pre))
 	}
 	return num
 }
 
-func getArchive(def *schema.MetricDefinition) *idx.Archive {
+func createArchive(def *schema.MetricDefinition) *idx.Archive {
 	path := def.NameWithTags()
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
@@ -621,12 +628,17 @@ func getArchive(def *schema.MetricDefinition) *idx.Archive {
 func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	// there is a race condition that can lead to an archive being added
 	// to the writeQueue just after a queued copy of the archive was flushed.
-	// If that happens, we update the contents of the passed 'archive' to be
-	// the contents of the 'existing' archive found.
+	// If that happens, we just do an update lastUpdate instead
 	if existing, ok := m.defById[archive.Id]; ok {
-		*archive = *existing
+		// We deliberately dont update existing.Partition as any change
+		// cant be passed back to the caller (cassandraIdx,BigtableIdx).
+		// If the partition has changed, then the next datapoint will update
+		// the partition and notify the caller of the change.
+		bumpLastUpdate(&existing.LastUpdate, archive.LastUpdate)
 		return
 	}
+
+	statMetricsActive.Inc()
 
 	def := &archive.MetricDefinition
 	path := def.NameWithTags()
@@ -732,7 +744,7 @@ func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	def, ok := m.defById[id]
 	statGetDuration.Value(time.Since(pre))
 	if ok {
-		return *def, ok
+		return CloneArchive(def), ok
 	}
 	return idx.Archive{}, ok
 }
@@ -753,7 +765,7 @@ func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archiv
 	archives := make([]idx.Archive, len(node.Defs))
 	for i, def := range node.Defs {
 		archive := m.defById[def]
-		archives[i] = *archive
+		archives[i] = CloneArchive(archive)
 	}
 	return archives
 }
@@ -1116,10 +1128,10 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, expressions []string, f
 				Path:        def.NameWithTags(),
 				Leaf:        true,
 				HasChildren: false,
-				Defs:        []idx.Archive{*def},
+				Defs:        []idx.Archive{CloneArchive(def)},
 			}
 		} else {
-			existing.Defs = append(existing.Defs, *def)
+			existing.Defs = append(existing.Defs, CloneArchive(def))
 		}
 	}
 
@@ -1165,7 +1177,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 	var matchedNodes []*Node
 	var err error
 	m.RLock()
-	defer m.RUnlock()
+	m.RUnlock()
 	tree, ok := m.tree[orgId]
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
@@ -1217,7 +1229,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 						lastSave := atomic.LoadUint32(&def.LastSave)
 						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
 					}
-					idxNode.Defs = append(idxNode.Defs, *def)
+					idxNode.Defs = append(idxNode.Defs, CloneArchive(def))
 				}
 				if len(idxNode.Defs) == 0 {
 					continue
@@ -1329,7 +1341,7 @@ func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	defs := make([]idx.Archive, 0)
 	for _, def := range m.defById {
 		if def.OrgId == orgId || def.OrgId == idx.OrgIdPublic {
-			defs = append(defs, *def)
+			defs = append(defs, CloneArchive(def))
 		}
 	}
 
@@ -1397,7 +1409,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 		if !m.deindexTags(tags, &def.MetricDefinition) {
 			continue
 		}
-		deletedDefs = append(deletedDefs, *def)
+		deletedDefs = append(deletedDefs, CloneArchive(def))
 		delete(m.defById, idStr)
 	}
 
@@ -1477,7 +1489,7 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() Index is corrupt. nil, %t := defById[%s]. path=%s ", ok, id.String(), n.Path)
 			continue
 		}
-		deletedDefs = append(deletedDefs, *archivePointer)
+		deletedDefs = append(deletedDefs, CloneArchive(archivePointer))
 		delete(m.defById, id)
 	}
 
@@ -1804,4 +1816,30 @@ func toRegexp(pattern string) string {
 	p = strings.Replace(p, "?", ".?", -1)
 	p = "^" + p + "$"
 	return p
+}
+
+// CloneArchive safely clones an archive. We use atomic operations to update
+// fields, so we need to use atomic operations to read those fields
+// when copying.
+func CloneArchive(a *idx.Archive) idx.Archive {
+	def := schema.MetricDefinition{
+		Id:         a.MetricDefinition.Id,
+		OrgId:      a.MetricDefinition.OrgId,
+		Name:       a.MetricDefinition.Name,
+		Interval:   a.MetricDefinition.Interval,
+		Unit:       a.MetricDefinition.Unit,
+		Mtype:      a.MetricDefinition.Mtype,
+		Tags:       a.MetricDefinition.Tags,
+		LastUpdate: atomic.LoadInt64(&a.MetricDefinition.LastUpdate),
+		Partition:  atomic.LoadInt32(&a.MetricDefinition.Partition),
+	}
+	// update nameWithTags
+	def.NameWithTags()
+	return idx.Archive{
+		SchemaId:         a.SchemaId,
+		AggId:            a.AggId,
+		IrId:             a.IrId,
+		LastSave:         atomic.LoadUint32(&a.LastSave),
+		MetricDefinition: def,
+	}
 }
