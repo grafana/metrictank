@@ -197,7 +197,7 @@ func (t *TestRun) runQuery() {
 		return
 	}
 
-	_, err := t.index.Find(orgID, pattern, 0)
+	res, err := t.index.Find(orgID, pattern, 0)
 	if err != nil {
 		log.Printf("Warning: Query failed with error: %s", err)
 	}
@@ -205,6 +205,6 @@ func (t *TestRun) runQuery() {
 	queryCompletedID := t.stats.incQueriesCompleted()
 	t.stats.addQueryTime(queryCompletedID, time.Now().Sub(pre))
 	if queryCompletedID%t.querySampleFactor == 0 {
-		log.Printf("Sample: queried for pattern %s", pattern)
+		log.Printf("Sample: query got %d results for pattern %s", len(res), pattern)
 	}
 }
