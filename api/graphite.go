@@ -153,6 +153,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	span.SetTag("format", request.Format)
 	span.SetTag("noproxy", request.NoProxy)
 	span.SetTag("process", request.Process)
+	span.SetTag("orgid", ctx.OrgId)
 
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
