@@ -127,6 +127,7 @@ func (t *TestRun) PrintStats() {
 
 func (t *TestRun) addedMdTracker(ctx context.Context, startedWg *sync.WaitGroup) func() error {
 	buffer := make([]addedMetricData, 0, 1000)
+	trackUpTo := 1000000 // how many added MDs to track at max
 	return func() error {
 		startedWg.Done()
 		for {
@@ -136,8 +137,15 @@ func (t *TestRun) addedMdTracker(ctx context.Context, startedWg *sync.WaitGroup)
 					buffer = append(buffer, md)
 				} else {
 					t.addedMdLock.Lock()
-					for i := range buffer {
-						t.addedMds = append(t.addedMds, buffer[i])
+					if len(t.addedMds) < trackUpTo {
+						for i := range buffer {
+							t.addedMds = append(t.addedMds, buffer[i])
+						}
+					} else {
+						startingAt := rand.Intn(trackUpTo)
+						for i := 0; i < len(buffer); i++ {
+							t.addedMds[(startingAt+i)%trackUpTo] = buffer[i]
+						}
 					}
 					t.addedMdLock.Unlock()
 					buffer = buffer[:0]
