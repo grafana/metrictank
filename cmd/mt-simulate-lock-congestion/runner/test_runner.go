@@ -2,7 +2,9 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -15,8 +17,14 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 	"golang.org/x/sync/errgroup"
 )
+
+type addedMetricData struct {
+	md        *schema.MetricData
+	partition int32
+}
 
 // TestRun represents one test run, including all the structures used for the test
 type TestRun struct {
@@ -24,11 +32,15 @@ type TestRun struct {
 	handler               input.Handler
 	metricNameGenerator   metricname.NameGenerator
 	queryPatternGenerator query.QueryGenerator
+	addedMdChan           chan addedMetricData
+	addedMdLock           sync.RWMutex
+	addedMds              []addedMetricData
 	stats                 runStats
 	addsPerSec            uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
 	addThreads            uint32 // number of concurrent add threads
 	addSampleFactor       uint32 // how often to print info about a completed add
 	addDelay              uint32 // once the benchmark starts the querying threads start, if addDelay is >0 then the adding into the index is delayed by the given number of seconds
+	updatesPerAdd         uint32 // how many metric updates should be done between each metric add, they also get called by the add threads
 	initialIndexSize      uint32 // prepopulate the index with the defined number of entries before starting the actual test run
 	queriesPerSec         uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
 	querySampleFactor     uint32 // how often to print info about a completed query
@@ -39,7 +51,7 @@ type TestRun struct {
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addDelay, addsPerSec, addThreads, addSampleFactor, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
+func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addDelay, addsPerSec, addThreads, addSampleFactor, updatesPerAdd, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
 	totalQueryCount := (queriesPerSec + addDelay) * uint32(runDuration.Seconds())
 
 	index := memory.New()
@@ -55,10 +67,12 @@ func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.Que
 		totalQueryCount:       totalQueryCount,
 		metricNameGenerator:   nameGenerator,
 		queryPatternGenerator: queryGenerator,
+		addedMdChan:           make(chan addedMetricData, 100),
 		addsPerSec:            addsPerSec,
 		addThreads:            addThreads,
 		addSampleFactor:       addSampleFactor,
 		addDelay:              addDelay,
+		updatesPerAdd:         updatesPerAdd,
 		initialIndexSize:      initialIndexSize,
 		queriesPerSec:         queriesPerSec,
 		querySampleFactor:     querySampleFactor,
@@ -72,6 +86,13 @@ func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.Que
 func (t *TestRun) Run() {
 	mainCtx, cancel := context.WithCancel(context.Background())
 
+	// wait group to wait until all routines have been started
+	startedWg := sync.WaitGroup{}
+	workerThreads, workerCtx := errgroup.WithContext(mainCtx)
+
+	startedWg.Add(1)
+	workerThreads.Go(t.addedMdTracker(workerCtx, &startedWg))
+
 	log.Printf("Starting the metric name generator")
 	t.metricNameGenerator.Start(mainCtx, t.addThreads)
 
@@ -80,10 +101,6 @@ func (t *TestRun) Run() {
 
 	log.Printf("Prepopulating the index with %d entries", t.initialIndexSize)
 	t.prepopulateIndex()
-
-	// wait group to wait until all routines have been started
-	startedWg := sync.WaitGroup{}
-	workerThreads, workerCtx := errgroup.WithContext(mainCtx)
 
 	startedWg.Add(1)
 	workerThreads.Go(t.queryRoutine(workerCtx, &startedWg))
@@ -108,6 +125,49 @@ func (t *TestRun) PrintStats() {
 	t.stats.Print(uint32(t.runDuration.Seconds()))
 }
 
+func (t *TestRun) addedMdTracker(ctx context.Context, startedWg *sync.WaitGroup) func() error {
+	buffer := make([]addedMetricData, 0, 1000)
+	return func() error {
+		startedWg.Done()
+		for {
+			select {
+			case md := <-t.addedMdChan:
+				if len(buffer) < cap(buffer) {
+					buffer = append(buffer, md)
+				} else {
+					t.addedMdLock.Lock()
+					for i := range buffer {
+						t.addedMds = append(t.addedMds, buffer[i])
+					}
+					t.addedMdLock.Unlock()
+					buffer = buffer[:0]
+				}
+			case <-ctx.Done():
+				fmt.Println("addedMdTracker is shutting down")
+				return nil
+			}
+		}
+	}
+}
+
+func (t *TestRun) getAddedMds(count int) []addedMetricData {
+	res := make([]addedMetricData, count)
+	t.addedMdLock.RLock()
+	defer t.addedMdLock.RUnlock()
+
+	addedMdsLen := len(t.addedMds)
+	if count > addedMdsLen || addedMdsLen == 0 {
+		return nil
+	}
+
+	startingAt := rand.Intn(addedMdsLen)
+	for i := 0; i < count; i++ {
+		res[i] = t.addedMds[(startingAt+i)%addedMdsLen]
+	}
+
+	return res
+}
+
 func (t *TestRun) prepopulateIndex() {
 	for i := uint32(0); i < t.initialIndexSize; i++ {
 		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time.Now().Unix()), Mtype: "gauge"}
@@ -118,7 +178,9 @@ func (t *TestRun) prepopulateIndex() {
 			log.Fatalf("Unexpected error when generating MKey from ID string: %s", err)
 		}
 
-		t.index.AddOrUpdate(key, &md, int32(i%t.addThreads))
+		partitionID := int32(i % t.addThreads)
+		t.index.AddOrUpdate(key, &md, partitionID)
+		t.addedMdChan <- addedMetricData{&md, partitionID}
 	}
 }
 
@@ -129,17 +191,31 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time), Mtype: "gauge"}
 		md.Name = t.metricNameGenerator.GetNewMetricName()
 		md.SetId()
-		// key, err := schema.MKeyFromString(md.Id)
-		// if err != nil {
-		// 	return fmt.Errorf("Unexpected error when generating MKey from ID string: %s", err)
-		// }
-
-		//t.index.AddOrUpdate(key, &md, partitionID)
 		t.handler.ProcessMetricData(&md, partitionID)
 		adds := t.stats.incAddsCompleted()
 		if adds%t.addSampleFactor == 0 {
 			log.Printf("Sample: added metric name to index %s", md.Name)
 		}
+
+		t.addedMdChan <- addedMetricData{&md, partitionID}
+
+		addedMds := t.getAddedMds(int(t.updatesPerAdd))
+		for i := range addedMds {
+			mkey, err := schema.MKeyFromString(addedMds[i].md.Id)
+			if err != nil {
+				log.Fatalf("Unexpected error when getting mkey from string \"%s\": %s", addedMds[i].md.Id, err.Error())
+			}
+			t.handler.ProcessMetricPoint(schema.MetricPoint{
+				MKey:  mkey,
+				Value: addedMds[i].md.Value,
+				Time:  uint32(addedMds[i].md.Time),
+			},
+				msg.FormatMetricPoint,
+				addedMds[i].partition,
+			)
+		}
+
+		t.stats.incUpdatesCompleted(t.updatesPerAdd)
 
 		return nil
 	}

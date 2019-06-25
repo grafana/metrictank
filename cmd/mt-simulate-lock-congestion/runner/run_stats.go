@@ -8,6 +8,7 @@ import (
 
 type runStats struct {
 	addsCompleted    uint32          // how many adds have been executed
+	updatesCompleted uint32          // how many updates have been executed
 	queriesStarted   uint32          // how many queries have been started
 	queriesCompleted uint32          // how many queries have been completed
 	queryTimes       []time.Duration // slice of query execution durations in ms
@@ -22,6 +23,7 @@ func newRunStats(queryCount uint32) runStats {
 
 func (r *runStats) Print(runSeconds uint32) {
 	log.Printf("Adds Completed: %d (%f / sec)", r.addsCompleted, float32(r.addsCompleted)/float32(runSeconds))
+	log.Printf("Updates Completed: %d (%f / sec)", r.updatesCompleted, float32(r.updatesCompleted)/float32(runSeconds))
 	log.Printf("Queries Started: %d (%f / sec)", r.queriesStarted, float32(r.queriesStarted)/float32(runSeconds))
 	log.Printf("Queries Completed: %d (%f / sec)", r.queriesCompleted, float32(r.queriesCompleted)/float32(runSeconds))
 
@@ -36,6 +38,9 @@ func (r *runStats) Print(runSeconds uint32) {
 
 func (r *runStats) incAddsCompleted() uint32 {
 	return atomic.AddUint32(&r.addsCompleted, 1)
+}
+func (r *runStats) incUpdatesCompleted(delta uint32) uint32 {
+	return atomic.AddUint32(&r.updatesCompleted, delta)
 }
 
 // incQueriesStarted increases the counter of queries that have been started
