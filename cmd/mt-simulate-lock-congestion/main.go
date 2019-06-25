@@ -29,6 +29,7 @@ var (
 	addThreads           = flag.Int("add-threads", 10, "Number of threads to concurrently try adding metrics into the index")
 	addSampleFactor      = flag.Int("add-sample-factor", 100000, "how often to print a sample metric name that we added")
 	addDelay             = flag.Int("add-delay", 0, "adds a delay of the given number of seconds until the adding of new metrics starts")
+	updatesPerAdd        = flag.Int("updates-per-add", 50, "Number of metric updates that should get called between each metric add")
 	initialIndexSize     = flag.Int("initial-index-size", 1000000, "prepopulate the index with the defined number of metrics before starting the benchmark")
 	queriesPerSec        = flag.Int("queries-per-sec", 100, "Index queries per second")
 	querySampleFactor    = flag.Int("query-sample-factor", 100, "how often to print a sample query")
@@ -104,7 +105,7 @@ func main() {
 		log.Fatalf("Error when instantiating query generator: %s", err)
 	}
 
-	testRun := runner.NewTestRun(nameGenerator, queryGenerator, uint32(*addDelay), uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*querySampleFactor), *runDuration)
+	testRun := runner.NewTestRun(nameGenerator, queryGenerator, uint32(*addDelay), uint32(*addsPerSec), uint32(*addThreads), uint32(*addSampleFactor), uint32(*updatesPerAdd), uint32(*initialIndexSize), uint32(*queriesPerSec), uint32(*querySampleFactor), *runDuration)
 	testRun.Run()
 	testRun.PrintStats()
 
