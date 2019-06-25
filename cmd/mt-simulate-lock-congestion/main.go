@@ -23,7 +23,7 @@ import (
 var (
 	nameGeneratorType    = flag.String("name-generator", "increasing-number", "select name generator (increasing-number|file)")
 	nameGeneratorArgs    = flag.String("name-generator-args", "", "args to pass to the name generator")
-	queryGeneratorType   = flag.String("query-generator", "increasing-number", "select query generator (node-replacer|file)")
+	queryGeneratorType   = flag.String("query-generator", "node-replacer", "select query generator (node-replacer|file)")
 	queryGeneratorArgs   = flag.String("query-generator-args", "", "args to pass to the query generator")
 	addsPerSec           = flag.Int("adds-per-sec", 100000, "Metric add operations per second")
 	addThreads           = flag.Int("add-threads", 10, "Number of threads to concurrently try adding metrics into the index")
@@ -70,7 +70,7 @@ func main() {
 
 	var nameGenerator metricname.NameGenerator
 	switch *nameGeneratorType {
-	case "increasingNumber":
+	case "increasing-number":
 		nameGenerator = metricname.NewIncreasingNumberGenerator()
 	case "file":
 		reader, err := reader.NewFileReader(*nameGeneratorArgs)
@@ -87,7 +87,7 @@ func main() {
 
 	var queryGenerator query.QueryGenerator
 	switch *queryGeneratorType {
-	case "nodeReplacer":
+	case "node-replacer":
 		valueBuffer := metricname.NewReturnedNamesBuffer(nameGenerator, 1000)
 		queryGenerator = query.NewNodeReplacer(valueBuffer.GetReturnedValue)
 		nameGenerator = valueBuffer
