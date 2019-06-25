@@ -374,13 +374,14 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	// we only need to a lock while reading the map. All future operations
+	// we only need a lock while reading the m.defById map. All future operations on the archive
+	// use sync/atomic to allow concurrent read/writes
 	m.RLock()
 	existing, ok := m.defById[mkey]
 	m.RUnlock()
 	if ok {
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("memory-idx: metricDef with id %s already in index.", mkey)
+			log.Debugf("memory-idx: metricDef with id %s already in the index", mkey)
 		}
 		oldPart := updateExisting(existing, partition, data.Time, pre)
 		return CloneArchive(existing), oldPart, ok
@@ -389,13 +390,14 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 	def.Partition = partition
 	archive := createArchive(def)
 	if m.writeQueue == nil {
-		// writeQueuing not enabled, so acquire a wlock and immediately add to the index.
+		// writeQueue not enabled, so acquire a wlock and immediately add to the index.
 		m.Lock()
 		m.add(archive)
 		m.Unlock()
 		statAddDuration.Value(time.Since(pre))
 	} else {
-		// push the new archive into the writeQueue
+		// push the new archive into the writeQueue.  If there is already an archive in the
+		// writeQueue with the same mkey, it will be replaced.
 		m.writeQueue.Queue(archive)
 	}
 
