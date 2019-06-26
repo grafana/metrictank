@@ -290,6 +290,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 
 func (m *UnpartitionedMemoryIdx) Init() error {
 	if findCacheSize > 0 {
+		log.Infof("memoryIdx: enabling findCache with with a size of %d items", findCacheSize)
 		m.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
 	}
 	if writeQueueEnabled {
