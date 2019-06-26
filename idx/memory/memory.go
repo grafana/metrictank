@@ -1179,7 +1179,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 	var matchedNodes []*Node
 	var err error
 	m.RLock()
-	m.RUnlock()
+	defer m.RUnlock()
 	tree, ok := m.tree[orgId]
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
