@@ -24,3 +24,18 @@ Metrictank will automatically combine the data together like so:
 Metrics can have tags and metrictank supports queries via the [graphite tag query api](https://graphite.readthedocs.io/en/latest/tags.html)
 In the future, metrictank aims to provide a proper implementation of [metrics 2.0](http://metrics20.org/)
 (it helps that both projects share the same main author)
+
+## What are different ways to reason about "active metrics"?
+
+* `tank.metrics_active`: number of series known to the tank (i.o.w. for which we have in-memory buffers). 
+  each metricdefinition corresponds to one series, so this excludes rollups.
+  series get cleared every gc-interval (1h by default) by comparing metric-max-stale (3h by default) against the lastWrite property,
+  which is wallclock time of when last point was successfully added
+* `index.metrics_active`: the number of metricdefinitions held within the in-memory index (i.o.w. that are available for querying)
+  subject to pruning via the [index rules config file](https://github.com/grafana/metrictank/blob/master/docs/config.md#index-rulesconf)
+  (these rules are applied during index loading at startup time and at runtime during Prune(), see prune-interval setting for your index plugin. 3h by default)
+   (compared against lastUpdate property, which is set to timestamp of most recent data)
+* output of `mt-index-cat`:
+  queries the persistent index using a single "default" index rule based on the maxStale flag (exclude entries with lastUpdate too old)
+  and cuts off on the fly based on minStale (which excludes entries that have a lastUpdate "too recent". disabled by default)
+  So this is equivalent to the index, assuming the index prune-interval is sufficiently low and assuming you don't filter via minStale (which the index doesn't do)
