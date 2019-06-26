@@ -320,7 +320,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 		log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
-		c.MemoryIndex.UpdateArchive(archive)
+		c.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -331,7 +331,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 		select {
 		case c.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
 			archive.LastSave = now
-			c.MemoryIndex.UpdateArchive(archive)
+			c.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 		default:
 			statSaveSkipped.Inc()
 			log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", archive.MetricDefinition.Id)

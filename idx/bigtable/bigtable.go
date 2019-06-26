@@ -286,7 +286,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		log.Debugf("bigtable-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
 		archive.LastSave = now
-		b.MemoryIndex.UpdateArchive(archive)
+		b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -297,7 +297,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		select {
 		case b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
 			archive.LastSave = now
-			b.MemoryIndex.UpdateArchive(archive)
+			b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 		default:
 			statSaveSkipped.Inc()
 			log.Debugf("bigtable-idx: writeQueue is full, update of %s not saved this time", archive.MetricDefinition.Id)

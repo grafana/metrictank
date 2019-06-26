@@ -62,8 +62,8 @@ func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metric
 }
 
 // UpdateArchive updates the archive information
-func (p *PartitionedMemoryIdx) UpdateArchive(archive idx.Archive) {
-	p.Partition[archive.Partition].UpdateArchive(archive)
+func (p *PartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition int32, lastSave uint32) {
+	p.Partition[partition].UpdateArchiveLastSave(id, partition, lastSave)
 }
 
 // Get returns the archive for the requested id.
@@ -514,8 +514,8 @@ func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.Metr
 	return p.Partition[partition].Load(defs)
 }
 
-func (p *PartitionedMemoryIdx) add(def *schema.MetricDefinition) idx.Archive {
-	return p.Partition[def.Partition].add(def)
+func (p *PartitionedMemoryIdx) add(archive *idx.Archive) {
+	p.Partition[archive.Partition].add(archive)
 }
 
 func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdSet {
