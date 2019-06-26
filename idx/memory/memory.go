@@ -543,7 +543,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 		tagValue := tagSplits[1]
 		tags.addTagId(tagName, tagValue, def.Id)
 	}
-	tags.addTagId("name", def.Name, def.Id)
+	tags.addTagId("name", def.NameSanitizedAsTagValue(), def.Id)
 
 	m.defByTagSet.add(def)
 }
@@ -569,7 +569,7 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 		tags.delTagId(tagName, tagValue, def.Id)
 	}
 
-	tags.delTagId("name", def.Name, def.Id)
+	tags.delTagId("name", def.NameSanitizedAsTagValue(), def.Id)
 
 	m.defByTagSet.del(def)
 
@@ -968,7 +968,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 		// special case if the tag to complete values for is "name"
 		if tag == "name" {
-			valueMap[def.Name] = struct{}{}
+			valueMap[def.NameSanitizedAsTagValue()] = struct{}{}
 		} else {
 			for _, tag := range def.Tags {
 				if !strings.HasPrefix(tag, tagPrefix) {
