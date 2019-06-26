@@ -3,303 +3,214 @@ package runner
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"log"
-	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/metricname"
-	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/query"
 	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/input"
-	"github.com/grafana/metrictank/mdata"
-
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
-
-type addedMetricData struct {
-	md        *schema.MetricData
-	partition int32
-}
 
 // TestRun represents one test run, including all the structures used for the test
 type TestRun struct {
-	index                 idx.MetricIndex
-	handler               input.Handler
-	metricNameGenerator   metricname.NameGenerator
-	queryPatternGenerator query.QueryGenerator
-	addedMdChan           chan addedMetricData
-	addedMdLock           sync.RWMutex
-	addedMds              []addedMetricData
-	stats                 runStats
-	addsPerSec            uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
-	addThreads            uint32 // number of concurrent add threads
-	addSampleFactor       uint32 // how often to print info about a completed add
-	addDelay              uint32 // once the benchmark starts the querying threads start, if addDelay is >0 then the adding into the index is delayed by the given number of seconds
-	updatesPerAdd         uint32 // how many metric updates should be done between each metric add, they also get called by the add threads
-	initialIndexSize      uint32 // prepopulate the index with the defined number of entries before starting the actual test run
-	queriesPerSec         uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
-	querySampleFactor     uint32 // how often to print info about a completed query
-	totalQueryCount       uint32 // the total number of queries we will start
-	runDuration           time.Duration
+	index            idx.MetricIndex
+	metricsChan      chan *schema.MetricData
+	queriesChan      chan string
+	addsPerSec       uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
+	addThreads       uint32 // number of concurrent add threads
+	addDelay         uint32 // once the benchmark starts the querying threads start, if addDelay is >0 then the adding into the index is delayed by the given number of seconds
+	initialIndexSize uint32 // prepopulate the index with the defined number of entries before starting the actual test run
+	queriesPerSec    uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
+	totalQueryCount  uint32 // the total number of queries we will start
+	startTime        time.Time
+	done             chan struct{}
 }
+
+var (
+	metricAdd    = stats.NewLatencyHistogram15s32("metric-add")
+	metricUpdate = stats.NewLatencyHistogram15s32("metric-update")
+	queryExec    = stats.NewLatencyHistogram15s32("query")
+)
 
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(nameGenerator metricname.NameGenerator, queryGenerator query.QueryGenerator, addDelay, addsPerSec, addThreads, addSampleFactor, updatesPerAdd, initialIndexSize, queriesPerSec, querySampleFactor uint32, runDuration time.Duration) *TestRun {
-	totalQueryCount := (queriesPerSec + addDelay) * uint32(runDuration.Seconds())
-
+func NewTestRun(metricsChan chan *schema.MetricData, queriesChan chan string, addDelay, addsPerSec, addThreads, initialIndexSize, queriesPerSec uint32) *TestRun {
 	index := memory.New()
+	index.Init()
 	// initializing with a `nil` store, that's a bit risky but good enough for the moment
 	mdata.Schemas = conf.NewSchemas(nil)
-	metrics := mdata.NewAggMetrics(nil, nil, false, 3600, 7200, 3600)
-	handler := input.NewDefaultHandler(metrics, index, "lock-congestion-simulator")
 
 	runner := TestRun{
-		index:                 index,
-		handler:               handler,
-		stats:                 newRunStats(totalQueryCount),
-		totalQueryCount:       totalQueryCount,
-		metricNameGenerator:   nameGenerator,
-		queryPatternGenerator: queryGenerator,
-		addedMdChan:           make(chan addedMetricData, 100),
-		addsPerSec:            addsPerSec,
-		addThreads:            addThreads,
-		addSampleFactor:       addSampleFactor,
-		addDelay:              addDelay,
-		updatesPerAdd:         updatesPerAdd,
-		initialIndexSize:      initialIndexSize,
-		queriesPerSec:         queriesPerSec,
-		querySampleFactor:     querySampleFactor,
-		runDuration:           runDuration,
+		index:            index,
+		metricsChan:      metricsChan,
+		queriesChan:      queriesChan,
+		addsPerSec:       addsPerSec,
+		addThreads:       addThreads,
+		addDelay:         addDelay,
+		initialIndexSize: initialIndexSize,
+		queriesPerSec:    queriesPerSec,
+		done:             make(chan struct{}),
 	}
 
 	return &runner
 }
 
+func (t *TestRun) Wait() {
+	<-t.done
+}
+
 // Run executes the run
-func (t *TestRun) Run() {
-	mainCtx, cancel := context.WithCancel(context.Background())
-
-	// wait group to wait until all routines have been started
-	startedWg := sync.WaitGroup{}
-	workerThreads, workerCtx := errgroup.WithContext(mainCtx)
-
-	startedWg.Add(1)
-	workerThreads.Go(t.addedMdTracker(workerCtx, &startedWg))
-
-	log.Printf("Starting the metric name generator")
-	t.metricNameGenerator.Start(mainCtx, t.addThreads)
-
-	log.Printf("Starting the query generator")
-	t.queryPatternGenerator.Start()
-
-	log.Printf("Prepopulating the index with %d entries", t.initialIndexSize)
+func (t *TestRun) Run(ctx context.Context, start chan struct{}) {
+	log.Printf("TestRun started")
+	defer close(t.done)
+	workerThreads, workerCtx := errgroup.WithContext(ctx)
 	t.prepopulateIndex()
-
-	startedWg.Add(1)
-	workerThreads.Go(t.queryRoutine(workerCtx, &startedWg))
-
-	<-time.After(time.Second * time.Duration(t.addDelay))
-
-	startedWg.Add(int(t.addThreads))
+	log.Printf("pre-populated the index with %d entries", t.initialIndexSize)
+	t.startTime = time.Now()
+	workerThreads.Go(t.queryRoutine(workerCtx))
+	close(start)
+	mdChans := make([]chan *schema.MetricData, t.addThreads)
 	for i := uint32(0); i < t.addThreads; i++ {
-		workerThreads.Go(t.addRoutine(workerCtx, &startedWg, i))
+		ch := make(chan *schema.MetricData, 1000)
+		mdChans[i] = ch
+		partition := int32(i)
+		workerThreads.Go(t.addRoutine(workerCtx, ch, partition))
 	}
-	startedWg.Wait()
-	log.Printf("Benchmark has started")
+	workerThreads.Go(t.routeMetrics(workerCtx, mdChans))
 
-	// as soon as all routines have started, we start the timer
-	<-time.After(t.runDuration)
-	cancel()
+	log.Printf("Benchmark has started")
 	workerThreads.Wait()
+	log.Printf("Benchmark has complete")
+	t.PrintStats()
 }
 
 // PrintStats writes all the statistics in human readable format into stdout
 func (t *TestRun) PrintStats() {
-	t.stats.Print(uint32(t.runDuration.Seconds()))
+	now := time.Now()
+	fmt.Printf("MetricAdd:\n%s\n", metricAdd.ReportGraphite([]byte("metric-add."), nil, now))
+	fmt.Printf("MetricUpdate:\n%s\n", metricUpdate.ReportGraphite([]byte("metric-update."), nil, now))
+	fmt.Printf("Query:\n%s\n", queryExec.ReportGraphite([]byte("query."), nil, now))
 }
 
-func (t *TestRun) addedMdTracker(ctx context.Context, startedWg *sync.WaitGroup) func() error {
-	buffer := make([]addedMetricData, 0, 1000)
-	trackUpTo := 1000000 // how many added MDs to track at max
-	return func() error {
-		startedWg.Done()
-		for {
-			select {
-			case md := <-t.addedMdChan:
-				if len(buffer) < cap(buffer) {
-					buffer = append(buffer, md)
-				} else {
-					t.addedMdLock.Lock()
-					if len(t.addedMds) < trackUpTo {
-						for i := range buffer {
-							t.addedMds = append(t.addedMds, buffer[i])
-						}
-					} else {
-						startingAt := rand.Intn(trackUpTo)
-						for i := 0; i < len(buffer); i++ {
-							t.addedMds[(startingAt+i)%trackUpTo] = buffer[i]
-						}
-					}
-					t.addedMdLock.Unlock()
-					buffer = buffer[:0]
-				}
-			case <-ctx.Done():
-				fmt.Println("addedMdTracker is shutting down")
-				return nil
-			}
-		}
+func getPartitionFromName(name string, partitionCount uint32) int32 {
+	h := fnv.New32a()
+	h.Write([]byte(name))
+	p := int32(h.Sum32() % partitionCount)
+	if p < 0 {
+		p = p * -1
 	}
-}
-
-func (t *TestRun) getAddedMds(count int) []addedMetricData {
-	res := make([]addedMetricData, count)
-	t.addedMdLock.RLock()
-	defer t.addedMdLock.RUnlock()
-
-	addedMdsLen := len(t.addedMds)
-	if count > addedMdsLen || addedMdsLen == 0 {
-		return nil
-	}
-
-	startingAt := rand.Intn(addedMdsLen)
-	for i := 0; i < count; i++ {
-		res[i] = t.addedMds[(startingAt+i)%addedMdsLen]
-	}
-
-	return res
+	return p
 }
 
 func (t *TestRun) prepopulateIndex() {
 	for i := uint32(0); i < t.initialIndexSize; i++ {
-		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time.Now().Unix()), Mtype: "gauge"}
-		md.Name = t.metricNameGenerator.GetNewMetricName()
-		md.SetId()
-		key, err := schema.MKeyFromString(md.Id)
-		if err != nil {
-			log.Fatalf("Unexpected error when generating MKey from ID string: %s", err)
-		}
-
-		partitionID := int32(i % t.addThreads)
-		t.index.AddOrUpdate(key, &md, partitionID)
-		t.addedMdChan <- addedMetricData{&md, partitionID}
+		md := <-t.metricsChan
+		partitionID := getPartitionFromName(md.Name, t.addThreads)
+		key, _ := schema.MKeyFromString(md.Id)
+		t.index.AddOrUpdate(key, md, partitionID)
 	}
 }
 
-func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, routineID uint32) func() error {
-	partitionID := int32(routineID)
-
-	addEntryToIndex := func(time int) error {
-		md := schema.MetricData{OrgId: orgID, Interval: 1, Value: 2, Time: int64(time), Mtype: "gauge"}
-		md.Name = t.metricNameGenerator.GetNewMetricName()
-		md.SetId()
-		t.handler.ProcessMetricData(&md, partitionID)
-		adds := t.stats.incAddsCompleted()
-		if adds%t.addSampleFactor == 0 {
-			log.Printf("Sample: added metric name to index %s", md.Name)
-		}
-
-		t.addedMdChan <- addedMetricData{&md, partitionID}
-
-		addedMds := t.getAddedMds(int(t.updatesPerAdd))
-		for i := range addedMds {
-			mkey, err := schema.MKeyFromString(addedMds[i].md.Id)
-			if err != nil {
-				log.Fatalf("Unexpected error when getting mkey from string \"%s\": %s", addedMds[i].md.Id, err.Error())
-			}
-			t.handler.ProcessMetricPoint(schema.MetricPoint{
-				MKey:  mkey,
-				Value: addedMds[i].md.Value,
-				Time:  uint32(addedMds[i].md.Time),
-			},
-				msg.FormatMetricPoint,
-				addedMds[i].partition,
-			)
-		}
-
-		t.stats.incUpdatesCompleted(t.updatesPerAdd)
-
-		return nil
-	}
-
-	if t.addsPerSec > 0 {
-		interval := time.Duration(int64(1000000000) * int64(t.addThreads) / int64(t.addsPerSec))
-
-		return func() error {
-			ticker := time.NewTicker(interval)
-			go func() {
-				<-ctx.Done()
-				ticker.Stop()
-			}()
-
-			startedWg.Done()
-			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				case tick := <-ticker.C:
-					if err := addEntryToIndex(tick.Second()); err != nil {
-						return err
-					}
-				}
-			}
-		}
-	}
-
+func (t *TestRun) routeMetrics(ctx context.Context, mdChans []chan *schema.MetricData) func() error {
 	return func() error {
-		startedWg.Done()
-
-		for i := 0; ; i++ {
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-				if err := addEntryToIndex(int(time.Now().Unix())); err != nil {
-					return err
-				}
-			}
-		}
-	}
-}
-
-func (t *TestRun) queryRoutine(ctx context.Context, startedWg *sync.WaitGroup) func() error {
-	return func() error {
-		ticker := time.NewTicker(time.Duration(int64(float64(1000000000) / float64(t.queriesPerSec))))
-		startedWg.Done()
+		log.Printf("routeMetrics thread started")
+		defer log.Printf("routeMetrics thread ended")
+		limiter := rate.NewLimiter(rate.Limit(t.addsPerSec), int(t.addsPerSec))
 		for {
 			select {
 			case <-ctx.Done():
+				log.Printf("routeMetrics thread shutting down")
+				for _, ch := range mdChans {
+					close(ch)
+				}
 				return nil
-			case <-ticker.C:
-				go t.runQuery()
+			case md := <-t.metricsChan:
+				if md == nil {
+					log.Printf("routeMetrics thread shutting down")
+					for _, ch := range mdChans {
+						close(ch)
+					}
+					return nil
+				}
+				limiter.Wait(ctx)
+				partitionID := getPartitionFromName(md.Name, t.addThreads)
+				ch := mdChans[partitionID]
+				ch <- md
 			}
 		}
 	}
 }
 
-func (t *TestRun) runQuery() {
-	pattern := t.queryPatternGenerator.GetPattern()
-	pre := time.Now()
-
-	queryStartedID := t.stats.incQueriesStarted()
-	if queryStartedID > t.totalQueryCount {
-		return
+func (t *TestRun) addRoutine(ctx context.Context, in chan *schema.MetricData, partitionID int32) func() error {
+	return func() error {
+		log.Printf("addRoutine(%d) thread started", partitionID)
+		defer log.Printf("addRoutine(%d) thread ended", partitionID)
+		for md := range in {
+			key, _ := schema.MKeyFromString(md.Id)
+			pre := time.Now()
+			_, _, update := t.index.AddOrUpdate(key, md, partitionID)
+			if !update {
+				metricAdd.Value(time.Since(pre))
+			} else {
+				metricUpdate.Value(time.Since(pre))
+			}
+		}
+		return nil
 	}
 
-	res, err := t.index.Find(orgID, pattern, 0)
+}
+
+func (t *TestRun) queryRoutine(ctx context.Context) func() error {
+	return func() error {
+		log.Printf("queryRoutine thread started")
+		defer log.Printf("queryRoutine thread ended")
+		limiter := rate.NewLimiter(rate.Limit(t.queriesPerSec), int(t.queriesPerSec))
+		var wg sync.WaitGroup
+		active := make(chan struct{}, 1000)
+		count := 0
+		ticker := time.NewTicker(time.Second * 5)
+	LOOP:
+		for {
+			select {
+			case <-ctx.Done():
+				break LOOP
+			case <-ticker.C:
+				log.Printf("%d find queries active. %d launched", len(active), count)
+			case pattern, ok := <-t.queriesChan:
+				if !ok {
+					break LOOP
+				}
+				limiter.Wait(ctx)
+				wg.Add(1)
+				count++
+				go t.runQuery(pattern, &wg, active)
+			}
+		}
+		log.Printf("queryRoutine shutting down. Waiting for %d running finds to complete", len(active))
+		wg.Wait()
+		return nil
+	}
+}
+
+func (t *TestRun) runQuery(pattern string, wg *sync.WaitGroup, active chan struct{}) {
+	defer func() {
+		<-active
+		wg.Done()
+	}()
+	pre := time.Now()
+	active <- struct{}{}
+	_, err := t.index.Find(orgID, pattern, 0)
 	if err != nil {
 		log.Printf("Warning: Query failed with error: %s", err)
 	}
 
-	queryCompletedID := t.stats.incQueriesCompleted()
-	t.stats.addQueryTime(queryCompletedID, time.Now().Sub(pre))
-	if queryCompletedID%t.querySampleFactor == 0 {
-		log.Printf("Sample: query got %d results for pattern %s", len(res), pattern)
-	}
+	queryExec.Value(time.Since(pre))
 }
