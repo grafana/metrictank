@@ -243,8 +243,8 @@ func (t *TestRun) addRoutine(ctx context.Context, startedWg *sync.WaitGroup, rou
 				select {
 				case <-ctx.Done():
 					return nil
-				case tick := <-ticker.C:
-					if err := addEntryToIndex(tick.Second()); err != nil {
+				case <-ticker.C:
+					if err := addEntryToIndex(int(time.Now().Unix())); err != nil {
 						return err
 					}
 				}
