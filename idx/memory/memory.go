@@ -56,6 +56,7 @@ var (
 	indexRulesFile               string
 	IndexRules                   conf.IndexRules
 	Partitioned                  bool
+	maxConcurrentFinds           = 500
 	findCacheSize                = 1000
 	findCacheInvalidateQueueSize = 200
 	findCacheInvalidateMaxSize   = 100
@@ -73,6 +74,7 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.IntVar(&maxConcurrentFinds, "max-concurrent-finds", 500, "maximum number of finds that can run concurrently")
 	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
@@ -261,17 +263,19 @@ type UnpartitionedMemoryIdx struct {
 
 	findCache *FindCache
 
-	writeQueue *WriteQueue
+	writeQueue      *WriteQueue
+	concurrentFinds chan struct{}
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 	m := &UnpartitionedMemoryIdx{
-		defById:        make(map[schema.MKey]*idx.Archive),
-		defByTagSet:    make(defByTagSet),
-		tree:           make(map[uint32]*Tree),
-		tags:           make(map[uint32]TagIndex),
-		metaTags:       make(map[uint32]metaTagIndex),
-		metaTagRecords: make(map[uint32]metaTagRecords),
+		defById:         make(map[schema.MKey]*idx.Archive),
+		defByTagSet:     make(defByTagSet),
+		tree:            make(map[uint32]*Tree),
+		tags:            make(map[uint32]TagIndex),
+		metaTags:        make(map[uint32]metaTagIndex),
+		metaTagRecords:  make(map[uint32]metaTagRecords),
+		concurrentFinds: make(chan struct{}, maxConcurrentFinds),
 	}
 	return m
 }
@@ -1155,57 +1159,11 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQuery) IdS
 	return query.Run(tags, m.defById)
 }
 
-func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
-
-	if m.findCache == nil {
-		return find(tree, pattern)
-	}
-
-	matchedNodes, ok := m.findCache.Get(orgId, pattern)
-	if ok {
-		return matchedNodes, nil
-	}
-
-	matchedNodes, err := find(tree, pattern)
-	if err != nil {
-		return nil, err
-	}
-	m.findCache.Add(orgId, pattern, matchedNodes)
-	return matchedNodes, nil
-}
-
-func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
-	pre := time.Now()
-	var matchedNodes []*Node
-	var err error
-	m.RLock()
-	defer m.RUnlock()
-	tree, ok := m.tree[orgId]
-	if !ok {
-		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
-	} else {
-		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
-		tree, ok = m.tree[idx.OrgIdPublic]
-		if ok {
-			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
-			if err != nil {
-				return nil, err
-			}
-			matchedNodes = append(matchedNodes, publicNodes...)
-		}
-	}
-	log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
-	results := make([]idx.Node, 0)
-	byPath := make(map[string]struct{})
+func (m *UnpartitionedMemoryIdx) toIdxNodes(matchedNodes []*Node, from int64) []idx.Node {
+	results := make([]idx.Node, 0, len(matchedNodes))
+	byPath := make(map[string]struct{}, len(matchedNodes))
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node
 	// for each path, and it holds all defs that the Node refers too.
-	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
-	// path, then the public metricDefs will be excluded.
 	for _, n := range matchedNodes {
 		if _, ok := byPath[n.Path]; !ok {
 			idxNode := idx.Node{
@@ -1243,9 +1201,82 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 			log.Debugf("memory-idx: path %s already seen", n.Path)
 		}
 	}
-	log.Debugf("memory-idx: %d nodes has %d unique paths.", len(matchedNodes), len(results))
+	return results
+}
+
+func (m *UnpartitionedMemoryIdx) findMaybeCached(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+	if m.findCache == nil {
+		m.concurrentFinds <- struct{}{}
+		m.RLock()
+		defer func() {
+			m.RUnlock()
+			<-m.concurrentFinds
+		}()
+		tree, ok := m.tree[orgId]
+		if !ok {
+			log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
+			return nil, nil
+		}
+		matchedNodes, err := find(tree, pattern)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
+		return m.toIdxNodes(matchedNodes, from), nil
+	}
+
+	matchedNodes, ok := m.findCache.Get(orgId, pattern)
+	if ok {
+		return m.toIdxNodes(matchedNodes, from), nil
+	}
+	m.concurrentFinds <- struct{}{}
+	m.RLock()
+	defer func() {
+		m.RUnlock()
+		<-m.concurrentFinds
+	}()
+	tree, ok := m.tree[orgId]
+	if !ok {
+		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
+		return nil, nil
+	}
+	matchedNodes, err := find(tree, pattern)
+	if err != nil {
+		return nil, err
+	}
+	log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
+	m.findCache.Add(orgId, pattern, matchedNodes)
+	return m.toIdxNodes(matchedNodes, from), nil
+}
+
+func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+	pre := time.Now()
+	matchedNodes, err := m.findMaybeCached(orgId, pattern, from)
+	if err != nil {
+		return nil, err
+	}
+	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
+		publicNodes, err := m.findMaybeCached(idx.OrgIdPublic, pattern, from)
+		if err != nil {
+			return nil, err
+		}
+		if len(publicNodes) > 0 {
+			// if there are publicNodes found we need to merge them with the existing matchedNodes
+			// If the same path is present in matchedNodes and publicNodes, we use matchedNodes
+			byPath := make(map[string]struct{}, len(matchedNodes))
+			for i := range matchedNodes {
+				byPath[matchedNodes[i].Path] = struct{}{}
+			}
+			for i := range publicNodes {
+				if _, ok := byPath[publicNodes[i].Path]; !ok {
+					matchedNodes = append(matchedNodes, publicNodes[i])
+				}
+			}
+		}
+	}
+	log.Debugf("memory-idx: %s pattern matches %d unique paths.", pattern, len(matchedNodes))
 	statFindDuration.Value(time.Since(pre))
-	return results, nil
+	return matchedNodes, nil
 }
 
 // find returns all Nodes matching the pattern for the given tree
