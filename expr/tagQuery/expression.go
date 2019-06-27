@@ -64,7 +64,7 @@ func ParseExpression(expression string) (Expression, error) {
 	}
 
 	if equalPos == 0 {
-		return res, fmt.Errorf("Empty tag name: %s", expression)
+		return res, fmt.Errorf("Empty tag key: %s", expression)
 	}
 
 	res.RequiresNonEmptyValue = true

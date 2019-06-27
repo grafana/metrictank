@@ -30,7 +30,7 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 	return res, nil
 }
 
-// matchesQueries compares another tag record's queries to this
+// MatchesQueries compares another tag record's queries to this
 // one's queries. Returns true if they are equal, otherwise false.
 // It is assumed that all the queries are already sorted
 func (m *MetaTagRecord) MatchesQueries(other MetaTagRecord) bool {
@@ -47,7 +47,7 @@ func (m *MetaTagRecord) MatchesQueries(other MetaTagRecord) bool {
 	return true
 }
 
-// hasMetaTags returns true if the meta tag record has one or more
+// HasMetaTags returns true if the meta tag record has one or more
 // meta tags, otherwise it returns false
 func (m *MetaTagRecord) HasMetaTags() bool {
 	return len(m.MetaTags) > 0

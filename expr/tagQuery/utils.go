@@ -14,7 +14,7 @@ func validateKey(key string) error {
 
 func validateValue(value string) error {
 	if strings.ContainsAny(value, ";~") {
-		return fmt.Errorf("Invalid character in value %s", value)
+		return fmt.Errorf("Invalid character in tag value %s", value)
 	}
 	return nil
 }

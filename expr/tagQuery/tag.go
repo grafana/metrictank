@@ -99,7 +99,7 @@ func ParseTag(tag string) (Tag, error) {
 		return res, fmt.Errorf("Error when validating tag %s: %s", tag, err)
 	}
 	if len(res.Key) == 0 {
-		return res, fmt.Errorf("Tag may not be empty: %s", tag)
+		return res, fmt.Errorf("Tag key may not be empty: %s", tag)
 	}
 
 	res.Value = tag[equalPos+1:]
@@ -108,7 +108,7 @@ func ParseTag(tag string) (Tag, error) {
 		return res, fmt.Errorf("Error when validating tag %s: %s", tag, err)
 	}
 	if len(res.Value) == 0 {
-		return res, fmt.Errorf("Value may not be empty: %s", tag)
+		return res, fmt.Errorf("Tag value may not be empty: %s", tag)
 	}
 
 	return res, nil

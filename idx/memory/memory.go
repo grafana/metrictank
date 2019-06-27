@@ -983,7 +983,6 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 					continue
 				}
 
-				// keep the value after "=", that's why "+1"
 				valueMap[tagValue[1]] = struct{}{}
 			}
 		}
