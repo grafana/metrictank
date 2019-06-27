@@ -93,6 +93,7 @@ func (wq *WriteQueue) loop() {
 			wq.Lock()
 			wq.flush()
 			wq.Unlock()
+			timer.Reset(wq.maxDelay)
 		case <-wq.shutdown:
 			wq.Lock()
 			wq.flush()
