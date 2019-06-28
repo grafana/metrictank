@@ -12,16 +12,15 @@ type Query struct {
 	// clause that operates on LastUpdate field
 	From int64
 
-	// clauses that operate on values. from expressions like tag<operator>value
-	Expressions map[ExpressionOperator]Expressions
+	// slice of expressions sorted by the estimated cost of their operators
+	Expressions Expressions
+
+	// the index in the Expressions slice at which we start evaluating the query
+	StartWith int
 
 	// clause that operate on tags (keys)
 	// we only need to support 1 condition for now: a prefix or match
-	TagClause ExpressionOperator // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	TagMatch  Expression         // only used for /metrics/tags with regex in filter param
-	TagPrefix string             // only used for auto complete of tags to match exact prefix
-
-	StartWith ExpressionOperator // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	TagClause Expression
 }
 
 func NewQueryFromStrings(expressionStrs []string, from int64) (Query, error) {
@@ -40,69 +39,52 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 		return q, errInvalidQuery
 	}
 
-	expressions.Sort()
-	q.Expressions = make(map[ExpressionOperator]Expressions)
-	for i, e := range expressions {
+	expressions.SortByFilterOrder()
+	for i := 0; i < len(expressions); i++ {
 		// skip duplicate expression
-		if i > 0 && e.IsEqualTo(expressions[i-1]) {
+		if i > 0 && ExpressionsAreEqual(expressions[i], expressions[i-1]) {
+			expressions = append(expressions[:i], expressions[i+1:]...)
+			i--
 			continue
 		}
 
-		// special case of empty value
-		if len(e.Value) == 0 {
-			if e.Operator == EQUAL || e.Operator == MATCH {
-				q.Expressions[NOT_MATCH] = append(q.Expressions[NOT_MATCH], e)
-			} else {
-				q.Expressions[MATCH] = append(q.Expressions[MATCH], e)
+		op := expressions[i].GetOperator()
+		switch op {
+		case MATCH_TAG:
+			fallthrough
+		case PREFIX_TAG:
+			// we only allow one query by tag
+			if q.TagClause != nil {
+				return q, errInvalidQuery
 			}
-		} else {
-			switch e.Operator {
-			case EQUAL:
-				q.Expressions[EQUAL] = append(q.Expressions[EQUAL], e)
-			case NOT_EQUAL:
-				q.Expressions[NOT_EQUAL] = append(q.Expressions[NOT_EQUAL], e)
-			case MATCH:
-				q.Expressions[MATCH] = append(q.Expressions[MATCH], e)
-			case NOT_MATCH:
-				q.Expressions[NOT_MATCH] = append(q.Expressions[NOT_MATCH], e)
-			case PREFIX:
-				q.Expressions[PREFIX] = append(q.Expressions[PREFIX], e)
-			case MATCH_TAG:
-				// we only allow one expression operating on tags
-				if q.TagClause != 0 {
-					return q, errInvalidQuery
-				}
 
-				q.TagMatch = e
-				q.TagClause = MATCH_TAG
-			case PREFIX_TAG:
-				// we only allow one expression operating on tags
-				if q.TagClause != 0 {
-					return q, errInvalidQuery
-				}
-
-				q.TagPrefix = e.Value
-				q.TagClause = PREFIX_TAG
-			}
+			q.TagClause = expressions[i]
+			expressions = append(expressions[:i], expressions[i+1:]...)
+			i--
 		}
 	}
 
-	// the cheapest operator to minimize the result set should have precedence
-	if len(q.Expressions[EQUAL]) > 0 {
-		q.StartWith = EQUAL
-	} else if len(q.Expressions[PREFIX]) > 0 {
-		q.StartWith = PREFIX
-	} else if len(q.Expressions[MATCH]) > 0 {
-		q.StartWith = MATCH
-	} else if q.TagClause == PREFIX_TAG {
-		// starting with a tag based expression can be very expensive because they
-		// have the potential to result in a huge initial result set
-		q.StartWith = PREFIX_TAG
-	} else if q.TagClause == MATCH_TAG {
-		q.StartWith = MATCH_TAG
-	} else {
+	q.Expressions = expressions
+	q.StartWith = q.Expressions.findInitialExpression()
+	if q.TagClause == nil && q.StartWith < 0 {
 		return q, errInvalidQuery
 	}
 
 	return q, nil
+}
+
+func (q *Query) GetMetricDefinitionFilters() (MetricDefinitionFilters, []FilterDecision) {
+	var filters MetricDefinitionFilters
+	var defaultDecisions []FilterDecision
+	for i := range q.Expressions {
+		// the one we start with does not need to be added to the filters,
+		// because we use it to build the initial result set
+		if i == q.StartWith {
+			continue
+		}
+		filters = append(filters, q.Expressions[i].GetMetricDefinitionFilter())
+		defaultDecisions = append(defaultDecisions, q.Expressions[i].GetDefaultDecision())
+	}
+
+	return filters, defaultDecisions
 }
