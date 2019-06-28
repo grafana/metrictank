@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/grafana/metrictank/expr/tagQuery"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
@@ -262,13 +262,13 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 			return
 		}
 
-		expressions := make(tagQuery.Expressions, 0, len(tags))
-		for _, tag := range tags {
-			expressions = append(expressions, tagQuery.Expression{
-				Tag:                   tag,
+		expressions := make(tagQuery.Expressions, len(tags))
+		for i := range tags {
+			expressions[i] = tagQuery.Expression{
+				Tag:                   tags[i],
 				Operator:              tagQuery.EQUAL,
 				RequiresNonEmptyValue: true,
-			})
+			}
 		}
 
 		query, err := tagQuery.NewQuery(expressions, 0)

@@ -9,13 +9,13 @@ import (
 type Tags []Tag
 
 func ParseTags(tags []string) (Tags, error) {
-	res := make(Tags, 0, len(tags))
+	res := make(Tags, len(tags))
 	for i := range tags {
 		tag, err := ParseTag(tags[i])
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, tag)
+		res[i] = tag
 	}
 
 	sort.Sort(res)
@@ -71,10 +71,10 @@ func (t Tags) Less(i, j int) bool {
 
 func (t Tags) Strings() []string {
 	builder := strings.Builder{}
-	res := make([]string, 0, len(t))
-	for _, tag := range t {
-		tag.StringIntoBuilder(&builder)
-		res = append(res, builder.String())
+	res := make([]string, len(t))
+	for i := range t {
+		t[i].StringIntoBuilder(&builder)
+		res[i] = builder.String()
 		builder.Reset()
 	}
 	return res

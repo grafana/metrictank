@@ -10,13 +10,13 @@ import (
 type Expressions []Expression
 
 func ParseExpressions(expressions []string) (Expressions, error) {
-	res := make(Expressions, 0, len(expressions))
+	res := make(Expressions, len(expressions))
 	for i := range expressions {
 		expression, err := ParseExpression(expressions[i])
 		if err != nil {
 			return nil, err
 		}
-		res = append(res, expression)
+		res[i] = expression
 	}
 	return res, nil
 }
@@ -36,10 +36,10 @@ func (e Expressions) Sort() {
 
 func (e Expressions) Strings() []string {
 	builder := strings.Builder{}
-	res := make([]string, 0, len(e))
-	for _, expression := range e {
-		expression.StringIntoBuilder(&builder)
-		res = append(res, builder.String())
+	res := make([]string, len(e))
+	for i := range e {
+		e[i].StringIntoBuilder(&builder)
+		res[i] = builder.String()
 		builder.Reset()
 	}
 	return res

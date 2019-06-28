@@ -2,13 +2,13 @@ package memory
 
 import (
 	"context"
-	"github.com/grafana/metrictank/expr/tagQuery"
 	"regexp"
 	"sort"
 	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -323,22 +323,7 @@ func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp, from in
 	}
 	g.Wait()
 
-	// merge our results into the unique set of tags
-	merged := map[string]struct{}{}
-	for _, tags := range result {
-		for _, t := range tags {
-			merged[t] = struct{}{}
-		}
-	}
-	if len(merged) == 0 {
-		return nil
-	}
-	response := make([]string, 0, len(merged))
-	for tag := range merged {
-		response = append(response, tag)
-	}
-
-	return response
+	return mergePartitionStringResults(result)
 }
 
 // FindTags returns tags matching the specified conditions
@@ -361,24 +346,10 @@ func (p *PartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int64,
 	}
 	g.Wait()
 
-	// merge our results into the unique set of tags
-	merged := map[string]struct{}{}
-	for _, tags := range result {
-		for _, t := range tags {
-			merged[t] = struct{}{}
-		}
-	}
-
-	response := make([]string, 0, len(merged))
-	for tag := range merged {
-		response = append(response, tag)
-	}
-
-	sort.Strings(response)
+	response := mergePartitionStringResults(result)
 	if uint(len(response)) > limit {
 		return response[:limit]
 	}
-
 	return response
 }
 
@@ -401,24 +372,10 @@ func (p *PartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, qu
 	}
 	g.Wait()
 
-	// merge our results into the unique set of tags
-	merged := map[string]struct{}{}
-	for _, tags := range result {
-		for _, t := range tags {
-			merged[t] = struct{}{}
-		}
-	}
-
-	response := make([]string, 0, len(merged))
-	for tag := range merged {
-		response = append(response, tag)
-	}
-
-	sort.Strings(response)
+	response := mergePartitionStringResults(result)
 	if uint(len(response)) > limit {
 		return response[:limit]
 	}
-
 	return response
 }
 
@@ -440,20 +397,13 @@ func (p *PartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, f
 	}
 	g.Wait()
 
-	// merge our results into the unique set of tags
-	merged := map[string]struct{}{}
-	for _, tags := range result {
-		for _, t := range tags {
-			merged[t] = struct{}{}
-		}
+	response := mergePartitionStringResults(result)
+	if uint(len(response)) > limit {
+		return response[:limit]
 	}
-	response := make([]string, 0, len(merged))
-	for tag := range merged {
-		response = append(response, tag)
-	}
-
 	return response
 }
+
 func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagQuery.Query, limit uint) []string {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]string, len(p.Partition))
@@ -468,18 +418,10 @@ func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix 
 	}
 	g.Wait()
 
-	// merge our results into the unique set of tags
-	merged := map[string]struct{}{}
-	for _, tags := range result {
-		for _, t := range tags {
-			merged[t] = struct{}{}
-		}
+	response := mergePartitionStringResults(result)
+	if uint(len(response)) > limit {
+		return response[:limit]
 	}
-	response := make([]string, 0, len(merged))
-	for tag := range merged {
-		response = append(response, tag)
-	}
-
 	return response
 }
 
@@ -612,4 +554,26 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagQu
 	}
 
 	return record, created, nil
+}
+
+func mergePartitionStringResults(partitionResults [][]string) []string {
+	// merge our results into the unique set of strings
+	merged := map[string]struct{}{}
+	for _, tags := range partitionResults {
+		for _, t := range tags {
+			merged[t] = struct{}{}
+		}
+	}
+
+	// convert the map into a slice
+	response := make([]string, len(merged))
+	i := 0
+	for tag := range merged {
+		response[i] = tag
+		i++
+	}
+
+	sort.Strings(response)
+
+	return response
 }

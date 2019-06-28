@@ -1325,13 +1325,8 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagQuery.Query
 	queryCtx := NewTagQueryContext(query)
 
 	m.RLock()
-	idMap := m.idsByTagQuery(orgId, queryCtx)
+	ids := m.idsByTagQuery(orgId, queryCtx)
 	m.RUnlock()
-
-	ids := make(IdSet, len(idMap))
-	for id := range idMap {
-		ids[id] = struct{}{}
-	}
 
 	m.Lock()
 	defer m.Unlock()
