@@ -819,7 +819,7 @@ func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
 					return nil, err
 				}
 
-				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue
+				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue()
 
 				results = append(results, expression)
 				continue
@@ -1222,13 +1222,17 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 				return
 			}
 
-			expressions := make(tagquery.Expressions, 0, len(tags))
-			for _, tag := range tags {
-				expressions = append(expressions, tagquery.Expression{
-					Tag:                   tag,
-					Operator:              tagquery.EQUAL,
-					RequiresNonEmptyValue: true,
-				})
+			expressions := make(tagquery.Expressions, len(tags))
+			builder := strings.Builder{}
+			for i := range tags {
+				tags[i].StringIntoBuilder(&builder)
+				var err error
+				expressions[i], err = tagquery.ParseExpression(builder.String())
+				if err != nil {
+					response.Write(ctx, response.WrapErrorForTagDB(err))
+					return
+				}
+				builder.Reset()
 			}
 
 			query, err := tagquery.NewQuery(expressions, 0)

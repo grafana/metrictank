@@ -33,13 +33,13 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 // MatchesQueries compares another tag record's queries to this
 // one's queries. Returns true if they are equal, otherwise false.
 // It is assumed that all the queries are already sorted
-func (m *MetaTagRecord) MatchesQueries(other MetaTagRecord) bool {
+func (m *MetaTagRecord) MatchesQueries(other *MetaTagRecord) bool {
 	if len(m.Queries) != len(other.Queries) {
 		return false
 	}
 
 	for i, query := range m.Queries {
-		if !query.IsEqualTo(other.Queries[i]) {
+		if !ExpressionsAreEqual(query, other.Queries[i]) {
 			return false
 		}
 	}

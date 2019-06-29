@@ -45,7 +45,7 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		if existingRecord, ok := m[id+recordId(i)]; ok {
-			if record.MatchesQueries(existingRecord) {
+			if record.MatchesQueries(&existingRecord) {
 				oldRecord = &existingRecord
 				oldId = id + recordId(i)
 				delete(m, oldId)
@@ -75,7 +75,7 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 
 // hashMetaTagRecord generates a hash of all the queries in the record
 func (m *metaTagRecords) hashMetaTagRecord(record tagquery.MetaTagRecord) recordId {
-	record.Queries.Sort()
+	record.Queries.SortByFilterOrder()
 	builder := strings.Builder{}
 	for _, query := range record.Queries {
 		query.StringIntoBuilder(&builder)
