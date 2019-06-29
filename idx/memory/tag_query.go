@@ -45,12 +45,11 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 	idCh := make(chan schema.MKey, 1000)
 	stopCh := make(chan struct{})
-	initial := q.query.Expressions[q.query.StartWith]
 
-	if initial.OperatesOnTag() {
-		q.getInitialByTag(initial, idCh, stopCh)
+	if q.query.GetInitialExpression().OperatesOnTag() {
+		q.getInitialByTag(idCh, stopCh)
 	} else {
-		q.getInitialByTagValue(initial, idCh, stopCh)
+		q.getInitialByTagValue(idCh, stopCh)
 	}
 
 	return idCh, stopCh
@@ -59,7 +58,9 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 // getInitialByTagValue generates an initial ID set which is later filtered down
 // it only handles those expressions which involve matching a tag value:
 // f.e. key=value but not key!=
-func (q *TagQueryContext) getInitialByTagValue(expr tagquery.Expression, idCh chan schema.MKey, stopCh chan struct{}) {
+func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struct{}) {
+	expr := q.query.GetInitialExpression()
+
 	q.wg.Add(1)
 	go func() {
 		defer close(idCh)
@@ -87,7 +88,9 @@ func (q *TagQueryContext) getInitialByTagValue(expr tagquery.Expression, idCh ch
 // getInitialByTag generates an initial ID set which is later filtered down
 // it only handles those expressions which do not involve matching a tag value:
 // f.e. key!= but not key=value
-func (q *TagQueryContext) getInitialByTag(expr tagquery.Expression, idCh chan schema.MKey, stopCh chan struct{}) {
+func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) {
+	expr := q.query.GetInitialExpression()
+
 	q.wg.Add(1)
 	go func() {
 		defer close(idCh)
@@ -209,13 +212,14 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive)
 func (q *TagQueryContext) getMaxTagCount() int {
 	defer q.wg.Done()
 
-	if q.query.TagClause == nil {
+	tagClause := q.query.GetTagClause()
+	if tagClause == nil {
 		return len(q.index)
 	}
 
 	var maxTagCount int
 	for tag := range q.index {
-		if q.query.TagClause.ValuePasses(tag) {
+		if tagClause.ValuePasses(tag) {
 			maxTagCount++
 		}
 	}
@@ -231,6 +235,7 @@ func (q *TagQueryContext) filterTagsFromChan(idCh chan schema.MKey, tagCh chan s
 	// used to prevent that this worker thread will push the same result into
 	// the chan twice
 	resultsCache := make(map[string]struct{})
+	tagClause := q.query.GetTagClause()
 
 IDS:
 	for id := range idCh {
@@ -262,7 +267,7 @@ IDS:
 				continue
 			}
 
-			if q.query.TagClause != nil && !q.query.TagClause.ValuePasses(key) {
+			if tagClause != nil && !tagClause.ValuePasses(key) {
 				continue
 			}
 
@@ -312,16 +317,18 @@ IDS:
 // tag "name". if it does, then we can omit some filtering because we know
 // that every metric has a name
 func (q *TagQueryContext) tagFilterMatchesName() bool {
+	tagClause := q.query.GetTagClause()
+
 	// some tag queries might have no prefix specified yet, in this case
 	// we do not need to filter by the name
 	// f.e. we know that every metric has a name, and we know that the
 	// prefix "" matches the string "name", so we know that every metric
 	// will pass the tag prefix test. hence we can omit the entire test.
-	if q.query.TagClause == nil {
+	if tagClause == nil {
 		return true
 	}
 
-	return q.query.TagClause.ValuePasses("name")
+	return tagClause.ValuePasses("name")
 }
 
 // RunGetTags executes the tag query and returns all the tags of the
