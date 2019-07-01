@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func TestWriteQueue(t *testing.T) {
 		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 
-	nodes, err := ix.Find(1, "some.metric.*", 0)
+	nodes, err := ix.Find(context.Background(), 1, "some.metric.*", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestWriteQueue(t *testing.T) {
 	mkey, _ := schema.MKeyFromString(data.Id)
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 
-	nodes, err = ix.Find(1, "some.metric.*", 0)
+	nodes, err = ix.Find(context.Background(), 1, "some.metric.*", 0)
 	if err != nil {
 		t.Fatal(err)
 	}

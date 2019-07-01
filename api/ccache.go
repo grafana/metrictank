@@ -17,9 +17,9 @@ import (
 func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) {
 	res := models.CCacheDeleteResp{}
 	code := http.StatusOK
-
+	reqCtx := ctx.Req.Context()
 	if req.Propagate {
-		res.Peers = s.ccacheDeletePropagate(ctx.Req.Context(), &req)
+		res.Peers = s.ccacheDeletePropagate(reqCtx, &req)
 		for _, peer := range res.Peers {
 			if peer.Errors > 0 {
 				code = http.StatusInternalServerError
@@ -48,7 +48,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		var toClear []idx.Node
 		if len(req.Patterns) > 0 {
 			for _, pattern := range req.Patterns {
-				nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
+				nodes, err := s.MetricIndex.Find(reqCtx, req.OrgId, pattern, 0)
 				if err != nil {
 					if res.Errors == 0 {
 						res.FirstError = err.Error()

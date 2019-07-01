@@ -3,6 +3,7 @@
 package idx
 
 import (
+	"context"
 	"time"
 
 	"github.com/raintank/schema"
@@ -82,7 +83,7 @@ type MetricIndex interface {
 	// * orgId describes the org to search in (public data in orgIdPublic is automatically included)
 	// * pattern is handled like graphite does. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
 	// * from is a unix timestamp. series not updated since then are excluded.
-	Find(orgId uint32, pattern string, from int64) ([]Node, error)
+	Find(ctx context.Context, orgId uint32, pattern string, from int64) ([]Node, error)
 
 	// List returns all Archives for the passed OrgId and the public orgId
 	List(orgId uint32) []Archive

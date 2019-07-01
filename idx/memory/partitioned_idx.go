@@ -172,13 +172,13 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archi
 // * orgId describes the org to search in (public data in orgIdPublic is automatically included)
 // * pattern is handled like graphite does. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
 // * from is a unix timestamp. series not updated since then are excluded.
-func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
-	g, _ := errgroup.WithContext(context.Background())
+func (p *PartitionedMemoryIdx) Find(ctx context.Context, orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+	g, groupCtx := errgroup.WithContext(ctx)
 	resultChan := make(chan []idx.Node)
 	for _, m := range p.Partition {
 		m := m
 		g.Go(func() error {
-			found, err := m.Find(orgId, pattern, from)
+			found, err := m.Find(groupCtx, orgId, pattern, from)
 			if err != nil {
 				return err
 			}

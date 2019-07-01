@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -1166,6 +1167,7 @@ func (m *UnpartitionedMemoryIdx) toIdxNodes(matchedNodes []*Node, from int64) []
 	// for each path, and it holds all defs that the Node refers too.
 	for _, n := range matchedNodes {
 		if _, ok := byPath[n.Path]; !ok {
+			// TODO: use a bufferPool for these to reduce allocations
 			idxNode := idx.Node{
 				Path:        n.Path,
 				Leaf:        n.Leaf(),
@@ -1204,9 +1206,21 @@ func (m *UnpartitionedMemoryIdx) toIdxNodes(matchedNodes []*Node, from int64) []
 	return results
 }
 
-func (m *UnpartitionedMemoryIdx) findMaybeCached(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+func (m *UnpartitionedMemoryIdx) checkReadConcurrency(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case m.concurrentFinds <- struct{}{}:
+	}
+	return nil
+}
+
+func (m *UnpartitionedMemoryIdx) findMaybeCached(ctx context.Context, orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	if m.findCache == nil {
-		m.concurrentFinds <- struct{}{}
+		err := m.checkReadConcurrency(ctx)
+		if err != nil {
+			return nil, err
+		}
 		m.RLock()
 		defer func() {
 			m.RUnlock()
@@ -1227,36 +1241,62 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(orgId uint32, pattern string, f
 
 	matchedNodes, ok := m.findCache.Get(orgId, pattern)
 	if ok {
-		return m.toIdxNodes(matchedNodes, from), nil
+		// we have our matched nodes, but these are pointers to Node structs,
+		// so before we can read the contents to build our []idx.Node slice, we
+		// need to make sure we have a readLock, which we should release after returning
+		m.RLock()
+		defer m.RUnlock()
+
+		// if our ctx was closed while waiting for the lock, we can return
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+	} else {
+		// nothing found in the cache, so we need to search the index.
+
+		// before trying to acquire a readLock, make sure there are not already
+		// too many finds currently running.  We will block here until a slot free's up
+		// or our ctx is done.
+		err := m.checkReadConcurrency(ctx)
+		if err != nil {
+			return nil, err
+		}
+		m.RLock()
+		defer func() {
+			m.RUnlock()
+			<-m.concurrentFinds
+		}()
+		// if our ctx was closed while waiting for the lock, we can return
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		tree, ok := m.tree[orgId]
+		if !ok {
+			log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
+			return nil, nil
+		}
+		matchedNodes, err = find(tree, pattern)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
+		m.findCache.Add(orgId, pattern, matchedNodes)
 	}
-	m.concurrentFinds <- struct{}{}
-	m.RLock()
-	defer func() {
-		m.RUnlock()
-		<-m.concurrentFinds
-	}()
-	tree, ok := m.tree[orgId]
-	if !ok {
-		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
-		return nil, nil
-	}
-	matchedNodes, err := find(tree, pattern)
-	if err != nil {
-		return nil, err
-	}
-	log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
-	m.findCache.Add(orgId, pattern, matchedNodes)
 	return m.toIdxNodes(matchedNodes, from), nil
 }
 
-func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+func (m *UnpartitionedMemoryIdx) Find(ctx context.Context, orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	pre := time.Now()
-	matchedNodes, err := m.findMaybeCached(orgId, pattern, from)
+	matchedNodes, err := m.findMaybeCached(ctx, orgId, pattern, from)
 	if err != nil {
 		return nil, err
 	}
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
-		publicNodes, err := m.findMaybeCached(idx.OrgIdPublic, pattern, from)
+		publicNodes, err := m.findMaybeCached(ctx, idx.OrgIdPublic, pattern, from)
 		if err != nil {
 			return nil, err
 		}
