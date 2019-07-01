@@ -279,10 +279,11 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 						chunkSaveOk.Inc()
 					}
 				}
+				log.Errorf("btStore: failed to write %d of %d rows. first error: %s", len(failedRowKeys), len(rowKeys), err)
 				rowKeys = failedRowKeys
 				muts = failedMutations
 				buf = retryBuf
-				log.Errorf("btStore: failed to write %d rows. first error: %s", len(failedRowKeys), err)
+				
 				chunkSaveFail.Add(len(failedRowKeys))
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
