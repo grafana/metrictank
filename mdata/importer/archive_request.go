@@ -5,13 +5,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/tinylib/msgp/msgp"
 	"io"
 	"time"
 
 	"github.com/grafana/metrictank/conf"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/raintank/schema"
+	"github.com/tinylib/msgp/msgp"
 )
 
 //go:generate msgp
@@ -66,7 +66,7 @@ func NewArchiveRequest(w *whisper.Whisper, schemas conf.Schemas, file, name stri
 
 			var archive schema.Archive
 			if retIdx > 0 {
-				archive = schema.NewArchive(m, retention.ChunkSpan)
+				archive = schema.NewArchive(m, uint32(retention.SecondsPerPoint))
 			}
 
 			encodedChunks := encodeChunksFromPoints(p, uint32(retention.SecondsPerPoint), retention.ChunkSpan, writeUnfinishedChunks)
