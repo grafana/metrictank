@@ -2,7 +2,6 @@ package memory
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/expr/tagQuery"
 	"os"
 	"reflect"
 	"regexp"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )

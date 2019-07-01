@@ -3,7 +3,6 @@ package memory
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/grafana/metrictank/expr/tagQuery"
 	"hash/fnv"
 	"regexp"
 	"runtime"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/expr/tagQuery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/test"
