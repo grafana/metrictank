@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/globalconf"
@@ -221,10 +222,17 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	s.index.AddOrUpdate(mkey, &data.MetricData, partition)
+
+	var wg sync.WaitGroup
+	cb := func() {
+		wg.Done()
+	}
 	for _, cwr := range data.ChunkWriteRequests {
-		cwrWithOrg := cwr.GetChunkWriteRequest(nil, mkey)
+		wg.Add(1)
+		cwrWithOrg := cwr.GetChunkWriteRequest(cb, mkey)
 		s.store.Add(&cwrWithOrg)
 	}
+	wg.Wait()
 }
 
 func getOrgId(req *http.Request) (int, error) {
