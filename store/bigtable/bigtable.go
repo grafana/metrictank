@@ -283,7 +283,6 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				rowKeys = failedRowKeys
 				muts = failedMutations
 				buf = retryBuf
-				
 				chunkSaveFail.Add(len(failedRowKeys))
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
