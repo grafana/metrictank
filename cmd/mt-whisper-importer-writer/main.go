@@ -224,15 +224,18 @@ func (s *Server) chunksHandler(w http.ResponseWriter, req *http.Request) {
 	s.index.AddOrUpdate(mkey, &data.MetricData, partition)
 
 	var wg sync.WaitGroup
-	cb := func() {
-		wg.Done()
-	}
 	for _, cwr := range data.ChunkWriteRequests {
 		wg.Add(1)
+		cb := func() {
+			wg.Done()
+			log.Debugf("Cwr has been written: %s / %s / %d", data.MetricData.Name, cwr.Archive.String(), cwr.T0)
+		}
 		cwrWithOrg := cwr.GetChunkWriteRequest(cb, mkey)
 		s.store.Add(&cwrWithOrg)
 	}
+
 	wg.Wait()
+	log.Infof("Successfully wrote %d cwrs for metric %s", len(data.ChunkWriteRequests), data.MetricData.Name)
 }
 
 func getOrgId(req *http.Request) (int, error) {
