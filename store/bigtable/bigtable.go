@@ -262,11 +262,15 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				failedRowKeys := make([]string, 0)
 				failedMutations := make([]*bigtable.Mutation, 0)
 				retryBuf := make([]*mdata.ChunkWriteRequest, 0)
-				for i, err := range errs {
-					if err != nil {
+				for i, errPerMut := range errs {
+					if errPerMut != nil {
 						failedRowKeys = append(failedRowKeys, rowKeys[i])
 						failedMutations = append(failedMutations, muts[i])
 						retryBuf = append(retryBuf, buf[i])
+						if err == nil {
+							// keep the first mutation error, to then log it further down
+							err = errPerMut
+						}
 					} else {
 						if buf[i].Callback != nil {
 							buf[i].Callback()
@@ -275,10 +279,10 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 						chunkSaveOk.Inc()
 					}
 				}
+				log.Errorf("btStore: failed to write %d of %d rows. first error: %s", len(failedRowKeys), len(rowKeys), err)
 				rowKeys = failedRowKeys
 				muts = failedMutations
 				buf = retryBuf
-				log.Errorf("btStore: failed to write %d rows. %s", len(failedRowKeys), err)
 				chunkSaveFail.Add(len(failedRowKeys))
 				sleepTime := 100 * attempts
 				if sleepTime > 2000 {
