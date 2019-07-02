@@ -16,10 +16,6 @@ var ErrInvalidEmptyName = errors.New("name cannot be empty")
 var ErrInvalidMtype = errors.New("invalid mtype")
 var ErrInvalidTagFormat = errors.New("invalid tag format")
 
-// as defined in https://github.com/graphite-project/graphite-web/blob/master/docs/tags.rst#carbon
-const invalidTagKeyChars = ";!^="
-const invalidTagValueChars = ";~"
-
 type PartitionedMetric interface {
 	Validate() error
 	SetId()
@@ -166,6 +162,10 @@ func (m *MetricDefinition) NameWithTags() string {
 	return m.nameWithTags
 }
 
+func (m *MetricDefinition) NameSanitizedAsTagValue() string {
+	return SanitizeNameAsTagValue(m.Name)
+}
+
 func (m *MetricDefinition) SetId() {
 	sort.Strings(m.Tags)
 
@@ -251,6 +251,25 @@ func MetricDefinitionFromMetricData(d *MetricData) *MetricDefinition {
 	return md
 }
 
+// SanitizeNameAsTagValue takes a name and potentially
+// modifies it to ensure it is a valid value that can be
+// used as a tag value. This is important when we index
+// metric names as values of the tag "name"
+func SanitizeNameAsTagValue(name string) string {
+	if len(name) == 0 || name[0] != '~' {
+		return name
+	}
+
+	for i := 1; i < len(name); i++ {
+		if name[i] != '~' {
+			return name[i:]
+		}
+	}
+
+	// the whole name consists of no other chars than '~'
+	return ""
+}
+
 // ValidateTags returns whether all tags are in a valid format.
 // a valid format is anything that looks like key=value,
 // the length of key and value must be >0 and both cannot contain
@@ -287,10 +306,24 @@ func ValidateTag(tag string) bool {
 	return ValidateTagKey(tag[:equal]) && ValidateTagValue(tag[equal+1:])
 }
 
+// ValidateTagKey validates tag key requirements as defined in graphite docs
 func ValidateTagKey(key string) bool {
-	return !strings.ContainsAny(key, invalidTagKeyChars)
+	if len(key) == 0 {
+		return false
+	}
+
+	return !strings.ContainsAny(key, ";!^=")
 }
 
+// ValidateTagValue is the same as the above ValidateTagKey, but for the tag value
 func ValidateTagValue(value string) bool {
-	return !strings.ContainsAny(value, invalidTagValueChars)
+	if len(value) == 0 {
+		return false
+	}
+
+	if value[0] == '~' {
+		return false
+	}
+
+	return !strings.ContainsRune(value, ';')
 }
