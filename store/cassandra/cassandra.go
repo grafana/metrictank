@@ -16,11 +16,9 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/tracing"
 	"github.com/grafana/metrictank/util"
 	hostpool "github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
-	tags "github.com/opentracing/opentracing-go/ext"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -417,15 +415,8 @@ func (c *CassandraStore) Search(ctx context.Context, key schema.AMKey, ttl, star
 // Basic search of cassandra in given table
 // start inclusive, end exclusive
 func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, table Table, start, end uint32) ([]chunk.IterGen, error) {
-	_, span := tracing.NewSpan(ctx, c.tracer, "CassandraStore.SearchTable")
-	defer span.Finish()
-	tags.SpanKindRPCClient.Set(span)
-	tags.PeerService.Set(span, "cassandra")
-
 	var itgens []chunk.IterGen
 	if start >= end {
-		tracing.Failure(span)
-		tracing.Error(span, errInvalidRange)
 		return itgens, errInvalidRange
 	}
 
@@ -491,8 +482,6 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	case c.readQueue <- &crr:
 	default:
 		cassReadQueueFull.Inc()
-		tracing.Failure(span)
-		tracing.Error(span, errReadQueueFull)
 		return nil, errReadQueueFull
 	}
 
@@ -507,8 +496,6 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 				// context was canceled, return immediately.
 				return nil, nil
 			}
-			tracing.Failure(span)
-			tracing.Error(span, res.err)
 			return nil, res.err
 		}
 		close(results)
@@ -524,14 +511,10 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	for res.i.Scan(&t0, &b) {
 		chunkSizeAtLoad.Value(len(b))
 		if len(b) < 2 {
-			tracing.Failure(span)
-			tracing.Error(span, errChunkTooSmall)
 			return itgens, errChunkTooSmall
 		}
 		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, b)
 		if err != nil {
-			tracing.Failure(span)
-			tracing.Error(span, err)
 			return itgens, err
 		}
 		itgens = append(itgens, itgen)
@@ -543,8 +526,6 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 			// query was aborted.
 			return nil, nil
 		}
-		tracing.Failure(span)
-		tracing.Error(span, err)
 		errmetrics.Inc(err)
 		return nil, err
 	}
@@ -554,8 +535,6 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	cassToIterDuration.Value(time.Now().Sub(pre))
 	cassRowsPerResponse.Value(len(rowKeys))
 	cassChunksPerResponse.Value(len(itgens))
-	span.SetTag("rows", len(rowKeys))
-	span.SetTag("chunks", len(itgens))
 	return itgens, nil
 }
 

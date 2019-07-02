@@ -12,10 +12,8 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/tracing"
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
-	tags "github.com/opentracing/opentracing-go/ext"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -336,15 +334,9 @@ func (s *Store) SetTracer(t opentracing.Tracer) {
 // start inclusive, end exclusive
 func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end uint32) ([]chunk.IterGen, error) {
 	log.Debugf("btStore: fetching chunks for metric %s in range %d %d", key, start, end)
-	_, span := tracing.NewSpan(ctx, s.tracer, "BigtableStore.Search")
-	defer span.Finish()
-	tags.SpanKindRPCClient.Set(span)
-	tags.PeerService.Set(span, "bigtable")
 
 	itgens := make([]chunk.IterGen, 0)
 	if start > end {
-		tracing.Failure(span)
-		tracing.Error(span, errStartBeforeEnd)
 		return itgens, errStartBeforeEnd
 	}
 
@@ -433,8 +425,6 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 		err = reqErr
 	}
 	if err != nil {
-		tracing.Failure(span)
-		tracing.Error(span, err)
 		btblReadError.Inc()
 	}
 	// TODO: do we need to ensure that itgens is sorted by chunk T0?

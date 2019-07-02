@@ -259,12 +259,15 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 // error is the error of the first failing target request
 func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]models.Series, error) {
 	log.Debugf("DP getTargetsLocal: handling %d reqs locally", len(reqs))
+	rCtx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
+	defer span.Finish()
+	span.SetTag("num_reqs", len(reqs))
 	responses := make(chan getTargetsResp, len(reqs))
 
 	var wg sync.WaitGroup
 	reqLimiter := util.NewLimiter(getTargetsConcurrency)
 
-	rCtx, cancel := context.WithCancel(ctx)
+	rCtx, cancel := context.WithCancel(rCtx)
 	defer cancel()
 LOOP:
 	for _, req := range reqs {
@@ -276,12 +279,9 @@ LOOP:
 		}
 		wg.Add(1)
 		go func(req models.Req) {
-			rCtx, span := tracing.NewSpan(rCtx, s.Tracer, "getTargetsLocal")
-			req.Trace(span)
 			pre := time.Now()
 			points, interval, err := s.getTarget(rCtx, req)
 			if err != nil {
-				tags.Error.Set(span, true)
 				cancel() // cancel all other requests.
 				responses <- getTargetsResp{nil, err}
 			} else {
@@ -300,7 +300,6 @@ LOOP:
 			wg.Done()
 			// pop an item of our limiter so that other requests can be processed.
 			reqLimiter.Release()
-			span.Finish()
 		}(req)
 	}
 	go func() {
@@ -310,6 +309,7 @@ LOOP:
 	out := make([]models.Series, 0, len(reqs))
 	for resp := range responses {
 		if resp.err != nil {
+			tags.Error.Set(span, true)
 			return nil, resp.err
 		}
 		out = append(out, resp.series...)
@@ -439,7 +439,6 @@ func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 
 	log.Debugf("oldest from aggmetrics is %d", res.Oldest)
 	span := opentracing.SpanFromContext(ctx.ctx)
-	span.SetTag("oldest_in_ring", res.Oldest)
 
 	if res.Oldest <= ctx.From {
 		reqSpanMem.ValueUint32(ctx.To - ctx.From)
@@ -452,6 +451,9 @@ func (s *Server) getSeries(ctx *requestContext) (mdata.Result, error) {
 	until := util.Min(res.Oldest, ctx.To)
 	fromCache, err := s.getSeriesCachedStore(ctx, until)
 	if err != nil {
+		tracing.Failure(span)
+		tracing.Error(span, err)
+		log.Errorf("getSeriesCachedStore: %s", err.Error())
 		return res, err
 	}
 	res.Iters = append(fromCache, res.Iters...)
@@ -482,9 +484,6 @@ func (s *Server) itersToPoints(ctx *requestContext, iters []tsz.Iter) []schema.P
 }
 
 func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) {
-	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesAggMetrics")
-	defer span.Finish()
-
 	// this is a query node that for some reason received a request
 	if s.MemoryStore == nil {
 		return mdata.Result{}, nil
@@ -516,19 +515,13 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 	var iters []tsz.Iter
 	var prevts uint32
 
-	_, span := tracing.NewSpan(ctx.ctx, s.Tracer, "getSeriesCachedStore")
-	defer span.Finish()
-	span.SetTag("key", ctx.AMKey)
-	span.SetTag("from", ctx.From)
-	span.SetTag("until", until)
-
 	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
 	logLoad("cassan", ctx.AMKey, ctx.From, ctx.To)
 
 	log.Debugf("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
 	cacheRes, err := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
 	if err != nil {
-		return iters, err
+		return iters, fmt.Errorf("Cache.Search() failed: %+v", err.Error())
 	}
 	log.Debugf("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 
@@ -545,9 +538,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 		prevts = itgen.T0
 		if err != nil {
 			// TODO(replay) figure out what to do if one piece is corrupt
-			tracing.Failure(span)
-			tracing.Errorf(span, "itergen: error getting iter from Start list %+v", err)
-			return iters, err
+			return iters, fmt.Errorf("error getting iter from cacheResult.Start: %+v", err.Error())
 		}
 		iters = append(iters, iter)
 	}
@@ -565,7 +556,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 		if cacheRes.From != cacheRes.Until {
 			storeIterGens, err := s.BackendStore.Search(ctx.ctx, ctx.AMKey, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
-				return iters, err
+				return iters, fmt.Errorf("BackendStore.Search() failed: %+v", err.Error())
 			}
 			// check to see if the request has been canceled, if so abort now.
 			select {
@@ -579,13 +570,11 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 				iter, err := itgen.Get()
 				if err != nil {
 					// TODO(replay) figure out what to do if one piece is corrupt
-					tracing.Failure(span)
-					tracing.Errorf(span, "itergen: error getting iter from store slice %+v", err)
 					if i > 0 {
 						// add all the iterators that are in good shape
 						s.Cache.AddRange(ctx.AMKey, prevts, storeIterGens[:i])
 					}
-					return iters, err
+					return iters, fmt.Errorf("error getting iter from BackendStore.Search(): %+v", err.Error())
 				}
 				iters = append(iters, iter)
 			}
@@ -599,8 +588,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 			iter, err := cacheRes.End[i].Get()
 			if err != nil {
 				// TODO(replay) figure out what to do if one piece is corrupt
-				log.Errorf("itergen: error getting iter from cache result end slice %+v", err.Error())
-				return iters, err
+				return iters, fmt.Errorf("error getting iter from cacheResult.End: %+v", err.Error())
 			}
 			iters = append(iters, iter)
 		}
