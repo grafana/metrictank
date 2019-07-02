@@ -86,7 +86,7 @@ func TestParseTagsFromMetricName(t *testing.T) {
 			},
 			want: Tags{
 				{Key: "aaa", Value: "bbb"},
-				{Key: "name", Value: "my.test.metric"},
+				{Key: "name", Value: "my~~~~.te~st.met~ric~"},
 			},
 		}, {
 			name: "invalid tag in name1",
@@ -121,7 +121,7 @@ func TestParseTagsFromMetricName(t *testing.T) {
 		}, {
 			name: "invalid tag in name6",
 			args: args{
-				name: "my.test.metric;a=b~b",
+				name: "my.test.metric;a=~b",
 			},
 			wantErr: true,
 		},
@@ -210,8 +210,12 @@ func TestParseTag(t *testing.T) {
 			args:    args{tag: "aa^a=bbb"},
 			wantErr: true,
 		}, {
+			name: "invalid value",
+			args: args{tag: "aaa=bb~b"},
+			want: Tag{Key: "aaa", Value: "bb~b"},
+		}, {
 			name:    "invalid value",
-			args:    args{tag: "aaa=bb~b"},
+			args:    args{tag: "aaa=~bbb"},
 			wantErr: true,
 		}, {
 			name: "weird chars in tag1",

@@ -109,7 +109,7 @@ func generateInvalidTags(t *testing.T) []string {
 func generateInvalidTagValues(t *testing.T) []string {
 	t.Helper()
 
-	invalidChars := ";~"
+	invalidChars := ";"
 	validChar := "a"
 
 	tagValues := generateInvalidStrings(t, invalidChars, validChar)
@@ -117,6 +117,10 @@ func generateInvalidTagValues(t *testing.T) []string {
 	for _, tagValue := range tagValues {
 		res = append(res, fmt.Sprintf("tag=%s", tagValue))
 	}
+
+	res = append(res, fmt.Sprintf("tag=~"))
+	res = append(res, fmt.Sprintf("tag=~a"))
+	res = append(res, fmt.Sprintf("tag=~aa"))
 	return res
 }
 

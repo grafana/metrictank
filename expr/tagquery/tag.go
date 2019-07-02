@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type Tags []Tag
@@ -26,27 +28,14 @@ func ParseTags(tags []string) (Tags, error) {
 func ParseTagsFromMetricName(name string) (Tags, error) {
 	elements := strings.Split(name, ";")
 
-	if len(elements[0]) == 0 {
-		return nil, fmt.Errorf("Metric name cannot have length 0")
-	}
+	nameValue := schema.SanitizeNameAsTagValue(elements[0])
 
-	// strip the ~ from the name, because it is not allowed in tag values
-	for i := 0; i < len(elements[0]); {
-		if elements[0][i] == '~' {
-			elements[0] = elements[0][:i] + elements[0][i+1:]
-		} else {
-			i++
-		}
-	}
-
-	// validate the name as a tag value
-	err := validateValue(elements[0])
-	if err != nil {
-		return nil, err
+	if !schema.ValidateTagValue(nameValue) {
+		return nil, fmt.Errorf("Metric name is invalid as tag value \"%s\"", nameValue)
 	}
 
 	if len(elements) < 2 {
-		return []Tag{{Key: "name", Value: elements[0]}}, nil
+		return []Tag{{Key: "name", Value: nameValue}}, nil
 	}
 
 	res, err := ParseTags(elements[1:])
@@ -54,7 +43,7 @@ func ParseTagsFromMetricName(name string) (Tags, error) {
 		return nil, err
 	}
 
-	res = append(res, Tag{Key: "name", Value: elements[0]})
+	res = append(res, Tag{Key: "name", Value: nameValue})
 	sort.Sort(res)
 
 	return res, nil
@@ -94,21 +83,13 @@ func ParseTag(tag string) (Tag, error) {
 	}
 
 	res.Key = tag[:equalPos]
-	err := validateKey(res.Key)
-	if err != nil {
-		return res, fmt.Errorf("Error when validating tag %s: %s", tag, err)
-	}
-	if len(res.Key) == 0 {
-		return res, fmt.Errorf("Tag key may not be empty: %s", tag)
+	if !schema.ValidateTagKey(res.Key) {
+		return res, fmt.Errorf("Invalid tag key \"%s\"", res.Key)
 	}
 
 	res.Value = tag[equalPos+1:]
-	err = validateValue(res.Value)
-	if err != nil {
-		return res, fmt.Errorf("Error when validating tag %s: %s", tag, err)
-	}
-	if len(res.Value) == 0 {
-		return res, fmt.Errorf("Tag value may not be empty: %s", tag)
+	if !schema.ValidateTagValue(res.Value) {
+		return res, fmt.Errorf("Invalid tag value \"%s\"", res.Value)
 	}
 
 	return res, nil

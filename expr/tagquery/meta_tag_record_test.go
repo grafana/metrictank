@@ -47,7 +47,7 @@ func TestErrorOnParsingMetaTagRecordWithInvalidTag(t *testing.T) {
 }
 
 func TestErrorOnParsingMetaTagRecordWithInvalidQuery(t *testing.T) {
-	_, err := ParseMetaTagRecord([]string{"a=b"}, []string{"c=~~d"})
+	_, err := ParseMetaTagRecord([]string{"a=b"}, []string{"c^^=~d"})
 	if err == nil {
 		t.Fatalf("Expected an error, but did not get one")
 	}
