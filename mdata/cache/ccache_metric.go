@@ -406,16 +406,15 @@ func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CC
 	mc.searchForward(ctx, metric, from, until, res)
 	if !res.Complete {
 		mc.searchBackward(from, until, res)
-	}
 
-	if !res.Complete && res.From > res.Until {
-		log.Warnf("CCacheMetric Search: Found from > until (%d/%d), key = %s, printing chunks\n", res.From, res.Until, mc.MKey.String())
-		mc.debugMetric(from-7200, until+7200)
-		res.Complete = false
-		res.Start = res.Start[:0]
-		res.End = res.End[:0]
-		res.From = from
-		res.Until = until
+		if res.From > res.Until {
+			log.Warnf("CCacheMetric Search: Found from > until (%d/%d), key = %s, printing chunks\n", res.From, res.Until, mc.MKey.String())
+			mc.debugMetric(from-7200, until+7200)
+			res.Start = res.Start[:0]
+			res.End = res.End[:0]
+			res.From = from
+			res.Until = until
+		}
 	}
 }
 
