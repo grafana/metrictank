@@ -235,8 +235,8 @@ func TestDisconnectedAdding(t *testing.T) {
 		t.Fatalf("expected err nil, got %v", err)
 	}
 
-	if res.Complete {
-		t.Fatalf("complete is expected to be false")
+	if res.Type != HitPartial {
+		t.Fatalf("expected ResultType HitPartial, got %v", res.Type)
 	}
 
 	if len(res.Start) != 0 {
@@ -273,8 +273,8 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 		t.Fatalf("expected err nil, got %v", err)
 	}
 
-	if res.Complete {
-		t.Fatalf("complete is expected to be false")
+	if res.Type != HitPartial {
+		t.Fatalf("expected ResultType to be HitPartial, got %v", res.Type)
 	}
 
 	if len(res.Start) != 0 {
@@ -304,7 +304,7 @@ func TestDisconnectedAddingByGuessing(t *testing.T) {
 	}
 }
 
-func TestSearchFromBeginningComplete(t *testing.T) {
+func TestSearchFromBeginningHit(t *testing.T) {
 	metric := test.GetAMKey(1)
 	cc := getConnectedChunks(t, metric)
 	res, err := cc.Search(test.NewContext(), metric, 1006, 1025)
@@ -313,8 +313,8 @@ func TestSearchFromBeginningComplete(t *testing.T) {
 		t.Fatalf("expected err nil, got %v", err)
 	}
 
-	if !res.Complete {
-		t.Fatalf("complete is expected to be true")
+	if res.Type != Hit {
+		t.Fatalf("expected ResultType to be Hit, got %v", res.Type)
 	}
 
 	if len(res.Start) != 4 {
@@ -334,8 +334,8 @@ func TestSearchFromBeginningIncompleteEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected err nil, got %v", err)
 	}
-	if res.Complete {
-		t.Fatalf("complete is expected to be false")
+	if res.Type != HitPartial {
+		t.Fatalf("expected ResultType to be HitPartial, got %v", res.Type)
 	}
 
 	if len(res.Start) != 4 {
@@ -356,8 +356,8 @@ func TestSearchFromEnd(t *testing.T) {
 		t.Fatalf("expected err nil, got %v", err)
 	}
 
-	if res.Complete {
-		t.Fatalf("complete is expected to not be true")
+	if res.Type != HitPartial {
+		t.Fatalf("expected ResultType to be HitPartial, got %v", res.Type)
 	}
 
 	if res.From != 500 {
@@ -427,8 +427,8 @@ func testSearchDisconnectedStartEnd(t *testing.T, spanaware, ascending bool) {
 			if err != nil {
 				t.Fatalf("expected err nil, got %v", err)
 			}
-			if !res.Complete {
-				t.Fatalf("from %d, until %d: complete is expected to be true", from, until)
+			if res.Type != Hit {
+				t.Fatalf("from %d, until %d: ResultType expected Hit", from, until)
 			}
 
 			if len(res.Start) != 6 {
@@ -505,8 +505,8 @@ func testSearchDisconnectedWithGapStartEnd(t *testing.T, spanaware, ascending bo
 			if err != nil {
 				t.Fatalf("expected err nil, got %v", err)
 			}
-			if res.Complete {
-				t.Fatalf("from %d, until %d: complete is expected to be false", from, until)
+			if res.Type != HitPartial {
+				t.Fatalf("from %d, until %d: ResultType is expected to be HitPartial", from, until)
 			}
 
 			if len(res.Start) != 3 {
