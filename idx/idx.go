@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/raintank/schema"
 )
 
@@ -96,7 +96,7 @@ type MetricIndex interface {
 	// be returned in the result.
 	// The returned results are not deduplicated and in certain cases it is possible
 	// that duplicate entries will be returned.
-	FindByTag(orgId uint32, query tagQuery.Query) []Node
+	FindByTag(orgId uint32, query tagquery.Query) []Node
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.
@@ -115,7 +115,7 @@ type MetricIndex interface {
 	// user to narrow down the result by specifying additional expressions,
 	// but if the query isn't necessary it is recommended to use FindTags()
 	// because it is faster
-	FindTagsWithQuery(orgId uint32, prefix string, query tagQuery.Query, limit uint) []string
+	FindTagsWithQuery(orgId uint32, prefix string, query tagquery.Query, limit uint) []string
 
 	// FindTagValues generates a list of possible values that could complete
 	// a given value prefix. It requires a tag to be specified and only values
@@ -132,7 +132,7 @@ type MetricIndex interface {
 	// allows the caller to pass a tag query which is used to further narrow down the
 	// result set. If the tag query is not necessary, it is recommended to use
 	// FindTagValues() because it is faster
-	FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagQuery.Query, limit uint) []string
+	FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string
 
 	// TagDetails returns a list of all values associated with a given tag key in the
 	// given org. The occurrences of each value is counted and the count is referred to by
@@ -145,7 +145,7 @@ type MetricIndex interface {
 
 	// DeleteTagged deletes the series returned by the given query from the tag index
 	// and also the DefById index.
-	DeleteTagged(orgId uint32, query tagQuery.Query) []Archive
+	DeleteTagged(orgId uint32, query tagquery.Query) []Archive
 
 	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
 	// whether it already exists or is new. The identity of a record is determined
@@ -159,9 +159,9 @@ type MetricIndex interface {
 	// 1) The relevant meta record as it is after this operation
 	// 2) A bool that is true if the record has been created, or false if updated
 	// 3) An error which is nil if no error has occurred
-	MetaTagRecordUpsert(orgId uint32, record tagQuery.MetaTagRecord) (tagQuery.MetaTagRecord, bool, error)
+	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error)
 
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
-	MetaTagRecordList(orgId uint32) []tagQuery.MetaTagRecord
+	MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord
 }

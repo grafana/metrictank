@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/grafana/metrictank/errors"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -22,7 +22,7 @@ func init() {
 }
 
 // list of meta records keyed by a unique identifier used as ID
-type metaTagRecords map[recordId]tagQuery.MetaTagRecord
+type metaTagRecords map[recordId]tagquery.MetaTagRecord
 
 type recordId uint32
 
@@ -36,9 +36,9 @@ type recordId uint32
 // 3) The id of the record that has been replaced if an update was performed
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
-func (m metaTagRecords) upsert(record tagQuery.MetaTagRecord) (recordId, *tagQuery.MetaTagRecord, recordId, *tagQuery.MetaTagRecord, error) {
+func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
 	id := m.hashMetaTagRecord(record)
-	var oldRecord *tagQuery.MetaTagRecord
+	var oldRecord *tagquery.MetaTagRecord
 	var oldId recordId
 
 	// loop over existing records, starting from id, trying to find one that has
@@ -74,7 +74,7 @@ func (m metaTagRecords) upsert(record tagQuery.MetaTagRecord) (recordId, *tagQue
 }
 
 // hashMetaTagRecord generates a hash of all the queries in the record
-func (m *metaTagRecords) hashMetaTagRecord(record tagQuery.MetaTagRecord) recordId {
+func (m *metaTagRecords) hashMetaTagRecord(record tagquery.MetaTagRecord) recordId {
 	record.Queries.Sort()
 	builder := strings.Builder{}
 	for _, query := range record.Queries {
@@ -93,7 +93,7 @@ func (m *metaTagRecords) hashMetaTagRecord(record tagQuery.MetaTagRecord) record
 type metaTagValue map[string][]recordId
 type metaTagIndex map[string]metaTagValue
 
-func (m metaTagIndex) deleteRecord(keyValue tagQuery.Tag, id recordId) {
+func (m metaTagIndex) deleteRecord(keyValue tagquery.Tag, id recordId) {
 	if values, ok := m[keyValue.Key]; ok {
 		if ids, ok := values[keyValue.Value]; ok {
 			for i := 0; i < len(ids); i++ {
@@ -110,7 +110,7 @@ func (m metaTagIndex) deleteRecord(keyValue tagQuery.Tag, id recordId) {
 	}
 }
 
-func (m metaTagIndex) insertRecord(keyValue tagQuery.Tag, id recordId) {
+func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 	var values metaTagValue
 	var ok bool
 

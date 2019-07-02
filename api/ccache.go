@@ -10,7 +10,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	log "github.com/sirupsen/logrus"
 )
@@ -60,12 +60,12 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		}
 
 		if len(req.Expr) > 0 {
-			expressions, err := tagQuery.ParseExpressions(req.Expr)
+			expressions, err := tagquery.ParseExpressions(req.Expr)
 			if err != nil {
 				res.AddError(err)
 				code = http.StatusBadRequest
 			} else {
-				query, err := tagQuery.NewQuery(expressions, 0)
+				query, err := tagquery.NewQuery(expressions, 0)
 				if err != nil {
 					res.AddError(err)
 					code = http.StatusInternalServerError

@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/errors"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -446,8 +446,8 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 // 1) The relevant meta record as it is after this operation
 // 2) A bool that is true if the record has been created, or false if updated
 // 3) An error which is nil if no error has occurred
-func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagQuery.MetaTagRecord) (tagQuery.MetaTagRecord, bool, error) {
-	res := tagQuery.MetaTagRecord{}
+func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
+	res := tagquery.MetaTagRecord{}
 
 	if !TagSupport {
 		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
@@ -498,8 +498,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	return res, true, nil
 }
 
-func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagQuery.MetaTagRecord {
-	var res []tagQuery.MetaTagRecord
+func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
+	var res []tagquery.MetaTagRecord
 
 	m.RLock()
 	defer m.RUnlock()
@@ -509,7 +509,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagQuery.Meta
 		return res
 	}
 
-	res = make([]tagQuery.MetaTagRecord, len(metaTagRecords))
+	res = make([]tagquery.MetaTagRecord, len(metaTagRecords))
 	i := 0
 	for _, record := range metaTagRecords {
 		res[i] = record
@@ -866,7 +866,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int6
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, query tagQuery.Query, limit uint) []string {
+func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, query tagquery.Query, limit uint) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -936,7 +936,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 	return res
 }
 
-func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagQuery.Query, limit uint) []string {
+func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -1067,7 +1067,7 @@ func (m *UnpartitionedMemoryIdx) idSetHasOneMetricFrom(ids IdSet, from int64) bo
 	return false
 }
 
-func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagQuery.Query) []idx.Node {
+func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []idx.Node {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -1316,7 +1316,7 @@ func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	return defs
 }
 
-func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagQuery.Query) []idx.Archive {
+func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) []idx.Archive {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil

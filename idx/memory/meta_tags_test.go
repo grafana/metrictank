@@ -5,12 +5,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 )
 
 func TestInsertSimpleMetaTagRecord(t *testing.T) {
 	metaTagRecords := make(metaTagRecords)
-	recordToInsert, err := tagQuery.ParseMetaTagRecord([]string{"metaTag1=abc", "anotherTag=theValue"}, []string{"metricTag!=a", "match=~this"})
+	recordToInsert, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=abc", "anotherTag=theValue"}, []string{"metricTag!=a", "match=~this"})
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
@@ -46,10 +46,10 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 
 	var seenMetaTag1, seenMetaTag2 bool
 	for _, metaTag := range record.MetaTags {
-		if reflect.DeepEqual(metaTag, tagQuery.Tag{Key: "metaTag1", Value: "abc"}) {
+		if reflect.DeepEqual(metaTag, tagquery.Tag{Key: "metaTag1", Value: "abc"}) {
 			seenMetaTag1 = true
 		}
-		if reflect.DeepEqual(metaTag, tagQuery.Tag{Key: "anotherTag", Value: "theValue"}) {
+		if reflect.DeepEqual(metaTag, tagquery.Tag{Key: "anotherTag", Value: "theValue"}) {
 			seenMetaTag2 = true
 		}
 	}
@@ -63,10 +63,10 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 		// ignore the compiled regex structs, as they can't reliably be compared
 		query.Regex = nil
 
-		if reflect.DeepEqual(query, tagQuery.Expression{Tag: tagQuery.Tag{Key: "metricTag", Value: "a"}, Operator: tagQuery.NOT_EQUAL, RequiresNonEmptyValue: false, UsesRegex: false}) {
+		if reflect.DeepEqual(query, tagquery.Expression{Tag: tagquery.Tag{Key: "metricTag", Value: "a"}, Operator: tagquery.NOT_EQUAL, RequiresNonEmptyValue: false, UsesRegex: false}) {
 			seenQuery1 = true
 		}
-		if reflect.DeepEqual(query, tagQuery.Expression{Tag: tagQuery.Tag{Key: "match", Value: "^(?:this)"}, Operator: tagQuery.MATCH, RequiresNonEmptyValue: true, UsesRegex: true}) {
+		if reflect.DeepEqual(query, tagquery.Expression{Tag: tagquery.Tag{Key: "match", Value: "^(?:this)"}, Operator: tagquery.MATCH, RequiresNonEmptyValue: true, UsesRegex: true}) {
 			seenQuery2 = true
 		}
 	}
@@ -78,18 +78,18 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 
 func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	// define the values for two metric records with the same meta tags, but different queries
-	recordToInsert1, err := tagQuery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~a", "tag2=~b"})
+	recordToInsert1, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~a", "tag2=~b"})
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
-	recordToInsert2, err := tagQuery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~c", "tag2=~d"})
+	recordToInsert2, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~c", "tag2=~d"})
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
 
 	// define the values for an update which is going to replace
 	// the first metric record because it has the same tag queries
-	recordToUpdate, err := tagQuery.ParseMetaTagRecord([]string{"metaTag1=value2"}, []string{"tag1=~a", "tag2=~b"})
+	recordToUpdate, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value2"}, []string{"tag1=~a", "tag2=~b"})
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
@@ -103,7 +103,7 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	}
 
 	// the order of the records may have changed due to sorting by id
-	var record1, record2 tagQuery.MetaTagRecord
+	var record1, record2 tagquery.MetaTagRecord
 	var found1, found2 bool
 	var recordIdToUpdate recordId
 	for id, record := range metaTagRecords {
@@ -162,29 +162,29 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 		t.Fatalf("Expected both meta tag records to be found, but not both were: %t / %t", found1, found2)
 	}
 
-	expectedRecord1 := tagQuery.MetaTagRecord{
-		MetaTags: []tagQuery.Tag{
+	expectedRecord1 := tagquery.MetaTagRecord{
+		MetaTags: []tagquery.Tag{
 			{
 				Key:   "metaTag1",
 				Value: "value2",
 			},
 		},
-		Queries: tagQuery.Expressions{
-			tagQuery.Expression{
-				Tag: tagQuery.Tag{
+		Queries: tagquery.Expressions{
+			tagquery.Expression{
+				Tag: tagquery.Tag{
 					Key:   "tag1",
 					Value: "^(?:a)",
 				},
-				Operator:              tagQuery.MATCH,
+				Operator:              tagquery.MATCH,
 				RequiresNonEmptyValue: true,
 				UsesRegex:             true,
 			},
-			tagQuery.Expression{
-				Tag: tagQuery.Tag{
+			tagquery.Expression{
+				Tag: tagquery.Tag{
 					Key:   "tag2",
 					Value: "^(?:b)",
 				},
-				Operator:              tagQuery.MATCH,
+				Operator:              tagquery.MATCH,
 				RequiresNonEmptyValue: true,
 				UsesRegex:             true,
 			},
@@ -199,29 +199,29 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 		t.Fatalf("Record1 did not look as expected:\nExpected\n%+v\nGot:\n%+v", expectedRecord1, record1)
 	}
 
-	expectedRecord2 := tagQuery.MetaTagRecord{
-		MetaTags: []tagQuery.Tag{
+	expectedRecord2 := tagquery.MetaTagRecord{
+		MetaTags: []tagquery.Tag{
 			{
 				Key:   "metaTag1",
 				Value: "value1",
 			},
 		},
-		Queries: tagQuery.Expressions{
-			tagQuery.Expression{
-				Tag: tagQuery.Tag{
+		Queries: tagquery.Expressions{
+			tagquery.Expression{
+				Tag: tagquery.Tag{
 					Key:   "tag1",
 					Value: "^(?:c)",
 				},
-				Operator:              tagQuery.MATCH,
+				Operator:              tagquery.MATCH,
 				RequiresNonEmptyValue: true,
 				UsesRegex:             true,
 			},
-			tagQuery.Expression{
-				Tag: tagQuery.Tag{
+			tagquery.Expression{
+				Tag: tagquery.Tag{
 					Key:   "tag2",
 					Value: "^(?:d)",
 				},
-				Operator:              tagQuery.MATCH,
+				Operator:              tagquery.MATCH,
 				RequiresNonEmptyValue: true,
 				UsesRegex:             true,
 			},
@@ -284,18 +284,18 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	metaTagRecords := make(metaTagRecords)
-	record, _ := tagQuery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
+	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
 	metaTagRecords.upsert(record)
-	record, _ = tagQuery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
+	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
 	metaTagRecords.upsert(record)
-	record, _ = tagQuery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
+	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
 	metaTagRecords.upsert(record)
 	if len(metaTagRecords) != 3 {
 		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords))
 	}
 
 	// adding a 4th record with the same hash but different queries
-	record, _ = tagQuery.ParseMetaTagRecord([]string{"metaTag4=value4"}, []string{"metricTag4=value4"})
+	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag4=value4"}, []string{"metricTag4=value4"})
 	id, returnedRecord, oldId, oldRecord, err := metaTagRecords.upsert(record)
 	if err == nil {
 		t.Fatalf("Expected an error to be returned, but there was none")
@@ -317,7 +317,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// updating the third record with the same hash and equal queries
-	record, _ = tagQuery.ParseMetaTagRecord([]string{"metaTag3=value4"}, []string{"metricTag3=value3"})
+	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value4"}, []string{"metricTag3=value3"})
 	id, returnedRecord, oldId, oldRecord, err = metaTagRecords.upsert(record)
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
@@ -335,7 +335,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// check if the returned old record looks as expected
-	record, _ = tagQuery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
+	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
 	if !reflect.DeepEqual(oldRecord, &record) {
 		t.Fatalf("Old record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, oldRecord)
 	}
@@ -347,10 +347,10 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 func TestDeletingMetaRecord(t *testing.T) {
 	// Adding 2 meta records
 	metaTagRecords := make(metaTagRecords)
-	record, _ := tagQuery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
+	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
 	metaTagRecords.upsert(record)
 
-	record, _ = tagQuery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
+	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
 	idOfRecord2, _, _, _, _ := metaTagRecords.upsert(record)
 
 	if len(metaTagRecords) != 2 {

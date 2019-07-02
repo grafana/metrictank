@@ -13,7 +13,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/test"
@@ -236,7 +236,7 @@ func testGetAddKey(t *testing.T) {
 	if TagSupport {
 		Convey("When adding metricDefs with the same series name as existing metricDefs (tagged)", t, func() {
 			Convey("then findByTag", func() {
-				query, err := tagQuery.NewQueryFromStrings([]string{"name!="}, 0)
+				query, err := tagquery.NewQueryFromStrings([]string{"name!="}, 0)
 				So(err, ShouldBeNil)
 				nodes := ix.FindByTag(1, query)
 				defs := make([]idx.Archive, 0, len(nodes))
@@ -465,20 +465,20 @@ func testDeleteTagged(t *testing.T) {
 
 	Convey("when deleting by tag", t, func() {
 		testName := schema.MetricDefinitionFromMetricData(org1Series[3]).NameWithTags()
-		tags, err := tagQuery.ParseTagsFromMetricName(testName)
+		tags, err := tagquery.ParseTagsFromMetricName(testName)
 		So(err, ShouldBeNil)
-		query, err := tagQuery.NewQueryFromStrings(tags.Strings(), 0)
+		query, err := tagquery.NewQueryFromStrings(tags.Strings(), 0)
 		So(err, ShouldBeNil)
 		ids := ix.DeleteTagged(1, query)
 		So(ids, ShouldHaveLength, 1)
 		So(ids[0].Id.String(), ShouldEqual, org1Series[3].Id)
 		Convey("series should not be present in the metricDef index", func() {
-			query, err := tagQuery.NewQueryFromStrings([]string{"series_id=3"}, 0)
+			query, err := tagquery.NewQueryFromStrings([]string{"series_id=3"}, 0)
 			So(err, ShouldBeNil)
 			nodes := ix.FindByTag(1, query)
 			So(nodes, ShouldHaveLength, 0)
 			Convey("but others should still be present", func() {
-				query, err := tagQuery.NewQueryFromStrings([]string{"series_id=~[0-9]"}, 0)
+				query, err := tagquery.NewQueryFromStrings([]string{"series_id=~[0-9]"}, 0)
 				So(err, ShouldBeNil)
 				nodes := ix.FindByTag(1, query)
 				So(err, ShouldBeNil)
@@ -760,15 +760,15 @@ func testPruneTaggedSeries(t *testing.T) {
 		pruned, err := ix.Prune(time.Unix(100, 0)) // old series should be gone
 		So(err, ShouldBeNil)
 		So(pruned, ShouldHaveLength, 5)
-		query, err := tagQuery.NewQueryFromStrings([]string{"name=~longterm\\.old.*", "series_id=~[0-4]"}, 0)
+		query, err := tagquery.NewQueryFromStrings([]string{"name=~longterm\\.old.*", "series_id=~[0-4]"}, 0)
 		So(err, ShouldBeNil)
 		nodes := ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 0)
-		query, err = tagQuery.NewQueryFromStrings([]string{"name=~longterm.*", "series_id=~[0-4]"}, 0)
+		query, err = tagquery.NewQueryFromStrings([]string{"name=~longterm.*", "series_id=~[0-4]"}, 0)
 		So(err, ShouldBeNil)
 		nodes = ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 5)
-		query, err = tagQuery.NewQueryFromStrings([]string{"name=~metric\\.never\\.exp.*", "series_id=~[0-4]"}, 0)
+		query, err = tagquery.NewQueryFromStrings([]string{"name=~metric\\.never\\.exp.*", "series_id=~[0-4]"}, 0)
 		So(err, ShouldBeNil)
 		nodes = ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 5)
@@ -804,11 +804,11 @@ func testPruneTaggedSeries(t *testing.T) {
 			pruned, err := ix.Prune(time.Unix(120, 0))
 			So(err, ShouldBeNil)
 			So(pruned, ShouldHaveLength, 4)
-			query, err := tagQuery.NewQueryFromStrings([]string{"name=~longterm", "series_id=~[0-4]"}, 0)
+			query, err := tagquery.NewQueryFromStrings([]string{"name=~longterm", "series_id=~[0-4]"}, 0)
 			So(err, ShouldBeNil)
 			nodes := ix.FindByTag(1, query)
 			So(nodes, ShouldHaveLength, 1)
-			query, err = tagQuery.NewQueryFromStrings([]string{"name=~metric\\.never.*", "series_id=~[0-4]"}, 0)
+			query, err = tagquery.NewQueryFromStrings([]string{"name=~metric\\.never.*", "series_id=~[0-4]"}, 0)
 			So(err, ShouldBeNil)
 			nodes = ix.FindByTag(1, query)
 			So(nodes, ShouldHaveLength, 5)
@@ -875,7 +875,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	})
 
 	Convey("After pruning", t, func() {
-		query, err := tagQuery.NewQueryFromStrings(findExpressions, 0)
+		query, err := tagquery.NewQueryFromStrings(findExpressions, 0)
 		So(err, ShouldBeNil)
 		nodes := ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 1)
@@ -893,7 +893,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 	})
 
 	Convey("After pruning", t, func() {
-		query, err := tagQuery.NewQueryFromStrings(findExpressions, 0)
+		query, err := tagquery.NewQueryFromStrings(findExpressions, 0)
 		So(err, ShouldBeNil)
 		nodes := ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 0)

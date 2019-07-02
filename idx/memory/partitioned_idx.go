@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -279,7 +279,7 @@ func (p *PartitionedMemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 // where the LastUpdate time is >= from will be returned as results.
 // The returned results are not deduplicated and in certain cases it is possible
 // that duplicate entries will be returned.
-func (p *PartitionedMemoryIdx) FindByTag(orgId uint32, query tagQuery.Query) []idx.Node {
+func (p *PartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []idx.Node {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]idx.Node, len(p.Partition))
 	var i int
@@ -358,7 +358,7 @@ func (p *PartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int64,
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (p *PartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, query tagQuery.Query, limit uint) []string {
+func (p *PartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, query tagquery.Query, limit uint) []string {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]string, len(p.Partition))
 	var i int
@@ -404,7 +404,7 @@ func (p *PartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, f
 	return response
 }
 
-func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagQuery.Query, limit uint) []string {
+func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]string, len(p.Partition))
 	var i int
@@ -459,7 +459,7 @@ func (p *PartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *rege
 
 // DeleteTagged deletes the specified series from the tag index and also the
 // DefById index.
-func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagQuery.Query) []idx.Archive {
+func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) []idx.Archive {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]idx.Archive, len(p.Partition))
 	var i int
@@ -519,7 +519,7 @@ func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext
 	return response
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagQuery.MetaTagRecord {
+func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
 	for _, m := range p.Partition {
 		// all partitions should have all meta records
 		return m.MetaTagRecordList(orgId)
@@ -527,11 +527,11 @@ func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagQuery.MetaTa
 	return nil
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagQuery.MetaTagRecord) (tagQuery.MetaTagRecord, bool, error) {
+func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
 	g, _ := errgroup.WithContext(context.Background())
 
 	var i int
-	var record tagQuery.MetaTagRecord
+	var record tagquery.MetaTagRecord
 	var created bool
 	for _, m := range p.Partition {
 		m := m

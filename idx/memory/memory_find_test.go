@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -478,7 +478,7 @@ func testTagSorting(t *testing.T) {
 	md1.Tags = []string{"d=a", "b=a", "c=a", "a=a", "e=a"}
 	index.AddOrUpdate(mkey, md1, getPartition(md1))
 
-	query, err := tagQuery.NewQueryFromStrings([]string{"b=a"}, 0)
+	query, err := tagquery.NewQueryFromStrings([]string{"b=a"}, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error returned when parsing query: %s", err)
 	}
@@ -507,7 +507,7 @@ func testTagSorting(t *testing.T) {
 	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
 	index.LoadPartition(getPartitionFromName("name2"), md2)
 
-	query, err = tagQuery.NewQueryFromStrings([]string{"3=a"}, 0)
+	query, err = tagquery.NewQueryFromStrings([]string{"3=a"}, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing query: %s", err)
 	}
@@ -632,7 +632,7 @@ func testAutoCompleteTagsWithQuery(t *testing.T) {
 func autoCompleteTagsWithQueryAndCompare(t testing.TB, tcIdx int, prefix string, expr []string, from int64, limit uint, expRes []string) {
 	t.Helper()
 
-	query, err := tagQuery.NewQueryFromStrings(expr, from)
+	query, err := tagquery.NewQueryFromStrings(expr, from)
 	if err != nil {
 		t.Fatalf("Error when instantiating query: %s", err)
 	}
@@ -761,7 +761,7 @@ func testAutoCompleteTagValuesWithQuery(t *testing.T) {
 func autoCompleteTagValuesWithQueryAndCompare(t testing.TB, tag, prefix string, expr []string, from int64, limit uint, expRes []string) {
 	t.Helper()
 
-	query, err := tagQuery.NewQueryFromStrings(expr, from)
+	query, err := tagquery.NewQueryFromStrings(expr, from)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query: %s", err)
 	}
@@ -1039,7 +1039,7 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 }
 
 func ixFindByTag(b *testing.B, org uint32, q int) {
-	query, err := tagQuery.NewQueryFromStrings(tagQueries[q].Expressions, 0)
+	query, err := tagquery.NewQueryFromStrings(tagQueries[q].Expressions, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -1166,7 +1166,7 @@ func benchmarkTagQueryFilterAndIntersect(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		q := queries[n%len(queries)]
-		query, err := tagQuery.NewQueryFromStrings(q.Expressions, 150000)
+		query, err := tagquery.NewQueryFromStrings(q.Expressions, 150000)
 		if err != nil {
 			b.Fatalf(err.Error())
 		}
@@ -1198,7 +1198,7 @@ func benchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		q := queries[n%len(queries)]
-		query, err := tagQuery.NewQueryFromStrings(q.Expressions, 0)
+		query, err := tagquery.NewQueryFromStrings(q.Expressions, 0)
 		if err != nil {
 			b.Fatalf(err.Error())
 		}

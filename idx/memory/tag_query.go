@@ -10,7 +10,7 @@ import (
 
 	"github.com/raintank/schema"
 
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	log "github.com/sirupsen/logrus"
 )
@@ -26,7 +26,7 @@ import (
 // the cost is an estimate how expensive this query is compared to others
 // with the same operator
 type kv struct {
-	tagQuery.Tag
+	tagquery.Tag
 	cost uint // cost of evaluating expression, compared to other kv objects
 }
 
@@ -70,17 +70,17 @@ type TagQueryContext struct {
 
 	index     TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId      map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-	tagClause tagQuery.ExpressionOperator  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
+	tagClause tagquery.ExpressionOperator  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
 	tagMatch  kvRe                         // only used for /metrics/tags with regex in filter param
 	tagPrefix string                       // only used for auto complete of tags to match exact prefix
-	startWith tagQuery.ExpressionOperator  // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	startWith tagquery.ExpressionOperator  // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 	wg        *sync.WaitGroup
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
 // context structs necessary to execute the query on the index
-func NewTagQueryContext(query tagQuery.Query) TagQueryContext {
-	kvsFromExpressions := func(expressions []tagQuery.Expression) []kv {
+func NewTagQueryContext(query tagquery.Query) TagQueryContext {
+	kvsFromExpressions := func(expressions []tagquery.Expression) []kv {
 		res := make([]kv, len(expressions))
 		for i := range expressions {
 			res[i] = kv{Tag: expressions[i].Tag}
@@ -88,7 +88,7 @@ func NewTagQueryContext(query tagQuery.Query) TagQueryContext {
 		return res
 	}
 
-	kvReFromExpression := func(expression tagQuery.Expression) kvRe {
+	kvReFromExpression := func(expression tagquery.Expression) kvRe {
 		return kvRe{
 			kv:         kv{Tag: expression.Tag},
 			Regex:      expression.Regex,
@@ -97,7 +97,7 @@ func NewTagQueryContext(query tagQuery.Query) TagQueryContext {
 		}
 	}
 
-	kvResFromExpressions := func(expressions []tagQuery.Expression) []kvRe {
+	kvResFromExpressions := func(expressions []tagquery.Expression) []kvRe {
 		res := make([]kvRe, len(expressions))
 		for i := range expressions {
 			res[i] = kvReFromExpression(expressions[i])
@@ -107,11 +107,11 @@ func NewTagQueryContext(query tagQuery.Query) TagQueryContext {
 
 	return TagQueryContext{
 		wg:        &sync.WaitGroup{},
-		equal:     kvsFromExpressions(query.Expressions[tagQuery.EQUAL]),
-		match:     kvResFromExpressions(query.Expressions[tagQuery.MATCH]),
-		notEqual:  kvsFromExpressions(query.Expressions[tagQuery.NOT_EQUAL]),
-		notMatch:  kvResFromExpressions(query.Expressions[tagQuery.NOT_MATCH]),
-		prefix:    kvsFromExpressions(query.Expressions[tagQuery.PREFIX]),
+		equal:     kvsFromExpressions(query.Expressions[tagquery.EQUAL]),
+		match:     kvResFromExpressions(query.Expressions[tagquery.MATCH]),
+		notEqual:  kvsFromExpressions(query.Expressions[tagquery.NOT_EQUAL]),
+		notMatch:  kvResFromExpressions(query.Expressions[tagquery.NOT_MATCH]),
+		prefix:    kvsFromExpressions(query.Expressions[tagquery.PREFIX]),
 		tagClause: query.TagClause,
 		tagPrefix: query.TagPrefix,
 		tagMatch:  kvReFromExpression(query.TagMatch),
@@ -255,21 +255,21 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 	q.wg.Add(1)
 
 	switch q.startWith {
-	case tagQuery.EQUAL:
+	case tagquery.EQUAL:
 		query := q.equal[0]
 		q.equal = q.equal[1:]
 		go q.getInitialByEqual(query, idCh, stopCh)
-	case tagQuery.PREFIX:
+	case tagquery.PREFIX:
 		query := q.prefix[0]
 		q.prefix = q.prefix[1:]
 		go q.getInitialByPrefix(query, idCh, stopCh)
-	case tagQuery.MATCH:
+	case tagquery.MATCH:
 		query := q.match[0]
 		q.match = q.match[1:]
 		go q.getInitialByMatch(query, idCh, stopCh)
-	case tagQuery.PREFIX_TAG:
+	case tagquery.PREFIX_TAG:
 		go q.getInitialByTagPrefix(idCh, stopCh)
-	case tagQuery.MATCH_TAG:
+	case tagquery.MATCH_TAG:
 		go q.getInitialByTagMatch(idCh, stopCh)
 	}
 
@@ -293,7 +293,7 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 		return false
 	}
 
-	if q.tagClause == tagQuery.PREFIX_TAG && !omitTagFilters && q.startWith != tagQuery.PREFIX_TAG {
+	if q.tagClause == tagquery.PREFIX_TAG && !omitTagFilters && q.startWith != tagquery.PREFIX_TAG {
 		if !q.testByTagPrefix(def) {
 			return false
 		}
@@ -303,7 +303,7 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 		return false
 	}
 
-	if q.tagClause == tagQuery.MATCH_TAG && !omitTagFilters && q.startWith != tagQuery.MATCH_TAG {
+	if q.tagClause == tagquery.MATCH_TAG && !omitTagFilters && q.startWith != tagquery.MATCH_TAG {
 		if !q.testByTagMatch(def) {
 			return false
 		}
@@ -596,14 +596,14 @@ func (q *TagQueryContext) getMaxTagCount() int {
 	defer q.wg.Done()
 	var maxTagCount int
 
-	if q.tagClause == tagQuery.PREFIX_TAG && len(q.tagPrefix) > 0 {
+	if q.tagClause == tagquery.PREFIX_TAG && len(q.tagPrefix) > 0 {
 		for tag := range q.index {
 			if !strings.HasPrefix(tag, q.tagPrefix) {
 				continue
 			}
 			maxTagCount++
 		}
-	} else if q.tagClause == tagQuery.MATCH_TAG {
+	} else if q.tagClause == tagquery.MATCH_TAG {
 		for tag := range q.index {
 			if q.tagMatch.Regex.MatchString(tag) {
 				maxTagCount++
@@ -655,11 +655,11 @@ IDS:
 				continue
 			}
 
-			if q.tagClause == tagQuery.PREFIX_TAG {
+			if q.tagClause == tagquery.PREFIX_TAG {
 				if !strings.HasPrefix(key, q.tagPrefix) {
 					continue
 				}
-			} else if q.tagClause == tagQuery.MATCH_TAG {
+			} else if q.tagClause == tagquery.MATCH_TAG {
 				if _, ok := q.tagMatch.missCache.Load(key); ok || !q.tagMatch.Regex.MatchString(tag) {
 					if !ok {
 						q.tagMatch.missCache.Store(key, struct{}{})
@@ -715,11 +715,11 @@ IDS:
 func (q *TagQueryContext) tagFilterMatchesName() bool {
 	matchName := false
 
-	if q.tagClause == tagQuery.PREFIX_TAG || q.startWith == tagQuery.PREFIX_TAG {
+	if q.tagClause == tagquery.PREFIX_TAG || q.startWith == tagquery.PREFIX_TAG {
 		if strings.HasPrefix("name", q.tagPrefix) {
 			matchName = true
 		}
-	} else if q.tagClause == tagQuery.MATCH_TAG || q.startWith == tagQuery.MATCH_TAG {
+	} else if q.tagClause == tagquery.MATCH_TAG || q.startWith == tagquery.MATCH_TAG {
 		if q.tagMatch.Regex.MatchString("name") {
 			matchName = true
 		}

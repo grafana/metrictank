@@ -21,7 +21,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/expr"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -661,7 +661,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		}
 		var err error
 		var series []Series
-		var exprs tagQuery.Expressions
+		var exprs tagquery.Expressions
 		const SeriesByTagIdent = "seriesByTag("
 		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
 			startPos := len(SeriesByTagIdent)
@@ -781,7 +781,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 // it then returns a slice of strings where each string is one of the queries, and an error
 // which is non-nil if there was an error in the expression validation
 // all expressions get validated and an error is returned if one or more are invalid
-func getTagQueryExpressions(expressions string) (tagQuery.Expressions, error) {
+func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
 	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
 	var expressionStartPos int
 	var needComma, insideExpression, requiresNonEmptyValue bool
@@ -789,7 +789,7 @@ func getTagQueryExpressions(expressions string) (tagQuery.Expressions, error) {
 
 	// this might allocate a bit more than we need if a tag or value contains ,
 	// it's still better than having to grow the slice though
-	results := make(tagQuery.Expressions, 0, strings.Count(expressions, ",")+1)
+	results := make(tagquery.Expressions, 0, strings.Count(expressions, ",")+1)
 
 	for i := 0; i < len(expressions); i++ {
 		char := expressions[i]
@@ -798,7 +798,7 @@ func getTagQueryExpressions(expressions string) (tagQuery.Expressions, error) {
 			if char == quoteChar {
 				insideExpression = false
 				needComma = true
-				expression, err := tagQuery.ParseExpression(expressions[expressionStartPos:i])
+				expression, err := tagquery.ParseExpression(expressions[expressionStartPos:i])
 				if err != nil {
 					return nil, err
 				}
@@ -976,7 +976,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filte
 func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
 	reqCtx := ctx.Req.Context()
 
-	expressions, err := tagQuery.ParseExpressions(request.Expr)
+	expressions, err := tagquery.ParseExpressions(request.Expr)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -1002,7 +1002,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	response.Write(ctx, response.NewJson(200, seriesNames, ""))
 }
 
-func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagQuery.Expressions, from int64, maxSeries int) ([]Series, error) {
+func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagquery.Expressions, from int64, maxSeries int) ([]Series, error) {
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions.Strings(), From: from}
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -1200,22 +1200,22 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 	// nothing to do on query nodes.
 	if s.MetricIndex != nil {
 		for _, path := range request.Paths {
-			tags, err := tagQuery.ParseTagsFromMetricName(path)
+			tags, err := tagquery.ParseTagsFromMetricName(path)
 			if err != nil {
 				response.Write(ctx, response.WrapErrorForTagDB(err))
 				return
 			}
 
-			expressions := make(tagQuery.Expressions, 0, len(tags))
+			expressions := make(tagquery.Expressions, 0, len(tags))
 			for _, tag := range tags {
-				expressions = append(expressions, tagQuery.Expression{
+				expressions = append(expressions, tagquery.Expression{
 					Tag:                   tag,
-					Operator:              tagQuery.EQUAL,
+					Operator:              tagquery.EQUAL,
 					RequiresNonEmptyValue: true,
 				})
 			}
 
-			query, err := tagQuery.NewQuery(expressions, 0)
+			query, err := tagquery.NewQuery(expressions, 0)
 			if err != nil {
 				response.Write(ctx, response.WrapErrorForTagDB(err))
 				return
@@ -1311,13 +1311,13 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 }
 
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
-	record, err := tagQuery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Queries)
+	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Queries)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	var localResult tagQuery.MetaTagRecord
+	var localResult tagquery.MetaTagRecord
 	var created bool
 	if s.MetricIndex != nil {
 		var err error

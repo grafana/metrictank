@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
@@ -204,7 +204,7 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 		expressions = append(expressions, "__tag^="+req.Prefix)
 	}
 
-	query, err := tagQuery.NewQueryFromStrings(expressions, req.From)
+	query, err := tagquery.NewQueryFromStrings(expressions, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -235,7 +235,7 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 		expressions = append(expressions, req.Tag+"^="+req.Prefix)
 	}
 
-	query, err := tagQuery.NewQueryFromStrings(expressions, req.From)
+	query, err := tagquery.NewQueryFromStrings(expressions, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -256,22 +256,22 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 	}
 
 	for _, path := range request.Paths {
-		tags, err := tagQuery.ParseTagsFromMetricName(path)
+		tags, err := tagquery.ParseTagsFromMetricName(path)
 		if err != nil {
 			response.Write(ctx, response.WrapErrorForTagDB(err))
 			return
 		}
 
-		expressions := make(tagQuery.Expressions, len(tags))
+		expressions := make(tagquery.Expressions, len(tags))
 		for i := range tags {
-			expressions[i] = tagQuery.Expression{
+			expressions[i] = tagquery.Expression{
 				Tag:                   tags[i],
-				Operator:              tagQuery.EQUAL,
+				Operator:              tagquery.EQUAL,
 				RequiresNonEmptyValue: true,
 			}
 		}
 
-		query, err := tagQuery.NewQuery(expressions, 0)
+		query, err := tagquery.NewQuery(expressions, 0)
 		if err != nil {
 			response.Write(ctx, response.WrapErrorForTagDB(err))
 			return
@@ -292,7 +292,7 @@ func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByT
 		return
 	}
 
-	query, err := tagQuery.NewQueryFromStrings(req.Expr, req.From)
+	query, err := tagquery.NewQueryFromStrings(req.Expr, req.From)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -579,7 +579,7 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 		return
 	}
 
-	record, err := tagQuery.ParseMetaTagRecord(req.MetaTags, req.Queries)
+	record, err := tagquery.ParseMetaTagRecord(req.MetaTags, req.Queries)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return

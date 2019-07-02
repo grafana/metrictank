@@ -8,7 +8,7 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/expr/tagQuery"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/util"
 	"github.com/prometheus/common/model"
@@ -65,7 +65,7 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		}
 	}
 
-	parsedExpressions, err := tagQuery.ParseExpressions(expressions)
+	parsedExpressions, err := tagquery.ParseExpressions(expressions)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (q *querier) LabelValues(name string) ([]string, error) {
 		expressions = append(expressions, "name=~[a-zA-Z_:][a-zA-Z0-9_:]*$")
 	}
 
-	query, err := tagQuery.NewQueryFromStrings(expressions, 0)
+	query, err := tagquery.NewQueryFromStrings(expressions, 0)
 	if err != nil {
 		return nil, err
 	}
