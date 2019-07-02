@@ -68,7 +68,7 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 			case PREFIX:
 				q.Expressions[PREFIX] = append(q.Expressions[PREFIX], e)
 			case MATCH_TAG:
-				// we only allow one query by tag
+				// we only allow one expression operating on tags
 				if q.TagClause != 0 {
 					return q, errInvalidQuery
 				}
@@ -76,7 +76,7 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 				q.TagMatch = e
 				q.TagClause = MATCH_TAG
 			case PREFIX_TAG:
-				// we only allow one query by tag
+				// we only allow one expression operating on tags
 				if q.TagClause != 0 {
 					return q, errInvalidQuery
 				}
@@ -95,7 +95,7 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 	} else if len(q.Expressions[MATCH]) > 0 {
 		q.StartWith = MATCH
 	} else if q.TagClause == PREFIX_TAG {
-		// starting with a tag based query can be very expensive because they
+		// starting with a tag based expression can be very expensive because they
 		// have the potential to result in a huge initial result set
 		q.StartWith = PREFIX_TAG
 	} else if q.TagClause == MATCH_TAG {

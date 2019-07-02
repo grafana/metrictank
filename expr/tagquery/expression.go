@@ -81,9 +81,9 @@ func ParseExpression(expression string) (Expression, error) {
 	}
 
 	res.Key = expression[:operatorStartPos]
-	err := validateKey(res.Key)
+	err := validateQueryExpressionTagKey(res.Key)
 	if err != nil {
-		return res, fmt.Errorf("Error when validating expression %s: %s", expression, err)
+		return res, fmt.Errorf("Error when validating key \"%s\" of expression \"%s\": %s", res.Key, expression, err)
 	}
 
 	res.UsesRegex = false
@@ -106,10 +106,6 @@ func ParseExpression(expression string) (Expression, error) {
 	}
 
 	res.Value = expression[operatorEndPos+1:]
-	err = validateValue(res.Value)
-	if err != nil {
-		return res, fmt.Errorf("Error when validating expression %s: %s", expression, err)
-	}
 
 	if res.UsesRegex {
 		if len(res.Value) > 0 && res.Value[0] != '^' {
