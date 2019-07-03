@@ -198,6 +198,7 @@ curl -s http://localhost:6060/priority | jsonpp
         }
     }
 ]
+```
 
 ## Cache delete
 
