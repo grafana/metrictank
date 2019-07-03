@@ -113,7 +113,7 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		return nil, err
 	}
 
-	out, err := q.getTargets(q.ctx, reqs)
+	out, _, err := q.getTargets(q.ctx, reqs)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
 		return nil, err

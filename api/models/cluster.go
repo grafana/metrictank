@@ -20,7 +20,13 @@ func NewIndexFindResp() *IndexFindResp {
 }
 
 //go:generate msgp
-type GetDataResp struct {
+type GetDataRespV0 struct {
+	Series []Series
+}
+
+//go:generate msgp
+type GetDataRespV1 struct {
+	Stats  StorageStats
 	Series []Series
 }
 

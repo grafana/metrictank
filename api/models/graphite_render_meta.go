@@ -23,12 +23,18 @@ func (rwm ResponseWithMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 // RenderMeta holds metadata about a render request/response
 type RenderMeta struct {
 	Stats stats
+	StorageStats
 }
 
 func (rm RenderMeta) MarshalJSONFast(b []byte) ([]byte, error) {
-	b = append(b, `{"stats":`...)
-	b, _ = rm.Stats.MarshalJSONFast(b)
-	b = append(b, '}')
+	// note: we "blend" both sources of stats into 1 dict of stats without hierarchy
+	// this provides a simple, clean interface to end users, instead of exposing
+	// implementation details
+	b = append(b, `{"stats":{`...)
+	b, _ = rm.Stats.MarshalJSONFastRaw(b)
+	b = append(b, ',')
+	b, _ = rm.StorageStats.MarshalJSONFastRaw(b)
+	b = append(b, `}}`...)
 	return b, nil
 }
 
@@ -43,7 +49,13 @@ type stats struct {
 }
 
 func (s stats) MarshalJSONFast(b []byte) ([]byte, error) {
-	b = append(b, `{"executeplan.resolve-series.ms":`...)
+	b = append(b, '{')
+	b, _ = s.MarshalJSONFastRaw(b)
+	b = append(b, '}')
+	return b, nil
+}
+func (s stats) MarshalJSONFastRaw(b []byte) ([]byte, error) {
+	b = append(b, `"executeplan.resolve-series.ms":`...)
 	b = strconv.AppendInt(b, s.ResolveSeriesDuration.Nanoseconds()/1e6, 10)
 	b = append(b, `,"executeplan.get-targets.ms":`...)
 	b = strconv.AppendInt(b, s.GetTargetsDuration.Nanoseconds()/1e6, 10)
@@ -57,6 +69,5 @@ func (s stats) MarshalJSONFast(b []byte) ([]byte, error) {
 	b = strconv.AppendUint(b, uint64(s.PointsFetch), 10)
 	b = append(b, `,"executeplan.points-return.count":`...)
 	b = strconv.AppendUint(b, uint64(s.PointsReturn), 10)
-	b = append(b, '}')
 	return b, nil
 }
