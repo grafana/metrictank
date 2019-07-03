@@ -29,3 +29,10 @@ type CCacheDeleteResp struct {
 	DeletedArchives int                         `json:"deletedArchives"`
 	Peers           map[string]CCacheDeleteResp `json:"peers"`
 }
+
+func (c *CCacheDeleteResp) AddError(err error) {
+	if c.Errors == 0 {
+		c.FirstError = err.Error()
+	}
+	c.Errors++
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	log "github.com/sirupsen/logrus"
 )
@@ -50,10 +51,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 			for _, pattern := range req.Patterns {
 				nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
 				if err != nil {
-					if res.Errors == 0 {
-						res.FirstError = err.Error()
-					}
-					res.Errors += 1
+					res.AddError(err)
 					code = http.StatusInternalServerError
 				} else {
 					toClear = append(toClear, nodes...)
@@ -62,15 +60,19 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		}
 
 		if len(req.Expr) > 0 {
-			nodes, err := s.MetricIndex.FindByTag(req.OrgId, req.Expr, 0)
+			expressions, err := tagquery.ParseExpressions(req.Expr)
 			if err != nil {
-				if res.Errors == 0 {
-					res.FirstError = err.Error()
-				}
-				res.Errors += 1
-				code = http.StatusInternalServerError
+				res.AddError(err)
+				code = http.StatusBadRequest
 			} else {
-				toClear = append(toClear, nodes...)
+				query, err := tagquery.NewQuery(expressions, 0)
+				if err != nil {
+					res.AddError(err)
+					code = http.StatusInternalServerError
+				} else {
+					nodes := s.MetricIndex.FindByTag(req.OrgId, query)
+					toClear = append(toClear, nodes...)
+				}
 			}
 		}
 

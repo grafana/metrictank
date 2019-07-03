@@ -3,14 +3,18 @@
 package idx
 
 import (
+	"regexp"
 	"time"
 
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/raintank/schema"
 )
 
 var OrgIdPublic = uint32(0)
 
 //go:generate msgp
+//msgp:ignore Archive
+
 type Node struct {
 	Path        string
 	Leaf        bool
@@ -24,11 +28,6 @@ type Archive struct {
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
-}
-
-type MetaTagRecord struct {
-	MetaTags []string
-	Queries  []string
 }
 
 // used primarily by tests, for convenience
@@ -91,45 +90,62 @@ type MetricIndex interface {
 	// It returns all Archives deleted and any error encountered.
 	Prune(oldest time.Time) ([]Archive, error)
 
-	// FindByTag takes a list of expressions in the format key<operator>value.
-	// The allowed operators are: =, !=, =~, !=~.
-	// It returns a slice of Node structs that match the given conditions, the
-	// conditions are logically AND-ed.
-	// If the third argument is > 0 then the results will be filtered and only those
-	// where the LastUpdate time is >= from will be returned as results.
+	// FindByTag takes a query object and executes the query on the index. The query
+	// is composed of one or many query expressions, plus a "from condition" defining
+	// after which time a metric must have received its last data point in order to
+	// be returned in the result.
 	// The returned results are not deduplicated and in certain cases it is possible
 	// that duplicate entries will be returned.
-	FindByTag(orgId uint32, expressions []string, from int64) ([]Node, error)
+	FindByTag(orgId uint32, query tagquery.Query) []Node
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.
-	// If the third parameter is >0 then only metrics will be accounted of which the
-	// LastUpdate time is >= the given value.
-	Tags(orgId uint32, filter string, from int64) ([]string, error)
+	// If the third parameter is >0 then only tags will be returned of which the
+	// LastUpdate of at least one metric with that tag is >= of the given from value.
+	Tags(orgId uint32, filter *regexp.Regexp, from int64) []string
 
 	// FindTags generates a list of possible tags that could complete a
-	// given prefix. It also accepts additional tag conditions to further narrow
-	// down the result set in the format of graphite's tag queries
-	FindTags(orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error)
+	// given prefix. It only supports simple queries by prefix and from,
+	// without any further conditions. But its faster than the alternative
+	// FindTagsWithQuery()
+	FindTags(orgId uint32, prefix string, from int64, limit uint) []string
 
-	// FindTagValues generates a list of possible values that could
-	// complete a given value prefix. It requires a tag to be specified and only values
-	// of the given tag will be returned. It also accepts additional conditions to
-	// further narrow down the result set in the format of graphite's tag queries
-	FindTagValues(orgId uint32, tag string, prefix string, expressions []string, from int64, limit uint) ([]string, error)
+	// FindTagsWithQuery generates a list of possible tags that could complete
+	// a given prefix. It runs a full query on the index, so it allows the
+	// user to narrow down the result by specifying additional expressions,
+	// but if the query isn't necessary it is recommended to use FindTags()
+	// because it is faster
+	FindTagsWithQuery(orgId uint32, prefix string, query tagquery.Query, limit uint) []string
+
+	// FindTagValues generates a list of possible values that could complete
+	// a given value prefix. It requires a tag to be specified and only values
+	// of the given tag will be returned. It also allows the caller to further
+	// narrow down the results by specifying a from value, if from >=0 then
+	// only values will be returned of which at least one metric has received
+	// a datapoint since or at "from". The "limit" limits the result set to a
+	// specified length, since the results are sorted before being sliced it
+	// can be relied on that always the first "limit" entries of the result
+	// set will be returned.
+	FindTagValues(orgId uint32, tag, prefix string, from int64, limit uint) []string
+
+	// FindTagValuesWithQuery does the same thing as FindTagValues, but additionally it
+	// allows the caller to pass a tag query which is used to further narrow down the
+	// result set. If the tag query is not necessary, it is recommended to use
+	// FindTagValues() because it is faster
+	FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string
 
 	// TagDetails returns a list of all values associated with a given tag key in the
 	// given org. The occurrences of each value is counted and the count is referred to by
 	// the metric names in the returned map.
-	// If the third parameter is not "" it will be used as a regular expression to filter
-	// the values before accounting for them.
+	// If the third parameter is not nil it will be used to filter the values before
+	// accounting for them.
 	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
 	// time is >= the from timestamp will be included.
-	TagDetails(orgId uint32, key string, filter string, from int64) (map[string]uint64, error)
+	TagDetails(orgId uint32, key string, filter *regexp.Regexp, from int64) map[string]uint64
 
-	// DeleteTagged deletes the specified series from the tag index and also the
-	// DefById index.
-	DeleteTagged(orgId uint32, paths []string) ([]Archive, error)
+	// DeleteTagged deletes the series returned by the given query from the tag index
+	// and also the DefById index.
+	DeleteTagged(orgId uint32, query tagquery.Query) []Archive
 
 	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
 	// whether it already exists or is new. The identity of a record is determined
@@ -138,14 +154,14 @@ type MetricIndex interface {
 	// then the existing record will be updated, otherwise a new one gets created.
 	// If an existing record is updated with one that has no meta tags
 	// associated, then this operation results in the deletion of the meta record
-	// because it has no effect without meta tags.
+	// because a meta record has no effect without meta tags.
 	// The return values are:
 	// 1) The relevant meta record as it is after this operation
 	// 2) A bool that is true if the record has been created, or false if updated
 	// 3) An error which is nil if no error has occurred
-	MetaTagRecordUpsert(orgId uint32, record MetaTagRecord) (MetaTagRecord, bool, error)
+	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error)
 
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
-	MetaTagRecordList(orgId uint32) []MetaTagRecord
+	MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord
 }

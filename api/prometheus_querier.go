@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/util"
 	"github.com/prometheus/common/model"
@@ -64,7 +65,12 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		}
 	}
 
-	series, err := q.clusterFindByTag(q.ctx, q.OrgID, expressions, 0, maxSeriesPerReq)
+	parsedExpressions, err := tagquery.ParseExpressions(expressions)
+	if err != nil {
+		return nil, err
+	}
+
+	series, err := q.clusterFindByTag(q.ctx, q.OrgID, parsedExpressions, 0, maxSeriesPerReq)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +129,13 @@ func (q *querier) LabelValues(name string) ([]string, error) {
 		name = "name"
 		expressions = append(expressions, "name=~[a-zA-Z_:][a-zA-Z0-9_:]*$")
 	}
-	return q.MetricIndex.FindTagValues(q.OrgID, name, "", expressions, 0, 100000)
+
+	query, err := tagquery.NewQueryFromStrings(expressions, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return q.MetricIndex.FindTagValuesWithQuery(q.OrgID, name, "", query, 100000), nil
 }
 
 // Close releases the resources of the Querier.

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -22,6 +21,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/expr"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -661,7 +661,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		}
 		var err error
 		var series []Series
-		var exprs []string
+		var exprs tagquery.Expressions
 		const SeriesByTagIdent = "seriesByTag("
 		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
 			startPos := len(SeriesByTagIdent)
@@ -781,7 +781,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 // it then returns a slice of strings where each string is one of the queries, and an error
 // which is non-nil if there was an error in the expression validation
 // all expressions get validated and an error is returned if one or more are invalid
-func getTagQueryExpressions(expressions string) ([]string, error) {
+func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
 	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
 	var expressionStartPos int
 	var needComma, insideExpression, requiresNonEmptyValue bool
@@ -789,7 +789,7 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 
 	// this might allocate a bit more than we need if a tag or value contains ,
 	// it's still better than having to grow the slice though
-	results := make([]string, 0, strings.Count(expressions, ",")+1)
+	results := make(tagquery.Expressions, 0, strings.Count(expressions, ",")+1)
 
 	for i := 0; i < len(expressions); i++ {
 		char := expressions[i]
@@ -798,14 +798,12 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 			if char == quoteChar {
 				insideExpression = false
 				needComma = true
-				expression := expressions[expressionStartPos:i]
-				positive, err := validateTagQueryExpression(expression)
+				expression, err := tagquery.ParseExpression(expressions[expressionStartPos:i])
 				if err != nil {
 					return nil, err
 				}
-				if positive {
-					requiresNonEmptyValue = true
-				}
+
+				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue
 
 				results = append(results, expression)
 				continue
@@ -849,72 +847,6 @@ func getTagQueryExpressions(expressions string) ([]string, error) {
 	}
 
 	return results, nil
-}
-
-// validateTagQueryExpression takes a tag query expression as a string and validates it
-// the first return value is a boolean which indicates whether this expression requires
-// a non-empty value
-// the second return value is an error which is non-nil if there was any validation error
-func validateTagQueryExpression(expression string) (bool, error) {
-	var operatorStartPos, operatorEndPos, equalPos int
-	equalPos = strings.Index(expression, "=")
-	if equalPos < 0 {
-		return false, fmt.Errorf("Missing equal sign: %s", expression)
-	}
-
-	if equalPos == 0 {
-		return false, fmt.Errorf("Empty tag name: %s", expression)
-	}
-
-	requiresNonEmptyValue := true
-	if expression[equalPos-1] == '!' {
-		operatorStartPos = equalPos - 1
-		requiresNonEmptyValue = false
-	} else if expression[equalPos-1] == '^' {
-		operatorStartPos = equalPos - 1
-	} else {
-		operatorStartPos = equalPos
-	}
-
-	if strings.ContainsAny(expression[:operatorStartPos], ";!^") {
-		return false, fmt.Errorf("Invalid character in tag key %s of expression %s", expression[:operatorStartPos], expression)
-	}
-
-	isRegex := false
-	if len(expression)-1 == equalPos {
-		operatorEndPos = equalPos
-	} else if expression[equalPos+1] == '~' {
-		operatorEndPos = equalPos + 1
-		isRegex = true
-	} else {
-		operatorEndPos = equalPos
-	}
-
-	value := expression[operatorEndPos+1:]
-	if strings.ContainsAny(value, ";~") {
-		return false, fmt.Errorf("Invalid character in tag value %s of expression %s", value, expression)
-	}
-
-	if isRegex {
-		matches, err := regexp.Match(value, nil)
-		if err != nil {
-			return false, fmt.Errorf("Invalid regular expression given as value %s in expression %s: %s", value, expression, err)
-		}
-		if matches {
-			// if value matches empty string, then requiresNonEmptyValue gets negated
-			requiresNonEmptyValue = !requiresNonEmptyValue
-		}
-	} else {
-		if len(value) == 0 {
-			// if value is empty, then requiresNonEmptyValue gets negated
-			// f.e.
-			// tag1!= means there must be a tag "tag1", instead of there must not be
-			// tag1= means there must not be a "tag1", instead of there must be
-			requiresNonEmptyValue = !requiresNonEmptyValue
-		}
-	}
-
-	return requiresNonEmptyValue, nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
@@ -1043,7 +975,14 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filte
 
 func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.GraphiteTagFindSeries) {
 	reqCtx := ctx.Req.Context()
-	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, request.Expr, request.From, maxSeriesPerReq)
+
+	expressions, err := tagquery.ParseExpressions(request.Expr)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, expressions, request.From, maxSeriesPerReq)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -1063,8 +1002,8 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	response.Write(ctx, response.NewJson(200, seriesNames, ""))
 }
 
-func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions []string, from int64, maxSeries int) ([]Series, error) {
-	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions, From: from}
+func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagquery.Expressions, from int64, maxSeries int) ([]Series, error) {
+	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions.Strings(), From: from}
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	responseChan, errorChan := s.peerQuerySpeculativeChan(newCtx, data, "clusterFindByTag", "/index/find_by_tag")
@@ -1256,17 +1195,35 @@ func (s *Server) graphiteFunctions(ctx *middleware.Context) {
 }
 
 func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.GraphiteTagDelSeries) {
-
 	res := models.GraphiteTagDelSeriesResp{}
 
 	// nothing to do on query nodes.
 	if s.MetricIndex != nil {
-		deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, request.Paths)
-		if err != nil {
-			response.Write(ctx, response.WrapErrorForTagDB(err))
-			return
+		for _, path := range request.Paths {
+			tags, err := tagquery.ParseTagsFromMetricName(path)
+			if err != nil {
+				response.Write(ctx, response.WrapErrorForTagDB(err))
+				return
+			}
+
+			expressions := make(tagquery.Expressions, 0, len(tags))
+			for _, tag := range tags {
+				expressions = append(expressions, tagquery.Expression{
+					Tag:                   tag,
+					Operator:              tagquery.EQUAL,
+					RequiresNonEmptyValue: true,
+				})
+			}
+
+			query, err := tagquery.NewQuery(expressions, 0)
+			if err != nil {
+				response.Write(ctx, response.WrapErrorForTagDB(err))
+				return
+			}
+
+			deleted := s.MetricIndex.DeleteTagged(ctx.OrgId, query)
+			res.Count += len(deleted)
 		}
-		res.Count = len(deleted)
 	}
 
 	if !request.Propagate {
@@ -1354,12 +1311,13 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 }
 
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
-	record := idx.MetaTagRecord{
-		MetaTags: upsertRequest.MetaTags,
-		Queries:  upsertRequest.Queries,
+	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Queries)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
 	}
 
-	var localResult idx.MetaTagRecord
+	var localResult tagquery.MetaTagRecord
 	var created bool
 	if s.MetricIndex != nil {
 		var err error
@@ -1371,8 +1329,8 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 
 		if !upsertRequest.Propagate {
 			response.Write(ctx, response.NewJson(200, models.MetaTagRecordUpsertResult{
-				MetaTags: localResult.MetaTags,
-				Queries:  localResult.Queries,
+				MetaTags: localResult.MetaTags.Strings(),
+				Queries:  localResult.Queries.Strings(),
 				Created:  created,
 			}, ""))
 			return
@@ -1383,8 +1341,8 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 
 	res := models.MetaTagRecordUpsertResultByNode{
 		Local: models.MetaTagRecordUpsertResult{
-			MetaTags: localResult.MetaTags,
-			Queries:  localResult.Queries,
+			MetaTags: localResult.MetaTags.Strings(),
+			Queries:  localResult.Queries.Strings(),
 			Created:  created,
 		},
 	}

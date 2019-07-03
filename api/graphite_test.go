@@ -15,7 +15,7 @@ func TestExpressionParsing(t *testing.T) {
 		{
 			inputValue:        "',=+'  , 'a=b','c=d', '~=~!', \"'[])(&%$#@!={}'\"",
 			expectError:       false,
-			expectExpressions: []string{",=+", "a=b", "c=d", "~=~!", "'[])(&%$#@!={}'"},
+			expectExpressions: []string{",=+", "a=b", "c=d", "~=~^(?:!)", "'[])(&%$#@!={}'"},
 		},
 		{
 			inputValue:        "'a=b',\"c=d\",'e=f'",
@@ -55,12 +55,12 @@ func TestExpressionParsing(t *testing.T) {
 		{
 			inputValue:        "'a!=~.*'",
 			expectError:       false,
-			expectExpressions: []string{"a!=~.*"},
+			expectExpressions: []string{"a!=~^(?:.*)"},
 		},
 		{
 			inputValue:        "'a=~.+'",
 			expectError:       false,
-			expectExpressions: []string{"a=~.+"},
+			expectExpressions: []string{"a=~^(?:.+)"},
 		},
 		{
 			inputValue:        "",
@@ -114,15 +114,21 @@ func TestExpressionParsing(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		expressions, err := getTagQueryExpressions(tc.inputValue)
 
 		if (err != nil) != tc.expectError {
 			t.Fatalf("Got unexpected error value %q in TC:\n%+v", err, tc)
 		}
 
-		if len(expressions) != len(tc.expectExpressions) || !reflect.DeepEqual(expressions, tc.expectExpressions) {
-			t.Fatalf("Got unexpected expressions %q in TC:\n%+v", expressions, tc)
+		// if we expected an error we don't need to check the returned values
+		if tc.expectError {
+			continue
+		}
+
+		expressionsStr := expressions.Strings()
+		if len(expressionsStr) != len(tc.expectExpressions) || !reflect.DeepEqual(expressionsStr, tc.expectExpressions) {
+			t.Fatalf("Got unexpected expressions in TC %d\nExpected:\n%+v\nGot:\n%+v\n", i, tc.expectExpressions, expressionsStr)
 		}
 	}
 }
