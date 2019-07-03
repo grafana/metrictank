@@ -21,7 +21,7 @@ see the [Makefile](../Makefile) for more targets
 1. functions, methods, types should be clearly understandable, either through an obvious name, or documentation when needed.
 2. all code documentation must conform to [golang best practices](https://blog.golang.org/godoc-documenting-go-code)
 3. add unit tests for tricky or non-trivial code. Not needed for obvious, simple or glue code.  Use your best judgment or just ask us.
-   In particular, for bugfixes, try to commit first the test and than the patch that fixes the test.
+   For bugfixes, construct the git history such that the commit introducing the test comes before the bugfix, this makes it much easier to validate the fix.
 4. add benchmarks for performance sensitive functionality (e.g. code in the read and write path) or commonly executed code. (e.g. index inserts and searches)
    ([how to write benchmarks tutorial](https://dave.cheney.net/2013/06/30/how-to-write-benchmarks-in-go))
 5. It's OK for your PR to not be based on the absolute latest master, but don't let the base of your branch get too out of date. (rule of thumb: no more than 40 commits or 2 weeks behind)
