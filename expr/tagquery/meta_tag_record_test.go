@@ -22,18 +22,17 @@ func TestParseMetaTagRecord(t *testing.T) {
 			},
 		},
 		Queries: Expressions{
-			{
-				Tag: Tag{
-					Key:   "e",
-					Value: "f",
+			&expressionNotEqual{
+				expressionCommon{
+					key:   "e",
+					value: "f",
 				},
-				Operator: NOT_EQUAL,
-			}, {
-				Tag: Tag{
-					Key:   "g",
-					Value: "h",
+			},
+			&expressionPrefix{
+				expressionCommon{
+					key:   "g",
+					value: "h",
 				},
-				Operator: PREFIX,
 			},
 		},
 	})

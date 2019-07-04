@@ -171,7 +171,7 @@ func TestQueryByTagWithEqualEmpty(t *testing.T) {
 
 func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3!=", "key3!=~"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3!="}, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -243,9 +243,6 @@ func TestQueryByTagFilterByTagPrefixSpecialCaseName(t *testing.T) {
 func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) {
 	ids := getTestIDs()
 	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~na", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	expect := make(IdSet)
 	expect[ids[0]] = struct{}{}
 	expect[ids[5]] = struct{}{}
@@ -255,30 +252,17 @@ func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) 
 func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
 	ids := getTestIDs()
 	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~a{1}", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
-
 	expect := make(IdSet)
 	expect[ids[5]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{2}", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{3}", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{4}", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	delete(expect, ids[5])
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 }
@@ -286,24 +270,15 @@ func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
 func TestQueryByTagFilterByTagPrefixWithExpression(t *testing.T) {
 	ids := getTestIDs()
 	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=aa", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 
 	expect := make(IdSet)
 	expect[ids[5]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaa", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaaa", "key2=value2"}, 0)
-	if q.StartWith != tagquery.EQUAL {
-		t.Fatalf("Expected query to start with equal expression")
-	}
 	delete(expect, ids[5])
 	delete(expect, ids[6])
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -448,7 +423,7 @@ func testGetByTag(t *testing.T) {
 			expectation: []string{},
 		}, {
 			expressions: []string{"key1=~value[0-9]", "key2=~", "key3!=value3"},
-			expectation: []string{fullName(mds[11])},
+			expectation: []string{fullName(mds[1]), fullName(mds[11]), fullName(mds[18])},
 		}, {
 			expressions: []string{"key2=", "key1=value1"},
 			expectation: []string{fullName(mds[11]), fullName(mds[3])},
