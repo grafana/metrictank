@@ -1014,6 +1014,66 @@ func testSingleNodeMetric(t *testing.T) {
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 }
 
+func TestMetricNameStartingWithTilde(t *testing.T) {
+	withAndWithoutPartitonedIndex(testMetricNameStartingWithTilde)(t)
+}
+
+func testMetricNameStartingWithTilde(t *testing.T) {
+	ix := New()
+	ix.Init()
+	defer func() {
+		ix.Stop()
+		ix = nil
+	}()
+
+	metricName := "~~~weird~.~metric~"
+	expectedNameTag := "weird~.~metric~"
+
+	data := &schema.MetricData{
+		Name:     metricName,
+		Interval: 1,
+		OrgId:    1,
+	}
+	data.SetId()
+	mkey, err := schema.MKeyFromString(data.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	arch, _, _ := ix.AddOrUpdate(mkey, data, getPartition(data))
+	if arch.Name != metricName {
+		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, arch.Name)
+	}
+
+	// query by the name minus the leading ~ characters
+	query, err := tagquery.NewQueryFromStrings([]string{"name=" + expectedNameTag}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query expression: %q", err)
+	}
+
+	findResult := ix.FindByTag(1, query)
+	if len(findResult) != 1 {
+		t.Fatalf("Expected 1 result, but got %d", len(findResult))
+	}
+
+	if findResult[0].Path != metricName {
+		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, findResult[0].Path)
+	}
+
+	tagDetails := ix.TagDetails(1, "name", nil, 0)
+	if len(tagDetails) != 1 {
+		t.Fatalf("Expected 1 result, but got %d", len(tagDetails))
+	}
+
+	count, ok := tagDetails[expectedNameTag]
+	if !ok {
+		t.Fatalf("Did not get expected name as tag value in result")
+	}
+	if count != 1 {
+		t.Fatalf("Expected 1 result, but got %d", count)
+	}
+}
+
 // TestMemoryIndexHeapUsageWithTagsUniqueNone5 gives a rough estimate of how much memory the index is using with tag support turned on.
 // It uses 0 unique tags and 10 identical tags
 func TestMemoryIndexHeapUsageWithTagsUniqueNone5(t *testing.T) {
