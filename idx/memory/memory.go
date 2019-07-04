@@ -315,32 +315,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tags:           make(map[uint32]TagIndex),
 		metaTags:       make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
-		shutdown:       make(chan struct{}),
 	}
-
-	if findCacheSize > 0 {
-		umi.findCache = NewFindCache(findCacheSize, findCacheInvalidateQueueSize, findCacheInvalidateMaxSize, findCacheInvalidateMaxWait, findCacheBackoffTime)
-	}
-
-	// gather memory and fragmentation statistics on the object store every minute
-	go func(shutdown chan struct{}) {
-		for {
-			select {
-			case <-shutdown:
-				return
-			default:
-				umi.Lock()
-				for _, internMemStat := range idx.IdxIntern.MemStatsPerPool() {
-					statInternMemory[internMemStat.ObjSize].SetUint64(internMemStat.MemUsed)
-				}
-				for _, internFragStat := range idx.IdxIntern.FragStatsPerPool() {
-					statInternFragmentation[internFragStat.ObjSize].SetUint32(uint32(100 - (internFragStat.FragPercent * 100)))
-				}
-				umi.Unlock()
-			}
-			time.Sleep(time.Minute)
-		}
-	}(umi.shutdown)
 
 	return &umi
 }
@@ -352,6 +327,29 @@ func (m *UnpartitionedMemoryIdx) Init() error {
 	if writeQueueEnabled {
 		m.writeQueue = NewWriteQueue(m, writeQueueDelay, writeMaxBatchSize)
 	}
+
+	m.shutdown = make(chan struct{})
+
+	// gather memory and fragmentation statistics on the object store every minute
+	go func(shutdown chan struct{}) {
+		for {
+			select {
+			case <-shutdown:
+				return
+			default:
+				m.Lock()
+				for _, internMemStat := range idx.IdxIntern.MemStatsPerPool() {
+					statInternMemory[internMemStat.ObjSize].SetUint64(internMemStat.MemUsed)
+				}
+				for _, internFragStat := range idx.IdxIntern.FragStatsPerPool() {
+					statInternFragmentation[internFragStat.ObjSize].SetUint32(uint32(100 - (internFragStat.FragPercent * 100)))
+				}
+				m.Unlock()
+			}
+			time.Sleep(time.Minute)
+		}
+	}(m.shutdown)
+
 	return nil
 }
 
@@ -364,6 +362,8 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 		m.writeQueue.Stop()
 		m.writeQueue = nil
 	}
+	close(m.shutdown)
+
 	return
 }
 

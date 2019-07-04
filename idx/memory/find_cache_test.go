@@ -85,6 +85,7 @@ func TestTreeFromPath(t *testing.T) {
 func TestFindCache(t *testing.T) {
 	Convey("when findCache is empty", t, func() {
 		c := NewFindCache(10, 5, 2, 100*time.Millisecond, time.Second*2)
+		defer c.Shutdown()
 		Convey("0 results should be returned", func() {
 			result, ok := c.Get(1, "foo.bar.*")
 			So(ok, ShouldBeFalse)
