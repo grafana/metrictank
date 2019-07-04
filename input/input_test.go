@@ -189,6 +189,7 @@ func getDefaultHandler(t *testing.T) (DefaultHandler, idx.MetricIndex, func()) {
 	oldTagSupport := memory.TagSupport
 	memory.TagSupport = true
 	index := memory.New()
+	index.Init()
 
 	reset := func() {
 		rejectInvalidTags = oldRejectInvalidTags

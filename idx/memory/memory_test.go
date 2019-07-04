@@ -1106,7 +1106,7 @@ func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 	// turn tag support on
 	TagSupport = true
 
-	globalMemoryIndex = newTestIndex()
+	globalMemoryIndex = New()
 	globalMemoryIndex.Init()
 	defer globalMemoryIndex.Stop()
 
@@ -1155,7 +1155,10 @@ func BenchmarkIndexing(b *testing.B) {
 func benchmarkIndexing(b *testing.B) {
 	ix := New()
 	ix.Init()
-	defer ix.Stop()
+	defer func() {
+		ix.Stop()
+		ix = nil
+	}()
 
 	var series string
 	var data *schema.MetricData
