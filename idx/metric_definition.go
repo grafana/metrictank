@@ -440,9 +440,9 @@ func (md *MetricDefinition) SetMetricName(name string) error {
 // is a separate Key/Value pair. Do not combine multiple Key/Value pairs
 // into a single index in the []string.
 func (md *MetricDefinition) SetTags(tags []string) {
-	md.Tags.KeyValues = make([]TagKeyValue, len(tags))
+	md.Tags.KeyValues = make([]TagKeyValue, 0, len(tags))
 	sort.Strings(tags)
-	for i, tag := range tags {
+	for _, tag := range tags {
 		if tag == "=" || tag == "" {
 			log.Error("idx: SetTags: Empty tag, ignoring: ", tag)
 			invalidTag.Inc()
@@ -466,7 +466,6 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			internError.Inc()
 			continue
 		}
-		md.Tags.KeyValues[i].Key = key
 
 		if strings.ContainsAny(tag[eqPos+1:], "; ~") {
 			log.Errorf("idx: Tag value %s has an invalid format, ignoring", tag[eqPos+1:])
@@ -480,7 +479,8 @@ func (md *MetricDefinition) SetTags(tags []string) {
 			IdxIntern.Delete(key)
 			continue
 		}
-		md.Tags.KeyValues[i].Value = value
+
+		md.Tags.KeyValues = append(md.Tags.KeyValues, TagKeyValue{Key: key, Value: value})
 	}
 }
 
