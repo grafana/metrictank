@@ -1,15 +1,13 @@
 package tagquery
 
 import (
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
 
 type expressionMatch struct {
-	expressionCommon
-	valueRe *regexp.Regexp
+	expressionCommonRe
 }
 
 func (e *expressionMatch) GetOperator() ExpressionOperator {
@@ -41,6 +39,10 @@ func (e *expressionMatch) StringIntoBuilder(builder *strings.Builder) {
 	builder.WriteString(e.key)
 	builder.WriteString("=~")
 	builder.WriteString(e.value)
+}
+
+func (e *expressionMatch) RequiresNonEmptyValue() bool {
+	return !e.matchesEmpty
 }
 
 func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {

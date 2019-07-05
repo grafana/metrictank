@@ -1,15 +1,13 @@
 package tagquery
 
 import (
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
 
 type expressionNotMatch struct {
-	expressionCommon
-	valueRe *regexp.Regexp
+	expressionCommonRe
 }
 
 func (e *expressionNotMatch) GetOperator() ExpressionOperator {
@@ -17,7 +15,7 @@ func (e *expressionNotMatch) GetOperator() ExpressionOperator {
 }
 
 func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
-	return false
+	return e.matchesEmpty
 }
 
 func (e *expressionNotMatch) HasRe() bool {

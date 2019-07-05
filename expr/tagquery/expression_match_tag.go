@@ -1,15 +1,13 @@
 package tagquery
 
 import (
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
 
 type expressionMatchTag struct {
-	expressionCommon
-	valueRe *regexp.Regexp
+	expressionCommonRe
 }
 
 func (e *expressionMatchTag) GetOperator() ExpressionOperator {
@@ -30,6 +28,10 @@ func (e *expressionMatchTag) GetDefaultDecision() FilterDecision {
 
 func (e *expressionMatchTag) OperatesOnTag() bool {
 	return true
+}
+
+func (e *expressionMatchTag) RequiresNonEmptyValue() bool {
+	return !e.matchesEmpty
 }
 
 func (e *expressionMatchTag) StringIntoBuilder(builder *strings.Builder) {

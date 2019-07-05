@@ -18,41 +18,126 @@ func TestExpressionParsing(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			expression: "key=value",
-			key:        "key",
+			expression: "a=value",
+			key:        "a",
 			value:      "value",
 			operator:   EQUAL,
-			err:        false,
 		}, {
-			expression: "key!=",
-			key:        "key",
+			expression: "abc=",
+			key:        "abc",
+			value:      "",
+			operator:   NOT_HAS_TAG,
+		}, {
+			expression: "__tag=",
+			err:        true,
+		}, {
+			expression: "ccc!=value",
+			key:        "ccc",
+			value:      "value",
+			operator:   NOT_EQUAL,
+		}, {
+			expression: "__tag=abc",
+			key:        "abc",
 			value:      "",
 			operator:   HAS_TAG,
-			err:        false,
 		}, {
-			expression: "key=",
-			key:        "key",
+			expression: "a!=",
+			key:        "a",
 			value:      "",
-			operator:   NOT_HAS_TAG,
-			err:        false,
+			operator:   HAS_TAG,
 		}, {
-			expression: "key=~",
-			key:        "key",
+			expression: "__tag!=",
+			err:        true,
+		}, {
+			expression: "tag1=~^abc.*",
+			key:        "tag1",
+			value:      "^abc.*",
+			operator:   MATCH,
+		}, {
+			expression: "abc=~",
+			key:        "abc",
 			value:      "",
-			operator:   NOT_HAS_TAG,
-			err:        false,
+			operator:   MATCH_ALL,
 		}, {
-			expression: "key=~v_alue",
+			expression: "abc=~.*",
+			key:        "abc",
+			value:      "^(?:.*)",
+			operator:   MATCH_ALL,
+		}, {
+			expression: "abc=~.+",
+			key:        "abc",
+			value:      "^(?:.+)",
+			operator:   MATCH,
+		}, {
+			expression: "tag123=~.*value.*",
+			key:        "tag123",
+			value:      "^(?:.*value.*)",
+			operator:   MATCH,
+		}, {
+			expression: "__tag=~.*value.*",
+			key:        "__tag",
+			value:      "^(?:.*value.*)",
+			operator:   MATCH_TAG,
+		}, {
+			expression: "__tag=~",
+			key:        "__tag",
+			value:      "",
+			operator:   MATCH_ALL,
+		}, {
+			expression: "__tag=~.*",
+			key:        "__tag",
+			value:      "^(?:.*)",
+			operator:   MATCH_ALL,
+		}, {
+			expression: "__tag=~.+",
+			key:        "__tag",
+			value:      "^(?:.+)",
+			operator:   MATCH_TAG,
+		}, {
+			expression: "abc!=~.*",
+			key:        "abc",
+			value:      "^(?:.*)",
+			operator:   MATCH_NONE,
+		}, {
+			expression: "key!=~v_alue",
 			key:        "key",
 			value:      "^(?:v_alue)",
-			operator:   MATCH,
-			err:        false,
-		}, {
-			expression: "k!=~v",
-			key:        "k",
-			value:      "^(?:v)",
 			operator:   NOT_MATCH,
-			err:        false,
+		}, {
+			expression: "k!=~",
+			key:        "k",
+			value:      "",
+			operator:   MATCH_NONE,
+		}, {
+			expression: "k!=~.*",
+			key:        "k",
+			value:      "^(?:.*)",
+			operator:   MATCH_NONE,
+		}, {
+			expression: "sometag!=~.*abc.*",
+			key:        "sometag",
+			value:      "^(?:.*abc.*)",
+			operator:   NOT_MATCH,
+		}, {
+			expression: "tag1^=",
+			key:        "tag1",
+			value:      "",
+			operator:   MATCH_ALL,
+		}, {
+			expression: "tag1^=abc",
+			key:        "tag1",
+			value:      "abc",
+			operator:   PREFIX,
+		}, {
+			expression: "__tag^=a",
+			key:        "__tag",
+			value:      "a",
+			operator:   PREFIX_TAG,
+		}, {
+			expression: "__tag^=",
+			key:        "__tag",
+			value:      "",
+			operator:   MATCH_ALL,
 		}, {
 			expression: "key!!=value",
 			err:        true,
@@ -61,27 +146,26 @@ func TestExpressionParsing(t *testing.T) {
 			key:        "key",
 			value:      "=value",
 			operator:   EQUAL,
-			err:        false,
 		}, {
 			expression: "key=~=value",
 			key:        "key",
 			value:      "^(?:=value)",
 			operator:   MATCH,
-			err:        false,
 		}, {
 			expression: "__tag=~key",
 			key:        "__tag",
 			value:      "^(?:key)",
 			operator:   MATCH_TAG,
-			err:        false,
 		}, {
 			expression: "__tag^=some.key",
 			key:        "__tag",
 			value:      "some.key",
 			operator:   PREFIX_TAG,
-			err:        false,
 		}, {
 			expression: "key=~(abc",
+			err:        true,
+		}, {
+			expression: "=key=abc",
 			err:        true,
 		}, {
 			expression: "__tag!=some.key",
@@ -95,7 +179,14 @@ func TestExpressionParsing(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("TC %d \"%s\"", i, tc.expression), func(t *testing.T) {
 			expression, err := ParseExpression(tc.expression)
-			if (err != nil) != tc.err || (err == nil && (expression.GetKey() != tc.key || expression.GetValue() != tc.value || expression.GetOperator() != tc.operator)) {
+			if (err != nil) != tc.err {
+				if tc.err {
+					t.Fatalf("Expected error, but did not get one")
+				} else {
+					t.Fatalf("Did not expect error, but got one: %q", err)
+				}
+			}
+			if err == nil && (expression.GetKey() != tc.key || expression.GetValue() != tc.value || expression.GetOperator() != tc.operator) {
 				t.Fatalf("Expected the values %s, %s, %d, %t, but got %s, %s, %d, %q", tc.key, tc.value, tc.operator, tc.err, expression.GetKey(), expression.GetValue(), expression.GetOperator(), err)
 			}
 		})

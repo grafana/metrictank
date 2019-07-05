@@ -34,7 +34,7 @@ func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
 		return func(_ string, _ []string) FilterDecision { return Pass }
 	}
 
-	matchPrefix := e.GetKey() + "="
+	matchPrefix := e.key + "="
 	return func(_ string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, matchPrefix) {
