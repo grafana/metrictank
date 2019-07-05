@@ -29,7 +29,7 @@ type Aggregator struct {
 	lstMetric       *AggMetric
 }
 
-func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool) *Aggregator {
+func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool, ingestAfter int64) *Aggregator {
 	if len(agg.AggregationMethod) == 0 {
 		panic("NewAggregator called without aggregations. this should never happen")
 	}
@@ -43,31 +43,31 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey,
 		case conf.Avg:
 			if aggregator.sumMetric == nil {
 				key.Archive = schema.NewArchive(schema.Sum, span)
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk, ingestAfter)
 			}
 			if aggregator.cntMetric == nil {
 				key.Archive = schema.NewArchive(schema.Cnt, span)
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk)
+				aggregator.cntMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk, ingestAfter)
 			}
 		case conf.Sum:
 			if aggregator.sumMetric == nil {
 				key.Archive = schema.NewArchive(schema.Sum, span)
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk, ingestAfter)
 			}
 		case conf.Lst:
 			if aggregator.lstMetric == nil {
 				key.Archive = schema.NewArchive(schema.Lst, span)
-				aggregator.lstMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk)
+				aggregator.lstMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk, ingestAfter)
 			}
 		case conf.Max:
 			if aggregator.maxMetric == nil {
 				key.Archive = schema.NewArchive(schema.Max, span)
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk)
+				aggregator.maxMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk, ingestAfter)
 			}
 		case conf.Min:
 			if aggregator.minMetric == nil {
 				key.Archive = schema.NewArchive(schema.Min, span)
-				aggregator.minMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk)
+				aggregator.minMetric = NewAggMetric(store, cachePusher, key, conf.Retentions{ret}, 0, span, nil, dropFirstChunk, ingestAfter)
 			}
 		}
 	}

@@ -31,39 +31,41 @@ type AggMetric struct {
 	store       Store
 	cachePusher cache.CachePusher
 	sync.RWMutex
-	key             schema.AMKey
-	rob             *ReorderBuffer
-	currentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
-	numChunks       uint32 // max size of the circular buffer
-	chunkSpan       uint32 // span of individual chunks in seconds
-	chunks          []*chunk.Chunk
-	aggregators     []*Aggregator
-	dropFirstChunk  bool
-	ttl             uint32
-	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
-	lastSaveFinish  uint32 // last chunk T0 successfully written to Cassandra.
-	lastWrite       uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
-	firstTs         uint32 // timestamp of first point seen
+	key                    schema.AMKey
+	rob                    *ReorderBuffer
+	currentChunkPos        int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
+	numChunks              uint32 // max size of the circular buffer
+	chunkSpan              uint32 // span of individual chunks in seconds
+	chunks                 []*chunk.Chunk
+	aggregators            []*Aggregator
+	dropFirstChunk         bool
+	ingestAfterNextChunkT0 uint32
+	ttl                    uint32
+	lastSaveStart          uint32 // last chunk T0 that was added to the write Queue.
+	lastSaveFinish         uint32 // last chunk T0 successfully written to Cassandra.
+	lastWrite              uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
+	firstTs                uint32 // timestamp of first point seen
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, dropFirstChunk bool, ingestAfter int64) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
 
 	m := AggMetric{
-		cachePusher:    cachePusher,
-		store:          store,
-		key:            key,
-		chunkSpan:      ret.ChunkSpan,
-		numChunks:      ret.NumChunks,
-		chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk: dropFirstChunk,
-		ttl:            uint32(ret.MaxRetention()),
+		cachePusher:            cachePusher,
+		store:                  store,
+		key:                    key,
+		chunkSpan:              ret.ChunkSpan,
+		numChunks:              ret.NumChunks,
+		chunks:                 make([]*chunk.Chunk, 0, ret.NumChunks),
+		dropFirstChunk:         dropFirstChunk,
+		ingestAfterNextChunkT0: uint32(ingestAfter-(ingestAfter%int64(ret.ChunkSpan))) + ret.ChunkSpan,
+		ttl:                    uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
@@ -73,7 +75,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 	}
 
 	for _, ret := range retentions[1:] {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk))
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk, ingestAfter))
 	}
 
 	return &m
@@ -424,6 +426,12 @@ func (a *AggMetric) persist(pos int) {
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
+	if ts < a.ingestAfterNextChunkT0 {
+		// TODO: add metric to keep track of the # of points discarded
+		log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-after. First chunk considered starts at %d", ts, val, a.ingestAfterNextChunkT0)
+		return
+	}
+
 	a.Lock()
 	defer a.Unlock()
 

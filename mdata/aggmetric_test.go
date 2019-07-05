@@ -128,7 +128,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	numChunks, chunkAddCount, chunkSpan := uint32(5), uint32(10), uint32(300)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0)}
-	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), ret, 0, chunkSpan, nil, false)
+	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), ret, 0, chunkSpan, nil, false, 0)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -164,7 +164,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, 0)}
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false))
+	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, 0))
 
 	// chunk t0's: 120, 240, 360, 480, 600, 720, 840, 960
 
@@ -242,7 +242,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, 120, 5, 0)}
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, 1, &agg, false))
+	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, 1, &agg, false, 0))
 
 	// basic adds and verifies with test data
 	c.Add(121, 121)
@@ -282,7 +282,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	chunkSpan := uint32(10)
 	numChunks := uint32(5)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0)}
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, true)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, true, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -299,6 +299,34 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	}
 	if len(itgens) != 2 || itgens[0].T0 != 20 || itgens[1].T0 != 30 {
 		t.Fatalf("expected 2 itgens for chunks 20 and 30 since the first one should be dropped. Got %v", itgens)
+	}
+}
+
+func TestAggMetricIngestAfter(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(true)
+	mockstore.Reset()
+	chunkSpan := uint32(10)
+	numChunks := uint32(5)
+	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0)}
+
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, 25)
+	m.Add(10, 10)
+	m.Add(11, 11)
+	m.Add(12, 12)
+	m.Add(20, 20)
+	m.Add(21, 21)
+	m.Add(22, 22)
+	m.Add(30, 30)
+	m.Add(31, 31)
+	m.Add(32, 32)
+	m.Add(40, 40)
+	itgens, err := mockstore.Search(test.NewContext(), test.GetAMKey(42), 0, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(itgens) != 1 || itgens[0].T0 != 30 {
+		t.Fatalf("expected 1 itgens for chunk 30 since the chunks before 25 should be dropped. Got %v", itgens)
 	}
 }
 
@@ -321,7 +349,7 @@ func BenchmarkAggMetricAdd(b *testing.B) {
 		},
 	}
 
-	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), retentions, 0, 10, nil, false)
+	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), retentions, 0, 10, nil, false, 0)
 
 	max := uint32(b.N*10 + 1)
 	for t := uint32(1); t < max; t += 10 {
