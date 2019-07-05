@@ -5,8 +5,8 @@ import (
 )
 
 type MetaTagRecord struct {
-	MetaTags Tags
-	Queries  Expressions
+	MetaTags    Tags
+	Expressions Expressions
 }
 
 func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, error) {
@@ -18,12 +18,12 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 		return res, err
 	}
 
-	res.Queries, err = ParseExpressions(queries)
+	res.Expressions, err = ParseExpressions(queries)
 	if err != nil {
 		return res, err
 	}
 
-	if len(res.Queries) == 0 {
+	if len(res.Expressions) == 0 {
 		return res, fmt.Errorf("Meta Tag Record must have at least one query")
 	}
 
@@ -34,12 +34,12 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 // one's queries. Returns true if they are equal, otherwise false.
 // It is assumed that all the queries are already sorted
 func (m *MetaTagRecord) MatchesQueries(other *MetaTagRecord) bool {
-	if len(m.Queries) != len(other.Queries) {
+	if len(m.Expressions) != len(other.Expressions) {
 		return false
 	}
 
-	for i, query := range m.Queries {
-		if !ExpressionsAreEqual(query, other.Queries[i]) {
+	for i, query := range m.Expressions {
+		if !ExpressionsAreEqual(query, other.Expressions[i]) {
 			return false
 		}
 	}
