@@ -21,7 +21,7 @@ func TestParseMetaTagRecord(t *testing.T) {
 				Value: "d",
 			},
 		},
-		Queries: Expressions{
+		Expressions: Expressions{
 			&expressionNotEqual{
 				expressionCommon{
 					key:   "e",

@@ -249,7 +249,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 		t.Fatalf("Expected returned meta tag record to have 0 meta tags, but it had %d", len(returnedRecord.MetaTags))
 	}
 	if !metaTagRecordsAreEqual(returnedRecord, &record) {
-		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", record.Queries, returnedRecord.Queries)
+		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", record.Expressions, returnedRecord.Expressions)
 	}
 	if oldId != idOfRecord2 {
 		t.Fatalf("Expected the oldId to be the id of record2 (%d), but it was %d", idOfRecord2, oldId)

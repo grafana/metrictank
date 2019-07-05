@@ -1350,7 +1350,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 		if !upsertRequest.Propagate {
 			response.Write(ctx, response.NewJson(200, models.MetaTagRecordUpsertResult{
 				MetaTags: localResult.MetaTags.Strings(),
-				Queries:  localResult.Queries.Strings(),
+				Queries:  localResult.Expressions.Strings(),
 				Created:  created,
 			}, ""))
 			return
@@ -1362,7 +1362,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 	res := models.MetaTagRecordUpsertResultByNode{
 		Local: models.MetaTagRecordUpsertResult{
 			MetaTags: localResult.MetaTags.Strings(),
-			Queries:  localResult.Queries.Strings(),
+			Queries:  localResult.Expressions.Strings(),
 			Created:  created,
 		},
 	}
