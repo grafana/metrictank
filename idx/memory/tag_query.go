@@ -326,7 +326,7 @@ func (q *TagQueryContext) testByMatch(def *idx.Archive, exprs []kvRe, not bool) 
 EXPRS:
 	for _, e := range exprs {
 		if e.Key == "name" {
-			if e.Regex == nil || e.Regex.MatchString(def.Name) {
+			if e.Regex == nil || e.Regex.MatchString(def.NameSanitizedAsTagValue()) {
 				if not {
 					return false
 				}
@@ -447,7 +447,7 @@ func (q *TagQueryContext) testByFrom(def *idx.Archive) bool {
 func (q *TagQueryContext) testByPrefix(def *idx.Archive, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
-		if e.Key == "name" && strings.HasPrefix(def.Name, e.Value) {
+		if e.Key == "name" && strings.HasPrefix(def.NameSanitizedAsTagValue(), e.Value) {
 			continue EXPRS
 		}
 
