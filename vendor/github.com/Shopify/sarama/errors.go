@@ -145,6 +145,27 @@ const (
 	ErrSASLAuthenticationFailed           KError = 58
 	ErrUnknownProducerID                  KError = 59
 	ErrReassignmentInProgress             KError = 60
+	ErrDelegationTokenAuthDisabled        KError = 61
+	ErrDelegationTokenNotFound            KError = 62
+	ErrDelegationTokenOwnerMismatch       KError = 63
+	ErrDelegationTokenRequestNotAllowed   KError = 64
+	ErrDelegationTokenAuthorizationFailed KError = 65
+	ErrDelegationTokenExpired             KError = 66
+	ErrInvalidPrincipalType               KError = 67
+	ErrNonEmptyGroup                      KError = 68
+	ErrGroupIDNotFound                    KError = 69
+	ErrFetchSessionIDNotFound             KError = 70
+	ErrInvalidFetchSessionEpoch           KError = 71
+	ErrListenerNotFound                   KError = 72
+	ErrTopicDeletionDisabled              KError = 73
+	ErrFencedLeaderEpoch                  KError = 74
+	ErrUnknownLeaderEpoch                 KError = 75
+	ErrUnsupportedCompressionType         KError = 76
+	ErrStaleBrokerEpoch                   KError = 77
+	ErrOffsetNotAvailable                 KError = 78
+	ErrMemberIdRequired                   KError = 79
+	ErrPreferredLeaderNotAvailable        KError = 80
+	ErrGroupMaxSizeReached                KError = 81
 )
 
 func (err KError) Error() string {
@@ -275,6 +296,48 @@ func (err KError) Error() string {
 		return "kafka server: The broker could not locate the producer metadata associated with the Producer ID."
 	case ErrReassignmentInProgress:
 		return "kafka server: A partition reassignment is in progress."
+	case ErrDelegationTokenAuthDisabled:
+		return "kafka server: Delegation Token feature is not enabled."
+	case ErrDelegationTokenNotFound:
+		return "kafka server: Delegation Token is not found on server."
+	case ErrDelegationTokenOwnerMismatch:
+		return "kafka server: Specified Principal is not valid Owner/Renewer."
+	case ErrDelegationTokenRequestNotAllowed:
+		return "kafka server: Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels."
+	case ErrDelegationTokenAuthorizationFailed:
+		return "kafka server: Delegation Token authorization failed."
+	case ErrDelegationTokenExpired:
+		return "kafka server: Delegation Token is expired."
+	case ErrInvalidPrincipalType:
+		return "kafka server: Supplied principalType is not supported."
+	case ErrNonEmptyGroup:
+		return "kafka server: The group is not empty."
+	case ErrGroupIDNotFound:
+		return "kafka server: The group id does not exist."
+	case ErrFetchSessionIDNotFound:
+		return "kafka server: The fetch session ID was not found."
+	case ErrInvalidFetchSessionEpoch:
+		return "kafka server: The fetch session epoch is invalid."
+	case ErrListenerNotFound:
+		return "kafka server: There is no listener on the leader broker that matches the listener on which metadata request was processed."
+	case ErrTopicDeletionDisabled:
+		return "kafka server: Topic deletion is disabled."
+	case ErrFencedLeaderEpoch:
+		return "kafka server: The leader epoch in the request is older than the epoch on the broker."
+	case ErrUnknownLeaderEpoch:
+		return "kafka server: The leader epoch in the request is newer than the epoch on the broker."
+	case ErrUnsupportedCompressionType:
+		return "kafka server: The requesting client does not support the compression type of given partition."
+	case ErrStaleBrokerEpoch:
+		return "kafka server: Broker epoch has changed"
+	case ErrOffsetNotAvailable:
+		return "kafka server: The leader high watermark has not caught up from a recent leader election so the offsets cannot be guaranteed to be monotonically increasing"
+	case ErrMemberIdRequired:
+		return "kafka server: The group member needs to have a valid member id before actually entering a consumer group"
+	case ErrPreferredLeaderNotAvailable:
+		return "kafka server: The preferred leader was not available"
+	case ErrGroupMaxSizeReached:
+		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members."
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
