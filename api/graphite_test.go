@@ -58,6 +58,11 @@ func TestExpressionParsing(t *testing.T) {
 			expectExpressions: []string{"a!=~^(?:.*)"},
 		},
 		{
+			inputValue:        "'a=~.*' , '__tag^=a'",
+			expectError:       false,
+			expectExpressions: []string{"a=~^(?:.*)", "__tag^=a"},
+		},
+		{
 			inputValue:        "'a=~.+'",
 			expectError:       false,
 			expectExpressions: []string{"a=~^(?:.+)"},

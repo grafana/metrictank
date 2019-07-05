@@ -64,25 +64,31 @@ func TestNewQueryFromStrings(t *testing.T) {
 						},
 					},
 					&expressionMatch{
-						expressionCommon: expressionCommon{
-							key:   "e",
-							value: "^(?:f)",
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "e",
+								value: "^(?:f)",
+							},
+							valueRe: nil,
 						},
-						valueRe: nil,
 					},
 					&expressionMatchTag{
-						expressionCommon: expressionCommon{
-							key:   "__tag",
-							value: "^(?:k)",
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "__tag",
+								value: "^(?:k)",
+							},
+							valueRe: nil,
 						},
-						valueRe: nil,
 					},
 					&expressionNotMatch{
-						expressionCommon: expressionCommon{
-							key:   "g",
-							value: "^(?:h)",
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "g",
+								value: "^(?:h)",
+							},
+							valueRe: nil,
 						},
-						valueRe: nil,
 					},
 				},
 				tagClause: 5,
@@ -107,6 +113,39 @@ func TestNewQueryFromStrings(t *testing.T) {
 			},
 			wantErr: true,
 		}, {
+			name: "missing an expression that requires non empty value because pattern matches empty value",
+			args: args{
+				expressionStrs: []string{"key=", "abc=~.*"},
+			},
+			wantErr: true,
+		}, {
+			name: "no error with + instead of * because pattern does not match empty value",
+			args: args{
+				expressionStrs: []string{"abc=~.+"},
+			},
+			want: Query{
+				From: 0,
+				Expressions: Expressions{
+					&expressionMatch{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "abc",
+								value: "^(?:.+)",
+							},
+							valueRe: nil,
+						},
+					},
+				},
+				tagClause: -1,
+				startWith: 0,
+			},
+		}, {
+			name: "missing an expression that requires non empty value because prefix matches empty value",
+			args: args{
+				expressionStrs: []string{"key=", "__tag^="},
+			},
+			wantErr: true,
+		}, {
 			name: "two different tag queries",
 			args: args{
 				expressionStrs: []string{"__tag^=abc", "__tag=~cba"},
@@ -120,11 +159,13 @@ func TestNewQueryFromStrings(t *testing.T) {
 			want: Query{
 				Expressions: Expressions{
 					&expressionMatch{
-						expressionCommon: expressionCommon{
-							key:   "abc",
-							value: "^(?:cba)",
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "abc",
+								value: "^(?:cba)",
+							},
+							valueRe: nil,
 						},
-						valueRe: nil,
 					},
 				},
 				startWith: 0,

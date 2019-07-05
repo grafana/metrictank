@@ -16,6 +16,12 @@ func (e *expressionPrefix) ValuePasses(value string) bool {
 	return strings.HasPrefix(value, e.value)
 }
 
+func (e *expressionPrefix) RequiresNonEmptyValue() bool {
+	// we know it requires an non-empty value, because the expression
+	// "__tag^=" would get parsed into the type expressionMatchAll
+	return true
+}
+
 func (e *expressionPrefix) GetDefaultDecision() FilterDecision {
 	return Fail
 }

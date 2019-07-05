@@ -12,6 +12,12 @@ func (e *expressionPrefixTag) GetOperator() ExpressionOperator {
 	return PREFIX_TAG
 }
 
+func (e *expressionPrefixTag) RequiresNonEmptyValue() bool {
+	// we know it requires an non-empty value, because the expression
+	// "__tag^=" would get parsed into the type expressionMatchAll
+	return true
+}
+
 func (e *expressionPrefixTag) ValuePasses(tag string) bool {
 	return strings.HasPrefix(tag, e.value)
 }

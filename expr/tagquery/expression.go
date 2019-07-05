@@ -60,13 +60,14 @@ func (e Expressions) SortByFilterOrder() {
 func (e Expressions) findInitialExpression() int {
 	// order of preference to start with the viable operators
 	for _, op := range []ExpressionOperator{
+		MATCH_NONE,
 		EQUAL,
 		HAS_TAG,
 		PREFIX,
 		PREFIX_TAG,
 		MATCH,
 		MATCH_TAG,
-		NOT_MATCH,
+		MATCH_ALL,
 	} {
 		for i := range e {
 			if e[i].GetOperator() == op && e[i].RequiresNonEmptyValue() {
@@ -223,80 +224,135 @@ FIND_OPERATOR:
 		}
 	}
 	resCommon.value = expr[valuePos:]
-	var operator ExpressionOperator
+	var originalOperator, effectiveOperator ExpressionOperator
 
+	// decide what operator this expression uses, based on the operator
+	// itself, but ignoring other factors like f.e. an empty value
 	if not {
-		if len(resCommon.value) == 0 {
-			operator = HAS_TAG
-		} else if regex {
-			operator = NOT_MATCH
+		if regex {
+			originalOperator = NOT_MATCH
 		} else {
-			operator = NOT_EQUAL
+			originalOperator = NOT_EQUAL
 		}
 	} else {
 		if prefix {
-			if len(resCommon.value) == 0 {
-				operator = HAS_TAG
-			} else {
-				operator = PREFIX
-			}
-		} else if len(resCommon.value) == 0 {
-			operator = NOT_HAS_TAG
+			originalOperator = PREFIX
 		} else if regex {
-			operator = MATCH
+			originalOperator = MATCH
 		} else {
-			operator = EQUAL
+			originalOperator = EQUAL
 		}
 	}
 
+	effectiveOperator = originalOperator
+
 	// special key to match on tag instead of a value
+	// update the operator decision accordingly
 	if resCommon.key == "__tag" {
 		// currently ! (not) queries on tags are not supported
 		// and unlike normal queries a value must be set
-		if not || len(resCommon.value) == 0 {
+		if not {
 			return nil, fmt.Errorf(invalidExpressionError, expr)
 		}
 
-		if operator == PREFIX {
-			operator = PREFIX_TAG
-		} else if operator == MATCH {
-			operator = MATCH_TAG
+		switch effectiveOperator {
+		case PREFIX:
+			if len(resCommon.value) == 0 {
+				effectiveOperator = MATCH_ALL
+			} else {
+				effectiveOperator = PREFIX_TAG
+			}
+		case MATCH:
+			if len(resCommon.value) == 0 {
+				effectiveOperator = MATCH_ALL
+			} else {
+				effectiveOperator = MATCH_TAG
+			}
+		case EQUAL:
+			if len(resCommon.value) == 0 {
+				return nil, fmt.Errorf(invalidExpressionError, expr)
+			}
+
+			// "__tag=abc", should internatlly be translated into "abc!="
+			resCommon.key = resCommon.value
+			resCommon.value = ""
+			effectiveOperator = HAS_TAG
 		}
 	}
 
-	if operator == MATCH || operator == NOT_MATCH || operator == MATCH_TAG {
+	// check for special case of an empty value and
+	// update chosen operator accordingly
+	if len(resCommon.value) == 0 {
+		switch effectiveOperator {
+		case EQUAL:
+			effectiveOperator = NOT_HAS_TAG
+		case NOT_EQUAL:
+			effectiveOperator = HAS_TAG
+		case MATCH:
+			effectiveOperator = MATCH_ALL
+		case NOT_MATCH:
+			effectiveOperator = MATCH_NONE
+		case PREFIX:
+			effectiveOperator = MATCH_ALL
+		}
+	}
+
+	if effectiveOperator == MATCH || effectiveOperator == MATCH_TAG || effectiveOperator == NOT_MATCH {
 		if len(resCommon.value) > 0 && resCommon.value[0] != '^' {
 			resCommon.value = "^(?:" + resCommon.value + ")"
+		}
+
+		// no need to run regular expressions that match any string
+		// so we update the operator to MATCH_ALL/NONE
+		if resCommon.value == "^(?:.*)" || resCommon.value == "^.*" || resCommon.value == "^(.*)" {
+			switch effectiveOperator {
+			case MATCH:
+				return &expressionMatchAll{expressionCommon: resCommon, originalOperator: originalOperator}, nil
+			case MATCH_TAG:
+				return &expressionMatchAll{expressionCommon: resCommon, originalOperator: originalOperator}, nil
+			case NOT_MATCH:
+				return &expressionMatchNone{expressionCommon: resCommon, originalOperator: originalOperator}, nil
+			}
 		}
 
 		valueRe, err := regexp.Compile(resCommon.value)
 		if err != nil {
 			return nil, err
 		}
-		switch operator {
+
+		// check for special case when regular expression matches
+		// empty value and update operator accordingly
+		matchesEmpty := valueRe.MatchString("")
+
+		switch effectiveOperator {
 		case MATCH:
-			return &expressionMatch{expressionCommon: resCommon, valueRe: valueRe}, nil
+			return &expressionMatch{expressionCommonRe: expressionCommonRe{expressionCommon: resCommon, valueRe: valueRe, matchesEmpty: matchesEmpty}}, nil
 		case NOT_MATCH:
-			return &expressionNotMatch{expressionCommon: resCommon, valueRe: valueRe}, nil
+			return &expressionNotMatch{expressionCommonRe: expressionCommonRe{expressionCommon: resCommon, valueRe: valueRe, matchesEmpty: matchesEmpty}}, nil
 		case MATCH_TAG:
-			return &expressionMatchTag{expressionCommon: resCommon, valueRe: valueRe}, nil
+			if matchesEmpty {
+				return nil, fmt.Errorf(invalidExpressionError, expr)
+			}
+			return &expressionMatchTag{expressionCommonRe: expressionCommonRe{expressionCommon: resCommon, valueRe: valueRe, matchesEmpty: matchesEmpty}}, nil
 		}
 	} else {
-		switch operator {
+		switch effectiveOperator {
 		case EQUAL:
 			return &expressionEqual{expressionCommon: resCommon}, nil
 		case NOT_EQUAL:
 			return &expressionNotEqual{expressionCommon: resCommon}, nil
 		case PREFIX:
 			return &expressionPrefix{expressionCommon: resCommon}, nil
-		case MATCH_TAG:
-			return &expressionMatchTag{expressionCommon: resCommon}, nil
 		case HAS_TAG:
 			return &expressionHasTag{expressionCommon: resCommon}, nil
 		case NOT_HAS_TAG:
 			return &expressionNotHasTag{expressionCommon: resCommon}, nil
 		case PREFIX_TAG:
 			return &expressionPrefixTag{expressionCommon: resCommon}, nil
+		case MATCH_ALL:
+			return &expressionMatchAll{expressionCommon: resCommon, originalOperator: originalOperator}, nil
+		case MATCH_NONE:
+			return &expressionMatchNone{expressionCommon: resCommon, originalOperator: originalOperator}, nil
 		}
 	}
 
@@ -345,6 +401,8 @@ const (
 	PREFIX_TAG                            // __tag^=   exact prefix with tag. non-standard, required for auto complete of tag keys
 	HAS_TAG                               // <tag>!="" specified tag must be present
 	NOT_HAS_TAG                           // <tag>="" specified tag must not be present
+	MATCH_ALL                             // special case of expression that matches every metric (f.e. key=.*)
+	MATCH_NONE                            // special case of expression that matches no metric (f.e. key!=.*)
 )
 
 func (o ExpressionOperator) StringIntoBuilder(builder *strings.Builder) {
@@ -367,5 +425,9 @@ func (o ExpressionOperator) StringIntoBuilder(builder *strings.Builder) {
 		builder.WriteString("!=")
 	case NOT_HAS_TAG:
 		builder.WriteString("=")
+	case MATCH_ALL:
+		builder.WriteString("=")
+	case MATCH_NONE:
+		builder.WriteString("!=")
 	}
 }
