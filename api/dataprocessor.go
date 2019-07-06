@@ -41,7 +41,6 @@ func doRecover(errp *error) {
 }
 
 type getTargetsResp struct {
-	stats  models.StorageStats
 	series []models.Series
 	err    error
 }
@@ -149,7 +148,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	return pointsA
 }
 
-func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Series, models.StorageStats, error) {
+func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
 	remoteReqs := make(map[string][]models.Req)
@@ -171,11 +170,11 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 		go func() {
 			// the only errors returned are from us catching panics, so we should treat them
 			// all as internalServerErrors
-			series, ss, err := s.getTargetsLocal(getCtx, localReqs)
+			series, err := s.getTargetsLocal(getCtx, ss, localReqs)
 			if err != nil {
 				cancel()
 			}
-			responses <- getTargetsResp{ss, series, err}
+			responses <- getTargetsResp{series, err}
 			wg.Done()
 		}()
 	}
@@ -183,11 +182,11 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 		wg.Add(1)
 		go func() {
 			// all errors returned are *response.Error.
-			series, ss, err := s.getTargetsRemote(getCtx, remoteReqs)
+			series, err := s.getTargetsRemote(getCtx, ss, remoteReqs)
 			if err != nil {
 				cancel()
 			}
-			responses <- getTargetsResp{ss, series, err}
+			responses <- getTargetsResp{series, err}
 			wg.Done()
 		}()
 	}
@@ -199,21 +198,19 @@ func (s *Server) getTargets(ctx context.Context, reqs []models.Req) ([]models.Se
 	}()
 
 	out := make([]models.Series, 0)
-	var ss models.StorageStats
 	for resp := range responses {
 		if resp.err != nil {
-			return nil, ss, resp.err
+			return nil, resp.err
 		}
 		out = append(out, resp.series...)
-		ss = models.StorageStatsSum(ss, resp.stats)
 	}
 	log.Debugf("DP getTargets: %d series found on cluster", len(out))
-	return out, ss, nil
+	return out, nil
 }
 
 // getTargetsRemote issues the requests on other nodes
 // it's nothing more than a thin network wrapper around getTargetsLocal of a peer.
-func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]models.Req) ([]models.Series, models.StorageStats, error) {
+func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[string][]models.Req) ([]models.Series, error) {
 	responses := make(chan getTargetsResp, len(remoteReqs))
 	rCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -227,7 +224,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 			buf, err := node.Post(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
 			if err != nil {
 				cancel()
-				responses <- getTargetsResp{models.StorageStats{}, nil, err}
+				responses <- getTargetsResp{nil, err}
 				return
 			}
 			var resp models.GetDataRespV1
@@ -235,11 +232,12 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 			if err != nil {
 				cancel()
 				log.Errorf("DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err.Error())
-				responses <- getTargetsResp{resp.Stats, nil, err}
+				responses <- getTargetsResp{nil, err}
 				return
 			}
 			log.Debugf("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
-			responses <- getTargetsResp{resp.Stats, resp.Series, nil}
+			ss.Add(resp.Stats)
+			responses <- getTargetsResp{resp.Series, nil}
 		}(nodeReqs)
 	}
 
@@ -250,20 +248,18 @@ func (s *Server) getTargetsRemote(ctx context.Context, remoteReqs map[string][]m
 	}()
 
 	out := make([]models.Series, 0)
-	var ss models.StorageStats
 	for resp := range responses {
 		if resp.err != nil {
-			return nil, ss, resp.err
+			return nil, resp.err
 		}
 		out = append(out, resp.series...)
-		ss = models.StorageStatsSum(ss, resp.stats)
 	}
 	log.Debugf("DP getTargetsRemote: total of %d series found on peers", len(out))
-	return out, ss, nil
+	return out, nil
 }
 
 // error is the error of the first failing target request
-func (s *Server) getTargetsLocal(ctx context.Context, reqs []models.Req) ([]models.Series, models.StorageStats, error) {
+func (s *Server) getTargetsLocal(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	log.Debugf("DP getTargetsLocal: handling %d reqs locally", len(reqs))
 	rCtx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
 	defer span.Finish()
@@ -286,25 +282,22 @@ LOOP:
 		wg.Add(1)
 		go func(req models.Req) {
 			pre := time.Now()
-			points, interval, ss, err := s.getTarget(rCtx, req)
+			points, interval, err := s.getTarget(rCtx, ss, req)
 			if err != nil {
 				cancel() // cancel all other requests.
-				responses <- getTargetsResp{ss, nil, err}
+				responses <- getTargetsResp{nil, err}
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
-				responses <- getTargetsResp{
-					stats: ss,
-					series: []models.Series{{
-						Target:       req.Target, // always simply the metric name from index
-						Datapoints:   points,
-						Interval:     interval,
-						QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was
-						QueryFrom:    req.From,
-						QueryTo:      req.To,
-						QueryCons:    req.ConsReq,
-						Consolidator: req.Consolidator,
-					}},
-				}
+				responses <- getTargetsResp{[]models.Series{{
+					Target:       req.Target, // always simply the metric name from index
+					Datapoints:   points,
+					Interval:     interval,
+					QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was
+					QueryFrom:    req.From,
+					QueryTo:      req.To,
+					QueryCons:    req.ConsReq,
+					Consolidator: req.Consolidator,
+				}}, nil}
 			}
 			wg.Done()
 			// pop an item of our limiter so that other requests can be processed.
@@ -316,21 +309,19 @@ LOOP:
 		close(responses)
 	}()
 	out := make([]models.Series, 0, len(reqs))
-	var ss models.StorageStats
 	for resp := range responses {
 		if resp.err != nil {
 			tags.Error.Set(span, true)
-			return nil, ss, resp.err
+			return nil, resp.err
 		}
 		out = append(out, resp.series...)
-		ss = models.StorageStatsSum(ss, resp.stats)
 	}
 	log.Debugf("DP getTargetsLocal: %d series found locally", len(out))
-	return out, ss, nil
+	return out, nil
 
 }
 
-func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema.Point, interval uint32, ss models.StorageStats, err error) {
+func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req models.Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
 	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
 	normalize := req.AggNum > 1    // do we need to normalize points at runtime?
@@ -344,57 +335,55 @@ func (s *Server) getTarget(ctx context.Context, req models.Req) (points []schema
 	}
 
 	if !readRollup && !normalize {
-		fixed, ss, err := s.getSeriesFixed(ctx, req, consolidation.None)
-		return fixed, req.OutInterval, ss, err
+		fixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.None)
+		return fixed, req.OutInterval, err
 	} else if !readRollup && normalize {
-		fixed, ss, err := s.getSeriesFixed(ctx, req, consolidation.None)
+		fixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.None)
 		if err != nil {
-			return nil, req.OutInterval, ss, err
+			return nil, req.OutInterval, err
 		}
-		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, ss, nil
+		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 	} else if readRollup && !normalize {
 		if req.Consolidator == consolidation.Avg {
-			sumFixed, ssSum, err := s.getSeriesFixed(ctx, req, consolidation.Sum)
+			sumFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Sum)
 			if err != nil {
-				return nil, req.OutInterval, ssSum, err
+				return nil, req.OutInterval, err
 			}
-			cntFixed, ssCnt, err := s.getSeriesFixed(ctx, req, consolidation.Cnt)
-			ss := models.StorageStatsSum(ssSum, ssCnt)
+			cntFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Cnt)
 			if err != nil {
-				return nil, req.OutInterval, ss, err
+				return nil, req.OutInterval, err
 			}
 			return divideContext(
 				ctx,
 				sumFixed,
 				cntFixed,
-			), req.OutInterval, ss, nil
+			), req.OutInterval, nil
 		} else {
-			fixed, ss, err := s.getSeriesFixed(ctx, req, req.Consolidator)
-			return fixed, req.OutInterval, ss, err
+			fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
+			return fixed, req.OutInterval, err
 		}
 	} else {
 		// readRollup && normalize
 		if req.Consolidator == consolidation.Avg {
-			sumFixed, ssSum, err := s.getSeriesFixed(ctx, req, consolidation.Sum)
+			sumFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Sum)
 			if err != nil {
-				return nil, req.OutInterval, ssSum, err
+				return nil, req.OutInterval, err
 			}
-			cntFixed, ssCnt, err := s.getSeriesFixed(ctx, req, consolidation.Cnt)
-			ss := models.StorageStatsSum(ssSum, ssCnt)
+			cntFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Cnt)
 			if err != nil {
-				return nil, req.OutInterval, ss, err
+				return nil, req.OutInterval, err
 			}
 			return divideContext(
 				ctx,
 				consolidation.Consolidate(sumFixed, req.AggNum, consolidation.Sum),
 				consolidation.Consolidate(cntFixed, req.AggNum, consolidation.Sum),
-			), req.OutInterval, ss, nil
+			), req.OutInterval, nil
 		} else {
-			fixed, ss, err := s.getSeriesFixed(ctx, req, req.Consolidator)
+			fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
 			if err != nil {
-				return nil, req.OutInterval, ss, err
+				return nil, req.OutInterval, err
 			}
-			return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, ss, nil
+			return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 		}
 	}
 }
@@ -406,74 +395,72 @@ func logLoad(typ string, key schema.AMKey, from, to uint32) {
 // getSeriesFixed gets the series and makes sure the output is quantized
 // (needed because the raw chunks don't contain quantized data)
 // TODO: we can probably forego Fix if archive > 0
-func (s *Server) getSeriesFixed(ctx context.Context, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, models.StorageStats, error) {
+func (s *Server) getSeriesFixed(ctx context.Context, ss *models.StorageStats, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
 	select {
 	case <-ctx.Done():
 		//request canceled
-		return nil, models.StorageStats{}, nil
+		return nil, nil
 	default:
 	}
 	rctx := newRequestContext(ctx, &req, consolidator)
 	// see newRequestContext for a detailed explanation of this.
 	if rctx.From == rctx.To {
-		return nil, models.StorageStats{}, nil
+		return nil, nil
 	}
-	res, ss, err := s.getSeries(rctx)
+	res, err := s.getSeries(rctx, ss)
 	if err != nil {
-		return nil, ss, err
+		return nil, err
 	}
 	select {
 	case <-ctx.Done():
 		//request canceled
-		return nil, ss, nil
+		return nil, nil
 	default:
 	}
 	res.Points = append(s.itersToPoints(rctx, res.Iters), res.Points...) // TODO the output from s.itersToPoints is never released to the pool?
 	// note: Fix() returns res.Points back to the pool
 	// this is safe because nothing else is still using it
 	// you can confirm this by analyzing what happens in prior calls such as itertoPoints and s.getSeries()
-	return Fix(res.Points, req.From, req.To, req.ArchInterval), ss, nil
+	return Fix(res.Points, req.From, req.To, req.ArchInterval), nil
 }
 
 // getSeries returns points from mem (and store if needed), within the range from (inclusive) - to (exclusive)
 // it can query for data within aggregated archives, by using fn min/max/sum/cnt and providing the matching agg span as interval
 // pass consolidation.None as consolidator to mean read from raw interval, otherwise we'll read from aggregated series.
-func (s *Server) getSeries(ctx *requestContext) (mdata.Result, models.StorageStats, error) {
-	var ssTank models.StorageStats
+func (s *Server) getSeries(ctx *requestContext, ss *models.StorageStats) (mdata.Result, error) {
 	res, err := s.getSeriesAggMetrics(ctx)
 	if err != nil {
-		return res, ssTank, err
+		return res, err
 	}
 	select {
 	case <-ctx.ctx.Done():
 		//request canceled
-		return res, ssTank, nil
+		return res, nil
 	default:
 	}
-	ssTank.ChunksFromTank = uint32(len(res.Iters))
+	ss.IncChunksFromTank(uint32(len(res.Iters)))
 
 	log.Debugf("oldest from aggmetrics is %d", res.Oldest)
 	span := opentracing.SpanFromContext(ctx.ctx)
 
 	if res.Oldest <= ctx.From {
 		reqSpanMem.ValueUint32(ctx.To - ctx.From)
-		return res, ssTank, nil
+		return res, nil
 	}
 
 	// if oldest < to -> search until oldest, we already have the rest from mem
 	// if to < oldest -> no need to search until oldest, only search until to
 	// adds iters from both the cache and the store (if applicable)
 	until := util.Min(res.Oldest, ctx.To)
-	fromCache, ss, err := s.getSeriesCachedStore(ctx, until)
-	ss.ChunksFromTank = ssTank.ChunksFromTank
+	fromCache, err := s.getSeriesCachedStore(ctx, ss, until)
 	if err != nil {
 		tracing.Failure(span)
 		tracing.Error(span, err)
 		log.Errorf("getSeriesCachedStore: %s", err.Error())
-		return res, ss, err
+		return res, err
 	}
 	res.Iters = append(fromCache, res.Iters...)
-	return res, ss, nil
+	return res, nil
 }
 
 // itersToPoints converts the iters to points if they are within the from/to range
@@ -521,12 +508,11 @@ func (s *Server) getSeriesAggMetrics(ctx *requestContext) (mdata.Result, error) 
 }
 
 // will only fetch until until, but uses ctx.To for debug logging
-func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.Iter, models.StorageStats, error) {
-	var ss models.StorageStats
+func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageStats, until uint32) ([]tsz.Iter, error) {
 
 	// this is a query node that for some reason received a data request
 	if s.BackendStore == nil {
-		return nil, ss, nil
+		return nil, nil
 	}
 
 	var iters []tsz.Iter
@@ -538,23 +524,16 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 	log.Debugf("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
 	cacheRes, err := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
 	if err != nil {
-		return iters, ss, fmt.Errorf("Cache.Search() failed: %+v", err.Error())
+		return iters, fmt.Errorf("Cache.Search() failed: %+v", err.Error())
 	}
 	log.Debugf("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
-	switch cacheRes.Type {
-	case cache.Hit:
-		ss.CacheHit = 1
-	case cache.HitPartial:
-		ss.CacheHitPartial = 1
-	case cache.Miss:
-		ss.CacheMiss = 1
-	}
+	ss.IncCacheResult(cacheRes.Type)
 
 	// check to see if the request has been canceled, if so abort now.
 	select {
 	case <-ctx.ctx.Done():
 		//request canceled
-		return iters, ss, nil
+		return iters, nil
 	default:
 	}
 
@@ -563,17 +542,17 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 		prevts = itgen.T0
 		if err != nil {
 			// TODO(replay) figure out what to do if one piece is corrupt
-			return iters, ss, fmt.Errorf("error getting iter from cacheResult.Start: %+v", err.Error())
+			return iters, fmt.Errorf("error getting iter from cacheResult.Start: %+v", err.Error())
 		}
 		iters = append(iters, iter)
 	}
-	ss.ChunksFromCache = uint32(len(cacheRes.Start))
+	ss.IncChunksFromCache(uint32(len(cacheRes.Start)))
 
 	// check to see if the request has been canceled, if so abort now.
 	select {
 	case <-ctx.ctx.Done():
 		//request canceled
-		return iters, ss, nil
+		return iters, nil
 	default:
 	}
 
@@ -582,13 +561,13 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 		if cacheRes.From != cacheRes.Until {
 			storeIterGens, err := s.BackendStore.Search(ctx.ctx, ctx.AMKey, ctx.Req.TTL, cacheRes.From, cacheRes.Until)
 			if err != nil {
-				return iters, ss, fmt.Errorf("BackendStore.Search() failed: %+v", err.Error())
+				return iters, fmt.Errorf("BackendStore.Search() failed: %+v", err.Error())
 			}
 			// check to see if the request has been canceled, if so abort now.
 			select {
 			case <-ctx.ctx.Done():
 				//request canceled
-				return iters, ss, nil
+				return iters, nil
 			default:
 			}
 
@@ -600,11 +579,11 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 						// add all the iterators that are in good shape
 						s.Cache.AddRange(ctx.AMKey, prevts, storeIterGens[:i])
 					}
-					return iters, ss, fmt.Errorf("error getting iter from BackendStore.Search(): %+v", err.Error())
+					return iters, fmt.Errorf("error getting iter from BackendStore.Search(): %+v", err.Error())
 				}
 				iters = append(iters, iter)
 			}
-			ss.ChunksFromStore = uint32(len(storeIterGens))
+			ss.IncChunksFromStore(uint32(len(storeIterGens)))
 			// it's important that the itgens get added in chronological order,
 			// currently we rely on store returning results in order
 			s.Cache.AddRange(ctx.AMKey, prevts, storeIterGens)
@@ -615,14 +594,14 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, until uint32) ([]tsz.
 			iter, err := cacheRes.End[i].Get()
 			if err != nil {
 				// TODO(replay) figure out what to do if one piece is corrupt
-				return iters, ss, fmt.Errorf("error getting iter from cacheResult.End: %+v", err.Error())
+				return iters, fmt.Errorf("error getting iter from cacheResult.End: %+v", err.Error())
 			}
 			iters = append(iters, iter)
 		}
-		ss.ChunksFromCache += uint32(len(cacheRes.End))
+		ss.IncChunksFromCache(uint32(len(cacheRes.End)))
 	}
 
-	return iters, ss, nil
+	return iters, nil
 }
 
 // check for duplicate series names for the same query. If found merge the results.

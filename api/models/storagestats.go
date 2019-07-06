@@ -2,7 +2,9 @@ package models
 
 import (
 	"strconv"
+	"sync/atomic"
 
+	"github.com/grafana/metrictank/mdata/cache"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -14,6 +16,37 @@ type StorageStats struct {
 	ChunksFromTank  uint32 `json:"executeplan.chunks-from-tank.count"`
 	ChunksFromCache uint32 `json:"executeplan.chunks-from-cache.count"`
 	ChunksFromStore uint32 `json:"executeplan.chunks-from-store.count"`
+}
+
+func (ss *StorageStats) IncCacheResult(t cache.ResultType) {
+	switch t {
+	case cache.Hit:
+		atomic.AddUint32(&ss.CacheHit, 1)
+	case cache.HitPartial:
+		atomic.AddUint32(&ss.CacheHitPartial, 1)
+	case cache.Miss:
+		atomic.AddUint32(&ss.CacheMiss, 1)
+	}
+}
+
+func (ss *StorageStats) IncChunksFromTank(n uint32) {
+	atomic.AddUint32(&ss.ChunksFromTank, n)
+}
+func (ss *StorageStats) IncChunksFromCache(n uint32) {
+	atomic.AddUint32(&ss.ChunksFromCache, n)
+}
+func (ss *StorageStats) IncChunksFromStore(n uint32) {
+	atomic.AddUint32(&ss.ChunksFromStore, n)
+}
+
+// Add adds a to ss. Note that a is presumed to be "done" (read unsafely)
+func (ss *StorageStats) Add(a StorageStats) {
+	atomic.AddUint32(&ss.CacheHit, a.CacheHit)
+	atomic.AddUint32(&ss.CacheHitPartial, a.CacheHitPartial)
+	atomic.AddUint32(&ss.CacheMiss, a.CacheMiss)
+	atomic.AddUint32(&ss.ChunksFromTank, a.ChunksFromTank)
+	atomic.AddUint32(&ss.ChunksFromCache, a.ChunksFromCache)
+	atomic.AddUint32(&ss.ChunksFromStore, a.ChunksFromStore)
 }
 
 func (ss StorageStats) MarshalJSONFast(b []byte) ([]byte, error) {
@@ -37,17 +70,6 @@ func (ss StorageStats) MarshalJSONFastRaw(b []byte) ([]byte, error) {
 	b = append(b, `,"executeplan.chunks-from-store.count":`...)
 	b = strconv.AppendUint(b, uint64(ss.ChunksFromStore), 10)
 	return b, nil
-}
-
-func StorageStatsSum(a, b StorageStats) StorageStats {
-	return StorageStats{
-		CacheMiss:       a.CacheMiss + b.CacheMiss,
-		CacheHitPartial: a.CacheHitPartial + b.CacheHitPartial,
-		CacheHit:        a.CacheHit + b.CacheHit,
-		ChunksFromTank:  a.ChunksFromTank + b.ChunksFromTank,
-		ChunksFromCache: a.ChunksFromCache + b.ChunksFromCache,
-		ChunksFromStore: a.ChunksFromStore + b.ChunksFromStore,
-	}
 }
 
 func (ss StorageStats) Trace(span opentracing.Span) {

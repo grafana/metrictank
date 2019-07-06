@@ -744,15 +744,14 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	}
 
 	a := time.Now()
-	out, ss, err := s.getTargets(ctx, reqs)
+	out, err := s.getTargets(ctx, &meta.StorageStats, reqs)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
 		return nil, meta, err
 	}
 	b := time.Now()
 	meta.Stats.GetTargetsDuration = b.Sub(a)
-	ss.Trace(span)
-	meta.StorageStats = ss
+	meta.StorageStats.Trace(span)
 
 	out = mergeSeries(out)
 

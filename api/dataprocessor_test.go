@@ -372,7 +372,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
 				req := models.NewReq(id, "", "", from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
 				req.ArchInterval = 10
-				points, _, err := srv.getSeriesFixed(test.NewContext(), req, consolidation.None)
+				points, err := srv.getSeriesFixed(test.NewContext(), &models.StorageStats{}, req, consolidation.None)
 				if err != nil {
 					t.Errorf("case %d: offset %d, from %d to %d -> error: %s", num, offset, from, to, err)
 				}
@@ -572,7 +572,7 @@ func TestGetSeriesCachedStore(t *testing.T) {
 				req := reqRaw(metric.MKey, from, to, span, 1, consolidation.None, 0, 0)
 				req.ArchInterval = 1
 				ctx := newRequestContext(test.NewContext(), &req, consolidation.None)
-				iters, _, err := srv.getSeriesCachedStore(ctx, to)
+				iters, err := srv.getSeriesCachedStore(ctx, &models.StorageStats{}, to)
 
 				// test invalid query; from must be less than to
 				if from == to {
