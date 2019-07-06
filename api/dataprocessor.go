@@ -316,6 +316,7 @@ LOOP:
 		}
 		out = append(out, resp.series...)
 	}
+	ss.Trace(span)
 	log.Debugf("DP getTargetsLocal: %d series found locally", len(out))
 	return out, nil
 
