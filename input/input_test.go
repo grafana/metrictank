@@ -195,7 +195,7 @@ func getDefaultHandler(t *testing.T) (DefaultHandler, idx.MetricIndex, func()) {
 	}
 
 	mdata.Schemas = conf.NewSchemas(nil)
-	metrics := mdata.NewAggMetrics(nil, nil, false, 3600, 7200, 3600)
+	metrics := mdata.NewAggMetrics(nil, nil, false, 0, 0, 3600, 7200, 3600)
 	return NewDefaultHandler(metrics, index, "test"), index, reset
 }
 
@@ -207,7 +207,7 @@ func BenchmarkProcessMetricDataUniqueMetrics(b *testing.B) {
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, 0))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 
-	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
+	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
 	defer metricIndex.Stop()
@@ -247,7 +247,7 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, 0))
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
 
-	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
+	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 0, 0, 800, 8000, 0)
 	metricIndex := memory.New()
 	metricIndex.Init()
 	defer metricIndex.Stop()
