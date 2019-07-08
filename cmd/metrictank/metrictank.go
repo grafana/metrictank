@@ -302,8 +302,10 @@ func main() {
 	if ingestAfterTimestamp > 0 {
 		log.Infof("Will only ingest data points for org id %d belonging to chunks starting after %s", ingestAfterOrgID, time.Unix(ingestAfterTimestamp, 0))
 	}
+	ingestAfter := make(map[uint32]int64)
+	ingestAfter[ingestAfterOrgID] = ingestAfterTimestamp
 	if inputEnabled {
-		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, ingestAfterOrgID, ingestAfterTimestamp, chunkMaxStale, metricMaxStale, gcInterval)
+		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, ingestAfter, chunkMaxStale, metricMaxStale, gcInterval)
 	}
 
 	/***********************************
