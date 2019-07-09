@@ -22,7 +22,7 @@ func (rwm ResponseWithMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 
 // RenderMeta holds metadata about a render request/response
 type RenderMeta struct {
-	Stats stats
+	RenderStats
 	StorageStats
 }
 
@@ -31,14 +31,14 @@ func (rm RenderMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 	// this provides a simple, clean interface to end users, instead of exposing
 	// implementation details
 	b = append(b, `{"stats":{`...)
-	b, _ = rm.Stats.MarshalJSONFastRaw(b)
+	b, _ = rm.RenderStats.MarshalJSONFastRaw(b)
 	b = append(b, ',')
 	b, _ = rm.StorageStats.MarshalJSONFastRaw(b)
 	b = append(b, `}}`...)
 	return b, nil
 }
 
-type stats struct {
+type RenderStats struct {
 	ResolveSeriesDuration time.Duration `json:"executeplan.resolve-series.ms"`
 	GetTargetsDuration    time.Duration `json:"executeplan.get-targets.ms"`
 	PrepareSeriesDuration time.Duration `json:"executeplan.prepare-series.ms"`
@@ -48,13 +48,13 @@ type stats struct {
 	PointsReturn          uint32        `json:"executeplan.points-return.count"`
 }
 
-func (s stats) MarshalJSONFast(b []byte) ([]byte, error) {
+func (s RenderStats) MarshalJSONFast(b []byte) ([]byte, error) {
 	b = append(b, '{')
 	b, _ = s.MarshalJSONFastRaw(b)
 	b = append(b, '}')
 	return b, nil
 }
-func (s stats) MarshalJSONFastRaw(b []byte) ([]byte, error) {
+func (s RenderStats) MarshalJSONFastRaw(b []byte) ([]byte, error) {
 	b = append(b, `"executeplan.resolve-series.ms":`...)
 	b = strconv.AppendInt(b, s.ResolveSeriesDuration.Nanoseconds()/1e6, 10)
 	b = append(b, `,"executeplan.get-targets.ms":`...)
