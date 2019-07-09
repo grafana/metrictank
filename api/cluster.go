@@ -16,7 +16,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/stats"
-	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -349,7 +348,6 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
-	ss.Trace(opentracing.SpanFromContext(ctx.Req.Context()))
 	response.Write(ctx, response.NewMsgp(200, &models.GetDataRespV1{Stats: ss, Series: series}))
 }
 
