@@ -13,7 +13,6 @@ import (
 var OrgIdPublic = uint32(0)
 
 //go:generate msgp
-//msgp:ignore Archive
 
 type Node struct {
 	Path        string
