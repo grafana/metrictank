@@ -236,7 +236,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 				return
 			}
 			log.Debugf("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
-			ss.Add(resp.Stats)
+			ss.Add(&resp.Stats)
 			responses <- getTargetsResp{resp.Series, nil}
 		}(nodeReqs)
 	}
