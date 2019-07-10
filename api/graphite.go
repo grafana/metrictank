@@ -711,7 +711,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		}
 	}
 
-	meta.Stats.ResolveSeriesDuration = time.Since(pre)
+	meta.RenderStats.ResolveSeriesDuration = time.Since(pre)
 
 	select {
 	case <-ctx.Done():
@@ -725,32 +725,33 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		return nil, meta, nil
 	}
 
-	meta.Stats.SeriesFetch = uint32(len(reqs))
+	meta.RenderStats.SeriesFetch = uint32(len(reqs))
 
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	var err error
-	reqs, meta.Stats.PointsFetch, meta.Stats.PointsReturn, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	reqs, meta.RenderStats.PointsFetch, meta.RenderStats.PointsReturn, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
 	if err != nil {
 		log.Errorf("HTTP Render alignReq error: %s", err.Error())
 		return nil, meta, err
 	}
 	span := opentracing.SpanFromContext(ctx)
 	span.SetTag("num_reqs", len(reqs))
-	span.SetTag("points_fetch", meta.Stats.PointsFetch)
-	span.SetTag("points_return", meta.Stats.PointsReturn)
+	span.SetTag("points_fetch", meta.RenderStats.PointsFetch)
+	span.SetTag("points_return", meta.RenderStats.PointsReturn)
 
 	for _, req := range reqs {
 		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
 	}
 
 	a := time.Now()
-	out, err := s.getTargets(ctx, reqs)
+	out, err := s.getTargets(ctx, &meta.StorageStats, reqs)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
 		return nil, meta, err
 	}
 	b := time.Now()
-	meta.Stats.GetTargetsDuration = b.Sub(a)
+	meta.RenderStats.GetTargetsDuration = b.Sub(a)
+	meta.StorageStats.Trace(span)
 
 	out = mergeSeries(out)
 
@@ -767,12 +768,12 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	for k := range data {
 		sort.Sort(models.SeriesByTarget(data[k]))
 	}
-	meta.Stats.PrepareSeriesDuration = time.Since(b)
+	meta.RenderStats.PrepareSeriesDuration = time.Since(b)
 
 	preRun := time.Now()
 	out, err = plan.Run(data)
-	meta.Stats.PlanRunDuration = time.Since(preRun)
-	planRunDuration.Value(meta.Stats.PlanRunDuration)
+	meta.RenderStats.PlanRunDuration = time.Since(preRun)
+	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
 	return out, meta, err
 }
 

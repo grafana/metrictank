@@ -70,28 +70,6 @@ func (r Req) DebugString() string {
 		r.MKey, r.Target, r.Pattern, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.RawInterval, r.Consolidator, r.ConsReq, r.SchemaId, r.AggId, r.Archive, r.ArchInterval, r.TTL, r.OutInterval, r.AggNum)
 }
 
-// Trace puts all request properties as tags in a span
-// good for when a span deals with 1 request
-func (r Req) Trace(span opentracing.Span) {
-	span.SetTag("key", r.MKey)
-	span.SetTag("target", r.Target)
-	span.SetTag("pattern", r.Pattern)
-	span.SetTag("from", r.From)
-	span.SetTag("to", r.To)
-	span.SetTag("span", r.To-r.From-1)
-	span.SetTag("mdp", r.MaxPoints)
-	span.SetTag("rawInterval", r.RawInterval)
-	span.SetTag("cons", r.Consolidator)
-	span.SetTag("consReq", r.ConsReq)
-	span.SetTag("schemaId", r.SchemaId)
-	span.SetTag("aggId", r.AggId)
-	span.SetTag("archive", r.Archive)
-	span.SetTag("archInterval", r.ArchInterval)
-	span.SetTag("TTL", r.TTL)
-	span.SetTag("outInterval", r.OutInterval)
-	span.SetTag("aggNum", r.AggNum)
-}
-
 // TraceLog puts all request properties in a span log entry
 // good for when a span deals with multiple requests
 // note that the amount of data generated here can be up to

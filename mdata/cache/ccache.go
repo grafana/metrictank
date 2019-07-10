@@ -11,7 +11,6 @@ import (
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -270,22 +269,17 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 		return res, nil
 	}
 
-	ctx, span := tracing.NewSpan(ctx, c.tracer, "CCache.Search")
-	defer span.Finish()
-
 	c.RLock()
 	defer c.RUnlock()
 
 	cm, ok := c.metricCache[metric]
 	if !ok {
-		span.SetTag("cache", "miss")
 		accnt.CacheMetricMiss.Inc()
 		return res, nil
 	}
 
 	cm.Search(ctx, metric, res, from, until)
-	if len(res.Start) == 0 && len(res.End) == 0 {
-		span.SetTag("cache", "miss")
+	if res.Type == Miss {
 		accnt.CacheMetricMiss.Inc()
 	} else {
 
@@ -295,11 +289,9 @@ func (c *CCache) Search(ctx context.Context, metric schema.AMKey, from, until ui
 			c.accnt.HitChunks(metric, res.End)
 		}()
 
-		if res.Complete {
-			span.SetTag("cache", "hit-full")
+		if res.Type == Hit {
 			accnt.CacheMetricHitFull.Inc()
 		} else {
-			span.SetTag("cache", "hit-partial")
 			accnt.CacheMetricHitPartial.Inc()
 		}
 	}

@@ -350,7 +350,7 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 		res.From = nextTs
 
 		if nextTs >= until {
-			res.Complete = true
+			res.Type = Hit
 			break
 		}
 		if mc.chunks[ts].Next != 0 && ts >= mc.chunks[ts].Next {
@@ -360,6 +360,10 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 			searchFwdBug.Inc()
 			break
 		}
+	}
+
+	if len(res.Start) > 0 && res.Type != Hit {
+		res.Type = HitPartial
 	}
 }
 
@@ -377,6 +381,10 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 		log.Debugf("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
 		res.End = append(res.End, mc.chunks[ts].Itgen)
 		res.Until = ts
+	}
+
+	if len(res.End) > 0 && res.Type == Miss {
+		res.Type = HitPartial
 	}
 }
 
@@ -404,12 +412,14 @@ func (mc *CCacheMetric) Search(ctx context.Context, metric schema.AMKey, res *CC
 	}
 
 	mc.searchForward(ctx, metric, from, until, res)
-	if !res.Complete {
+	if res.Type != Hit {
 		mc.searchBackward(from, until, res)
 
 		if res.From > res.Until {
 			log.Warnf("CCacheMetric Search: Found from > until (%d/%d), key = %s, printing chunks\n", res.From, res.Until, mc.MKey.String())
 			mc.debugMetric(from-7200, until+7200)
+			// enforce not using of cached data
+			res.Type = Miss
 			res.Start = res.Start[:0]
 			res.End = res.End[:0]
 			res.From = from

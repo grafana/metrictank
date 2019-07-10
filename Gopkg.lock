@@ -308,6 +308,20 @@
   revision = "553a641470496b2327abcac10b36396bd98e45c9"
 
 [[projects]]
+  digest = "1:bf40199583e5143d1472fc34d10d6f4b69d97572142acf343b3e43136da40823"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/flags",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "NUT"
+  revision = "6f77996f0c42f7b84e5a2b252227263f93432e9b"
+  version = "v0.3.0"
+
+[[projects]]
   digest = "1:fe852c57b4fc4d11e6ef79bce1e930ee2f2f7d148b370afef8f8d012a80960ea"
   name = "github.com/googleapis/gax-go"
   packages = ["."]
@@ -1133,6 +1147,7 @@
     "github.com/gocql/gocql",
     "github.com/gogo/protobuf/proto",
     "github.com/golang/snappy",
+    "github.com/google/go-cmp/cmp",
     "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
     "github.com/hashicorp/golang-lru",

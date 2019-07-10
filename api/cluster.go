@@ -339,7 +339,8 @@ func (s *Server) indexList(ctx *middleware.Context, req models.IndexList) {
 }
 
 func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
-	series, err := s.getTargetsLocal(ctx.Req.Context(), request.Requests)
+	var ss models.StorageStats
+	series, err := s.getTargetsLocal(ctx.Req.Context(), &ss, request.Requests)
 	if err != nil {
 		// the only errors returned are from us catching panics, so we should treat them
 		// all as internalServerErrors
@@ -347,7 +348,7 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
-	response.Write(ctx, response.NewMsgp(200, &models.GetDataResp{Series: series}))
+	response.Write(ctx, response.NewMsgp(200, &models.GetDataRespV1{Stats: ss, Series: series}))
 }
 
 func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {

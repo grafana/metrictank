@@ -22,24 +22,32 @@ type CachePusher interface {
 }
 
 type CCSearchResult struct {
-	// whether the whole request can be served from cache
-	Complete bool
+	Type ResultType
 
-	// if this result is not Complete, then the following store query
+	// if Type is not Hit, then the following store query
 	// will need to use this from value to fill in the missing data
 	From uint32
 
-	// if this result is not Complete, then the following store query
+	// if Type is not Hit, then the following store query
 	// will need to use this until value to fill in the missing data
 	Until uint32
 
 	// if the cache contained the chunk containing the original "from" ts then
 	// this slice will hold it as the first element, plus all the subsequent
-	// cached chunks. If Complete is true then all chunks are in this slice.
+	// cached chunks. If Type is Hit then all chunks are in this slice.
 	Start []chunk.IterGen
 
-	// if this result is not Complete and the original "until" ts is in a cached chunk
+	// if type is not Hit and the original "until" ts is in a cached chunk
 	// then this slice will hold it as the first element, plus all the previous
 	// ones in reverse order (because the search is seeking in reverse)
 	End []chunk.IterGen
 }
+
+//go:generate stringer -type=ResultType
+type ResultType uint8
+
+const (
+	Miss       ResultType = iota // no data for this request in cache
+	HitPartial                   // request partially served from cache
+	Hit                          // whole request served from cache
+)

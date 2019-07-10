@@ -97,8 +97,8 @@ func testRun(t *testing.T, run func(*CCacheMetric)) {
 
 	res := CCSearchResult{}
 	ccm.Search(test.NewContext(), amkey, &res, 25, 45)
-	if res.Complete != true {
-		t.Fatalf("Expected result to be complete, but it was not")
+	if res.Type != Hit {
+		t.Fatalf("expected ResultType Hit, got %v", res.Type)
 	}
 
 	if res.Start[0].T0 != 20 {
