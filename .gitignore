@@ -5,6 +5,7 @@
 /cmd/metrictank/metrictank
 /cmd/mt-aggs-explain/mt-aggs-explain
 /cmd/mt-explain/mt-explain
+/cmd/mt-index-analyzer/mt-index-analyzer
 /cmd/mt-index-cat/mt-index-cat
 /cmd/mt-index-migrate/mt-index-migrate
 /cmd/mt-index-prune/mt-index-prune
