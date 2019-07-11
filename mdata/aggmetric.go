@@ -319,7 +319,9 @@ func (a *AggMetric) Get(from, to uint32) (Result, error) {
 // caller must hold lock
 func (a *AggMetric) addAggregators(ts uint32, val float64) {
 	for _, agg := range a.aggregators {
-		log.Debugf("AM: %s pushing %d,%f to aggregator %d", a.key, ts, val, agg.span)
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("AM: %s pushing %d,%f to aggregator %d", a.key, ts, val, agg.span)
+		}
 		agg.Add(ts, val)
 	}
 }
