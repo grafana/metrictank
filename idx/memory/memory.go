@@ -1767,13 +1767,11 @@ func toRegexp(pattern string) string {
 // fields, so we need to use atomic operations to read those fields
 // when copying.
 func CloneArchive(a *idx.Archive) idx.Archive {
-	// clones the Archive's MetricDefinition, including nameWithTags.
-	def := a.MetricDefinition.Clone()
 	return idx.Archive{
 		SchemaId:         a.SchemaId,
 		AggId:            a.AggId,
 		IrId:             a.IrId,
 		LastSave:         atomic.LoadUint32(&a.LastSave),
-		MetricDefinition: def,
+		MetricDefinition: a.MetricDefinition.Clone(),
 	}
 }
