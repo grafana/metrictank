@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/mdata/cache"
 	backendStore "github.com/grafana/metrictank/store"
 	"github.com/raintank/schema"
+	"github.com/raintank/schema/msg"
 )
 
 func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T) {
@@ -275,5 +276,53 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		in.ProcessMetricData(datas[i], 1)
+	}
+}
+
+func BenchmarkProcessMetricPoint(b *testing.B) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+
+	store := backendStore.NewDevnullStore()
+
+	mdata.SetSingleSchema(
+		conf.NewRetentionMT(1, 3600, 3600, 2, 0),
+		conf.NewRetentionMT(60, 3600*6, 3600*6, 2, 0),
+	)
+	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
+
+	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
+	metricIndex := memory.New()
+	metricIndex.Init()
+	defer metricIndex.Stop()
+
+	in := NewDefaultHandler(aggmetrics, metricIndex, "BenchmarkProcess")
+
+	md := schema.MetricData{
+		Id:       "1.12345678901234567890123456789012",
+		OrgId:    500,
+		Name:     "some.test.metric",
+		Interval: 10,
+		Value:    1234.567,
+		Unit:     "ms",
+		Time:     int64(1),
+		Mtype:    "gauge",
+		Tags:     []string{"some=tag", "ok=yes"},
+	}
+	md.SetId()
+
+	in.ProcessMetricData(&md, 1)
+
+	mkey, err := schema.MKeyFromString(md.Id)
+	if err != nil {
+		b.Fatalf("Unexpected error when parsing id string %q: %q", md.Id, err)
+	}
+	mp := schema.MetricPoint{MKey: mkey}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		mp.Value = float64(i)
+		mp.Time = uint32(i) + 1
+		in.ProcessMetricPoint(mp, msg.FormatMetricPoint, 1)
 	}
 }
