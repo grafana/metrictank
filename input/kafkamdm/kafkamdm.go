@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/pkg/arg"
 	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 	"github.com/raintank/schema/msg"
@@ -136,17 +137,13 @@ func ConfigProcess(instance string) {
 		log.Fatalf("kafkamdm: %s", err.Error())
 	}
 	log.Infof("kafkamdm: available partitions %v", availParts)
-	if partitionStr == "*" {
+	partitions, err = arg.ParsePartitions(partitionStr)
+	if err != nil {
+		log.Fatalf("kafkamdm: %s", err.Error())
+	}
+	if len(partitions) == 0 {
 		partitions = availParts
 	} else {
-		parts := strings.Split(partitionStr, ",")
-		for _, part := range parts {
-			i, err := strconv.Atoi(part)
-			if err != nil {
-				log.Fatalf("could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
-			}
-			partitions = append(partitions, int32(i))
-		}
 		missing := kafka.DiffPartitions(partitions, availParts)
 		if len(missing) > 0 {
 			log.Fatalf("kafkamdm: configured partitions not in list of available partitions. missing %v", missing)

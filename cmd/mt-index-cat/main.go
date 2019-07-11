@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/pkg/arg"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -217,24 +218,10 @@ func main() {
 		cutoffMin = time.Now().Unix() - int64(minStaleInt)
 	}
 
-	var partitions []int32
-	if partitionStr != "*" {
-		for _, p := range strings.Split(partitionStr, ",") {
-			p = strings.TrimSpace(p)
-
-			// handle trailing "," on the list of partitions.
-			if p == "" {
-				continue
-			}
-
-			id, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				log.Printf("invalid partition id %q. must be a int32", p)
-				flag.Usage()
-				os.Exit(-1)
-			}
-			partitions = append(partitions, int32(id))
-		}
+	partitions, err := arg.ParsePartitions(partitionStr)
+	if err != nil {
+		flag.Usage()
+		os.Exit(-1)
 	}
 
 	var defs []schema.MetricDefinition

@@ -3,13 +3,13 @@ package notifierKafka
 import (
 	"flag"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/pkg/arg"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 )
@@ -89,17 +89,6 @@ func ConfigProcess(instance string) {
 		log.Fatalf("kafka-cluster: unable to parse backlog-process-timeout. %s", err)
 	}
 
-	if partitionStr != "*" {
-		parts := strings.Split(partitionStr, ",")
-		for _, part := range parts {
-			i, err := strconv.Atoi(part)
-			if err != nil {
-				log.Fatalf("kafka-cluster: could not parse partition %q. partitions must be '*' or a comma separated list of id's", part)
-			}
-			partitions = append(partitions, int32(i))
-		}
-	}
-	// validate our partitions
 	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
 		log.Fatalf("kafka-cluster: failed to create client. %s", err)
@@ -110,7 +99,12 @@ func ConfigProcess(instance string) {
 	if err != nil {
 		log.Fatalf("kafka-cluster: %s", err.Error())
 	}
-	if partitionStr == "*" {
+
+	partitions, err = arg.ParsePartitions(partitionStr)
+	if err != nil {
+		log.Fatalf("kafka-cluster: %s", err.Error())
+	}
+	if len(partitions) == 0 {
 		partitions = availParts
 	} else {
 		missing := kafka.DiffPartitions(partitions, availParts)
