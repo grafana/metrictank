@@ -111,7 +111,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/raintank/schema"
-  revision = "01adbd1099945856c1e6955a89c643bcdbe33266"
+  revision = "172e29ac645828b87130d8ae8b41e0a3727ad40d"
 
 [[constraint]]
   name = "github.com/rs/cors"
