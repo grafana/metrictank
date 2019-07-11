@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 var ErrInvalidIntervalzero = errors.New("interval cannot be 0")
@@ -160,6 +161,23 @@ func (m *MetricDefinition) NameWithTags() string {
 	m.Name = m.nameWithTags[:len(m.Name)]
 
 	return m.nameWithTags
+}
+
+// Clone() returns a copy of the MetricDefinition. It uses atomic operations
+// to read certain properties that get updated atomically
+func (m *MetricDefinition) Clone() MetricDefinition {
+	return MetricDefinition{
+		Id:           m.Id,
+		OrgId:        m.OrgId,
+		Name:         m.Name,
+		Interval:     m.Interval,
+		Unit:         m.Unit,
+		Mtype:        m.Mtype,
+		Tags:         m.Tags,
+		LastUpdate:   atomic.LoadInt64(&m.LastUpdate),
+		Partition:    atomic.LoadInt32(&m.Partition),
+		nameWithTags: m.nameWithTags,
+	}
 }
 
 func (m *MetricDefinition) NameSanitizedAsTagValue() string {

@@ -1767,19 +1767,8 @@ func toRegexp(pattern string) string {
 // fields, so we need to use atomic operations to read those fields
 // when copying.
 func CloneArchive(a *idx.Archive) idx.Archive {
-	def := schema.MetricDefinition{
-		Id:         a.MetricDefinition.Id,
-		OrgId:      a.MetricDefinition.OrgId,
-		Name:       a.MetricDefinition.Name,
-		Interval:   a.MetricDefinition.Interval,
-		Unit:       a.MetricDefinition.Unit,
-		Mtype:      a.MetricDefinition.Mtype,
-		Tags:       a.MetricDefinition.Tags,
-		LastUpdate: atomic.LoadInt64(&a.MetricDefinition.LastUpdate),
-		Partition:  atomic.LoadInt32(&a.MetricDefinition.Partition),
-	}
-	// update nameWithTags
-	def.NameWithTags()
+	// clones the Archive's MetricDefinition, including nameWithTags.
+	def := a.MetricDefinition.Clone()
 	return idx.Archive{
 		SchemaId:         a.SchemaId,
 		AggId:            a.AggId,
