@@ -325,7 +325,7 @@ func updateExisting(existing *idx.Archive, partition int32, lastUpdate int64, pr
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	m.RLock()
@@ -337,7 +337,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 		}
 
 		oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-		return CloneArchive(existing), oldPart, true
+		return existing, oldPart, true
 	}
 
 	if m.writeQueue != nil {
@@ -349,7 +349,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 				log.Debugf("memory-idx: metricDef with id %v is in the writeQueue", point.MKey)
 			}
 			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-			return CloneArchive(existing), oldPart, true
+			return existing, oldPart, true
 		}
 
 		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
@@ -362,17 +362,17 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 				log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
 			}
 			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-			return CloneArchive(existing), oldPart, true
+			return existing, oldPart, true
 		}
 	}
 
-	return idx.Archive{}, 0, false
+	return &idx.Archive{}, 0, false
 }
 
 // AddOrUpdate returns the corresponding Archive for the MetricData.
 // if it is existing -> updates lastUpdate based on .Time, and partition
 // if was new        -> adds new MetricDefinition to index
-func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
+func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	// we only need a lock while reading the m.defById map. All future operations on the archive
@@ -385,7 +385,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 			log.Debugf("memory-idx: metricDef with id %s already in the index", mkey)
 		}
 		oldPart := updateExisting(existing, partition, data.Time, pre)
-		return CloneArchive(existing), oldPart, ok
+		return existing, oldPart, ok
 	}
 	def := schema.MetricDefinitionFromMetricData(data)
 	def.Partition = partition
@@ -402,7 +402,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		m.writeQueue.Queue(archive)
 	}
 
-	return CloneArchive(archive), 0, false
+	return archive, 0, false
 }
 
 // UpdateArchiveLastSave updates the LastSave timestamp of the archive

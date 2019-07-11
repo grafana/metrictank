@@ -180,6 +180,13 @@ func (m *MetricDefinition) Clone() MetricDefinition {
 	}
 }
 
+func (m *MetricDefinition) GetLastUpdate() int64 {
+	return atomic.LoadInt64(&m.LastUpdate)
+}
+func (m *MetricDefinition) GetPartition() int32 {
+	return atomic.LoadInt32(&m.Partition)
+}
+
 func (m *MetricDefinition) NameSanitizedAsTagValue() string {
 	return SanitizeNameAsTagValue(m.Name)
 }

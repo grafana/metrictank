@@ -4,6 +4,7 @@ package idx
 
 import (
 	"regexp"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -27,6 +28,14 @@ type Archive struct {
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
+}
+
+func (a *Archive) GetLastSave() uint32 {
+	return atomic.LoadUint32(&a.LastSave)
+}
+
+func (a *Archive) SetLastSave(value uint32) {
+	atomic.StoreUint32(&a.LastSave, value)
 }
 
 // used primarily by tests, for convenience
@@ -57,11 +66,11 @@ type MetricIndex interface {
 
 	// Update updates an existing archive, if found.
 	// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-	Update(point schema.MetricPoint, partition int32) (Archive, int32, bool)
+	Update(point schema.MetricPoint, partition int32) (*Archive, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (Archive, int32, bool)
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*Archive, int32, bool)
 
 	// Get returns the archive for the requested id.
 	Get(key schema.MKey) (Archive, bool)

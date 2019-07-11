@@ -205,7 +205,7 @@ func (b *BigtableIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (*idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	archive, oldPartition, inMemory := b.MemoryIndex.Update(point, partition)
@@ -229,7 +229,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 		}
 		// check if we need to save to bigtable.
 		now := uint32(time.Now().Unix())
-		if archive.LastSave < (now - b.cfg.updateInterval32) {
+		if archive.GetLastSave() < (now - b.cfg.updateInterval32) {
 			archive = b.updateBigtable(now, inMemory, archive, partition)
 		}
 	}
@@ -238,7 +238,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (idx.Arc
 	return archive, oldPartition, inMemory
 }
 
-func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
+func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.Archive, int32, bool) {
 	pre := time.Now()
 
 	archive, oldPartition, inMemory := b.MemoryIndex.AddOrUpdate(mkey, data, partition)
@@ -279,13 +279,13 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 // updateBigtable saves the archive to bigtable and
 // updates the memory index with the updated fields.
-func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Archive, partition int32) idx.Archive {
+func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *idx.Archive, partition int32) *idx.Archive {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if archive.LastSave < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
+	if archive.GetLastSave() < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
 		log.Debugf("bigtable-idx: updating def %s in index.", archive.MetricDefinition.Id)
 		b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}
-		archive.LastSave = now
+		archive.SetLastSave(now)
 		b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
@@ -296,7 +296,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 		// do a blocking write to the queue.
 		select {
 		case b.writeQueue <- writeReq{recvTime: time.Now(), def: &archive.MetricDefinition}:
-			archive.LastSave = now
+			archive.SetLastSave(now)
 			b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 		default:
 			statSaveSkipped.Inc()
