@@ -13,11 +13,24 @@ import (
 	"github.com/raintank/dur"
 )
 
+// Month_sec is the number of seconds in a month of 28 days of 24 hour
 const Month_sec = 60 * 60 * 24 * 28
 
 var errReadyFormat = errors.New("'ready' field must be a bool or unsigned integer")
 
+// Retentions describes a set of graphite retentions
 type Retentions []Retention
+
+func (rets Retentions) String() string {
+	var out string
+	for _, ret := range rets {
+		if out != "" {
+			out += ","
+		}
+		out += ret.String()
+	}
+	return out
+}
 
 // Validate assures the retentions are sane.  As the whisper source code says:
 // An ArchiveList must:
@@ -65,10 +78,15 @@ type Retention struct {
 	ChunkSpan       uint32 // duration of chunk of aggregated metric for storage, controls how many aggregated points go into 1 chunk
 	NumChunks       uint32 // number of chunks to keep in memory. remember, for a query from now until 3 months ago, we will end up querying the memory server as well.
 	Ready           uint32 // ready for reads for data as of this timestamp (or as of now-TTL, whichever is highest)
+	Str             string // original input string describing this retention
 }
 
 func (r Retention) MaxRetention() int {
 	return r.SecondsPerPoint * r.NumberOfPoints
+}
+
+func (r Retention) String() string {
+	return r.Str
 }
 
 func NewRetention(secondsPerPoint, numberOfPoints int) Retention {
@@ -166,7 +184,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 				}
 			}
 		}
-
+		retention.Str = def
 		retentions = append(retentions, retention)
 	}
 	return retentions, retentions.Validate()

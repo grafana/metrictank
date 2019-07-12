@@ -2,15 +2,16 @@ package conf
 
 import (
 	"math"
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestParseRetentions(t *testing.T) {
 	cases := []struct {
 		in  string
 		err bool
-		out []Retention
+		out Retentions
 	}{
 		{
 			in:  "1s:1d:1h:2,1m:8d:4h:2:1234567890,10m:120d:6h:1:true,30m:2y:6h:1:false",
@@ -22,6 +23,7 @@ func TestParseRetentions(t *testing.T) {
 					ChunkSpan:       60 * 60,
 					NumChunks:       2,
 					Ready:           0,
+					Str:             "1s:1d:1h:2",
 				},
 				{
 					SecondsPerPoint: 60,
@@ -29,6 +31,7 @@ func TestParseRetentions(t *testing.T) {
 					ChunkSpan:       4 * 60 * 60,
 					NumChunks:       2,
 					Ready:           1234567890,
+					Str:             "1m:8d:4h:2:1234567890",
 				},
 				{
 					SecondsPerPoint: 600,
@@ -36,6 +39,7 @@ func TestParseRetentions(t *testing.T) {
 					ChunkSpan:       6 * 60 * 60,
 					NumChunks:       1,
 					Ready:           0,
+					Str:             "10m:120d:6h:1:true",
 				},
 				{
 					SecondsPerPoint: 30 * 60,
@@ -43,6 +47,7 @@ func TestParseRetentions(t *testing.T) {
 					ChunkSpan:       6 * 60 * 60,
 					NumChunks:       1,
 					Ready:           math.MaxUint32,
+					Str:             "30m:2y:6h:1:false",
 				},
 			},
 		},
@@ -55,8 +60,8 @@ func TestParseRetentions(t *testing.T) {
 		if c.err {
 			continue
 		}
-		if !reflect.DeepEqual(Retentions(c.out), got) {
-			t.Fatalf("case %d: exp retentions\n%v\nbut got\n%v", i, c.out, got)
+		if diff := cmp.Diff(c.out, got); diff != "" {
+			t.Fatalf("case %d: exp retentions mismatch (-want +got):\n%s", i, diff)
 		}
 	}
 }
