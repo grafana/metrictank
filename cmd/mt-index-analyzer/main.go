@@ -85,6 +85,9 @@ func main() {
 	aggDist = make([]int, len(aggregations.Data)+1) // we need one extra to mark the default case
 	schemaDist = make([]int, len(schemas.Index)+1)  // we need one extra to mark the default case
 	comboDist = make(map[combo]int)
+	pointsInTankPerPart = make([]uint64, numPartitions)
+	pointsInStorePerPart = make([]uint64, numPartitions)
+	seriesPerPart = make([]uint64, numPartitions)
 
 	jobs := make(chan Job, 10000)
 
@@ -105,6 +108,7 @@ func main() {
 type Job struct {
 	path     string
 	interval int
+	part     int32
 }
 
 func loadConfFiles() {
@@ -141,6 +145,7 @@ func loadJobs(idx *cassandra.CasIdx, jobs chan Job) {
 			jobs <- Job{
 				path:     def.NameWithTags(),
 				interval: def.Interval,
+				part:     part,
 			}
 		}
 	}
@@ -170,7 +175,7 @@ func processJobs(wg *sync.WaitGroup, jobs chan Job) {
 				numSeries = uint64(conf.NumSeries(agg.AggregationMethod))
 			}
 		}
-		addStat(aggID, irID, schemaID, pointsInTank, pointsInStore)
+		addStat(job.part, aggID, irID, schemaID, pointsInTank, pointsInStore)
 	}
 	wg.Done()
 }

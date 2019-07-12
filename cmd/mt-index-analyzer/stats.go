@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -13,11 +14,14 @@ var (
 	totalPointsInStore uint64
 	totalSeries        uint64
 
-	dist       sync.Mutex
-	irDist     []int
-	aggDist    []int
-	schemaDist []int
-	comboDist  map[combo]int
+	dist                 sync.Mutex
+	irDist               []int
+	aggDist              []int
+	schemaDist           []int
+	comboDist            map[combo]int
+	pointsInTankPerPart  []uint64
+	pointsInStorePerPart []uint64
+	seriesPerPart        []uint64
 )
 
 type combo struct {
@@ -26,7 +30,7 @@ type combo struct {
 	schemaID uint16
 }
 
-func addStat(aggID, irID, schemaID uint16, pointsInTank, pointsInStore uint64) {
+func addStat(part int32, aggID, irID, schemaID uint16, pointsInTank, pointsInStore uint64) {
 
 	c := combo{
 		irID:     irID,
@@ -38,6 +42,9 @@ func addStat(aggID, irID, schemaID uint16, pointsInTank, pointsInStore uint64) {
 	irDist[irID]++
 	schemaDist[schemaID]++
 	comboDist[c]++
+	pointsInTankPerPart[part] += pointsInTank
+	pointsInStorePerPart[part] += pointsInStore
+	seriesPerPart[part]++
 	dist.Unlock()
 
 	atomic.AddUint64(&totalPointsInTank, pointsInTank)
@@ -72,11 +79,47 @@ func printStats() {
 		fmt.Printf("  %25s %40q %5d %39s %d\n", schema.Name, schema.Pattern, schema.Priority, schema.Retentions.String(), count)
 	}
 
-	fmt.Println("# combination distribution ###")
+	fmt.Println("# combination distribution")
 	for c, count := range comboDist {
 		ir := indexRules.Get(uint16(c.irID))
 		agg := aggregations.Get(uint16(c.aggID))
 		schema := schemas.Get(uint16(c.schemaID))
 		fmt.Printf("schema(%15s/%25q) agg(%15s/%25q) ir(%15s/%25q) %d\n", schema.Name, schema.Pattern, agg.Name, agg.Pattern, ir.Name, ir.Pattern, count)
 	}
+
+	fmt.Println("# distribution (across partitions) health - only accurate for when O(series per partition) >> O(partitions)")
+	cov, pctDiff := stats(pointsInTankPerPart)
+	fmt.Printf("points in tank cov=%.3f, diff=%.2f%%\n", cov, pctDiff)
+	cov, pctDiff = stats(pointsInStorePerPart)
+	fmt.Printf("points in store cov=%.3f, diff=%.2f%%\n", cov, pctDiff)
+	cov, pctDiff = stats(seriesPerPart)
+	fmt.Printf("series          cov=%.3f, diff=%.2f%%\n", cov, pctDiff)
+}
+
+// stats computes the stats of the distribution:
+// 1) coefficient of variation, which is an excellent measure of relative variation.
+// 2) percent difference between highest and lowest partition
+func stats(distributions []uint64) (float64, float64) {
+	var sum uint64
+	min := uint64(math.MaxUint64)
+	max := uint64(0)
+	for _, cnt := range distributions {
+		if cnt < min {
+			min = cnt
+		}
+		if cnt > max {
+			max = cnt
+		}
+		sum += cnt
+	}
+	mean := float64(sum / uint64(len(distributions))) // needs sufficiently high sum for accuracy
+
+	var stdev float64
+	for _, cnt := range distributions {
+		stdev += math.Pow(float64(cnt)-mean, 2)
+	}
+	stdev = math.Sqrt(stdev / float64(len(distributions)))
+	cov := stdev / mean
+	pctdiff := float64(100*(max-min)) / float64(min)
+	return cov, pctdiff
 }
