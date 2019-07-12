@@ -2,6 +2,7 @@ package conf
 
 import "math/bits"
 
+//go:generate stringer -type=Method
 type Method int
 
 const (
@@ -39,4 +40,15 @@ func NumSeries(methods []Method) int {
 		}
 	}
 	return bits.OnesCount8(buf)
+}
+
+func MethodsString(methods []Method) string {
+	var out string
+	for _, method := range methods {
+		if out != "" {
+			out += ","
+		}
+		out += method.String()
+	}
+	return out
 }
