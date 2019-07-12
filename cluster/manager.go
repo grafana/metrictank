@@ -151,6 +151,24 @@ func (c *MemberlistManager) setList(list *memberlist.Memberlist) {
 }
 
 func (c *MemberlistManager) ThisNode() Node {
+	done := make(chan struct{})
+	defer close(done)
+
+	go func() {
+		start := time.Now()
+		ticker := time.NewTicker(time.Second * 3)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-done:
+				return
+			case now := <-ticker.C:
+				log.Warnf("MemberlistManager: ThisNode() has been blocked for %s", now.Sub(start))
+			}
+		}
+	}()
+
 	return c.thisNode()
 }
 
