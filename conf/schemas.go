@@ -14,7 +14,7 @@ import (
 // Schemas contains schema settings
 type Schemas struct {
 	raw           []Schema
-	index         []Schema
+	Index         []Schema
 	DefaultSchema Schema
 }
 
@@ -51,10 +51,10 @@ func (s Schemas) List() ([]Schema, Schema) {
 }
 
 func (s *Schemas) BuildIndex() {
-	s.index = make([]Schema, 0)
+	s.Index = make([]Schema, 0)
 	for _, schema := range s.raw {
 		for pos := range schema.Retentions {
-			s.index = append(s.index, Schema{
+			s.Index = append(s.Index, Schema{
 				Name:          schema.Name,
 				Pattern:       schema.Pattern,
 				Retentions:    schema.Retentions[pos:],
@@ -65,7 +65,7 @@ func (s *Schemas) BuildIndex() {
 	}
 	// add the default schema
 	for pos := range s.DefaultSchema.Retentions {
-		s.index = append(s.index, Schema{
+		s.Index = append(s.Index, Schema{
 			Name:       s.DefaultSchema.Name,
 			Pattern:    s.DefaultSchema.Pattern,
 			Retentions: s.DefaultSchema.Retentions[pos:],
@@ -171,8 +171,8 @@ func ReadSchemas(file string) (Schemas, error) {
 //     (pattern3).
 func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 	i := 0
-	for i < len(s.index) {
-		schema := s.index[i]
+	for i < len(s.Index) {
+		schema := s.Index[i]
 		if schema.Pattern.MatchString(metric) {
 			// no interval passed,use the raw retentions.
 			// This is primarily used by the carbon input plugin.
@@ -193,13 +193,13 @@ func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 					// the position in the index (schemaId) is the position of the schema we used for the
 					// regex match + the position of the retention.
 					pos := i + j
-					return uint16(pos), s.index[pos]
+					return uint16(pos), s.Index[pos]
 				}
 			}
 			// no retentions found with SecondsPerPoint > interval. So lets just use the retention
 			// with the largest secondsPerPoint.
 			pos := i + len(schema.Retentions) - 1
-			return uint16(pos), s.index[pos]
+			return uint16(pos), s.Index[pos]
 		}
 		// the next len(schema.Retentions) schemas in the index all have the
 		// same schema pattern, so we can skip over them.
@@ -208,15 +208,15 @@ func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 
 	// as the DefaultSchema is in the schemas.index, this should typically never be reached.
 	// Though as the user can modify schemas.DefaultSchema we keep this for safety.
-	return uint16(len(s.index)), s.DefaultSchema
+	return uint16(len(s.Index)), s.DefaultSchema
 }
 
 // Get returns the schema setting corresponding to the given index
 func (s Schemas) Get(i uint16) Schema {
-	if i+1 > uint16(len(s.index)) {
+	if i+1 > uint16(len(s.Index)) {
 		return s.DefaultSchema
 	}
-	return s.index[i]
+	return s.Index[i]
 }
 
 // TTLs returns a slice of all TTL's seen amongst all archives of all schemas
