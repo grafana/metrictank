@@ -8,8 +8,16 @@ type expressionNotHasTag struct {
 	expressionCommon
 }
 
+func (e *expressionNotHasTag) GetDefaultDecision() FilterDecision {
+	return Pass
+}
+
 func (e *expressionNotHasTag) GetOperator() ExpressionOperator {
 	return NOT_HAS_TAG
+}
+
+func (e *expressionNotHasTag) OperatesOnTag() bool {
+	return true
 }
 
 func (e *expressionNotHasTag) RequiresNonEmptyValue() bool {
@@ -18,19 +26,6 @@ func (e *expressionNotHasTag) RequiresNonEmptyValue() bool {
 
 func (e *expressionNotHasTag) ValuePasses(value string) bool {
 	return value == e.key
-}
-
-func (e *expressionNotHasTag) GetDefaultDecision() FilterDecision {
-	return Pass
-}
-
-func (e *expressionNotHasTag) OperatesOnTag() bool {
-	return true
-}
-
-func (e *expressionNotHasTag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("=")
 }
 
 func (e *expressionNotHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -47,4 +42,9 @@ func (e *expressionNotHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter
 		}
 		return None
 	}
+}
+
+func (e *expressionNotHasTag) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("=")
 }

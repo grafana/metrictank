@@ -15,9 +15,9 @@ func (e *expressionCommon) GetValue() string {
 	return e.value
 }
 
-func (e *expressionCommon) RequiresNonEmptyValue() bool {
-	// by default assume true, unless a concrete type overrides this method
-	return true
+func (e *expressionCommon) HasRe() bool {
+	// by default assume false, unless a concrete type overrides this method
+	return false
 }
 
 func (e *expressionCommon) OperatesOnTag() bool {
@@ -25,9 +25,9 @@ func (e *expressionCommon) OperatesOnTag() bool {
 	return false
 }
 
-func (e *expressionCommon) HasRe() bool {
-	// by default assume false, unless a concrete type overrides this method
-	return false
+func (e *expressionCommon) RequiresNonEmptyValue() bool {
+	// by default assume true, unless a concrete type overrides this method
+	return true
 }
 
 // expressionCommonRe is an extended version of expressionCommon with additional

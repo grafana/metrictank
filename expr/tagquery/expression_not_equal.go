@@ -8,6 +8,10 @@ type expressionNotEqual struct {
 	expressionCommon
 }
 
+func (e *expressionNotEqual) GetDefaultDecision() FilterDecision {
+	return Pass
+}
+
 func (e *expressionNotEqual) GetOperator() ExpressionOperator {
 	return NOT_EQUAL
 }
@@ -18,16 +22,6 @@ func (e *expressionNotEqual) RequiresNonEmptyValue() bool {
 
 func (e *expressionNotEqual) ValuePasses(value string) bool {
 	return value != e.value
-}
-
-func (e *expressionNotEqual) GetDefaultDecision() FilterDecision {
-	return Pass
-}
-
-func (e *expressionNotEqual) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("!=")
-	builder.WriteString(e.value)
 }
 
 func (e *expressionNotEqual) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -57,4 +51,10 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter() MetricDefinitionFilter 
 		}
 		return None
 	}
+}
+
+func (e *expressionNotEqual) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("!=")
+	builder.WriteString(e.value)
 }

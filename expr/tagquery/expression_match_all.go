@@ -10,6 +10,10 @@ type expressionMatchAll struct {
 	originalOperator ExpressionOperator
 }
 
+func (e *expressionMatchAll) GetDefaultDecision() FilterDecision {
+	return Pass
+}
+
 func (e *expressionMatchAll) GetKey() string {
 	return e.key
 }
@@ -18,36 +22,28 @@ func (e *expressionMatchAll) GetValue() string {
 	return e.value
 }
 
-func (e *expressionMatchAll) RequiresNonEmptyValue() bool {
-	return false
-}
-
-func (e *expressionMatchAll) OperatesOnTag() bool {
-	return false
+func (e *expressionMatchAll) GetOperator() ExpressionOperator {
+	return MATCH_ALL
 }
 
 func (e *expressionMatchAll) HasRe() bool {
 	return false
 }
 
-func (e *expressionMatchAll) GetOperator() ExpressionOperator {
-	return MATCH_ALL
+func (e *expressionMatchAll) RequiresNonEmptyValue() bool {
+	return false
 }
 
 func (e *expressionMatchAll) ValuePasses(value string) bool {
 	return true
 }
 
-func (e *expressionMatchAll) GetDefaultDecision() FilterDecision {
-	return Pass
+func (e *expressionMatchAll) GetMetricDefinitionFilter() MetricDefinitionFilter {
+	return func(_ string, _ []string) FilterDecision { return Pass }
 }
 
 func (e *expressionMatchAll) StringIntoBuilder(builder *strings.Builder) {
 	builder.WriteString(e.key)
 	e.originalOperator.StringIntoBuilder(builder)
 	builder.WriteString(e.value)
-}
-
-func (e *expressionMatchAll) GetMetricDefinitionFilter() MetricDefinitionFilter {
-	return func(_ string, _ []string) FilterDecision { return Pass }
 }

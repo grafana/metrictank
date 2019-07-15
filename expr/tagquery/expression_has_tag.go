@@ -8,25 +8,20 @@ type expressionHasTag struct {
 	expressionCommon
 }
 
-func (e *expressionHasTag) GetOperator() ExpressionOperator {
-	return HAS_TAG
-}
-
-func (e *expressionHasTag) ValuePasses(value string) bool {
-	return value == e.key
-}
-
 func (e *expressionHasTag) GetDefaultDecision() FilterDecision {
 	return Fail
+}
+
+func (e *expressionHasTag) GetOperator() ExpressionOperator {
+	return HAS_TAG
 }
 
 func (e *expressionHasTag) OperatesOnTag() bool {
 	return true
 }
 
-func (e *expressionHasTag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("!=")
+func (e *expressionHasTag) ValuePasses(value string) bool {
+	return value == e.key
 }
 
 func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -44,4 +39,9 @@ func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
 
 		return None
 	}
+}
+
+func (e *expressionHasTag) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("!=")
 }

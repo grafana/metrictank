@@ -8,22 +8,16 @@ type expressionEqual struct {
 	expressionCommon
 }
 
+func (e *expressionEqual) GetDefaultDecision() FilterDecision {
+	return Fail
+}
+
 func (e *expressionEqual) GetOperator() ExpressionOperator {
 	return EQUAL
 }
 
 func (e *expressionEqual) ValuePasses(value string) bool {
 	return value == e.value
-}
-
-func (e *expressionEqual) GetDefaultDecision() FilterDecision {
-	return Fail
-}
-
-func (e *expressionEqual) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("=")
-	builder.WriteString(e.value)
 }
 
 func (e *expressionEqual) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -57,4 +51,10 @@ func (e *expressionEqual) GetMetricDefinitionFilter() MetricDefinitionFilter {
 
 		return None
 	}
+}
+
+func (e *expressionEqual) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("=")
+	builder.WriteString(e.value)
 }
