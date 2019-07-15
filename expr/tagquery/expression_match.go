@@ -10,18 +10,6 @@ type expressionMatch struct {
 	expressionCommonRe
 }
 
-func (e *expressionMatch) GetOperator() ExpressionOperator {
-	return MATCH
-}
-
-func (e *expressionMatch) HasRe() bool {
-	return true
-}
-
-func (e *expressionMatch) ValuePasses(value string) bool {
-	return e.valueRe.MatchString(value)
-}
-
 func (e *expressionMatch) GetDefaultDecision() FilterDecision {
 	// if the pattern matches "" (f.e. "tag=~.*) then a metric which
 	// does not have the tag "tag" at all should also be part of the
@@ -35,14 +23,20 @@ func (e *expressionMatch) GetDefaultDecision() FilterDecision {
 	return Fail
 }
 
-func (e *expressionMatch) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("=~")
-	builder.WriteString(e.value)
+func (e *expressionMatch) GetOperator() ExpressionOperator {
+	return MATCH
+}
+
+func (e *expressionMatch) HasRe() bool {
+	return true
 }
 
 func (e *expressionMatch) RequiresNonEmptyValue() bool {
 	return !e.matchesEmpty
+}
+
+func (e *expressionMatch) ValuePasses(value string) bool {
+	return e.valueRe.MatchString(value)
 }
 
 func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -104,4 +98,10 @@ func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
 
 		return None
 	}
+}
+
+func (e *expressionMatch) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("=~")
+	builder.WriteString(e.value)
 }

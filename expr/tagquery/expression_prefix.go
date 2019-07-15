@@ -8,12 +8,12 @@ type expressionPrefix struct {
 	expressionCommon
 }
 
-func (e *expressionPrefix) GetOperator() ExpressionOperator {
-	return PREFIX
+func (e *expressionPrefix) GetDefaultDecision() FilterDecision {
+	return Fail
 }
 
-func (e *expressionPrefix) ValuePasses(value string) bool {
-	return strings.HasPrefix(value, e.value)
+func (e *expressionPrefix) GetOperator() ExpressionOperator {
+	return PREFIX
 }
 
 func (e *expressionPrefix) RequiresNonEmptyValue() bool {
@@ -22,14 +22,8 @@ func (e *expressionPrefix) RequiresNonEmptyValue() bool {
 	return true
 }
 
-func (e *expressionPrefix) GetDefaultDecision() FilterDecision {
-	return Fail
-}
-
-func (e *expressionPrefix) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("^=")
-	builder.WriteString(e.value)
+func (e *expressionPrefix) ValuePasses(value string) bool {
+	return strings.HasPrefix(value, e.value)
 }
 
 func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -59,4 +53,10 @@ func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
 
 		return None
 	}
+}
+
+func (e *expressionPrefix) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("^=")
+	builder.WriteString(e.value)
 }

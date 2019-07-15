@@ -8,8 +8,16 @@ type expressionPrefixTag struct {
 	expressionCommon
 }
 
+func (e *expressionPrefixTag) GetDefaultDecision() FilterDecision {
+	return Fail
+}
+
 func (e *expressionPrefixTag) GetOperator() ExpressionOperator {
 	return PREFIX_TAG
+}
+
+func (e *expressionPrefixTag) OperatesOnTag() bool {
+	return true
 }
 
 func (e *expressionPrefixTag) RequiresNonEmptyValue() bool {
@@ -20,19 +28,6 @@ func (e *expressionPrefixTag) RequiresNonEmptyValue() bool {
 
 func (e *expressionPrefixTag) ValuePasses(tag string) bool {
 	return strings.HasPrefix(tag, e.value)
-}
-
-func (e *expressionPrefixTag) OperatesOnTag() bool {
-	return true
-}
-
-func (e *expressionPrefixTag) GetDefaultDecision() FilterDecision {
-	return Fail
-}
-
-func (e *expressionPrefixTag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString("__tag^=")
-	builder.WriteString(e.value)
 }
 
 func (e *expressionPrefixTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -49,4 +44,9 @@ func (e *expressionPrefixTag) GetMetricDefinitionFilter() MetricDefinitionFilter
 		}
 		return None
 	}
+}
+
+func (e *expressionPrefixTag) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString("__tag^=")
+	builder.WriteString(e.value)
 }

@@ -10,22 +10,6 @@ type expressionNotMatch struct {
 	expressionCommonRe
 }
 
-func (e *expressionNotMatch) GetOperator() ExpressionOperator {
-	return NOT_MATCH
-}
-
-func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
-	return e.matchesEmpty
-}
-
-func (e *expressionNotMatch) HasRe() bool {
-	return true
-}
-
-func (e *expressionNotMatch) ValuePasses(value string) bool {
-	return !e.valueRe.MatchString(value)
-}
-
 func (e *expressionNotMatch) GetDefaultDecision() FilterDecision {
 	// if the pattern matches "" (f.e. "tag!=~.*) then a metric which
 	// does not have the tag "tag" at all should not be part of the
@@ -39,10 +23,20 @@ func (e *expressionNotMatch) GetDefaultDecision() FilterDecision {
 	return Pass
 }
 
-func (e *expressionNotMatch) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	builder.WriteString("!=~")
-	builder.WriteString(e.value)
+func (e *expressionNotMatch) GetOperator() ExpressionOperator {
+	return NOT_MATCH
+}
+
+func (e *expressionNotMatch) HasRe() bool {
+	return true
+}
+
+func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
+	return e.matchesEmpty
+}
+
+func (e *expressionNotMatch) ValuePasses(value string) bool {
+	return !e.valueRe.MatchString(value)
 }
 
 func (e *expressionNotMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -104,4 +98,10 @@ func (e *expressionNotMatch) GetMetricDefinitionFilter() MetricDefinitionFilter 
 
 		return None
 	}
+}
+
+func (e *expressionNotMatch) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString(e.key)
+	builder.WriteString("!=~")
+	builder.WriteString(e.value)
 }

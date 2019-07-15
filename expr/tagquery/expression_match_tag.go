@@ -10,20 +10,16 @@ type expressionMatchTag struct {
 	expressionCommonRe
 }
 
+func (e *expressionMatchTag) GetDefaultDecision() FilterDecision {
+	return Fail
+}
+
 func (e *expressionMatchTag) GetOperator() ExpressionOperator {
 	return MATCH_TAG
 }
 
 func (e *expressionMatchTag) HasRe() bool {
 	return true
-}
-
-func (e *expressionMatchTag) ValuePasses(tag string) bool {
-	return e.valueRe.MatchString(tag)
-}
-
-func (e *expressionMatchTag) GetDefaultDecision() FilterDecision {
-	return Fail
 }
 
 func (e *expressionMatchTag) OperatesOnTag() bool {
@@ -34,9 +30,8 @@ func (e *expressionMatchTag) RequiresNonEmptyValue() bool {
 	return !e.matchesEmpty
 }
 
-func (e *expressionMatchTag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString("__tag=~")
-	builder.WriteString(e.value)
+func (e *expressionMatchTag) ValuePasses(tag string) bool {
+	return e.valueRe.MatchString(tag)
 }
 
 func (e *expressionMatchTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
@@ -81,4 +76,9 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter() MetricDefinitionFilter 
 
 		return None
 	}
+}
+
+func (e *expressionMatchTag) StringIntoBuilder(builder *strings.Builder) {
+	builder.WriteString("__tag=~")
+	builder.WriteString(e.value)
 }

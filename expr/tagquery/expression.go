@@ -90,10 +90,6 @@ func (e Expressions) Strings() []string {
 }
 
 type Expression interface {
-	// GetMetricDefinitionFilter returns a MetricDefinitionFilter. It takes a metric definition, looks
-	// at its tags and returns a decision regarding this query expression applied to its tags.
-	GetMetricDefinitionFilter() MetricDefinitionFilter
-
 	// GetDefaultDecision defines what decision should be made if the filter has not come to a conclusive
 	// decision based on a single index. When looking at more than one tag index in order of decreasing
 	// priority to decide whether a metric should be part of the final result set, some operators and metric
@@ -147,18 +143,29 @@ type Expression interface {
 	// GetOperator returns the operator of this expression
 	GetOperator() ExpressionOperator
 
-	// FilterValues takes a map that's indexed by strings and applies this expression's criteria to
-	// each of the strings, then it returns the strings that have matched
-	// In case of expressions that get applied to tags, the first level map of the metric tag index
-	// or meta tag index can get passed into this function, otherwise the second level under the key
-	// returned by GetKey()
-	ValuePasses(string) bool
-
 	// HasRe indicates whether the evaluation of this expression involves regular expressions
 	HasRe() bool
 
-	RequiresNonEmptyValue() bool
+	// OperatesOnTag returns true if this expression operators on the tag keys,
+	// or false if it operates on the values
 	OperatesOnTag() bool
+
+	// RequiresNonEmptyValue returns boolean indicating whether this expression requires a non-empty
+	// value. Every query must have at least one expression requiring a non-empty value, otherwise
+	// the query is considered invalid
+	RequiresNonEmptyValue() bool
+
+	// ValuePasses takes a string which should either be a tag key or value depending on the return
+	// value of OperatesOnTag(), then it returns a bool to indicate whether the given value satisfies
+	// this expression
+	ValuePasses(string) bool
+
+	// GetMetricDefinitionFilter returns a MetricDefinitionFilter
+	// The MetricDefinitionFilter takes a metric definition, looks at its tags and returns a decision
+	// regarding this query expression applied to its tags
+	GetMetricDefinitionFilter() MetricDefinitionFilter
+
+	// StringIntoBuilder takes a builder and writes a string representation of this expression into it
 	StringIntoBuilder(builder *strings.Builder)
 }
 
