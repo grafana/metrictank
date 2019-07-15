@@ -51,8 +51,11 @@ mt-index-analyzer
 
 analyzes the contents of your index
 limitations:
- - does not take into account series churn. more specifically, assumes each series has data for its entire defined retention
  - assumes chunks are filled corresponding to the interval, doesn't account for sparse data or too-high resolution data
+ - does not take into account series churn. more specifically, assumes each series has data for its entire defined retention
+   to properly handle churn, find the sweet spot for max-stale:
+   a too aggressive (low) value will exclude series that have temporarily not received data due to an intermittent interruption
+   a too loose (high) value may accidentally incorporate churn events, e.g. multiple series that are supposed to count for the same single 'logical' series that cycled onto a new name
   -aggregations-file string
     	path to storage-aggregation.conf file (default "/etc/metrictank/storage-aggregation.conf")
   -archive-table string
@@ -77,6 +80,8 @@ limitations:
     	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -max-stale duration
+    	exclude series that have not been seen for this much time.  use 0 to disable (default 1h0m0s)
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -num-partitions int

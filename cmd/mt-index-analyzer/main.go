@@ -21,6 +21,7 @@ var (
 	aggregations  conf.Aggregations
 	indexRules    conf.IndexRules
 	schemas       conf.Schemas
+	maxStale      = time.Hour
 
 	aggFile        = "/etc/metrictank/storage-aggregation.conf"
 	indexRulesFile = "/etc/metrictank/index-rules.conf"
@@ -47,14 +48,18 @@ func main() {
 	fl.StringVar(&indexRulesFile, "rules-file", indexRulesFile, "path to index-rules.conf file")
 	fl.StringVar(&schemasFile, "schemas-file", schemasFile, "path to storage-schemas.conf file")
 	fl.IntVar(&numPartitions, "num-partitions", numPartitions, "amount of partitions to look for")
+	fl.DurationVar(&maxStale, "max-stale", maxStale, "exclude series that have not been seen for this much time.  use 0 to disable")
 
 	flag.Usage = func() {
 		fmt.Println("mt-index-analyzer")
 		fmt.Println("")
 		fmt.Println("analyzes the contents of your index")
 		fmt.Println("limitations:")
-		fmt.Println(" - does not take into account series churn. more specifically, assumes each series has data for its entire defined retention")
 		fmt.Println(" - assumes chunks are filled corresponding to the interval, doesn't account for sparse data or too-high resolution data")
+		fmt.Println(" - does not take into account series churn. more specifically, assumes each series has data for its entire defined retention")
+		fmt.Println("   to properly handle churn, find the sweet spot for max-stale:")
+		fmt.Println("   a too aggressive (low) value will exclude series that have temporarily not received data due to an intermittent interruption")
+		fmt.Println("   a too loose (high) value may accidentally incorporate churn events, e.g. multiple series that are supposed to count for the same single 'logical' series that cycled onto a new name")
 		fl.PrintDefaults()
 	}
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
@@ -75,7 +80,7 @@ func main() {
 		Default: conf.IndexRule{
 			Name:     "default",
 			Pattern:  regexp.MustCompile(""),
-			MaxStale: 0,
+			MaxStale: maxStale,
 		},
 	}
 
