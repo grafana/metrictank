@@ -2,6 +2,7 @@ package memory
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -89,7 +90,9 @@ func queryAndCompareResults(t *testing.T, q TagQueryContext, expectedData IdSet)
 	res := q.Run(tagIdx, byId)
 
 	if !reflect.DeepEqual(expectedData, res) {
+		q.Run(tagIdx, byId)
 		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", expectedData, res)
+
 	}
 }
 
@@ -340,6 +343,146 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	res = qCtx.Run(tagIdx, byId)
 	if len(res) != 4 {
 		t.Fatalf("Expected %d results, but got %d", 4, len(res))
+	}
+}
+
+func TestTagExpressionQueriesInAllCombinations(t *testing.T) {
+	type expressionWithOperator struct {
+		expression  string
+		operator    tagquery.ExpressionOperator
+		expectedIds []int // based on the data generated in getTestIndex
+	}
+	expressionStrings := []expressionWithOperator{
+		{
+			expression:  "key1=value1",
+			operator:    tagquery.EQUAL,
+			expectedIds: []int{0, 1, 2, 3},
+		}, {
+			expression:  "key3!=value3",
+			operator:    tagquery.NOT_EQUAL,
+			expectedIds: []int{0, 2, 5, 6, 7, 8},
+		}, {
+			expression:  "key2=~v",
+			operator:    tagquery.MATCH,
+			expectedIds: []int{0, 4, 5},
+		}, {
+			expression:  "key3!=~.*1$",
+			operator:    tagquery.NOT_MATCH,
+			expectedIds: []int{0, 1, 2, 3, 4, 5, 7},
+		}, {
+			expression:  "key3^=v",
+			operator:    tagquery.PREFIX,
+			expectedIds: []int{1, 3, 4, 5, 6, 7},
+		}, {
+			expression:  "__tag^=a",
+			operator:    tagquery.PREFIX_TAG,
+			expectedIds: []int{3, 5, 6},
+		}, {
+			expression:  "__tag=abc",
+			operator:    tagquery.HAS_TAG,
+			expectedIds: []int{3, 5},
+		}, {
+			expression:  "key2=",
+			operator:    tagquery.NOT_HAS_TAG,
+			expectedIds: []int{1, 2, 3, 6, 7},
+		}, {
+			expression:  "a=~.*",
+			operator:    tagquery.MATCH_ALL,
+			expectedIds: []int{0, 1, 2, 3, 4, 5, 6, 7},
+		}, {
+			expression:  "a!=~.*",
+			operator:    tagquery.MATCH_NONE,
+			expectedIds: []int{},
+		},
+	}
+
+	// parse all expression strings into expression objects
+	var err error
+	allExpressions := make(tagquery.Expressions, len(expressionStrings))
+	for i, expr := range expressionStrings {
+		allExpressions[i], err = tagquery.ParseExpression(expr.expression)
+		if err != nil {
+			t.Fatalf("Unexpected error when parsing expression %q: %q", expr, err)
+		}
+		if allExpressions[i].GetOperator() != expr.operator {
+			t.Fatalf("Expression was %q supposed to result in operator %d, but got %d", expr.expression, expr.operator, allExpressions[i].GetOperator())
+		}
+	}
+
+	// find all the possible combinations of query expressions
+	all_subsets := make([][]int, 0, int(math.Pow(2, float64(len(expressionStrings))))-1)
+	var find_subsets func([]int, []int)
+	find_subsets = func(so_far, rest []int) {
+		if len(rest) == 0 {
+			if len(so_far) > 0 {
+				all_subsets = append(all_subsets, so_far)
+			}
+		} else {
+			find_subsets(append(so_far, rest[0]), rest[1:])
+			find_subsets(so_far, rest[1:])
+		}
+	}
+	all_ids := make([]int, len(expressionStrings))
+	for i := range all_ids {
+		all_ids[i] = i
+	}
+	find_subsets([]int{}, all_ids)
+
+	ids := getTestIDs()
+TEST_CASES:
+	for tc, expressionIds := range all_subsets {
+		expressions := make(tagquery.Expressions, len(expressionIds))
+		var expectedResults []int // intersection of expected results of each expression
+
+		includingExpressionRequiringNonEmptyValue := false
+		// build the slice of expressions we want to query for and find the
+		// expected results for the current combination of expressions
+		for i, expressionId := range expressionIds {
+			expressions[i] = allExpressions[expressionId]
+			includingExpressionRequiringNonEmptyValue = includingExpressionRequiringNonEmptyValue || expressions[i].RequiresNonEmptyValue()
+
+			if i == 0 {
+				expectedResults = make([]int, len(expressionStrings[expressionId].expectedIds))
+				copy(expectedResults, expressionStrings[expressionId].expectedIds)
+			} else {
+			EXPECTED_RESULTS:
+				for j := 0; j < len(expectedResults); j++ {
+					for _, id := range expressionStrings[expressionId].expectedIds {
+						if expectedResults[j] == id {
+							continue EXPECTED_RESULTS
+						}
+					}
+					expectedResults = append(expectedResults[:j], expectedResults[j+1:]...)
+					j--
+				}
+			}
+		}
+
+		// this combination of expressions would result in an invalid query
+		// because there is no expression requiring a non-empty value
+		if !includingExpressionRequiringNonEmptyValue {
+			continue TEST_CASES
+		}
+
+		expectedIds := make(IdSet, len(expectedResults))
+		for j := range expectedResults {
+			expectedIds[ids[expectedResults[j]]] = struct{}{}
+		}
+
+		builder := strings.Builder{}
+		builder.WriteString(fmt.Sprintf("TC %d: ", tc))
+		for _, expr := range expressions {
+			expr.StringIntoBuilder(&builder)
+			builder.WriteString(";")
+		}
+		t.Run(builder.String(), func(t *testing.T) {
+			query, err := tagquery.NewQuery(expressions, 0)
+			if err != nil {
+				t.Fatalf("Unexpected error when getting query from expressions %q: %q", expressions, err)
+			}
+
+			queryAndCompareResults(t, NewTagQueryContext(query), expectedIds)
+		})
 	}
 }
 
