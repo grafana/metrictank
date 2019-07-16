@@ -1156,23 +1156,27 @@ func benchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
 
-	queries := make([]testQuery, 0)
+	type testCase struct {
+		query           tagquery.Query
+		expectedResults int
+	}
+	var testCases []testCase
 	for _, expressions := range permutations([]string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}) {
-		queries = append(queries, testQuery{Expressions: expressions, ExpectedResults: 90})
+		query, err := tagquery.NewQueryFromStrings(expressions, 150000)
+		if err != nil {
+			b.Fatalf("Failed to instantiate query: %s", err.Error())
+		}
+		testCases = append(testCases, testCase{query: query, expectedResults: 90})
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		q := queries[n%len(queries)]
-		query, err := tagquery.NewQueryFromStrings(q.Expressions, 150000)
-		if err != nil {
-			b.Fatalf(err.Error())
-		}
-		series := ix.FindByTag(1, query)
-		if len(series) != q.ExpectedResults {
-			b.Fatalf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series))
+		tc := testCases[n%len(testCases)]
+		series := ix.FindByTag(1, tc.query)
+		if len(series) != tc.expectedResults {
+			b.Fatalf("%+v expected %d got %d results instead", tc.query, tc.expectedResults, len(series))
 		}
 	}
 }
