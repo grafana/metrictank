@@ -2,6 +2,8 @@ package tagquery
 
 import (
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type expressionNotEqual struct {
@@ -30,7 +32,7 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter() MetricDefinitionFilter 
 			return func(_ string, _ []string) FilterDecision { return Pass }
 		}
 		return func(name string, _ []string) FilterDecision {
-			if name == e.value {
+			if schema.SanitizeNameAsTagValue(name) == e.value {
 				return Fail
 			}
 			return Pass

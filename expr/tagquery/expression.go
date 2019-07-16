@@ -9,7 +9,7 @@ import (
 
 const invalidExpressionError = "Invalid expression: %s"
 
-var matchCacheSize int
+const matchCacheSize = 1000
 
 type Expressions []Expression
 

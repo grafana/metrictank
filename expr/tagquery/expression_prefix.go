@@ -2,6 +2,8 @@ package tagquery
 
 import (
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type expressionPrefix struct {
@@ -32,7 +34,7 @@ func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
 
 	if e.key == "name" {
 		return func(name string, _ []string) FilterDecision {
-			if strings.HasPrefix(name, e.value) {
+			if strings.HasPrefix(schema.SanitizeNameAsTagValue(name), e.value) {
 				return Pass
 			}
 
