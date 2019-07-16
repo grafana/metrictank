@@ -1,6 +1,11 @@
 # master
 
 ## breaking changes
+* version v0.12.0-96-g998933c3 introduces config options for the cassandra/scylladb index table names.
+  The default settings and schemas match the previous behavior, but people who have customized the schema-idx template files
+  should know that we now no longer only expand the keyspace (and assume a hardcoded table name).
+  Now both the `schema_table` and `schema_archive_table` sections in the template name should have 2 `%s` sections which will be
+  expanded to the `keyspace` and `table`, or `keyspace` and `archive-table` settings respectively configured under `cassandra-idx` of the metrictank config file.
 * version v0.12.0-81-g4ee87166 and later reject metrics with invalid tags on ingest by default, this can be disabled via the `input.reject-invalid-tags` flag.
   if you're unsure whether you're currently sending invalid tags, it's a good idea to first disable the invalid tag rejection and watch the
   new counter called `input.<input name>.metricdata.discarded.invalid_tag`, if invalid tags get ingested this counter will increase without
