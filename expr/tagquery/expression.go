@@ -9,8 +9,6 @@ import (
 
 const invalidExpressionError = "Invalid expression: %s"
 
-const matchCacheSize = 1000
-
 type Expressions []Expression
 
 func ParseExpressions(expressions []string) (Expressions, error) {
