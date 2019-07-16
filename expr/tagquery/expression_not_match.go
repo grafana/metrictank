@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/raintank/schema"
 )
 
 type expressionNotMatch struct {
@@ -47,7 +49,7 @@ func (e *expressionNotMatch) GetMetricDefinitionFilter() MetricDefinitionFilter 
 		}
 
 		return func(name string, _ []string) FilterDecision {
-			if e.valueRe.MatchString(name) {
+			if e.valueRe.MatchString(schema.SanitizeNameAsTagValue(name)) {
 				return Fail
 			}
 			return Pass
@@ -62,11 +64,6 @@ func (e *expressionNotMatch) GetMetricDefinitionFilter() MetricDefinitionFilter 
 		for _, tag := range tags {
 			if !strings.HasPrefix(tag, prefix) {
 				continue
-			}
-
-			// if value is empty, every metric which has this tag passes
-			if e.value == "" {
-				return Pass
 			}
 
 			value := tag[len(prefix):]

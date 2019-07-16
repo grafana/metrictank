@@ -1089,9 +1089,10 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 			continue
 		}
 
-		if existing, ok := byPath[def.NameWithTags()]; !ok {
-			byPath[def.NameWithTags()] = &idx.Node{
-				Path:        def.NameWithTags(),
+		nameWithTags := def.NameWithTags()
+		if existing, ok := byPath[nameWithTags]; !ok {
+			byPath[nameWithTags] = &idx.Node{
+				Path:        nameWithTags,
 				Leaf:        true,
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
@@ -1101,10 +1102,12 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		}
 	}
 
-	results := make([]idx.Node, 0, len(byPath))
+	results := make([]idx.Node, len(byPath))
 
+	i := 0
 	for _, v := range byPath {
-		results = append(results, *v)
+		results[i] = *v
+		i++
 	}
 
 	return results
