@@ -1219,14 +1219,12 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 
 	type testCase struct {
 		prefix string
-		expr   []string
 		from   int64
 		expRes []string
 	}
 
 	tc := testCase{
 		prefix: "di",
-		expr:   []string{},
 		from:   100,
 		expRes: []string{"direction", "disk"},
 	}
@@ -1235,7 +1233,7 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, tc.from, 2, tc.expRes)
+		autoCompleteTagsAndCompare(b, n, tc.prefix, tc.from, 2, tc.expRes)
 	}
 }
 
@@ -1266,5 +1264,80 @@ func benchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, tc.from, 2, tc.expRes)
+	}
+}
+
+func BenchmarkTagQueryFilterByEqualExpression(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterByEqualExpression)(b)
+}
+
+func benchmarkTagQueryFilterByEqualExpression(b *testing.B) {
+	InitLargeIndex()
+	defer ix.Stop()
+
+	query, err := tagquery.NewQueryFromStrings([]string{"dc=dc1", "cpu=cpu12"}, 0)
+	if err != nil {
+		b.Fatalf("Unexpected error when instantiating query: %s", err.Error())
+	}
+	expectedResults := 8000
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		series := ix.FindByTag(1, query)
+		if len(series) != expectedResults {
+			b.Fatalf("%+v expected %d got %d results instead", query, expectedResults, len(series))
+		}
+	}
+}
+
+func BenchmarkTagQueryFilterByMatchExpression(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterByMatchExpression)(b)
+}
+
+func benchmarkTagQueryFilterByMatchExpression(b *testing.B) {
+	InitLargeIndex()
+	defer ix.Stop()
+
+	query, err := tagquery.NewQueryFromStrings([]string{"dc=dc1", "cpu=~cpu[0-9]2"}, 0)
+	if err != nil {
+		b.Fatalf("Unexpected error when instantiating query: %s", err.Error())
+	}
+	expectedResults := 16000
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		series := ix.FindByTag(1, query)
+		if len(series) != expectedResults {
+			b.Fatalf("%+v expected %d got %d results instead", query, expectedResults, len(series))
+		}
+	}
+}
+
+func BenchmarkTagQueryFilterByHasTagExpression(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterByHasTagExpression)(b)
+}
+
+func benchmarkTagQueryFilterByHasTagExpression(b *testing.B) {
+	InitLargeIndex()
+	defer ix.Stop()
+
+	query, err := tagquery.NewQueryFromStrings([]string{"dc=dc1", "disk!="}, 0)
+	if err != nil {
+		b.Fatalf("Unexpected error when instantiating query: %s", err.Error())
+	}
+	expectedResults := 80000
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for n := 0; n < b.N; n++ {
+		series := ix.FindByTag(1, query)
+		if len(series) != expectedResults {
+			b.Fatalf("%+v expected %d got %d results instead", query, expectedResults, len(series))
+		}
 	}
 }
