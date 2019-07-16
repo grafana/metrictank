@@ -21,7 +21,7 @@ type TagQueryContext struct {
 	wg sync.WaitGroup
 
 	query            tagquery.Query
-	filters          tagquery.MetricDefinitionFilters
+	filters          []tagquery.MetricDefinitionFilter
 	defaultDecisions []tagquery.FilterDecision
 
 	index TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()

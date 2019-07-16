@@ -79,8 +79,12 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 	return q, nil
 }
 
-func (q *Query) GetMetricDefinitionFilters() (MetricDefinitionFilters, []FilterDecision) {
-	var filters MetricDefinitionFilters
+// GetMetricDefinitionFilters returns all the metric definition filters associated with this
+// query, together with their according default decision
+// The returned filters get generated from the query expressions, excluding the one which has
+// been dedicated to be the initial expression (marked via the .startWith index)
+func (q *Query) GetMetricDefinitionFilters() ([]MetricDefinitionFilter, []FilterDecision) {
+	var filters []MetricDefinitionFilter
 	var defaultDecisions []FilterDecision
 	for i := range q.Expressions {
 		// the one we start with does not need to be added to the filters,

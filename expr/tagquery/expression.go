@@ -371,21 +371,6 @@ func ExpressionsAreEqual(expr1, expr2 Expression) bool {
 // MetricDefinitionFilter takes a metric name together with its tags and returns a FilterDecision
 type MetricDefinitionFilter func(name string, tags []string) FilterDecision
 
-type MetricDefinitionFilters []MetricDefinitionFilter
-
-func (m MetricDefinitionFilters) Filter(name string, tags []string) FilterDecision {
-	for i := range m {
-		decision := m[i](name, tags)
-		if decision == Fail {
-			return Fail
-		} else if decision == Pass {
-			return Pass
-		}
-	}
-
-	return None
-}
-
 type FilterDecision uint8
 
 const (
