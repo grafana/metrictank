@@ -28,7 +28,7 @@ func (e *expressionHasTag) ValuePasses(value string) bool {
 
 func (e *expressionHasTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
-		return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
+		return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
 	}
 
 	resultIfTagIsAbsent := None
@@ -37,7 +37,7 @@ func (e *expressionHasTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefini
 	}
 
 	matchPrefix := e.key + "="
-	return func(id schema.MKey, name string, tags []string) FilterDecision {
+	return func(_ schema.MKey, _ string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, matchPrefix) {
 				return Pass
