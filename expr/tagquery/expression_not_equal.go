@@ -41,6 +41,17 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter() MetricDefinitionFilter 
 
 	prefix := e.key + "="
 	matchString := prefix + e.value
+	if !metaTagSupport {
+		return func(name string, tags []string) FilterDecision {
+			for _, tag := range tags {
+				if tag == matchString {
+					return Fail
+				}
+			}
+			return Pass
+		}
+	}
+
 	return func(_ string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, prefix) {

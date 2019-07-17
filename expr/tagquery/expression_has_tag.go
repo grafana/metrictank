@@ -29,6 +29,11 @@ func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
 		return func(_ string, _ []string) FilterDecision { return Pass }
 	}
 
+	resultIfTagIsAbsent := None
+	if !metaTagSupport {
+		resultIfTagIsAbsent = Fail
+	}
+
 	matchPrefix := e.key + "="
 	return func(_ string, tags []string) FilterDecision {
 		for _, tag := range tags {
@@ -37,7 +42,7 @@ func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
 			}
 		}
 
-		return None
+		return resultIfTagIsAbsent
 	}
 }
 

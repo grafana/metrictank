@@ -40,6 +40,11 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter() MetricDefinitionFilter 
 		return func(_ string, _ []string) FilterDecision { return Pass }
 	}
 
+	resultIfTagIsAbsent := None
+	if !metaTagSupport {
+		resultIfTagIsAbsent = Fail
+	}
+
 	var matchCache, missCache sync.Map
 	var currentMatchCacheSize, currentMissCacheSize int32
 
@@ -74,7 +79,7 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter() MetricDefinitionFilter 
 			}
 		}
 
-		return None
+		return resultIfTagIsAbsent
 	}
 }
 

@@ -36,13 +36,18 @@ func (e *expressionPrefixTag) GetMetricDefinitionFilter() MetricDefinitionFilter
 		return func(_ string, _ []string) FilterDecision { return Pass }
 	}
 
-	return func(_ string, tags []string) FilterDecision {
+	resultIfTagIsAbsent := None
+	if !metaTagSupport {
+		resultIfTagIsAbsent = Fail
+	}
+
+	return func(name string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, e.value) {
 				return Pass
 			}
 		}
-		return None
+		return resultIfTagIsAbsent
 	}
 }
 
