@@ -34,9 +34,12 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 	ctx := TagQueryContext{
 		query: query,
 	}
-	ctx.filters, ctx.defaultDecisions = query.GetMetricDefinitionFilters()
 
 	return ctx
+}
+
+func (q *TagQueryContext) prepareFilters(lookup tagquery.IdTagLookup) {
+	q.filters, q.defaultDecisions = q.query.GetMetricDefinitionFilters(lookup)
 }
 
 // getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
@@ -125,7 +128,7 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 	}
 
 	for i := range q.filters {
-		decision := q.filters[i](schema.SanitizeNameAsTagValue(def.Name), def.Tags)
+		decision := q.filters[i](id, schema.SanitizeNameAsTagValue(def.Name), def.Tags)
 
 		if decision == tagquery.None {
 			decision = q.defaultDecisions[i]

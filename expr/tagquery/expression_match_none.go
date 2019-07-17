@@ -2,6 +2,8 @@ package tagquery
 
 import (
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type expressionMatchNone struct {
@@ -38,8 +40,8 @@ func (e *expressionMatchNone) ValuePasses(value string) bool {
 	return false
 }
 
-func (e *expressionMatchNone) GetMetricDefinitionFilter() MetricDefinitionFilter {
-	return func(_ string, _ []string) FilterDecision { return Fail }
+func (e *expressionMatchNone) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
+	return func(id schema.MKey, name string, tags []string) FilterDecision { return Fail }
 }
 
 func (e *expressionMatchNone) StringIntoBuilder(builder *strings.Builder) {

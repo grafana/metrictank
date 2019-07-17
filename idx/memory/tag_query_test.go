@@ -77,6 +77,8 @@ func queryAndCompareTagResults(t *testing.T, q TagQueryContext, expectedData map
 	t.Helper()
 	tagIdx, byId := getTestIndex()
 
+	q.prepareFilters(tagIdx.idHasTag)
+
 	res := q.RunGetTags(tagIdx, byId)
 	if !reflect.DeepEqual(expectedData, res) {
 		t.Fatalf("Expected: %+v\nGot: %+v", expectedData, res)
@@ -87,12 +89,26 @@ func queryAndCompareResults(t *testing.T, q TagQueryContext, expectedData IdSet)
 	t.Helper()
 	tagIdx, byId := getTestIndex()
 
+	q.prepareFilters(tagIdx.idHasTag)
+
 	res := q.Run(tagIdx, byId)
 
 	if !reflect.DeepEqual(expectedData, res) {
 		q.Run(tagIdx, byId)
 		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", expectedData, res)
 
+	}
+}
+
+func TestIdHasTag(t *testing.T) {
+	tagIdx, _ := getTestIndex()
+
+	ids := getTestIDs()
+	if tagIdx.idHasTag(ids[1], "key4", "value4") {
+		t.Fatalf("Expected false, but got true")
+	}
+	if !tagIdx.idHasTag(ids[2], "key4", "value4") {
+		t.Fatalf("Expected true, but got false")
 	}
 }
 

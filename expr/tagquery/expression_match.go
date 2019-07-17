@@ -41,13 +41,13 @@ func (e *expressionMatch) ValuePasses(value string) bool {
 	return e.valueRe.MatchString(value)
 }
 
-func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
+func (e *expressionMatch) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
 		if e.value == "" {
 			// silly query, always fails
-			return func(_ string, _ []string) FilterDecision { return Fail }
+			return func(id schema.MKey, name string, tags []string) FilterDecision { return Fail }
 		}
-		return func(name string, _ []string) FilterDecision {
+		return func(id schema.MKey, name string, tags []string) FilterDecision {
 			if e.valueRe.MatchString(schema.SanitizeNameAsTagValue(name)) {
 				return Pass
 			} else {
@@ -61,11 +61,10 @@ func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
 		resultIfTagIsAbsent = Fail
 	}
 
+	prefix := e.key + "="
 	var matchCache, missCache sync.Map
 	var currentMatchCacheSize, currentMissCacheSize int32
-	prefix := e.key + "="
-
-	return func(_ string, tags []string) FilterDecision {
+	return func(id schema.MKey, name string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if !strings.HasPrefix(tag, prefix) {
 				continue

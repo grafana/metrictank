@@ -28,12 +28,12 @@ func (e *expressionPrefix) ValuePasses(value string) bool {
 	return strings.HasPrefix(value, e.value)
 }
 
-func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
+func (e *expressionPrefix) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	prefix := e.key + "="
 	matchString := prefix + e.value
 
 	if e.key == "name" {
-		return func(name string, _ []string) FilterDecision {
+		return func(id schema.MKey, name string, tags []string) FilterDecision {
 			if strings.HasPrefix(schema.SanitizeNameAsTagValue(name), e.value) {
 				return Pass
 			}
@@ -47,7 +47,7 @@ func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
 		resultIfTagIsAbsent = Fail
 	}
 
-	return func(name string, tags []string) FilterDecision {
+	return func(_ schema.MKey, _ string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, matchString) {
 				return Pass
