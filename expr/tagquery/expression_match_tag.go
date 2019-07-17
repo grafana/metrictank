@@ -39,7 +39,7 @@ func (e *expressionMatchTag) ValuePasses(tag string) bool {
 func (e *expressionMatchTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if e.valueRe.Match([]byte("name")) {
 		// every metric has a tag name, so we can always return Pass
-		return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
+		return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
 	}
 
 	resultIfTagIsAbsent := None
@@ -50,7 +50,7 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefi
 	var matchCache, missCache sync.Map
 	var currentMatchCacheSize, currentMissCacheSize int32
 
-	return func(id schema.MKey, name string, tags []string) FilterDecision {
+	return func(_ schema.MKey, _ string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			values := strings.SplitN(tag, "=", 2)
 			if len(values) < 2 {
@@ -72,13 +72,13 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefi
 					atomic.AddInt32(&currentMatchCacheSize, 1)
 				}
 				return Pass
-			} else {
-				if atomic.LoadInt32(&currentMissCacheSize) < int32(matchCacheSize) {
-					missCache.Store(value, struct{}{})
-					atomic.AddInt32(&currentMissCacheSize, 1)
-				}
-				continue
 			}
+
+			if atomic.LoadInt32(&currentMissCacheSize) < int32(matchCacheSize) {
+				missCache.Store(value, struct{}{})
+				atomic.AddInt32(&currentMissCacheSize, 1)
+			}
+			continue
 		}
 
 		return resultIfTagIsAbsent

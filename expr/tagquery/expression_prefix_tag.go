@@ -35,7 +35,7 @@ func (e *expressionPrefixTag) ValuePasses(tag string) bool {
 func (e *expressionPrefixTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if strings.HasPrefix("name", e.value) {
 		// every metric has a name
-		return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
+		return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
 	}
 
 	resultIfTagIsAbsent := None

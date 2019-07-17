@@ -33,7 +33,7 @@ func (e *expressionPrefix) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefini
 	matchString := prefix + e.value
 
 	if e.key == "name" {
-		return func(id schema.MKey, name string, tags []string) FilterDecision {
+		return func(_ schema.MKey, name string, _ []string) FilterDecision {
 			if strings.HasPrefix(schema.SanitizeNameAsTagValue(name), e.value) {
 				return Pass
 			}

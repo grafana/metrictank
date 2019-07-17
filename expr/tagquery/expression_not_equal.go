@@ -29,9 +29,10 @@ func (e *expressionNotEqual) ValuePasses(value string) bool {
 func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
 		if e.value == "" {
-			return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
+			return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
 		}
-		return func(id schema.MKey, name string, tags []string) FilterDecision {
+
+		return func(_ schema.MKey, name string, _ []string) FilterDecision {
 			if schema.SanitizeNameAsTagValue(name) == e.value {
 				return Fail
 			}
@@ -40,7 +41,7 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) Metri
 	}
 
 	if !metaTagSupport {
-		return func(id schema.MKey, name string, tags []string) FilterDecision {
+		return func(id schema.MKey, _ string, _ []string) FilterDecision {
 			if lookup(id, e.key, e.value) {
 				return Fail
 			}
@@ -49,7 +50,7 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) Metri
 	}
 
 	prefix := e.key + "="
-	return func(id schema.MKey, name string, tags []string) FilterDecision {
+	return func(id schema.MKey, _ string, tags []string) FilterDecision {
 		if lookup(id, e.key, e.value) {
 			return Fail
 		}

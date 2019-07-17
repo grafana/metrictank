@@ -41,7 +41,7 @@ func (e *expressionMatchAll) ValuePasses(value string) bool {
 }
 
 func (e *expressionMatchAll) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
-	return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
+	return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
 }
 
 func (e *expressionMatchAll) StringIntoBuilder(builder *strings.Builder) {

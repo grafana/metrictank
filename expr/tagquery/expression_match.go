@@ -45,9 +45,10 @@ func (e *expressionMatch) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinit
 	if e.key == "name" {
 		if e.value == "" {
 			// silly query, always fails
-			return func(id schema.MKey, name string, tags []string) FilterDecision { return Fail }
+			return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Fail }
 		}
-		return func(id schema.MKey, name string, tags []string) FilterDecision {
+
+		return func(_ schema.MKey, name string, _ []string) FilterDecision {
 			if e.valueRe.MatchString(schema.SanitizeNameAsTagValue(name)) {
 				return Pass
 			} else {
@@ -64,7 +65,7 @@ func (e *expressionMatch) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinit
 	prefix := e.key + "="
 	var matchCache, missCache sync.Map
 	var currentMatchCacheSize, currentMissCacheSize int32
-	return func(id schema.MKey, name string, tags []string) FilterDecision {
+	return func(_ schema.MKey, _ string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if !strings.HasPrefix(tag, prefix) {
 				continue
@@ -88,13 +89,13 @@ func (e *expressionMatch) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinit
 					atomic.AddInt32(&currentMatchCacheSize, 1)
 				}
 				return Pass
-			} else {
-				if atomic.LoadInt32(&currentMissCacheSize) < int32(matchCacheSize) {
-					missCache.Store(value, struct{}{})
-					atomic.AddInt32(&currentMissCacheSize, 1)
-				}
-				return Fail
 			}
+
+			if atomic.LoadInt32(&currentMissCacheSize) < int32(matchCacheSize) {
+				missCache.Store(value, struct{}{})
+				atomic.AddInt32(&currentMissCacheSize, 1)
+			}
+			return Fail
 		}
 
 		return resultIfTagIsAbsent
