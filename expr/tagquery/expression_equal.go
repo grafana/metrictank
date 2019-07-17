@@ -36,6 +36,18 @@ func (e *expressionEqual) GetMetricDefinitionFilter() MetricDefinitionFilter {
 
 	prefix := e.key + "="
 	matchString := prefix + e.value
+	if !metaTagSupport {
+		return func(name string, tags []string) FilterDecision {
+			for _, tag := range tags {
+				if tag == matchString {
+					return Pass
+				}
+			}
+
+			return Fail
+		}
+	}
+
 	return func(name string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if tag == matchString {

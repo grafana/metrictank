@@ -56,6 +56,11 @@ func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
 		}
 	}
 
+	resultIfTagIsAbsent := None
+	if !metaTagSupport {
+		resultIfTagIsAbsent = Fail
+	}
+
 	var matchCache, missCache sync.Map
 	var currentMatchCacheSize, currentMissCacheSize int32
 	prefix := e.key + "="
@@ -93,7 +98,7 @@ func (e *expressionMatch) GetMetricDefinitionFilter() MetricDefinitionFilter {
 			}
 		}
 
-		return None
+		return resultIfTagIsAbsent
 	}
 }
 

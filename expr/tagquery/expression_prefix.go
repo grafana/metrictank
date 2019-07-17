@@ -42,7 +42,12 @@ func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
 		}
 	}
 
-	return func(_ string, tags []string) FilterDecision {
+	resultIfTagIsAbsent := None
+	if !metaTagSupport {
+		resultIfTagIsAbsent = Fail
+	}
+
+	return func(name string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, matchString) {
 				return Pass
@@ -53,7 +58,7 @@ func (e *expressionPrefix) GetMetricDefinitionFilter() MetricDefinitionFilter {
 			}
 		}
 
-		return None
+		return resultIfTagIsAbsent
 	}
 }
 
