@@ -2,6 +2,8 @@ package tagquery
 
 import (
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type expressionHasTag struct {
@@ -24,9 +26,9 @@ func (e *expressionHasTag) ValuePasses(value string) bool {
 	return value == e.key
 }
 
-func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
+func (e *expressionHasTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
-		return func(_ string, _ []string) FilterDecision { return Pass }
+		return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
 	}
 
 	resultIfTagIsAbsent := None
@@ -35,7 +37,7 @@ func (e *expressionHasTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
 	}
 
 	matchPrefix := e.key + "="
-	return func(_ string, tags []string) FilterDecision {
+	return func(id schema.MKey, name string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			if strings.HasPrefix(tag, matchPrefix) {
 				return Pass

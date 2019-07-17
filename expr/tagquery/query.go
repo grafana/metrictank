@@ -2,6 +2,8 @@ package tagquery
 
 import (
 	"errors"
+
+	"github.com/raintank/schema"
 )
 
 var (
@@ -83,7 +85,7 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 // query, together with their according default decision
 // The returned filters get generated from the query expressions, excluding the one which has
 // been dedicated to be the initial expression (marked via the .startWith index)
-func (q *Query) GetMetricDefinitionFilters() ([]MetricDefinitionFilter, []FilterDecision) {
+func (q *Query) GetMetricDefinitionFilters(lookup IdTagLookup) ([]MetricDefinitionFilter, []FilterDecision) {
 	var filters []MetricDefinitionFilter
 	var defaultDecisions []FilterDecision
 	for i := range q.Expressions {
@@ -92,12 +94,14 @@ func (q *Query) GetMetricDefinitionFilters() ([]MetricDefinitionFilter, []Filter
 		if i == q.startWith {
 			continue
 		}
-		filters = append(filters, q.Expressions[i].GetMetricDefinitionFilter())
+		filters = append(filters, q.Expressions[i].GetMetricDefinitionFilter(lookup))
 		defaultDecisions = append(defaultDecisions, q.Expressions[i].GetDefaultDecision())
 	}
 
 	return filters, defaultDecisions
 }
+
+type IdTagLookup func(id schema.MKey, tag, value string) bool
 
 // GetInitialExpression returns the expression which should be used to generate the initial
 // result set, to later filter it down with the remaining expressions.

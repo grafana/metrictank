@@ -106,7 +106,6 @@ func ConfigProcess() {
 	if findCacheInvalidateMaxSize >= findCacheInvalidateQueueSize {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
-
 }
 
 // interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
@@ -176,6 +175,11 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey) {
 // org id -> nameWithTags -> Set of references to schema.MetricDefinition
 // nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
 type defByTagSet map[uint32]map[string]map[*schema.MetricDefinition]struct{}
+
+func (t TagIndex) idHasTag(id schema.MKey, tag, value string) bool {
+	_, ok := t[tag][value][id]
+	return ok
+}
 
 func (defs defByTagSet) add(def *schema.MetricDefinition) {
 	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
@@ -880,6 +884,8 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		return nil
 	}
 
+	queryCtx.prepareFilters(tags.idHasTag)
+
 	// probably allocating more than necessary, still better than growing
 	res := make([]string, 0, len(tags))
 
@@ -949,6 +955,8 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	if !ok {
 		return nil
 	}
+
+	queryCtx.prepareFilters(tags.idHasTag)
 
 	ids := queryCtx.Run(tags, m.defById)
 	valueMap := make(map[string]struct{})
@@ -1116,6 +1124,8 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 	if !ok {
 		return nil
 	}
+
+	query.prepareFilters(tags.idHasTag)
 
 	return query.Run(tags, m.defById)
 }

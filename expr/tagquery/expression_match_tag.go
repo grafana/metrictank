@@ -4,6 +4,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/raintank/schema"
 )
 
 type expressionMatchTag struct {
@@ -34,10 +36,10 @@ func (e *expressionMatchTag) ValuePasses(tag string) bool {
 	return e.valueRe.MatchString(tag)
 }
 
-func (e *expressionMatchTag) GetMetricDefinitionFilter() MetricDefinitionFilter {
+func (e *expressionMatchTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if e.valueRe.Match([]byte("name")) {
 		// every metric has a tag name, so we can always return Pass
-		return func(_ string, _ []string) FilterDecision { return Pass }
+		return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
 	}
 
 	resultIfTagIsAbsent := None
@@ -48,7 +50,7 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter() MetricDefinitionFilter 
 	var matchCache, missCache sync.Map
 	var currentMatchCacheSize, currentMissCacheSize int32
 
-	return func(_ string, tags []string) FilterDecision {
+	return func(id schema.MKey, name string, tags []string) FilterDecision {
 		for _, tag := range tags {
 			values := strings.SplitN(tag, "=", 2)
 			if len(values) < 2 {

@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 const invalidExpressionError = "Invalid expression: %s"
@@ -161,7 +163,7 @@ type Expression interface {
 	// GetMetricDefinitionFilter returns a MetricDefinitionFilter
 	// The MetricDefinitionFilter takes a metric definition, looks at its tags and returns a decision
 	// regarding this query expression applied to its tags
-	GetMetricDefinitionFilter() MetricDefinitionFilter
+	GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter
 
 	// StringIntoBuilder takes a builder and writes a string representation of this expression into it
 	StringIntoBuilder(builder *strings.Builder)
@@ -369,7 +371,7 @@ func ExpressionsAreEqual(expr1, expr2 Expression) bool {
 }
 
 // MetricDefinitionFilter takes a metric name together with its tags and returns a FilterDecision
-type MetricDefinitionFilter func(name string, tags []string) FilterDecision
+type MetricDefinitionFilter func(id schema.MKey, name string, tags []string) FilterDecision
 
 type FilterDecision uint8
 

@@ -26,12 +26,12 @@ func (e *expressionNotEqual) ValuePasses(value string) bool {
 	return value != e.value
 }
 
-func (e *expressionNotEqual) GetMetricDefinitionFilter() MetricDefinitionFilter {
+func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
 		if e.value == "" {
-			return func(_ string, _ []string) FilterDecision { return Pass }
+			return func(id schema.MKey, name string, tags []string) FilterDecision { return Pass }
 		}
-		return func(name string, _ []string) FilterDecision {
+		return func(id schema.MKey, name string, tags []string) FilterDecision {
 			if schema.SanitizeNameAsTagValue(name) == e.value {
 				return Fail
 			}
@@ -39,29 +39,29 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter() MetricDefinitionFilter 
 		}
 	}
 
-	prefix := e.key + "="
-	matchString := prefix + e.value
 	if !metaTagSupport {
-		return func(name string, tags []string) FilterDecision {
-			for _, tag := range tags {
-				if tag == matchString {
-					return Fail
-				}
+		return func(id schema.MKey, name string, tags []string) FilterDecision {
+			if lookup(id, e.key, e.value) {
+				return Fail
 			}
 			return Pass
 		}
 	}
 
-	return func(_ string, tags []string) FilterDecision {
+	prefix := e.key + "="
+	return func(id schema.MKey, name string, tags []string) FilterDecision {
+		if lookup(id, e.key, e.value) {
+			return Fail
+		}
+
 		for _, tag := range tags {
+			// the tag is set, but it has a different value,
+			// no need to keep looking at other indexes
 			if strings.HasPrefix(tag, prefix) {
-				if tag == matchString {
-					return Fail
-				} else {
-					return Pass
-				}
+				return Pass
 			}
 		}
+
 		return None
 	}
 }
