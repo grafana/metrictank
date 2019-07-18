@@ -107,17 +107,29 @@ func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh cha
 
 		key := expr.GetKey()
 
-	OUTER:
-		for value, ids := range q.index[key] {
-			if !expr.ValuePasses(value) {
-				continue
-			}
+		if expr.ValueMatchesExactly() {
+			value := expr.GetValue()
 
-			for id := range ids {
+			for id := range q.index[key][value] {
 				select {
 				case <-stopCh:
-					break OUTER
+					break
 				case idCh <- id:
+				}
+			}
+		} else {
+		OUTER:
+			for value, ids := range q.index[key] {
+				if !expr.ValuePasses(value) {
+					continue
+				}
+
+				for id := range ids {
+					select {
+					case <-stopCh:
+						break OUTER
+					case idCh <- id:
+					}
 				}
 			}
 		}
