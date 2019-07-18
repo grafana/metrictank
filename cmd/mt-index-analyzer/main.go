@@ -21,7 +21,7 @@ var (
 	aggregations  conf.Aggregations
 	indexRules    conf.IndexRules
 	schemas       conf.Schemas
-	maxStale      = time.Hour
+	maxStale      = 5 * time.Hour
 
 	aggFile        = "/etc/metrictank/storage-aggregation.conf"
 	indexRulesFile = "/etc/metrictank/index-rules.conf"
@@ -60,6 +60,7 @@ func main() {
 		fmt.Println("   to properly handle churn, find the sweet spot for max-stale:")
 		fmt.Println("   a too aggressive (low) value will exclude series that have temporarily not received data due to an intermittent interruption")
 		fmt.Println("   a too loose (high) value may accidentally incorporate churn events, e.g. multiple series that are supposed to count for the same single 'logical' series that cycled onto a new name")
+		fmt.Println("   note: pay attention to your index. e.g. cassandra-idx.update-interval results in the cassandra data not being up to date (by default 4 to 6 hours)")
 		fl.PrintDefaults()
 	}
 	if len(os.Args) == 2 && (os.Args[1] == "-h" || os.Args[1] == "--help") {
