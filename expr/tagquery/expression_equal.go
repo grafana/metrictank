@@ -18,8 +18,16 @@ func (e *expressionEqual) GetOperator() ExpressionOperator {
 	return EQUAL
 }
 
+func (e *expressionEqual) GetCostMultiplier() uint32 {
+	return 1
+}
+
 func (e *expressionEqual) ValuePasses(value string) bool {
 	return value == e.value
+}
+
+func (e *expressionEqual) ValueMatchesExactly() bool {
+	return true
 }
 
 func (e *expressionEqual) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {

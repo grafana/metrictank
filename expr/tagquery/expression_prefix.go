@@ -18,6 +18,10 @@ func (e *expressionPrefix) GetOperator() ExpressionOperator {
 	return PREFIX
 }
 
+func (e *expressionPrefix) GetCostMultiplier() uint32 {
+	return 2
+}
+
 func (e *expressionPrefix) RequiresNonEmptyValue() bool {
 	// we know it requires an non-empty value, because the expression
 	// "__tag^=" would get parsed into the type expressionMatchAll

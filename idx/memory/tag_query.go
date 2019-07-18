@@ -2,6 +2,7 @@ package memory
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,22 +25,57 @@ type TagQueryContext struct {
 	filters          []tagquery.MetricDefinitionFilter
 	defaultDecisions []tagquery.FilterDecision
 
-	index TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId  map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	index     TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId      map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	startWith int                          // the expression index to start with
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
 // context structs necessary to execute the query on the indexes
 func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 	ctx := TagQueryContext{
-		query: query,
+		query:     query,
+		startWith: -1,
 	}
 
 	return ctx
 }
 
-func (q *TagQueryContext) prepareFilters(lookup tagquery.IdTagLookup) {
-	q.filters, q.defaultDecisions = q.query.GetMetricDefinitionFilters(lookup)
+func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
+	type expressionCost struct {
+		cost          uint32
+		expressionIdx int
+	}
+	costs := make([]expressionCost, len(q.query.Expressions))
+
+	for i, expr := range q.query.Expressions {
+		costs[i].expressionIdx = i
+		if expr.ValueMatchesExactly() {
+			costs[i].cost = uint32(len(idx[expr.GetKey()][expr.GetValue()])) * expr.GetCostMultiplier()
+		} else {
+			if expr.OperatesOnTag() {
+				costs[i].cost = uint32(len(idx)) * expr.GetCostMultiplier()
+			} else {
+				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
+			}
+		}
+	}
+
+	sort.Slice(costs, func(i, j int) bool { return costs[i].cost < costs[j].cost })
+
+	q.filters = make([]tagquery.MetricDefinitionFilter, len(q.query.Expressions)-1)
+	q.defaultDecisions = make([]tagquery.FilterDecision, len(q.query.Expressions)-1)
+
+	i := 0
+	for _, cost := range costs {
+		if q.startWith < 0 && q.query.Expressions[cost.expressionIdx].RequiresNonEmptyValue() {
+			q.startWith = cost.expressionIdx
+		} else {
+			q.filters[i] = q.query.Expressions[cost.expressionIdx].GetMetricDefinitionFilter(idx.idHasTag)
+			q.defaultDecisions[i] = q.query.Expressions[cost.expressionIdx].GetDefaultDecision()
+			i++
+		}
+	}
 }
 
 // getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
@@ -49,7 +85,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 	idCh := make(chan schema.MKey, 1000)
 	stopCh := make(chan struct{})
 
-	if q.query.GetInitialExpression().OperatesOnTag() {
+	if q.query.Expressions[q.startWith].OperatesOnTag() {
 		q.getInitialByTag(idCh, stopCh)
 	} else {
 		q.getInitialByTagValue(idCh, stopCh)
@@ -62,7 +98,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 // it only handles those expressions which involve matching a tag value:
 // f.e. key=value but not key!=
 func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struct{}) {
-	expr := q.query.GetInitialExpression()
+	expr := q.query.Expressions[q.startWith]
 
 	q.wg.Add(1)
 	go func() {
@@ -92,7 +128,7 @@ func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh cha
 // it only handles those expressions which do not involve matching a tag value:
 // f.e. key!= but not key=value
 func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) {
-	expr := q.query.GetInitialExpression()
+	expr := q.query.Expressions[q.startWith]
 
 	q.wg.Add(1)
 	go func() {
@@ -181,6 +217,7 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
 	q.index = index
 	q.byId = byId
+	q.prepareExpressions(index)
 
 	idCh, _ := q.getInitialIds()
 	resCh := make(chan schema.MKey)
@@ -339,6 +376,7 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
 	q.index = index
 	q.byId = byId
+	q.prepareExpressions(index)
 
 	maxTagCount := int32(math.MaxInt32)
 

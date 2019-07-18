@@ -3,7 +3,6 @@ package tagquery
 import (
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/raintank/schema"
@@ -23,59 +22,6 @@ func ParseExpressions(expressions []string) (Expressions, error) {
 		res[i] = expression
 	}
 	return res, nil
-}
-
-// SortByFilterOrder sorts all the expressions first by operator
-// roughly in cost-increaseing order when they are used as filters,
-// then by key, then by value
-func (e Expressions) SortByFilterOrder() {
-	costByOperator := map[ExpressionOperator]int{
-		MATCH_NONE:  0,
-		EQUAL:       1,
-		HAS_TAG:     2,
-		PREFIX:      3,
-		PREFIX_TAG:  4,
-		NOT_EQUAL:   5,
-		NOT_HAS_TAG: 6,
-		MATCH:       7,
-		MATCH_TAG:   8,
-		NOT_MATCH:   9,
-		MATCH_ALL:   10,
-	}
-
-	sort.Slice(e, func(i, j int) bool {
-		if e[i].GetOperator() == e[j].GetOperator() {
-			if e[i].GetKey() == e[j].GetKey() {
-				return e[i].GetValue() < e[j].GetValue()
-			}
-			return e[i].GetKey() < e[j].GetKey()
-		}
-		return costByOperator[e[i].GetOperator()] < costByOperator[e[j].GetOperator()]
-	})
-}
-
-// findInitialExpression returns the id of the expression which is the
-// most suitable to start the query execution with. the chosen expression
-// should be as cheap as possible and it must require a non-empty value
-func (e Expressions) findInitialExpression() int {
-	// order of preference to start with the viable operators
-	for _, op := range []ExpressionOperator{
-		MATCH_NONE,
-		EQUAL,
-		HAS_TAG,
-		PREFIX,
-		PREFIX_TAG,
-		MATCH,
-		MATCH_TAG,
-		MATCH_ALL,
-	} {
-		for i := range e {
-			if e[i].GetOperator() == op && e[i].RequiresNonEmptyValue() {
-				return i
-			}
-		}
-	}
-	return -1
 }
 
 func (e Expressions) Strings() []string {
@@ -143,6 +89,8 @@ type Expression interface {
 	// GetOperator returns the operator of this expression
 	GetOperator() ExpressionOperator
 
+	GetCostMultiplier() uint32
+
 	// HasRe indicates whether the evaluation of this expression involves regular expressions
 	HasRe() bool
 
@@ -159,6 +107,8 @@ type Expression interface {
 	// value of OperatesOnTag(), then it returns a bool to indicate whether the given value satisfies
 	// this expression
 	ValuePasses(string) bool
+
+	ValueMatchesExactly() bool
 
 	// GetMetricDefinitionFilter returns a MetricDefinitionFilter
 	// The MetricDefinitionFilter takes a metric definition, looks at its tags and returns a decision

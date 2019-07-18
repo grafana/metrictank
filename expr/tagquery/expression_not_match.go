@@ -29,6 +29,10 @@ func (e *expressionNotMatch) GetOperator() ExpressionOperator {
 	return NOT_MATCH
 }
 
+func (e *expressionNotMatch) GetCostMultiplier() uint32 {
+	return 10
+}
+
 func (e *expressionNotMatch) HasRe() bool {
 	return true
 }

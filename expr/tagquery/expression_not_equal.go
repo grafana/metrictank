@@ -18,12 +18,20 @@ func (e *expressionNotEqual) GetOperator() ExpressionOperator {
 	return NOT_EQUAL
 }
 
+func (e *expressionNotEqual) GetCostMultiplier() uint32 {
+	return 1
+}
+
 func (e *expressionNotEqual) RequiresNonEmptyValue() bool {
 	return false
 }
 
 func (e *expressionNotEqual) ValuePasses(value string) bool {
 	return value != e.value
+}
+
+func (e *expressionNotEqual) ValueMatchesExactly() bool {
+	return true
 }
 
 func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {

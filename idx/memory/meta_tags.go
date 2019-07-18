@@ -75,7 +75,6 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 
 // hashMetaTagRecord generates a hash of all the queries in the record
 func (m *metaTagRecords) hashMetaTagRecord(record tagquery.MetaTagRecord) recordId {
-	record.Expressions.SortByFilterOrder()
 	builder := strings.Builder{}
 	for _, query := range record.Expressions {
 		query.StringIntoBuilder(&builder)

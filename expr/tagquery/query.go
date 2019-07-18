@@ -17,9 +17,6 @@ type Query struct {
 	// slice of expressions sorted by the estimated cost of their operators
 	Expressions Expressions
 
-	// the index in the Expressions slice at which we start evaluating the query
-	startWith int
-
 	// the index of clause that operate on tags (keys)
 	// we only support 0 or 1 tag expression per query
 	// tag expressions are __tag^= and __tag=~
@@ -43,7 +40,6 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 	}
 
 	foundExpressionRequiringNonEmptyValue := false
-	expressions.SortByFilterOrder()
 	for i := 0; i < len(expressions); i++ {
 		// skip duplicate expression
 		if i > 0 && ExpressionsAreEqual(expressions[i], expressions[i-1]) {
@@ -73,43 +69,11 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 	}
 
 	q.Expressions = expressions
-	q.startWith = q.Expressions.findInitialExpression()
-	if q.startWith < 0 {
-		return q, errInvalidQuery
-	}
 
 	return q, nil
 }
 
-// GetMetricDefinitionFilters returns all the metric definition filters associated with this
-// query, together with their according default decision
-// The returned filters get generated from the query expressions, excluding the one which has
-// been dedicated to be the initial expression (marked via the .startWith index)
-func (q *Query) GetMetricDefinitionFilters(lookup IdTagLookup) ([]MetricDefinitionFilter, []FilterDecision) {
-	var filters []MetricDefinitionFilter
-	var defaultDecisions []FilterDecision
-	for i := range q.Expressions {
-		// the one we start with does not need to be added to the filters,
-		// because we use it to build the initial result set
-		if i == q.startWith {
-			continue
-		}
-		filters = append(filters, q.Expressions[i].GetMetricDefinitionFilter(lookup))
-		defaultDecisions = append(defaultDecisions, q.Expressions[i].GetDefaultDecision())
-	}
-
-	return filters, defaultDecisions
-}
-
 type IdTagLookup func(id schema.MKey, tag, value string) bool
-
-// GetInitialExpression returns the expression which should be used to generate the initial
-// result set, to later filter it down with the remaining expressions.
-// We assume Query has been instantiated via NewQuery(), in which case it is guaranteed that
-// that .startWith has been set correctly or otherwise an error would have been returned
-func (q *Query) GetInitialExpression() Expression {
-	return q.Expressions[q.startWith]
-}
 
 // GetTagClause returns the expression which operates on tags, if one is present.
 // This assumes that Query has been instantiated via NewQuery(), which either sets

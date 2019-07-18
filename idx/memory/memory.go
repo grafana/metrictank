@@ -884,8 +884,6 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		return nil
 	}
 
-	queryCtx.prepareFilters(tags.idHasTag)
-
 	// probably allocating more than necessary, still better than growing
 	res := make([]string, 0, len(tags))
 
@@ -955,8 +953,6 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	if !ok {
 		return nil
 	}
-
-	queryCtx.prepareFilters(tags.idHasTag)
 
 	ids := queryCtx.Run(tags, m.defById)
 	valueMap := make(map[string]struct{})
@@ -1124,8 +1120,6 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 	if !ok {
 		return nil
 	}
-
-	query.prepareFilters(tags.idHasTag)
 
 	return query.Run(tags, m.defById)
 }
