@@ -77,8 +77,6 @@ func queryAndCompareTagResults(t *testing.T, q TagQueryContext, expectedData map
 	t.Helper()
 	tagIdx, byId := getTestIndex()
 
-	q.prepareFilters(tagIdx.idHasTag)
-
 	res := q.RunGetTags(tagIdx, byId)
 	if !reflect.DeepEqual(expectedData, res) {
 		t.Fatalf("Expected: %+v\nGot: %+v", expectedData, res)
@@ -88,8 +86,6 @@ func queryAndCompareTagResults(t *testing.T, q TagQueryContext, expectedData map
 func queryAndCompareResults(t *testing.T, q TagQueryContext, expectedData IdSet) {
 	t.Helper()
 	tagIdx, byId := getTestIndex()
-
-	q.prepareFilters(tagIdx.idHasTag)
 
 	res := q.Run(tagIdx, byId)
 

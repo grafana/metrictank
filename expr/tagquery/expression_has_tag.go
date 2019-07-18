@@ -18,6 +18,10 @@ func (e *expressionHasTag) GetOperator() ExpressionOperator {
 	return HAS_TAG
 }
 
+func (e *expressionHasTag) GetCostMultiplier() uint32 {
+	return 2
+}
+
 func (e *expressionHasTag) OperatesOnTag() bool {
 	return true
 }

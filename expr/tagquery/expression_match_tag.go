@@ -20,6 +20,10 @@ func (e *expressionMatchTag) GetOperator() ExpressionOperator {
 	return MATCH_TAG
 }
 
+func (e *expressionMatchTag) GetCostMultiplier() uint32 {
+	return 20
+}
+
 func (e *expressionMatchTag) HasRe() bool {
 	return true
 }

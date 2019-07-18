@@ -30,6 +30,10 @@ func (e *expressionCommon) RequiresNonEmptyValue() bool {
 	return true
 }
 
+func (e *expressionCommon) ValueMatchesExactly() bool {
+	return false
+}
+
 // expressionCommonRe is an extended version of expressionCommon with additional
 // properties for operators that use regular expressions
 type expressionCommonRe struct {

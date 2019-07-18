@@ -28,6 +28,10 @@ func (e *expressionMatchAll) GetOperator() ExpressionOperator {
 	return MATCH_ALL
 }
 
+func (e *expressionMatchAll) GetCostMultiplier() uint32 {
+	return 50
+}
+
 func (e *expressionMatchAll) HasRe() bool {
 	return false
 }

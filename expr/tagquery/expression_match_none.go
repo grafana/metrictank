@@ -28,6 +28,10 @@ func (e *expressionMatchNone) GetOperator() ExpressionOperator {
 	return MATCH_NONE
 }
 
+func (e *expressionMatchNone) GetCostMultiplier() uint32 {
+	return 0
+}
+
 func (e *expressionMatchNone) HasRe() bool {
 	return false
 }
