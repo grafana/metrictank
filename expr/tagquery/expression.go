@@ -3,6 +3,7 @@ package tagquery
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/raintank/schema"
@@ -33,6 +34,18 @@ func (e Expressions) Strings() []string {
 		builder.Reset()
 	}
 	return res
+}
+
+func (e Expressions) Sort() {
+	sort.Slice(e, func(i, j int) bool {
+		if e[i].GetKey() == e[j].GetKey() {
+			if e[i].GetOperator() == e[j].GetOperator() {
+				return e[i].GetValue() < e[j].GetValue()
+			}
+			return e[i].GetOperator() < e[j].GetOperator()
+		}
+		return e[i].GetKey() < e[j].GetKey()
+	})
 }
 
 type Expression interface {

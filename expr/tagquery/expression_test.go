@@ -2,7 +2,6 @@ package tagquery
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 )
@@ -188,27 +187,6 @@ func TestExpressionParsing(t *testing.T) {
 			}
 			if err == nil && (expression.GetKey() != tc.key || expression.GetValue() != tc.value || expression.GetOperator() != tc.operator) {
 				t.Fatalf("Expected the values %s, %s, %d, %t, but got %s, %s, %d, %q", tc.key, tc.value, tc.operator, tc.err, expression.GetKey(), expression.GetValue(), expression.GetOperator(), err)
-			}
-		})
-	}
-}
-
-func TestExpressions_Sort(t *testing.T) {
-	tests := make([]struct {
-		name string
-		have Expressions
-		want Expressions
-	}, 1)
-
-	tests[0].name = "simple sort"
-	tests[0].have, _ = ParseExpressions([]string{"a!=a", "b=a", "a=b", "a=a"})
-	tests[0].want, _ = ParseExpressions([]string{"a=a", "a=b", "b=a", "a!=a"})
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.have.SortByFilterOrder()
-			if !reflect.DeepEqual(tt.have, tt.want) {
-				t.Fatalf("Expected expressions to be sorted:\nExpected:\n%+v\nGot:\n%+v\n", tt.want, tt.have)
 			}
 		})
 	}

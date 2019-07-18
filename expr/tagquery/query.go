@@ -39,6 +39,7 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 		return q, errInvalidQuery
 	}
 
+	expressions.Sort()
 	foundExpressionRequiringNonEmptyValue := false
 	for i := 0; i < len(expressions); i++ {
 		// skip duplicate expression
