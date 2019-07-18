@@ -39,22 +39,19 @@ func TestNewQueryFromStrings(t *testing.T) {
 			want: Query{
 				From: 321,
 				Expressions: Expressions{
+					&expressionMatchTag{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "__tag",
+								value: "^(?:k)",
+							},
+							valueRe: nil,
+						},
+					},
 					&expressionEqual{
 						expressionCommon{
 							key:   "a",
 							value: "b",
-						},
-					},
-					&expressionEqual{
-						expressionCommon{
-							key:   "x",
-							value: "z",
-						},
-					},
-					&expressionPrefix{
-						expressionCommon{
-							key:   "i",
-							value: "j",
 						},
 					},
 					&expressionNotEqual{
@@ -72,15 +69,6 @@ func TestNewQueryFromStrings(t *testing.T) {
 							valueRe: nil,
 						},
 					},
-					&expressionMatchTag{
-						expressionCommonRe{
-							expressionCommon: expressionCommon{
-								key:   "__tag",
-								value: "^(?:k)",
-							},
-							valueRe: nil,
-						},
-					},
 					&expressionNotMatch{
 						expressionCommonRe{
 							expressionCommon: expressionCommon{
@@ -90,9 +78,20 @@ func TestNewQueryFromStrings(t *testing.T) {
 							valueRe: nil,
 						},
 					},
+					&expressionPrefix{
+						expressionCommon{
+							key:   "i",
+							value: "j",
+						},
+					},
+					&expressionEqual{
+						expressionCommon{
+							key:   "x",
+							value: "z",
+						},
+					},
 				},
-				tagClause: 5,
-				startWith: 0,
+				tagClause: 0,
 			},
 		}, {
 			name: "test tag prefix with empty value",
@@ -137,7 +136,6 @@ func TestNewQueryFromStrings(t *testing.T) {
 					},
 				},
 				tagClause: -1,
-				startWith: 0,
 			},
 		}, {
 			name: "missing an expression that requires non empty value because prefix matches empty value",
@@ -168,7 +166,6 @@ func TestNewQueryFromStrings(t *testing.T) {
 						},
 					},
 				},
-				startWith: 0,
 				tagClause: -1,
 			},
 		}, {
@@ -191,7 +188,6 @@ func TestNewQueryFromStrings(t *testing.T) {
 						},
 					},
 				},
-				startWith: 0,
 				tagClause: -1,
 			},
 		},
