@@ -33,7 +33,7 @@
     ]
   },
   "editable": true,
-  "gnetId": null,
+  "gnetId": 279,
   "graphTooltip": 1,
   "id": 21,
   "iteration": 1547213827205,
@@ -4433,13 +4433,13 @@
     },
     {
       "aliasColors": {
-        "join": "#3F6833",
-        "leave": "#99440A",
+        "join": "dark-green",
+        "leave": "dark-red",
         "total.primary-not-ready": "#3F6833",
         "total.primary-ready": "#9AC48A",
         "total.secondary-not-ready": "#052B51",
         "total.secondary-ready": "#2F575E",
-        "update": "#511749"
+        "update": "light-purple"
       },
       "bars": false,
       "dashLength": 10,
@@ -4447,8 +4447,8 @@
       "datasource": "$datasource",
       "fill": 1,
       "gridPos": {
-        "h": 7,
-        "w": 12,
+        "h": 6,
+        "w": 18,
         "x": 0,
         "y": 86
       },
@@ -4470,44 +4470,7 @@
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "alias": "/total.primary-not-ready/",
-          "fill": 4,
-          "lines": true,
-          "linewidth": 0,
-          "points": false,
-          "stack": "B",
-          "yaxis": 2
-        },
-        {
-          "alias": "/total.primary-ready/",
-          "fill": 4,
-          "lines": true,
-          "linewidth": 0,
-          "points": false,
-          "stack": "B",
-          "yaxis": 2
-        },
-        {
-          "alias": "/total.secondary-not-ready/",
-          "fill": 4,
-          "lines": true,
-          "linewidth": 0,
-          "points": false,
-          "stack": "B",
-          "yaxis": 2
-        },
-        {
-          "alias": "/total.secondary-ready/",
-          "fill": 4,
-          "lines": true,
-          "linewidth": 0,
-          "points": false,
-          "stack": "B",
-          "yaxis": 2
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
@@ -4515,17 +4478,13 @@
         {
           "refId": "A",
           "target": "groupByNode(perSecond(metrictank.stats.$environment.$instance.cluster.events.*.counter32), 6, 'sum')"
-        },
-        {
-          "refId": "B",
-          "target": "groupByNode(metrictank.stats.$environment.$instance.cluster.total.state.*.gauge32, 7, 'sum')"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "gossip events and state",
+      "title": "gossip events",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -4570,9 +4529,9 @@
       "datasource": "$datasource",
       "fill": 1,
       "gridPos": {
-        "h": 7,
-        "w": 12,
-        "x": 12,
+        "h": 11,
+        "w": 6,
+        "x": 18,
         "y": 86
       },
       "id": 15,
@@ -4643,10 +4602,106 @@
         "align": false,
         "alignLevel": null
       }
+    },
+    {
+      "aliasColors": {
+        "join": "semi-dark-green",
+        "leave": "light-red",
+        "primary-not-ready": "dark-red",
+        "primary-ready": "dark-green",
+        "query-not-ready": "rgb(120, 0, 15)",
+        "query-ready": "rgb(154, 0, 227)",
+        "secondary-not-ready": "rgb(214, 17, 0)",
+        "secondary-ready": "rgb(54, 193, 31)",
+        "total.primary-not-ready": "#3F6833",
+        "total.primary-ready": "#9AC48A",
+        "total.secondary-not-ready": "#052B51",
+        "total.secondary-ready": "#2F575E",
+        "update": "#511749"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fill": 4,
+      "gridPos": {
+        "h": 5,
+        "w": 18,
+        "x": 0,
+        "y": 92
+      },
+      "id": 59,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pointradius": 1,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": true,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "B",
+          "target": "groupByNode(metrictank.stats.$environment.$instance.cluster.total.state.*.gauge32, 7, 'sum')"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "gossip events and state",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     }
   ],
   "refresh": false,
-  "schemaVersion": 16,
+  "schemaVersion": 19,
   "style": "dark",
   "tags": [],
   "templating": {
