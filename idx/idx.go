@@ -73,11 +73,11 @@ type MetricIndex interface {
 
 	// Update updates an existing archive, if found.
 	// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-	Update(point schema.MetricPoint, partition int32) (Archive, int32, bool)
+	Update(point schema.MetricPoint, partition int32) (*Archive, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (Archive, int32, bool)
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*Archive, int32, bool)
 
 	// Get returns the archive for the requested id.
 	Get(key schema.MKey) (Archive, bool)
@@ -199,4 +199,17 @@ func InternReleaseMetricDefinition(md MetricDefinition) {
 	}
 
 	IdxIntern.DeleteByString(md.Unit)
+}
+
+func InternIncMetricDefinitionRefCounts(md MetricDefinition) {
+	for _, tag := range md.Tags.KeyValues {
+		IdxIntern.IncRefCnt(tag.Key)
+		IdxIntern.IncRefCnt(tag.Value)
+	}
+
+	for _, id := range md.Name.Nodes() {
+		IdxIntern.IncRefCnt(id)
+	}
+
+	IdxIntern.IncRefCntByString(md.Unit)
 }
