@@ -1046,7 +1046,7 @@ func testMetricNameStartingWithTilde(t *testing.T) {
 	}
 
 	arch, _, _ := ix.AddOrUpdate(mkey, data, getPartition(data))
-	if arch.Name != metricName {
+	if arch.Name.String() != metricName {
 		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, arch.Name)
 	}
 

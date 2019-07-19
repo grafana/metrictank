@@ -403,6 +403,11 @@ func (md *MetricDefinition) Mtype() string {
 // SetUnit takes a string, interns it in an object store
 // and then uses it to store the unit.
 func (md *MetricDefinition) SetUnit(unit string) {
+	if unit == "" {
+		md.Unit = ""
+		return
+	}
+
 	sz, err := IdxIntern.AddOrGetString([]byte(unit), false)
 	if err != nil {
 		log.Errorf("idx: Failed to intern Unit %v. %v", unit, err)
