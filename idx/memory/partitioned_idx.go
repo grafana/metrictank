@@ -53,13 +53,13 @@ func (p *PartitionedMemoryIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
+func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*idx.Archive, int32, bool) {
 	return p.Partition[partition].Update(point, partition)
 }
 
 // AddOrUpdate makes sure a metric is known in the index,
 // and should be called for every received metric.
-func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
+func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.Archive, int32, bool) {
 	return p.Partition[partition].AddOrUpdate(mkey, data, partition)
 }
 

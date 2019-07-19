@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
@@ -531,6 +532,22 @@ func (md *MetricDefinition) ConvertToSchemaMd() schema.MetricDefinition {
 	}
 	smd.NameWithTags() //ensure nameWithTags is set
 	return smd
+}
+
+// Clone() returns a copy of the MetricDefinition. It uses atomic operations
+// to read certain properties that get updated atomically
+func (md *MetricDefinition) Clone() *MetricDefinition {
+	return &MetricDefinition{
+		Id:         md.Id,
+		OrgId:      md.OrgId,
+		Name:       md.Name,
+		Interval:   md.Interval,
+		Unit:       md.Unit,
+		mtype:      md.mtype,
+		Tags:       md.Tags,
+		LastUpdate: atomic.LoadInt64(&md.LastUpdate),
+		Partition:  atomic.LoadInt32(&md.Partition),
+	}
 }
 
 // MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition
