@@ -53,7 +53,7 @@ type ErrUnknownKwarg struct {
 }
 
 func (e ErrUnknownKwarg) Error() string {
-	return fmt.Sprintf("unknown keyword argument %q", e)
+	return fmt.Sprintf("unknown keyword argument %q", e.key)
 }
 
 type ErrBadKwarg struct {
