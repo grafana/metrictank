@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	gos "github.com/grafana/go-generic-object-store"
@@ -105,7 +106,7 @@ func (oi *ObjectIntern) getAndIncrement(obj []byte) (uintptr, bool) {
 	addr, ok := oi.objIndex[string(obj)]
 	if ok {
 		// increment reference count by 1
-		(*(*uint32)(unsafe.Pointer(addr + uintptr(len(obj)))))++
+		atomic.AddUint32((*uint32)(unsafe.Pointer(addr+uintptr(len(obj)))), 1)
 		return addr, true
 	}
 	return 0, false
@@ -159,13 +160,13 @@ func (oi *ObjectIntern) AddOrGet(obj []byte, safe bool) (uintptr, error) {
 		// if compression is turned off this is likely the least costly and most
 		// probable path
 		if oi.conf.Compression == None {
-			oi.Lock()
+			oi.RLock()
 			addr, ok := oi.getAndIncrement(obj)
 			if ok {
-				oi.Unlock()
+				oi.RUnlock()
 				return addr, nil
 			}
-			oi.Unlock()
+			oi.RUnlock()
 		}
 
 		var objComp []byte
@@ -182,9 +183,20 @@ func (oi *ObjectIntern) AddOrGet(obj []byte, safe bool) (uintptr, error) {
 		}
 
 		// acquire lock
-		oi.Lock()
+		oi.RLock()
 
 		addr, ok := oi.getAndIncrement(objComp)
+		if ok {
+			oi.RUnlock()
+			return addr, nil
+		}
+
+		oi.RUnlock()
+
+		oi.Lock()
+
+		// re-check everything
+		addr, ok = oi.getAndIncrement(objComp)
 		if ok {
 			oi.Unlock()
 			return addr, nil
@@ -202,9 +214,20 @@ func (oi *ObjectIntern) AddOrGet(obj []byte, safe bool) (uintptr, error) {
 
 	// if neither of those terms is true then we can avoid costly allocations
 	// acquire lock
-	oi.Lock()
+	oi.RLock()
 
 	addr, ok := oi.getAndIncrement(obj)
+	if ok {
+		oi.RUnlock()
+		return addr, nil
+	}
+
+	oi.RUnlock()
+
+	oi.Lock()
+
+	// re-check everything
+	addr, ok = oi.getAndIncrement(obj)
 	if ok {
 		oi.Unlock()
 		return addr, nil
@@ -241,7 +264,7 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 		if oi.conf.Compression == None {
 
 			//acquire the lock
-			oi.Lock()
+			oi.RLock()
 
 			addr, ok := oi.getAndIncrement(obj)
 			if ok {
@@ -249,11 +272,11 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 					Data: addr,
 					Len:  len(obj),
 				}
-				oi.Unlock()
+				oi.RUnlock()
 				return (*(*string)(unsafe.Pointer(stringHeader))), nil
 			}
 
-			oi.Unlock()
+			oi.RUnlock()
 		}
 
 		var objComp []byte
@@ -269,9 +292,30 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 		}
 
 		// acquire lock
-		oi.Lock()
+		oi.RLock()
 
 		addr, ok := oi.getAndIncrement(objComp)
+		if ok {
+			if oi.conf.Compression == None {
+				// create a StringHeader and set its values appropriately
+				stringHeader := &reflect.StringHeader{
+					Data: addr,
+					Len:  len(objComp),
+				}
+				oi.RUnlock()
+				return (*(*string)(unsafe.Pointer(stringHeader))), nil
+			}
+			// don't want to return compressed data, so we create a string from the original object
+			oi.RUnlock()
+			return string(obj), nil
+		}
+
+		oi.RUnlock()
+
+		oi.Lock()
+
+		// re-check everything
+		addr, ok = oi.getAndIncrement(objComp)
 		if ok {
 			if oi.conf.Compression == None {
 				// create a StringHeader and set its values appropriately
@@ -296,7 +340,7 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 		oi.Unlock()
 		if oi.conf.Compression != None {
 			// don't want to return compressed data, so we create a string from the original object
-			return string(objComp), nil
+			return string(obj), nil
 		}
 
 		// create a StringHeader and set its values appropriately
@@ -309,9 +353,25 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 
 	// if neither of those terms is true then we can avoid costly allocations
 	// acquire lock
-	oi.Lock()
+	oi.RLock()
 
 	addr, ok := oi.getAndIncrement(obj)
+	if ok {
+		// create a StringHeader and set its values appropriately
+		stringHeader := &reflect.StringHeader{
+			Data: addr,
+			Len:  len(obj),
+		}
+		oi.RUnlock()
+		return (*(*string)(unsafe.Pointer(stringHeader))), nil
+	}
+
+	oi.RUnlock()
+
+	oi.Lock()
+
+	// re-check everything
+	addr, ok = oi.getAndIncrement(obj)
 	if ok {
 		// create a StringHeader and set its values appropriately
 		stringHeader := &reflect.StringHeader{
@@ -331,7 +391,7 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 	// create a StringHeader and set its values appropriately
 	stringHeader := &reflect.StringHeader{
 		Data: addr,
-		Len:  len(obj) - 4,
+		Len:  len(obj),
 	}
 
 	oi.Unlock()
@@ -418,9 +478,29 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	var err error
 
 	// acquire write lock
-	oi.Lock()
+	oi.RLock()
 
 	// check if object exists in the object store
+	obj, err = oi.store.Get(objAddr)
+	if err != nil {
+		oi.RUnlock()
+		return false, err
+	}
+
+	// most likely case is that we will just decrement the reference count and return
+	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4)))) > 1 {
+		// decrement reference count by 1
+		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4))), ^uint32(0))
+
+		oi.RUnlock()
+		return false, nil
+	}
+
+	oi.RUnlock()
+
+	oi.Lock()
+
+	// re-check if object exists in the object store
 	obj, err = oi.store.Get(objAddr)
 	if err != nil {
 		oi.Unlock()
@@ -428,9 +508,9 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	}
 
 	// most likely case is that we will just decrement the reference count and return
-	if *(*uint32)(unsafe.Pointer(objAddr + uintptr(len(obj)-4))) > 1 {
+	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4)))) > 1 {
 		// decrement reference count by 1
-		(*(*uint32)(unsafe.Pointer(objAddr + uintptr(len(obj)-4))))--
+		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4))), ^uint32(0))
 
 		oi.Unlock()
 		return false, nil
@@ -452,11 +532,11 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	// delete object from object store
 	err = oi.store.Delete(objAddr)
 
+	oi.Unlock()
+
 	if err == nil {
-		oi.Unlock()
 		return true, nil
 	}
-	oi.Unlock()
 	return false, err
 }
 
@@ -544,24 +624,23 @@ func (oi *ObjectIntern) RefCnt(objAddr uintptr) (uint32, error) {
 	}
 
 	// remove 4 trailing bytes for reference count
-	return *(*uint32)(unsafe.Pointer(objAddr + uintptr(len(compObj)-4))), nil
-
+	return atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr + uintptr(len(compObj)-4)))), nil
 }
 
 // IncRefCnt increments the reference count of an object interned in the store.
 // On failure it returns false and an error, on success it returns true and nil
 func (oi *ObjectIntern) IncRefCnt(objAddr uintptr) (bool, error) {
-	oi.Lock()
+	oi.RLock()
 	obj, err := oi.store.Get(objAddr)
 	if err != nil {
-		oi.Unlock()
+		oi.RUnlock()
 		return false, err
 	}
 
 	// increment reference count by 1
-	(*(*uint32)(unsafe.Pointer(objAddr + uintptr(len(obj)-4))))++
+	atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4))), 1)
 
-	oi.Unlock()
+	oi.RUnlock()
 	return true, nil
 }
 
