@@ -434,7 +434,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 		}
 	}
 
-	return idx.NewSafeArchive(&idx.Archive{}), 0, false
+	return nil, 0, false
 }
 
 // AddOrUpdate returns the corresponding Archive for the MetricData.
@@ -458,7 +458,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 
 	def, err := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
 	if err != nil {
-		return idx.NewSafeArchive(&idx.Archive{}), 0, false
+		return nil, 0, false
 	}
 	def.Partition = partition
 

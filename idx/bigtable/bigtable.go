@@ -248,7 +248,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 		stat = statAddDuration
 	}
 
-	if !b.cfg.UpdateBigtableIdx {
+	if !b.cfg.UpdateBigtableIdx || archive == nil {
 		stat.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
