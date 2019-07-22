@@ -287,7 +287,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 		stat = statAddDuration
 	}
 
-	if !c.Config.updateCassIdx {
+	if !c.Config.updateCassIdx || archive == nil {
 		stat.Value(time.Since(pre))
 		return archive, oldPartition, inMemory
 	}
