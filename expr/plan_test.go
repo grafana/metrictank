@@ -173,6 +173,19 @@ func TestArgs(t *testing.T) {
 			nil,
 			ErrMissingArg,
 		},
+		{
+			"2 args normal, 1 by position, 1 by keyword (unknown!)",
+			[]*expr{
+				{etype: etName, str: "foo.bar.*"},
+				{etype: etString, str: "1hour"},
+				{etype: etString, str: "sum"},
+			},
+			map[string]*expr{
+				"unknownArg": {etype: etBool, bool: true},
+			},
+			nil,
+			ErrUnknownKwarg{"unknownArg"},
+		},
 	}
 
 	fn := NewSmartSummarize()
