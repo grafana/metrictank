@@ -732,11 +732,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e579da082009e4c7a7ec5685b53c8d93fc68c60d95422600b98933e37eb262ff"
+  digest = "1:73fbe6a6838e8d312f8d78fce7185282f409d35e27906027bd4f5ccf7a5d3ae9"
   name = "github.com/robert-milan/go-object-interning"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "a1cf681dcb7bab8d3a865b4da74932870da135b9"
+  revision = "f911bee7f9bef4c3d0bb590205eb58f3259820df"
 
 [[projects]]
   digest = "1:c5741d3d03a06220bcca801547f28de803103249b739eb5537e54b77e89f435a"

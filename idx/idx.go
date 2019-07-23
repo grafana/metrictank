@@ -197,14 +197,9 @@ func InternReleaseMetricDefinition(md MetricDefinition) {
 }
 
 func InternIncMetricDefinitionRefCounts(md MetricDefinition) {
-	for _, tag := range md.Tags.KeyValues {
-		IdxIntern.IncRefCnt(tag.Key)
-		IdxIntern.IncRefCnt(tag.Value)
+	IdxIntern.IncRefCntBatch(md.Name.Nodes())
+	for i := range md.Tags.KeyValues {
+		IdxIntern.IncRefCntBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
 	}
-
-	for _, id := range md.Name.Nodes() {
-		IdxIntern.IncRefCnt(id)
-	}
-
 	IdxIntern.IncRefCntByString(md.Unit)
 }

@@ -732,6 +732,22 @@ func (oi *ObjectIntern) IncRefCntByString(obj string) (bool, error) {
 	return oi.IncRefCnt(addr)
 }
 
+func (oi *ObjectIntern) IncRefCntBatch(ptrs []uintptr) {
+	oi.RLock()
+	for _, p := range ptrs {
+
+		obj, err := oi.store.Get(p)
+		if err != nil {
+			continue
+		}
+
+		// increment reference count by 1
+		atomic.AddUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4))), 1)
+
+	}
+	oi.RUnlock()
+}
+
 // ObjBytes returns a []byte and nil on success.
 // On failure it returns nil and an error.
 //
