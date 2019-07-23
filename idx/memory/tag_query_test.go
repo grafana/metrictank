@@ -34,7 +34,7 @@ func getTestIDs() []schema.MKey {
 	return ids
 }
 
-func getTestIndex() (TagIndex, map[schema.MKey]*idx.Archive) {
+func getTestIndex() (TagIndex, map[schema.MKey]*idx.ArchiveInterned) {
 	type testCase struct {
 		id         schema.MKey
 		lastUpdate int64
@@ -55,10 +55,10 @@ func getTestIndex() (TagIndex, map[schema.MKey]*idx.Archive) {
 	}
 
 	tagIdx := make(TagIndex)
-	byId := make(map[schema.MKey]*idx.Archive)
+	byId := make(map[schema.MKey]*idx.ArchiveInterned)
 
 	for i, d := range data {
-		byId[d.id] = &idx.Archive{}
+		byId[d.id] = &idx.ArchiveInterned{}
 		byId[d.id].MetricDefinition = new(idx.MetricDefinition)
 		byId[d.id].SetMetricName(fmt.Sprintf("metric%d", i))
 		byId[d.id].SetTags(d.tags)

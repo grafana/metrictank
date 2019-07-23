@@ -137,9 +137,9 @@ func BenchmarkHttpRespJsonNulls(b *testing.B) {
 }
 
 func BenchmarkHttpRespJson1MMetricNames(b *testing.B) {
-	series := make([]idx.Archive, 1000000)
+	series := make([]idx.ArchiveInterned, 1000000)
 	for i := 0; i < 1000000; i++ {
-		series[i] = idx.NewArchiveBare(fmt.Sprintf("this.is.the.name.of.a.random-graphite-series.%d", i))
+		series[i] = idx.NewArchiveInternedBare(fmt.Sprintf("this.is.the.name.of.a.random-graphite-series.%d", i))
 	}
 
 	b.ResetTimer()
@@ -154,9 +154,9 @@ func BenchmarkHttpRespJson1MMetricNames(b *testing.B) {
 }
 
 func BenchmarkHttpRespJson1MMetricNamesNeedEscaping(b *testing.B) {
-	series := make([]idx.Archive, 1000000)
+	series := make([]idx.ArchiveInterned, 1000000)
 	for i := 0; i < 1000000; i++ {
-		series[i] = idx.NewArchiveBare(fmt.Sprintf(`this.is.the.name.of.\.random\graphite\series.%d`, i))
+		series[i] = idx.NewArchiveInternedBare(fmt.Sprintf(`this.is.the.name.of.\.random\graphite\series.%d`, i))
 	}
 	b.ResetTimer()
 	var resp *Json

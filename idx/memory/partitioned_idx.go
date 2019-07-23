@@ -53,13 +53,13 @@ func (p *PartitionedMemoryIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*idx.Archive, int32, bool) {
+func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*idx.ArchiveInterned, int32, bool) {
 	return p.Partition[partition].Update(point, partition)
 }
 
 // AddOrUpdate makes sure a metric is known in the index,
 // and should be called for every received metric.
-func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.Archive, int32, bool) {
+func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.ArchiveInterned, int32, bool) {
 	return p.Partition[partition].AddOrUpdate(mkey, data, partition)
 }
 
@@ -167,9 +167,9 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) (int, error)
 	return items, nil
 }
 
-func (p *PartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([]idx.Archive, error) {
+func (p *PartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([]*idx.ArchiveInterned, error) {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]idx.Archive, len(p.Partition))
+	result := make([][]*idx.ArchiveInterned, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
@@ -194,7 +194,7 @@ func (p *PartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([
 		items += len(r)
 	}
 
-	response := make([]idx.Archive, 0, items)
+	response := make([]*idx.ArchiveInterned, 0, items)
 	for _, r := range result {
 		response = append(response, r...)
 	}
@@ -289,9 +289,9 @@ func (p *PartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 
 // Prune deletes all metrics that haven't been seen since the given timestamp.
 // It returns all Archives deleted and any error encountered.
-func (p *PartitionedMemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
+func (p *PartitionedMemoryIdx) Prune(oldest time.Time) ([]*idx.ArchiveInterned, error) {
 	// Prune each partition sequentially.
-	result := []idx.Archive{}
+	result := []*idx.ArchiveInterned{}
 	for _, m := range p.Partition {
 		found, err := m.Prune(oldest)
 		if err != nil {
@@ -523,7 +523,7 @@ func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricD
 	return p.Partition[partition].Load(defs)
 }
 
-func (p *PartitionedMemoryIdx) add(archive *idx.Archive) {
+func (p *PartitionedMemoryIdx) add(archive *idx.ArchiveInterned) {
 	p.Partition[archive.Partition].add(archive)
 }
 

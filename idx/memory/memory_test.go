@@ -244,7 +244,7 @@ func testGetAddKey(t *testing.T) {
 				query, err := tagquery.NewQueryFromStrings([]string{"name!="}, 0)
 				So(err, ShouldBeNil)
 				nodes := ix.FindByTag(1, query)
-				defs := make([]idx.Archive, 0, len(nodes))
+				defs := make([]idx.ArchiveInterned, 0, len(nodes))
 				for i := range nodes {
 					defs = append(defs, nodes[i].Defs...)
 				}
@@ -884,7 +884,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 		So(err, ShouldBeNil)
 		nodes := ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 1)
-		defs := make([]idx.Archive, 0, len(nodes))
+		defs := make([]idx.ArchiveInterned, 0, len(nodes))
 		for i := range nodes {
 			defs = append(defs, nodes[i].Defs...)
 		}
@@ -1311,7 +1311,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 	defer ix.Stop()
 
 	data := make([]*idx.MetricDefinition, 10)
-	archives := make([]*idx.Archive, 10)
+	archives := make([]*idx.ArchiveInterned, 10)
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &idx.MetricDefinition{

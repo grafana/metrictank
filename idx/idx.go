@@ -4,6 +4,7 @@ package idx
 
 import (
 	"regexp"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -36,6 +37,14 @@ type Node struct {
 }
 
 type Archive struct {
+	schema.MetricDefinition
+	SchemaId uint16 // index in mdata.schemas (not persisted)
+	AggId    uint16 // index in mdata.aggregations (not persisted)
+	IrId     uint16 // index in mdata.indexrules (not persisted)
+	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
+}
+
+type ArchiveInterned struct {
 	*MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
@@ -43,13 +52,23 @@ type Archive struct {
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
 }
 
+func (a *ArchiveInterned) GetArchive() Archive {
+	return Archive{
+		a.MetricDefinition.ConvertToSchemaMd(),
+		a.SchemaId,
+		a.AggId,
+		a.IrId,
+		atomic.LoadUint32(&a.LastSave),
+	}
+}
+
 // used primarily by tests, for convenience
-func NewArchiveBare(name string) Archive {
-	arc := Archive{}
+func NewArchiveInternedBare(name string) ArchiveInterned {
+	arc := ArchiveInterned{}
 	arc.MetricDefinition = new(MetricDefinition)
 	err := arc.MetricDefinition.SetMetricName(name)
 	if err != nil {
-		return Archive{}
+		return ArchiveInterned{}
 	}
 	return arc
 }
@@ -73,11 +92,11 @@ type MetricIndex interface {
 
 	// Update updates an existing archive, if found.
 	// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-	Update(point schema.MetricPoint, partition int32) (*Archive, int32, bool)
+	Update(point schema.MetricPoint, partition int32) (*ArchiveInterned, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*Archive, int32, bool)
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*ArchiveInterned, int32, bool)
 
 	// Get returns the archive for the requested id.
 	Get(key schema.MKey) (Archive, bool)
@@ -94,7 +113,7 @@ type MetricIndex interface {
 
 	// DeletePersistent deletes items from the index
 	// It returns the deleted items in a []idx.Archive
-	DeletePersistent(orgId uint32, pattern string) ([]Archive, error)
+	DeletePersistent(orgId uint32, pattern string) ([]*ArchiveInterned, error)
 
 	// Find searches the index for matching nodes.
 	// * orgId describes the org to search in (public data in orgIdPublic is automatically included)
@@ -107,7 +126,7 @@ type MetricIndex interface {
 
 	// Prune deletes all metrics that haven't been seen since the given timestamp.
 	// It returns all Archives deleted and any error encountered.
-	Prune(oldest time.Time) ([]Archive, error)
+	Prune(oldest time.Time) ([]*ArchiveInterned, error)
 
 	// FindByTag takes a query object and executes the query on the index. The query
 	// is composed of one or many query expressions, plus a "from condition" defining

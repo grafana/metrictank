@@ -67,12 +67,12 @@ type TagQueryContext struct {
 	notMatch []kvRe // NOT_MATCH
 	prefix   []kv   // PREFIX
 
-	index     TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId      map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-	tagClause tagquery.ExpressionOperator  // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	tagMatch  kvRe                         // only used for /metrics/tags with regex in filter param
-	tagPrefix string                       // only used for auto complete of tags to match exact prefix
-	startWith tagquery.ExpressionOperator  // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	index     TagIndex                             // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId      map[schema.MKey]*idx.ArchiveInterned // the metric index by ID, set by Run()/RunGetTags()
+	tagClause tagquery.ExpressionOperator          // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
+	tagMatch  kvRe                                 // only used for /metrics/tags with regex in filter param
+	tagPrefix string                               // only used for auto complete of tags to match exact prefix
+	startWith tagquery.ExpressionOperator          // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 	wg        *sync.WaitGroup
 }
 
@@ -332,7 +332,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 // all required tests in order to decide whether this metric should be part
 // of the final result set or not
 // in map/reduce terms this is the reduce function
-func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTagFilters bool) bool {
+func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.ArchiveInterned, omitTagFilters bool) bool {
 	if !q.testByFrom(def) {
 		return false
 	}
@@ -374,7 +374,7 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 
 // testByMatch filters a given metric by matching a regular expression against
 // the values of specific associated tags
-func (q *TagQueryContext) testByMatch(def *idx.Archive, exprs []kvRe, not bool) bool {
+func (q *TagQueryContext) testByMatch(def *idx.ArchiveInterned, exprs []kvRe, not bool) bool {
 EXPRS:
 	for _, e := range exprs {
 		if e.Key == "name" {
@@ -448,7 +448,7 @@ EXPRS:
 
 // testByTagMatch filters a given metric by matching a regular expression against
 // the associated tags
-func (q *TagQueryContext) testByTagMatch(def *idx.Archive) bool {
+func (q *TagQueryContext) testByTagMatch(def *idx.ArchiveInterned) bool {
 	// special case for tag "name"
 	if _, ok := q.tagMatch.missCache.Load("name"); !ok {
 		if _, ok := q.tagMatch.matchCache.Load("name"); ok || q.tagMatch.Regex.MatchString("name") {
@@ -497,13 +497,13 @@ func (q *TagQueryContext) testByTagMatch(def *idx.Archive) bool {
 }
 
 // testByFrom filters a given metric by its LastUpdate time
-func (q *TagQueryContext) testByFrom(def *idx.Archive) bool {
+func (q *TagQueryContext) testByFrom(def *idx.ArchiveInterned) bool {
 	return q.from <= atomic.LoadInt64(&def.LastUpdate)
 }
 
 // testByPrefix filters a given metric by matching prefixes against the values
 // of a specific tag
-func (q *TagQueryContext) testByPrefix(def *idx.Archive, exprs []kv) bool {
+func (q *TagQueryContext) testByPrefix(def *idx.ArchiveInterned, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
 		if e.Key == "name" && strings.HasPrefix(schema.SanitizeNameAsTagValue(def.Name.String()), e.Value) {
@@ -537,7 +537,7 @@ EXPRS:
 }
 
 // testByTagPrefix filters a given metric by matching prefixes against its tags
-func (q *TagQueryContext) testByTagPrefix(def *idx.Archive) bool {
+func (q *TagQueryContext) testByTagPrefix(def *idx.ArchiveInterned) bool {
 	if strings.HasPrefix("name", q.tagPrefix) {
 		return true
 	}
@@ -593,7 +593,7 @@ func (q *TagQueryContext) testByEqual(id schema.MKey, exprs []kv, not bool) bool
 // it returns the final result set via the given resCh parameter
 func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	for id := range idCh {
-		var def *idx.Archive
+		var def *idx.ArchiveInterned
 		var ok bool
 
 		if def, ok = q.byId[id]; !ok {
@@ -665,7 +665,7 @@ func (q *TagQueryContext) sortByCost() {
 }
 
 // Run executes the tag query on the given index and returns a list of ids
-func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
+func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.ArchiveInterned) IdSet {
 	q.index = index
 	q.byId = byId
 
@@ -751,7 +751,7 @@ func (q *TagQueryContext) filterTagsFromChan(idCh chan schema.MKey, tagCh chan s
 
 IDS:
 	for id := range idCh {
-		var def *idx.Archive
+		var def *idx.ArchiveInterned
 		var ok bool
 
 		if def, ok = q.byId[id]; !ok {
@@ -859,7 +859,7 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
+func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.ArchiveInterned) map[string]struct{} {
 	q.index = index
 	q.byId = byId
 

@@ -13,7 +13,7 @@ var (
 
 var safeArchivePool = sync.Pool{
 	New: func() interface{} {
-		return new(Archive)
+		return new(ArchiveInterned)
 	},
 }
 
@@ -29,8 +29,8 @@ var metricDefinitionPool = sync.Pool{
 // the string interning.
 // It is important that SafeArchive.ReleaseSafeArchive() gets called
 // before it goes out of scope to return its memory back to the pool.
-func NewSafeArchive(archive *Archive) *Archive {
-	safeArchive := safeArchivePool.Get().(*Archive)
+func NewSafeArchive(archive *ArchiveInterned) *ArchiveInterned {
+	safeArchive := safeArchivePool.Get().(*ArchiveInterned)
 	safeArchive.SchemaId = archive.SchemaId
 	safeArchive.AggId = archive.AggId
 	safeArchive.IrId = archive.IrId
@@ -46,7 +46,7 @@ func NewSafeArchive(archive *Archive) *Archive {
 	return safeArchive
 }
 
-func (s *Archive) ReleaseSafeArchive() {
+func (s *ArchiveInterned) ReleaseSafeArchive() {
 	InternReleaseMetricDefinition(*s.MetricDefinition)
 	metricDefinitionPool.Put(s.MetricDefinition)
 	safeArchivePool.Put(s)
