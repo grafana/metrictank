@@ -540,6 +540,73 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	return false, err
 }
 
+func (oi *ObjectIntern) DeleteBatch(ptrs []uintptr) {
+	var obj []byte
+	var err error
+
+	// acquire lock
+	oi.RLock()
+
+	toDelete := ptrs[:0]
+
+	for _, p := range ptrs {
+		// check if object exists in the object store
+		obj, err = oi.store.Get(p)
+		if err != nil {
+			continue
+		}
+
+		// most likely case is that we will just decrement the reference count and return
+		if atomic.LoadUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4)))) > 1 {
+			// decrement reference count by 1
+			atomic.AddUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4))), ^uint32(0))
+			continue
+		}
+
+		toDelete = append(toDelete, p)
+	}
+
+	oi.RUnlock()
+
+	if len(toDelete) > 0 {
+
+		oi.Lock()
+
+		for _, p := range toDelete {
+			// re-check if object exists in the object store
+			obj, err = oi.store.Get(p)
+			if err != nil {
+				continue
+			}
+
+			// most likely case is that we will just decrement the reference count and return
+			if atomic.LoadUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4)))) > 1 {
+				// decrement reference count by 1
+				atomic.AddUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4))), ^uint32(0))
+				continue
+			}
+
+			// if reference count is 1 or less, delete the object and remove it from index
+			// If one of these operations fails it is still safe to perform the other
+			// Once we get to this point we are just going to remove all traces of the object
+
+			// delete object from index first
+			// If you delete all of the objects in the slab then the slab will be deleted
+			// When this happens the memory that the slab was using is MUnmapped, which is
+			// the same memory pointed to by the key stored in the ObjIndex. When you try to
+			// access the key to delete it from the ObjIndex you will get a SEGFAULT
+			//
+			// remove 4 trailing bytes for reference count since ObjIndex does not store reference count in the key
+			delete(oi.objIndex, string(obj[:len(obj)-4]))
+
+			// delete object from object store
+			err = oi.store.Delete(p)
+		}
+
+		oi.Unlock()
+	}
+}
+
 // DeleteByByte decrements the reference count of an object identified by its value as a []byte.
 // Possible return values are as follows:
 //
