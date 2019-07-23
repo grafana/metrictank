@@ -244,7 +244,7 @@ func testGetAddKey(t *testing.T) {
 				query, err := tagquery.NewQueryFromStrings([]string{"name!="}, 0)
 				So(err, ShouldBeNil)
 				nodes := ix.FindByTag(1, query)
-				defs := make([]idx.ArchiveInterned, 0, len(nodes))
+				defs := make([]idx.Archive, 0, len(nodes))
 				for i := range nodes {
 					defs = append(defs, nodes[i].Defs...)
 				}
@@ -786,12 +786,12 @@ func testPruneTaggedSeries(t *testing.T) {
 		// to a more recent time that will survive the next prune
 		var data *schema.MetricData
 		for _, def := range defs {
-			if strings.HasPrefix(def.Name.String(), "longterm") {
+			if strings.HasPrefix(def.Name, "longterm") {
 				data = &schema.MetricData{
-					Name:     def.Name.String(),
+					Name:     def.Name,
 					Id:       def.Id.String(),
-					Tags:     def.Tags.Strings(),
-					Mtype:    def.Mtype(),
+					Tags:     def.Tags,
+					Mtype:    def.Mtype,
 					OrgId:    1,
 					Interval: 10,
 					Time:     100,
@@ -884,7 +884,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 		So(err, ShouldBeNil)
 		nodes := ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 1)
-		defs := make([]idx.ArchiveInterned, 0, len(nodes))
+		defs := make([]idx.Archive, 0, len(nodes))
 		for i := range nodes {
 			defs = append(defs, nodes[i].Defs...)
 		}
@@ -972,7 +972,7 @@ func testPrune(t *testing.T) {
 		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
-			Name:     defs[0].Name.String(),
+			Name:     defs[0].Name,
 			Id:       defs[0].Id.String(),
 			OrgId:    1,
 			Interval: 30,

@@ -10,29 +10,29 @@ import (
 func TestGraphiteNames(t *testing.T) {
 
 	cases := []struct {
-		in  []idx.ArchiveInterned
+		in  []idx.Archive
 		out string
 	}{
 		{
-			in:  []idx.ArchiveInterned{},
+			in:  []idx.Archive{},
 			out: `[]`,
 		},
 		{
-			in: []idx.ArchiveInterned{
-				idx.NewArchiveInternedBare("foo"),
+			in: []idx.Archive{
+				idx.NewArchiveBare("foo"),
 			},
 			out: `["foo"]`,
 		},
 		{
-			in: []idx.ArchiveInterned{
-				idx.NewArchiveInternedBare("foo"),
-				idx.NewArchiveInternedBare("bar"),
+			in: []idx.Archive{
+				idx.NewArchiveBare("foo"),
+				idx.NewArchiveBare("bar"),
 			},
 			out: `["bar","foo"]`,
 		},
 		{
-			in: []idx.ArchiveInterned{
-				idx.NewArchiveInternedBare(`a\b`),
+			in: []idx.Archive{
+				idx.NewArchiveBare(`a\b`),
 			},
 			out: `["a\\b"]`,
 		},

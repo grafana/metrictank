@@ -63,13 +63,9 @@ func (a *ArchiveInterned) GetArchive() Archive {
 }
 
 // used primarily by tests, for convenience
-func NewArchiveInternedBare(name string) ArchiveInterned {
-	arc := ArchiveInterned{}
-	arc.MetricDefinition = new(MetricDefinition)
-	err := arc.MetricDefinition.SetMetricName(name)
-	if err != nil {
-		return ArchiveInterned{}
-	}
+func NewArchiveBare(name string) Archive {
+	arc := Archive{}
+	arc.Name = name
 	return arc
 }
 
