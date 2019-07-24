@@ -49,7 +49,7 @@ var (
 )
 
 type writeReq struct {
-	def      *idx.Archive
+	def      *idx.ArchiveInterned
 	recvTime time.Time
 }
 
@@ -205,7 +205,7 @@ func (b *BigtableIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (*idx.Archive, int32, bool) {
+func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (*idx.ArchiveInterned, int32, bool) {
 	pre := time.Now()
 
 	archive, oldPartition, inMemory := b.MemoryIndex.Update(point, partition)
@@ -238,7 +238,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (*idx.Ar
 	return archive, oldPartition, inMemory
 }
 
-func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.Archive, int32, bool) {
+func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*idx.ArchiveInterned, int32, bool) {
 	pre := time.Now()
 
 	archive, oldPartition, inMemory := b.MemoryIndex.AddOrUpdate(mkey, data, partition)
@@ -279,7 +279,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 // updateBigtable saves the archive to bigtable and
 // updates the memory index with the updated fields.
-func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *idx.Archive, partition int32) *idx.Archive {
+func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *idx.ArchiveInterned, partition int32) *idx.ArchiveInterned {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
 	if archive.LastSave < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
@@ -481,13 +481,12 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 	}
 	statDeleteDuration.Value(time.Since(pre))
 
-	// there is nothing higher up in the call path that uses MetricDefinitions
-	// so this is the safest place to release the objects in MetricDefinition
-	// that have been interned
-	for _, arc := range defs {
-		idx.InternReleaseMetricDefinition(*arc.MetricDefinition)
+	defCount := len(defs)
+	for i := range defs {
+		defs[i].ReleaseSafeArchive()
 	}
-	return len(defs), err
+
+	return defCount, err
 }
 
 func (b *BigtableIdx) deleteDef(def *idx.MetricDefinition) error {
@@ -509,7 +508,7 @@ func (b *BigtableIdx) deleteRow(key string) error {
 	return nil
 }
 
-func (b *BigtableIdx) Prune(now time.Time) ([]idx.Archive, error) {
+func (b *BigtableIdx) Prune(now time.Time) ([]*idx.ArchiveInterned, error) {
 	log.Info("bigtable-idx: start pruning of series")
 	pruned, err := b.MemoryIndex.Prune(now)
 	duration := time.Since(now)
@@ -529,7 +528,10 @@ func (b *BigtableIdx) prune() {
 	for {
 		select {
 		case now := <-ticker.C:
-			b.Prune(now)
+			defs, _ := b.Prune(now)
+			for i := range defs {
+				defs[i].ReleaseSafeArchive()
+			}
 		case <-b.shutdown:
 			return
 		}

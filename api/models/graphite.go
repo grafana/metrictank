@@ -164,7 +164,7 @@ func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	names := make([]string, 0, len(defs))
 
 	for i := 0; i < len(defs); i++ {
-		name := defs[i].Name.String()
+		name := defs[i].Name
 		_, ok := seen[name]
 		if !ok {
 			names = append(names, name)

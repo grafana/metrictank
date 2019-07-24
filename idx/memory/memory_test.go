@@ -786,12 +786,12 @@ func testPruneTaggedSeries(t *testing.T) {
 		// to a more recent time that will survive the next prune
 		var data *schema.MetricData
 		for _, def := range defs {
-			if strings.HasPrefix(def.Name.String(), "longterm") {
+			if strings.HasPrefix(def.Name, "longterm") {
 				data = &schema.MetricData{
-					Name:     def.Name.String(),
+					Name:     def.Name,
 					Id:       def.Id.String(),
-					Tags:     def.Tags.Strings(),
-					Mtype:    def.Mtype(),
+					Tags:     def.Tags,
+					Mtype:    def.Mtype,
 					OrgId:    1,
 					Interval: 10,
 					Time:     100,
@@ -972,7 +972,7 @@ func testPrune(t *testing.T) {
 		defs := ix.List(1)
 		So(defs, ShouldHaveLength, 5)
 		data := &schema.MetricData{
-			Name:     defs[0].Name.String(),
+			Name:     defs[0].Name,
 			Id:       defs[0].Id.String(),
 			OrgId:    1,
 			Interval: 30,
@@ -1311,7 +1311,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 	defer ix.Stop()
 
 	data := make([]*idx.MetricDefinition, 10)
-	archives := make([]*idx.Archive, 10)
+	archives := make([]*idx.ArchiveInterned, 10)
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &idx.MetricDefinition{

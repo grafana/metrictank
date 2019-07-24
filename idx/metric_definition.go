@@ -532,10 +532,9 @@ func (md *MetricDefinition) ConvertToSchemaMd() schema.MetricDefinition {
 		Unit:       md.Unit,
 		Mtype:      md.Mtype(),
 		Tags:       md.Tags.Strings(),
-		LastUpdate: md.LastUpdate,
-		Partition:  md.Partition,
+		LastUpdate: atomic.LoadInt64(&md.LastUpdate),
+		Partition:  atomic.LoadInt32(&md.Partition),
 	}
-	smd.NameWithTags() //ensure nameWithTags is set
 	return smd
 }
 

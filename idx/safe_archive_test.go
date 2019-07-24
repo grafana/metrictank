@@ -11,7 +11,7 @@ func BenchmarkCreatingSafeArchives(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to get amkey: %s", err)
 	}
-	arch := &Archive{
+	arch := &ArchiveInterned{
 		SchemaId: 1,
 		AggId:    2,
 		IrId:     3,
