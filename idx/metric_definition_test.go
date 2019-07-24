@@ -20,10 +20,10 @@ func genTags(num int) []string {
 	return tags
 }
 
-func genMetricDefinitionsWithSameName(num int) []*MetricDefinition {
-	defs := make([]*MetricDefinition, num)
+func genMetricDefinitionsWithSameName(num int) []*MetricDefinitionInterned {
+	defs := make([]*MetricDefinitionInterned, num)
 	for i := 0; i < num; i++ {
-		defs[i] = &MetricDefinition{
+		defs[i] = &MetricDefinitionInterned{
 			OrgId:      1,
 			Interval:   10,
 			LastUpdate: 0,
@@ -38,10 +38,10 @@ func genMetricDefinitionsWithSameName(num int) []*MetricDefinition {
 	return defs
 }
 
-func genMetricDefinitionsWithoutTags(num int) []*MetricDefinition {
-	defs := make([]*MetricDefinition, num)
+func genMetricDefinitionsWithoutTags(num int) []*MetricDefinitionInterned {
+	defs := make([]*MetricDefinitionInterned, num)
 	for i := 0; i < num; i++ {
-		defs[i] = &MetricDefinition{
+		defs[i] = &MetricDefinitionInterned{
 			OrgId:      1,
 			Interval:   10,
 			LastUpdate: 0,
@@ -83,7 +83,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		})
 		Convey(fmt.Sprintf("After deleting half of the metricdefinitions reference count should be %d", num/2), func() {
 			for i := 0; i < num/2; i++ {
-				InternReleaseMetricDefinition(*defs[i])
+				defs[i].ReleaseInterned()
 				defs[i] = nil
 			}
 			defs = defs[num/2:]
@@ -104,7 +104,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		Convey("After deleting all of the metricdefinitions the name should be removed from the object store", func() {
 			nameAddr := defs[0].Name.Nodes()[0]
 			for i := 0; i < len(defs); i++ {
-				InternReleaseMetricDefinition(*defs[i])
+				defs[i].ReleaseInterned()
 				defs[i] = nil
 			}
 			cnt, err := IdxIntern.RefCnt(nameAddr)
@@ -123,9 +123,9 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 
 func TestMetricNameAndTagAddresses(t *testing.T) {
 	IdxIntern = goi.NewObjectIntern(goi.NewConfig())
-	defs := make([]*MetricDefinition, 5)
+	defs := make([]*MetricDefinitionInterned, 5)
 	for i := 0; i < len(defs); i++ {
-		defs[i] = &MetricDefinition{
+		defs[i] = &MetricDefinitionInterned{
 			OrgId:      uint32(i),
 			Interval:   10,
 			LastUpdate: 0,

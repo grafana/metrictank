@@ -1310,11 +1310,11 @@ func testMatchSchemaWithTags(t *testing.T) {
 	ix.Init()
 	defer ix.Stop()
 
-	data := make([]*idx.MetricDefinition, 10)
+	data := make([]*idx.MetricDefinitionInterned, 10)
 	archives := make([]*idx.ArchiveInterned, 10)
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
-		data[i] = &idx.MetricDefinition{
+		data[i] = &idx.MetricDefinitionInterned{
 			OrgId:     1,
 			Interval:  1,
 			Partition: getPartitionFromName(name),

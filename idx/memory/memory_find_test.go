@@ -527,7 +527,7 @@ func testTagSorting(t *testing.T) {
 		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
 	}
 
-	md2 := []idx.MetricDefinition{
+	md2 := []idx.MetricDefinitionInterned{
 		{
 			Tags:       idx.TagKeyValues{},
 			Interval:   10,

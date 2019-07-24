@@ -170,7 +170,7 @@ func main() {
 		}
 	}
 
-	var show func(d metricIndex.MetricDefinition)
+	var show func(d metricIndex.MetricDefinitionInterned)
 
 	switch format {
 	case "dump":
@@ -238,7 +238,7 @@ func main() {
 		}
 	}
 
-	var defs []metricIndex.MetricDefinition
+	var defs []metricIndex.MetricDefinitionInterned
 	if len(partitions) == 0 {
 		defs = idx.Load(nil, time.Now())
 	} else {
