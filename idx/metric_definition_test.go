@@ -83,7 +83,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		})
 		Convey(fmt.Sprintf("After deleting half of the metricdefinitions reference count should be %d", num/2), func() {
 			for i := 0; i < num/2; i++ {
-				InternReleaseMetricDefinition(*defs[i])
+				defs[i].ReleaseInterned()
 				defs[i] = nil
 			}
 			defs = defs[num/2:]
@@ -104,7 +104,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		Convey("After deleting all of the metricdefinitions the name should be removed from the object store", func() {
 			nameAddr := defs[0].Name.Nodes()[0]
 			for i := 0; i < len(defs); i++ {
-				InternReleaseMetricDefinition(*defs[i])
+				defs[i].ReleaseInterned()
 				defs[i] = nil
 			}
 			cnt, err := IdxIntern.RefCnt(nameAddr)
