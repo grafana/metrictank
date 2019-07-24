@@ -66,6 +66,10 @@ func (u *Unit) UnmarshalBinary(value []byte) error {
 }
 
 func (u *Unit) String() string {
+	if *u == 0 {
+		return ""
+	}
+
 	res, err := IdxIntern.GetStringFromPtr(uintptr(*u))
 	if err != nil {
 		log.Errorf("idx: Failed to acquire interned string from unit: %s", err)
