@@ -534,7 +534,7 @@ func (c *CasIdx) processWriteQueue() {
 				req.def.Partition,
 				req.def.Name.String(),
 				req.def.Interval,
-				req.def.Unit,
+				req.def.Unit.String(),
 				req.def.Mtype(),
 				req.def.Tags.Strings(),
 				req.def.LastUpdate).Exec(); err != nil {
@@ -587,7 +587,7 @@ func (c *CasIdx) addDefToArchive(def idx.MetricDefinitionInterned) error {
 			def.Partition,
 			def.Name,
 			def.Interval,
-			def.Unit,
+			def.Unit.String(),
 			def.Mtype,
 			def.Tags,
 			def.LastUpdate,

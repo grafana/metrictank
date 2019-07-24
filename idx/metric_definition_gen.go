@@ -139,8 +139,8 @@ func (z *MetricDefinitionInterned) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "Interval")
 				return
 			}
-		case "Unit":
-			z.Unit, err = dc.ReadString()
+		case "unit":
+			err = dc.ReadExtension(&z.Unit)
 			if err != nil {
 				err = msgp.WrapError(err, "Unit")
 				return
@@ -217,12 +217,12 @@ func (z *MetricDefinitionInterned) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "Interval")
 		return
 	}
-	// write "Unit"
-	err = en.Append(0xa4, 0x55, 0x6e, 0x69, 0x74)
+	// write "unit"
+	err = en.Append(0xa4, 0x75, 0x6e, 0x69, 0x74)
 	if err != nil {
 		return
 	}
-	err = en.WriteString(z.Unit)
+	err = en.WriteExtension(&z.Unit)
 	if err != nil {
 		err = msgp.WrapError(err, "Unit")
 		return
@@ -284,9 +284,13 @@ func (z *MetricDefinitionInterned) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Interval"
 	o = append(o, 0xa8, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c)
 	o = msgp.AppendInt(o, z.Interval)
-	// string "Unit"
-	o = append(o, 0xa4, 0x55, 0x6e, 0x69, 0x74)
-	o = msgp.AppendString(o, z.Unit)
+	// string "unit"
+	o = append(o, 0xa4, 0x75, 0x6e, 0x69, 0x74)
+	o, err = msgp.AppendExtension(o, &z.Unit)
+	if err != nil {
+		err = msgp.WrapError(err, "Unit")
+		return
+	}
 	// string "tagkeyvalues"
 	o = append(o, 0xac, 0x74, 0x61, 0x67, 0x6b, 0x65, 0x79, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73)
 	o, err = msgp.AppendExtension(o, &z.Tags)
@@ -345,8 +349,8 @@ func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error
 				err = msgp.WrapError(err, "Interval")
 				return
 			}
-		case "Unit":
-			z.Unit, bts, err = msgp.ReadStringBytes(bts)
+		case "unit":
+			bts, err = msgp.ReadExtensionBytes(bts, &z.Unit)
 			if err != nil {
 				err = msgp.WrapError(err, "Unit")
 				return
@@ -383,7 +387,7 @@ func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *MetricDefinitionInterned) Msgsize() (s int) {
-	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.ExtensionPrefixSize + z.Name.Len() + 9 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Unit) + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
+	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.ExtensionPrefixSize + z.Name.Len() + 9 + msgp.IntSize + 5 + msgp.ExtensionPrefixSize + z.Unit.Len() + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
 	return
 }
 

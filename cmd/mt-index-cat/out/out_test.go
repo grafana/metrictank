@@ -48,8 +48,8 @@ func compareSchemaWithIdxMd(smd schema.MetricDefinition, imd idx.MetricDefinitio
 	if smd.Interval != imd.Interval {
 		return fmt.Errorf("Interval not equal. schema: %d, idx: %d", smd.Interval, imd.Interval)
 	}
-	if smd.Unit != imd.Unit {
-		return fmt.Errorf("Unit not equal. schema: %v, idx: %v", smd.Unit, imd.Unit)
+	if smd.Unit != imd.Unit.String() {
+		return fmt.Errorf("Unit not equal. schema: %v, idx: %v", smd.Unit, imd.Unit.String())
 	}
 	if smd.Mtype != imd.Mtype() {
 		return fmt.Errorf("Mtype not equal. schema: %v, idx: %v", smd.Mtype, imd.Mtype())

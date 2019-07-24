@@ -24,7 +24,7 @@ func SchemaToRow(def *idx.MetricDefinitionInterned) (string, map[string][]byte) 
 		"OrgId":      make([]byte, 8),
 		"Name":       []byte(def.Name.String()),
 		"Interval":   make([]byte, 8),
-		"Unit":       []byte(def.Unit),
+		"Unit":       []byte(def.Unit.String()),
 		"Mtype":      []byte(def.Mtype()),
 		"Tags":       []byte(strings.Join(def.Tags.Strings(), ";")),
 		"LastUpdate": make([]byte, 8),
