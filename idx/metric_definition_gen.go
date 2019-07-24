@@ -98,7 +98,7 @@ func (z KeyValuesSlice) Msgsize() (s int) {
 }
 
 // DecodeMsg implements msgp.Decodable
-func (z *MetricDefinition) DecodeMsg(dc *msgp.Reader) (err error) {
+func (z *MetricDefinitionInterned) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
 	var zb0001 uint32
@@ -175,7 +175,7 @@ func (z *MetricDefinition) DecodeMsg(dc *msgp.Reader) (err error) {
 }
 
 // EncodeMsg implements msgp.Encodable
-func (z *MetricDefinition) EncodeMsg(en *msgp.Writer) (err error) {
+func (z *MetricDefinitionInterned) EncodeMsg(en *msgp.Writer) (err error) {
 	// map header, size 8
 	// write "Id"
 	err = en.Append(0x88, 0xa2, 0x49, 0x64)
@@ -261,7 +261,7 @@ func (z *MetricDefinition) EncodeMsg(en *msgp.Writer) (err error) {
 }
 
 // MarshalMsg implements msgp.Marshaler
-func (z *MetricDefinition) MarshalMsg(b []byte) (o []byte, err error) {
+func (z *MetricDefinitionInterned) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
 	// map header, size 8
 	// string "Id"
@@ -304,7 +304,7 @@ func (z *MetricDefinition) MarshalMsg(b []byte) (o []byte, err error) {
 }
 
 // UnmarshalMsg implements msgp.Unmarshaler
-func (z *MetricDefinition) UnmarshalMsg(bts []byte) (o []byte, err error) {
+func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	var field []byte
 	_ = field
 	var zb0001 uint32
@@ -382,7 +382,7 @@ func (z *MetricDefinition) UnmarshalMsg(bts []byte) (o []byte, err error) {
 }
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z *MetricDefinition) Msgsize() (s int) {
+func (z *MetricDefinitionInterned) Msgsize() (s int) {
 	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.ExtensionPrefixSize + z.Name.Len() + 9 + msgp.IntSize + 5 + msgp.StringPrefixSize + len(z.Unit) + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
 	return
 }

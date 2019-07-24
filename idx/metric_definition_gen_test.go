@@ -122,8 +122,8 @@ func BenchmarkDecodeKeyValuesSlice(b *testing.B) {
 	}
 }
 
-func TestMarshalUnmarshalMetricDefinition(t *testing.T) {
-	v := MetricDefinition{}
+func TestMarshalUnmarshalMetricDefinitionInterned(t *testing.T) {
+	v := MetricDefinitionInterned{}
 	bts, err := v.MarshalMsg(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -145,8 +145,8 @@ func TestMarshalUnmarshalMetricDefinition(t *testing.T) {
 	}
 }
 
-func BenchmarkMarshalMsgMetricDefinition(b *testing.B) {
-	v := MetricDefinition{}
+func BenchmarkMarshalMsgMetricDefinitionInterned(b *testing.B) {
+	v := MetricDefinitionInterned{}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -154,8 +154,8 @@ func BenchmarkMarshalMsgMetricDefinition(b *testing.B) {
 	}
 }
 
-func BenchmarkAppendMsgMetricDefinition(b *testing.B) {
-	v := MetricDefinition{}
+func BenchmarkAppendMsgMetricDefinitionInterned(b *testing.B) {
+	v := MetricDefinitionInterned{}
 	bts := make([]byte, 0, v.Msgsize())
 	bts, _ = v.MarshalMsg(bts[0:0])
 	b.SetBytes(int64(len(bts)))
@@ -166,8 +166,8 @@ func BenchmarkAppendMsgMetricDefinition(b *testing.B) {
 	}
 }
 
-func BenchmarkUnmarshalMetricDefinition(b *testing.B) {
-	v := MetricDefinition{}
+func BenchmarkUnmarshalMetricDefinitionInterned(b *testing.B) {
+	v := MetricDefinitionInterned{}
 	bts, _ := v.MarshalMsg(nil)
 	b.ReportAllocs()
 	b.SetBytes(int64(len(bts)))
@@ -180,8 +180,8 @@ func BenchmarkUnmarshalMetricDefinition(b *testing.B) {
 	}
 }
 
-func TestEncodeDecodeMetricDefinition(t *testing.T) {
-	v := MetricDefinition{}
+func TestEncodeDecodeMetricDefinitionInterned(t *testing.T) {
+	v := MetricDefinitionInterned{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 
@@ -190,7 +190,7 @@ func TestEncodeDecodeMetricDefinition(t *testing.T) {
 		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
-	vn := MetricDefinition{}
+	vn := MetricDefinitionInterned{}
 	err := msgp.Decode(&buf, &vn)
 	if err != nil {
 		t.Error(err)
@@ -204,8 +204,8 @@ func TestEncodeDecodeMetricDefinition(t *testing.T) {
 	}
 }
 
-func BenchmarkEncodeMetricDefinition(b *testing.B) {
-	v := MetricDefinition{}
+func BenchmarkEncodeMetricDefinitionInterned(b *testing.B) {
+	v := MetricDefinitionInterned{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))
@@ -218,8 +218,8 @@ func BenchmarkEncodeMetricDefinition(b *testing.B) {
 	en.Flush()
 }
 
-func BenchmarkDecodeMetricDefinition(b *testing.B) {
-	v := MetricDefinition{}
+func BenchmarkDecodeMetricDefinitionInterned(b *testing.B) {
+	v := MetricDefinitionInterned{}
 	var buf bytes.Buffer
 	msgp.Encode(&buf, &v)
 	b.SetBytes(int64(buf.Len()))

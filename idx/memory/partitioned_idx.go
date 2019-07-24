@@ -519,7 +519,7 @@ func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) 
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinition) int {
+func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinitionInterned) int {
 	return p.Partition[partition].Load(defs)
 }
 

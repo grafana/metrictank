@@ -4,10 +4,11 @@ package idx
 
 import (
 	"regexp"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 	goi "github.com/robert-milan/go-object-interning"
 )
@@ -18,6 +19,19 @@ var OrgIdPublic = uint32(0)
 //
 // Default config does not use compression
 var IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+var archiveInternedCount = stats.NewGauge32("idx.archive_interned_pool")
+
+var archiveInternedPool = sync.Pool{
+	New: func() interface{} {
+		return new(ArchiveInterned)
+	},
+}
+
+var metricDefinitionInternedPool = sync.Pool{
+	New: func() interface{} {
+		return new(MetricDefinitionInterned)
+	},
+}
 
 //msgp:ignore Md5Hash
 
@@ -34,39 +48,6 @@ type Node struct {
 	Leaf        bool
 	Defs        []Archive
 	HasChildren bool
-}
-
-type Archive struct {
-	schema.MetricDefinition
-	SchemaId uint16 // index in mdata.schemas (not persisted)
-	AggId    uint16 // index in mdata.aggregations (not persisted)
-	IrId     uint16 // index in mdata.indexrules (not persisted)
-	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
-}
-
-type ArchiveInterned struct {
-	*MetricDefinition
-	SchemaId uint16 // index in mdata.schemas (not persisted)
-	AggId    uint16 // index in mdata.aggregations (not persisted)
-	IrId     uint16 // index in mdata.indexrules (not persisted)
-	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
-}
-
-func (a *ArchiveInterned) GetArchive() Archive {
-	return Archive{
-		a.MetricDefinition.ConvertToSchemaMd(),
-		a.SchemaId,
-		a.AggId,
-		a.IrId,
-		atomic.LoadUint32(&a.LastSave),
-	}
-}
-
-// used primarily by tests, for convenience
-func NewArchiveBare(name string) Archive {
-	arc := Archive{}
-	arc.Name = name
-	return arc
 }
 
 // The MetricIndex interface supports Graphite style queries.
@@ -203,7 +184,7 @@ type MetricIndex interface {
 // InternReleaseMetricDefinition releases all previously acquired strings
 // into the interning layer so that their reference count can be
 // decreased by 1 and they can eventually be deleted
-func InternReleaseMetricDefinition(md MetricDefinition) {
+func InternReleaseMetricDefinition(md MetricDefinitionInterned) {
 	IdxIntern.DeleteBatch(md.Name.Nodes())
 	for i := range md.Tags.KeyValues {
 		IdxIntern.DeleteBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
@@ -211,7 +192,7 @@ func InternReleaseMetricDefinition(md MetricDefinition) {
 	IdxIntern.DeleteByString(md.Unit)
 }
 
-func InternIncMetricDefinitionRefCounts(md MetricDefinition) {
+func InternIncMetricDefinitionRefCounts(md MetricDefinitionInterned) {
 	IdxIntern.IncRefCntBatch(md.Name.Nodes())
 	for i := range md.Tags.KeyValues {
 		IdxIntern.IncRefCntBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})

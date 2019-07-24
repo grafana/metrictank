@@ -131,7 +131,7 @@ func ConfigProcess() {
 // this is needed to support unit tests.
 type MemoryIndex interface {
 	idx.MetricIndex
-	LoadPartition(int32, []idx.MetricDefinition) int
+	LoadPartition(int32, []idx.MetricDefinitionInterned) int
 	UpdateArchiveLastSave(schema.MKey, int32, uint32)
 	add(*idx.ArchiveInterned)
 	idsByTagQuery(uint32, TagQueryContext) IdSet
@@ -193,19 +193,19 @@ func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey) {
 }
 
 // org id -> NameWithTagsHash() -> Map keyed by *idx.MetricDefinition.
-type defByTagSet map[uint32]map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
+type defByTagSet map[uint32]map[idx.Md5Hash]map[*idx.MetricDefinitionInterned]struct{}
 
-func (defs defByTagSet) add(def *idx.MetricDefinition) {
-	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
+func (defs defByTagSet) add(def *idx.MetricDefinitionInterned) {
+	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinitionInterned]struct{}
 	var ok bool
 	if orgDefs, ok = defs[def.OrgId]; !ok {
-		orgDefs = make(map[idx.Md5Hash]map[*idx.MetricDefinition]struct{})
+		orgDefs = make(map[idx.Md5Hash]map[*idx.MetricDefinitionInterned]struct{})
 		defs[def.OrgId] = orgDefs
 	}
 
 	hashedName := def.NameWithTagsHash()
 	if _, ok = orgDefs[hashedName]; !ok {
-		orgDefs[hashedName] = make(map[*idx.MetricDefinition]struct{}, 1)
+		orgDefs[hashedName] = make(map[*idx.MetricDefinitionInterned]struct{}, 1)
 	}
 
 	if _, ok = orgDefs[hashedName][def]; !ok {
@@ -213,8 +213,8 @@ func (defs defByTagSet) add(def *idx.MetricDefinition) {
 	}
 }
 
-func (defs defByTagSet) del(def *idx.MetricDefinition) {
-	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
+func (defs defByTagSet) del(def *idx.MetricDefinitionInterned) {
+	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinitionInterned]struct{}
 	var ok bool
 	if orgDefs, ok = defs[def.OrgId]; !ok {
 		return
@@ -232,8 +232,8 @@ func (defs defByTagSet) del(def *idx.MetricDefinition) {
 	}
 }
 
-func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefinition]struct{} {
-	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinition]struct{}
+func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefinitionInterned]struct{} {
+	var orgDefs map[idx.Md5Hash]map[*idx.MetricDefinitionInterned]struct{}
 	var ok bool
 	if orgDefs, ok = defs[id]; !ok {
 		return nil
@@ -245,7 +245,7 @@ func (defs defByTagSet) defs(id uint32, fullName string) map[*idx.MetricDefiniti
 		Lower: binary.LittleEndian.Uint64(md5Sum[8:]),
 	}
 
-	ret := make(map[*idx.MetricDefinition]struct{})
+	ret := make(map[*idx.MetricDefinitionInterned]struct{})
 
 	//TODO: Possibly refactor by adding a method to compare
 	//		based on uintptrs instead of strings
@@ -405,7 +405,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 		}
 
 		oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-		return idx.NewSafeArchive(existing), oldPart, true
+		return existing.CloneInterned(), oldPart, true
 	}
 
 	if m.writeQueue != nil {
@@ -417,7 +417,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 				log.Debugf("memory-idx: metricDef with id %v is in the writeQueue", point.MKey)
 			}
 			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-			return idx.NewSafeArchive(existing), oldPart, true
+			return existing.CloneInterned(), oldPart, true
 		}
 
 		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
@@ -430,7 +430,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 				log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
 			}
 			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-			return idx.NewSafeArchive(existing), oldPart, true
+			return existing.CloneInterned(), oldPart, true
 		}
 	}
 
@@ -453,7 +453,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 			log.Debugf("memory-idx: metricDef with id %s already in the index", mkey)
 		}
 		oldPart := updateExisting(existing, partition, data.Time, pre)
-		return idx.NewSafeArchive(existing), oldPart, ok
+		return existing.CloneInterned(), oldPart, ok
 	}
 
 	def, err := idx.MetricDefinitionFromMetricDataWithMKey(mkey, data)
@@ -475,7 +475,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		m.writeQueue.Queue(archive)
 	}
 
-	return idx.NewSafeArchive(archive), 0, false
+	return archive.CloneInterned(), 0, false
 }
 
 // UpdateArchiveLastSave updates the LastSave timestamp of the archive
@@ -595,7 +595,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 // indexTags reads the tags of a given metric definition and creates the
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
-func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
+func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinitionInterned) {
 	tags, ok := m.tags[def.OrgId]
 	if !ok {
 		tags = make(TagIndex)
@@ -623,7 +623,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinition) {
 // a return value of "false" means there was an error and the deindexing was
 // unsuccessful, "true" means the indexing was at least partially or completely
 // successful
-func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefinition) bool {
+func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefinitionInterned) bool {
 	for _, tag := range def.Tags.KeyValues {
 		tags.delTagId(tag.Key, tag.Value, def.Id)
 	}
@@ -648,13 +648,13 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefin
 }
 
 // LoadPartition is used to rebuild the index from an existing set of metricDefinitions for a specific paritition.
-func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinition) int {
+func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []idx.MetricDefinitionInterned) int {
 	// UnpartitionedMemoryIdx isnt partitioned, so just ignore the partition passed and call Load()
 	return m.Load(defs)
 }
 
 // Load is used to rebuild the index from an existing set of metricDefinitions.
-func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
+func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinitionInterned) int {
 	m.Lock()
 	defer m.Unlock()
 	var pre time.Time
@@ -677,17 +677,17 @@ func (m *UnpartitionedMemoryIdx) Load(defs []idx.MetricDefinition) int {
 	return num
 }
 
-func createArchive(def *idx.MetricDefinition) *idx.ArchiveInterned {
+func createArchive(def *idx.MetricDefinitionInterned) *idx.ArchiveInterned {
 	path := def.NameWithTags()
 	schemaId, _ := mdata.MatchSchema(path, def.Interval)
 	aggId, _ := mdata.MatchAgg(path)
 	irId, _ := IndexRules.Match(path)
 
 	return &idx.ArchiveInterned{
-		MetricDefinition: def,
-		SchemaId:         schemaId,
-		AggId:            aggId,
-		IrId:             irId,
+		MetricDefinitionInterned: def,
+		SchemaId:                 schemaId,
+		AggId:                    aggId,
+		IrId:                     irId,
 	}
 }
 
@@ -706,14 +706,14 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.ArchiveInterned) {
 
 	statMetricsActive.Inc()
 
-	def := archive.MetricDefinition
+	def := archive.MetricDefinitionInterned
 	path := def.NameWithTags()
 
 	if TagSupport {
 		// Even if there are no tags, index at least "name". It's important to use the definition
 		// in the archive pointer that we add to defById, because the pointers must reference the
 		// same underlying object in m.defById and m.defByTagSet
-		m.indexTags(archive.MetricDefinition)
+		m.indexTags(archive.MetricDefinitionInterned)
 
 		if len(def.Tags.KeyValues) > 0 {
 			if _, ok := m.defById[def.Id]; !ok {
@@ -1492,7 +1492,7 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 
 		// this is a special case where the MetricDefinitions need to be
 		// released outside of the normal Delete() path.
-		idx.InternReleaseMetricDefinition(*deleted[i].MetricDefinition)
+		idx.InternReleaseMetricDefinition(*deleted[i].MetricDefinitionInterned)
 	}
 
 	return res
@@ -1516,7 +1516,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 			// while we switched from read to write lock
 			continue
 		}
-		if !m.deindexTags(tags, def.MetricDefinition) {
+		if !m.deindexTags(tags, def.MetricDefinitionInterned) {
 			continue
 		}
 		deletedDefs = append(deletedDefs, def)
@@ -1570,7 +1570,7 @@ func (m *UnpartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) 
 	i := 0
 	for _, deleteResult := range deleteResults {
 		for _, def := range deleteResult {
-			deletedDefs[i] = idx.NewSafeArchive(def)
+			deletedDefs[i] = def.CloneInterned()
 			i++
 		}
 	}
@@ -1704,7 +1704,7 @@ func (m *UnpartitionedMemoryIdx) Prune(now time.Time) ([]*idx.ArchiveInterned, e
 	var pruned []*idx.ArchiveInterned
 
 	// expandPruned takes a list of interned archives and appends them to the
-	// pruned slice after calling NewSafeArchive() for each of them
+	// pruned slice after calling  .CloneArchiveInterned() on each of them
 	expandPruned := func(defs []*idx.ArchiveInterned) {
 		prunedOld := pruned
 		pruned = make([]*idx.ArchiveInterned, len(prunedOld)+len(defs))
@@ -1712,7 +1712,7 @@ func (m *UnpartitionedMemoryIdx) Prune(now time.Time) ([]*idx.ArchiveInterned, e
 			pruned[i] = prunedOld[i]
 		}
 		for i := range defs {
-			pruned[len(prunedOld)+i] = idx.NewSafeArchive(defs[i])
+			pruned[len(prunedOld)+i] = defs[i].CloneInterned()
 		}
 	}
 
@@ -1951,17 +1951,4 @@ func toRegexp(pattern string) string {
 	p = strings.Replace(p, "?", ".?", -1)
 	p = "^" + p + "$"
 	return p
-}
-
-// CloneArchive safely clones an archive. We use atomic operations to update
-// fields, so we need to use atomic operations to read those fields
-// when copying.
-func CloneArchive(a *idx.ArchiveInterned) idx.ArchiveInterned {
-	return idx.ArchiveInterned{
-		SchemaId:         a.SchemaId,
-		AggId:            a.AggId,
-		IrId:             a.IrId,
-		LastSave:         atomic.LoadUint32(&a.LastSave),
-		MetricDefinition: a.MetricDefinition.Clone(),
-	}
 }

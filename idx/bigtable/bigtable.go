@@ -286,7 +286,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *idx.Arc
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("bigtable-idx: updating def %s in index.", archive.Id)
 		}
-		b.writeQueue <- writeReq{recvTime: time.Now(), def: idx.NewSafeArchive(archive)}
+		b.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}
 		archive.LastSave = now
 		b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 	} else {
@@ -297,7 +297,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *idx.Arc
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
 		// do a blocking write to the queue.
 		select {
-		case b.writeQueue <- writeReq{recvTime: time.Now(), def: idx.NewSafeArchive(archive)}:
+		case b.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}:
 			archive.LastSave = now
 			b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
 		default:
@@ -316,7 +316,7 @@ func (b *BigtableIdx) rebuildIndex() {
 	pre := time.Now()
 
 	num := 0
-	var defs []idx.MetricDefinition
+	var defs []idx.MetricDefinitionInterned
 	for _, partition := range cluster.Manager.GetPartitions() {
 		defs = b.LoadPartition(partition, defs[:0], pre)
 		num += b.MemoryIndex.LoadPartition(partition, defs)
@@ -325,13 +325,13 @@ func (b *BigtableIdx) rebuildIndex() {
 	log.Infof("bigtable-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (b *BigtableIdx) LoadPartition(partition int32, defs []idx.MetricDefinition, now time.Time) []idx.MetricDefinition {
+func (b *BigtableIdx) LoadPartition(partition int32, defs []idx.MetricDefinitionInterned, now time.Time) []idx.MetricDefinitionInterned {
 	ctx := context.Background()
 	rr := bigtable.PrefixRange(fmt.Sprintf("%d_", partition))
-	defsByNames := make(map[string][]idx.MetricDefinition)
+	defsByNames := make(map[string][]idx.MetricDefinitionInterned)
 	var marshalErr error
 	err := b.tbl.ReadRows(ctx, rr, func(r bigtable.Row) bool {
-		def := idx.MetricDefinition{}
+		def := idx.MetricDefinitionInterned{}
 		marshalErr = RowToSchema(r, &def)
 		if marshalErr != nil {
 			return false
@@ -380,8 +380,8 @@ func (b *BigtableIdx) processWriteQueue() {
 		byteCount := 0
 		for i, req := range buffer {
 			statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
-			key, cols := SchemaToRow(req.def.MetricDefinition)
-			req.def.ReleaseSafeArchive()
+			key, cols := SchemaToRow(req.def.MetricDefinitionInterned)
+			req.def.ReleaseArchiveInterned()
 			rowKeys[i] = key
 			mut := bigtable.NewMutation()
 			for col, val := range cols {
@@ -471,10 +471,10 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 	}
 	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
-			delErr := b.deleteDef(def.MetricDefinition)
+			delErr := b.deleteDef(def.MetricDefinitionInterned)
 			// the last error encountered will be passed back to the caller
 			if delErr != nil {
-				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinition.Id, err)
+				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinitionInterned.Id, err)
 				err = delErr
 			}
 		}
@@ -483,13 +483,13 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 
 	defCount := len(defs)
 	for i := range defs {
-		defs[i].ReleaseSafeArchive()
+		defs[i].ReleaseArchiveInterned()
 	}
 
 	return defCount, err
 }
 
-func (b *BigtableIdx) deleteDef(def *idx.MetricDefinition) error {
+func (b *BigtableIdx) deleteDef(def *idx.MetricDefinitionInterned) error {
 	return b.deleteRow(FormatRowKey(def.Id, def.Partition))
 }
 
@@ -530,7 +530,7 @@ func (b *BigtableIdx) prune() {
 		case now := <-ticker.C:
 			defs, _ := b.Prune(now)
 			for i := range defs {
-				defs[i].ReleaseSafeArchive()
+				defs[i].ReleaseArchiveInterned()
 			}
 		case <-b.shutdown:
 			return

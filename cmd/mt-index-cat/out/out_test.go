@@ -17,10 +17,10 @@ func genTags(num int) []string {
 	return tags
 }
 
-func genMetricDefinitions(num int) []idx.MetricDefinition {
-	defs := make([]idx.MetricDefinition, num)
+func genMetricDefinitions(num int) []idx.MetricDefinitionInterned {
+	defs := make([]idx.MetricDefinitionInterned, num)
 	for i := 0; i < num; i++ {
-		defs[i] = idx.MetricDefinition{
+		defs[i] = idx.MetricDefinitionInterned{
 			OrgId:      1,
 			Interval:   10,
 			LastUpdate: 0,
@@ -35,7 +35,7 @@ func genMetricDefinitions(num int) []idx.MetricDefinition {
 	return defs
 }
 
-func compareSchemaWithIdxMd(smd schema.MetricDefinition, imd idx.MetricDefinition) error {
+func compareSchemaWithIdxMd(smd schema.MetricDefinition, imd idx.MetricDefinitionInterned) error {
 	if smd.Id != imd.Id {
 		return fmt.Errorf("Id not equal. schema: %d, idx: %d", smd.Id, imd.Id)
 	}

@@ -18,7 +18,7 @@ func FormatRowKey(mkey schema.MKey, partition int32) string {
 }
 
 // SchemaToRow takes a metricDefintion and returns a rowKey and column data.
-func SchemaToRow(def *idx.MetricDefinition) (string, map[string][]byte) {
+func SchemaToRow(def *idx.MetricDefinitionInterned) (string, map[string][]byte) {
 	row := map[string][]byte{
 		//"Id" omitted as it is part of the rowKey
 		"OrgId":      make([]byte, 8),
@@ -51,7 +51,7 @@ func DecodeRowKey(key string) (schema.MKey, int32, error) {
 }
 
 // RowToSchema takes a row and unmarshals the data into the provided MetricDefinition.
-func RowToSchema(row bigtable.Row, def *idx.MetricDefinition) error {
+func RowToSchema(row bigtable.Row, def *idx.MetricDefinitionInterned) error {
 	if def == nil {
 		return fmt.Errorf("cant write row to nil MetricDefinition")
 	}
@@ -59,7 +59,7 @@ func RowToSchema(row bigtable.Row, def *idx.MetricDefinition) error {
 	if !ok {
 		return fmt.Errorf("no columns in columnFamly %s", COLUMN_FAMILY)
 	}
-	*def = idx.MetricDefinition{}
+	*def = idx.MetricDefinitionInterned{}
 	var err error
 	var val int64
 

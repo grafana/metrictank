@@ -314,8 +314,8 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-// MetricDefinition stores information which identifies a single metric
-type MetricDefinition struct {
+// MetricDefinitionInterned stores information which identifies a single metric
+type MetricDefinitionInterned struct {
 	Id    schema.MKey
 	OrgId uint32
 	// using custom marshalling for MetricName
@@ -329,9 +329,9 @@ type MetricDefinition struct {
 	Partition  int32
 }
 
-// NameWithTags returns a string version of the MetricDefinition's name with
-// all of its tags in the form of 'name;key1=value1;key2=value2;key3=value3'
-func (md *MetricDefinition) NameWithTags() string {
+// NameWithTags returns a string version of the MetricDefinitionInterned's
+// name with all of its tags in the form of 'name;key1=value1;key2=value2;key3=value3'
+func (md *MetricDefinitionInterned) NameWithTags() string {
 	var bld strings.Builder
 
 	md.Name.string(&bld)
@@ -351,7 +351,7 @@ func (md *MetricDefinition) NameWithTags() string {
 
 // NameWithTagsHash returns an Md5Hash struct containing the
 // hashed md5 sum of a NameWithTags for the given MetricDefinition
-func (md *MetricDefinition) NameWithTagsHash() Md5Hash {
+func (md *MetricDefinitionInterned) NameWithTagsHash() Md5Hash {
 	md5Sum := md5.Sum([]byte(md.NameWithTags()))
 	ret := Md5Hash{
 		Upper: binary.LittleEndian.Uint64(md5Sum[:8]),
@@ -363,7 +363,7 @@ func (md *MetricDefinition) NameWithTagsHash() Md5Hash {
 // SetMType translates a string into a uint8 which is used to store
 // the actual metric type. Valid values are 'gauge', 'rate', 'count',
 // 'counter', and 'timestamp'.
-func (md *MetricDefinition) SetMType(mtype string) {
+func (md *MetricDefinitionInterned) SetMType(mtype string) {
 	switch mtype {
 	case "gauge":
 		md.mtype = MTypeGauge
@@ -382,7 +382,7 @@ func (md *MetricDefinition) SetMType(mtype string) {
 }
 
 // Mtype returns a string version of the current MType
-func (md *MetricDefinition) Mtype() string {
+func (md *MetricDefinitionInterned) Mtype() string {
 	switch md.mtype {
 	case MTypeGauge:
 		return "gauge"
@@ -402,7 +402,7 @@ func (md *MetricDefinition) Mtype() string {
 
 // SetUnit takes a string, interns it in an object store
 // and then uses it to store the unit.
-func (md *MetricDefinition) SetUnit(unit string) {
+func (md *MetricDefinitionInterned) SetUnit(unit string) {
 	if unit == "" {
 		md.Unit = ""
 		return
@@ -421,7 +421,7 @@ func (md *MetricDefinition) SetUnit(unit string) {
 // SetMetricName interns the MetricName in an
 // object store and stores the addresses of those strings
 // in MetricName.nodes
-func (md *MetricDefinition) SetMetricName(name string) error {
+func (md *MetricDefinitionInterned) SetMetricName(name string) error {
 	nodes := strings.Split(name, ".")
 	md.Name.nodes = make([]uintptr, len(nodes))
 	for i, node := range nodes {
@@ -445,7 +445,7 @@ func (md *MetricDefinition) SetMetricName(name string) error {
 // The items in the input argument should not contain ';'. Each item
 // is a separate Key/Value pair. Do not combine multiple Key/Value pairs
 // into a single index in the []string.
-func (md *MetricDefinition) SetTags(tags []string) {
+func (md *MetricDefinitionInterned) SetTags(tags []string) {
 	md.Tags.KeyValues = make([]TagKeyValue, 0, len(tags))
 	sort.Strings(tags)
 	for _, tag := range tags {
@@ -491,7 +491,7 @@ func (md *MetricDefinition) SetTags(tags []string) {
 }
 
 // SetId creates and sets the MKey which identifies a metric
-func (md *MetricDefinition) SetId() {
+func (md *MetricDefinitionInterned) SetId() {
 	sort.Sort(md.Tags.KeyValues)
 	buffer := bytes.NewBufferString(md.Name.String())
 	buffer.WriteByte(0)
@@ -523,7 +523,7 @@ func (md *MetricDefinition) SetId() {
 }
 
 // ConvertToSchemaMd converts an idx.MetricDefinition to a schema.MetricDefinition
-func (md *MetricDefinition) ConvertToSchemaMd() schema.MetricDefinition {
+func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition {
 	smd := schema.MetricDefinition{
 		Id:         md.Id,
 		OrgId:      md.OrgId,
@@ -538,10 +538,11 @@ func (md *MetricDefinition) ConvertToSchemaMd() schema.MetricDefinition {
 	return smd
 }
 
-// Clone() returns a copy of the MetricDefinition. It uses atomic operations
-// to read certain properties that get updated atomically
-func (md *MetricDefinition) Clone() *MetricDefinition {
-	return &MetricDefinition{
+// CloneInterned() returns a copy of the MetricDefinition
+// It uses atomic operations to read certain properties that get updated atomically
+// and also increases the reference count of all interned values
+func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
+	return &MetricDefinitionInterned{
 		Id:         md.Id,
 		OrgId:      md.OrgId,
 		Name:       md.Name,
@@ -556,8 +557,8 @@ func (md *MetricDefinition) Clone() *MetricDefinition {
 
 // MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition
 // based on them.
-func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricData) (*MetricDefinition, error) {
-	md := &MetricDefinition{
+func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricData) (*MetricDefinitionInterned, error) {
+	md := &MetricDefinitionInterned{
 		Id:         mkey,
 		OrgId:      uint32(d.OrgId),
 		Interval:   d.Interval,
@@ -566,7 +567,7 @@ func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricDa
 
 	err := md.SetMetricName(d.Name)
 	if err != nil {
-		return &MetricDefinition{}, err
+		return &MetricDefinitionInterned{}, err
 	}
 	md.SetUnit(d.Unit)
 	md.SetMType(d.Mtype)
@@ -577,7 +578,7 @@ func MetricDefinitionFromMetricDataWithMKey(mkey schema.MKey, d *schema.MetricDa
 
 // MetricDefinitionFromMetricData takes a MetricData, attempts to generate an MKey for it,
 // and returns a MetricDefinition upon success. On failure it returns an error
-func MetricDefinitionFromMetricData(d *schema.MetricData) (*MetricDefinition, error) {
+func MetricDefinitionFromMetricData(d *schema.MetricData) (*MetricDefinitionInterned, error) {
 	mkey, err := schema.MKeyFromString(d.Id)
 	if err != nil {
 		return nil, fmt.Errorf("idx: Error parsing ID: %s", err)

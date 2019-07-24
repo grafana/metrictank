@@ -318,11 +318,11 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive *idx.Archive
 	// then perform a blocking save.
 	if archive.LastSave < (now - c.updateInterval32 - c.updateInterval32/2) {
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinition.Id)
+			log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinitionInterned.Id)
 		}
-		c.writeQueue <- writeReq{recvTime: time.Now(), def: idx.NewSafeArchive(archive)}
+		c.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}
 		archive.LastSave = now
-		c.MemoryIndex.UpdateArchiveLastSave(archive.MetricDefinition.Id, archive.Partition, now)
+		c.MemoryIndex.UpdateArchiveLastSave(archive.MetricDefinitionInterned.Id, archive.Partition, now)
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -331,12 +331,12 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive *idx.Archive
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
 		// do a blocking write to the queue.
 		select {
-		case c.writeQueue <- writeReq{recvTime: time.Now(), def: idx.NewSafeArchive(archive)}:
+		case c.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}:
 			archive.LastSave = now
-			c.MemoryIndex.UpdateArchiveLastSave(archive.MetricDefinition.Id, archive.Partition, now)
+			c.MemoryIndex.UpdateArchiveLastSave(archive.MetricDefinitionInterned.Id, archive.Partition, now)
 		default:
 			statSaveSkipped.Inc()
-			log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", archive.MetricDefinition.Id)
+			log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", archive.MetricDefinitionInterned.Id)
 		}
 	}
 
@@ -350,7 +350,7 @@ func (c *CasIdx) rebuildIndex() {
 	var wg sync.WaitGroup
 	defPool := sync.Pool{
 		New: func() interface{} {
-			return []idx.MetricDefinition{}
+			return []idx.MetricDefinitionInterned{}
 		},
 	}
 	var num uint32
@@ -358,7 +358,7 @@ func (c *CasIdx) rebuildIndex() {
 		wg.Add(1)
 		go func(p int32) {
 			gate <- struct{}{}
-			defs := defPool.Get().([]idx.MetricDefinition)
+			defs := defPool.Get().([]idx.MetricDefinitionInterned)
 			defer func() {
 				defPool.Put(defs[:0])
 				wg.Done()
@@ -372,12 +372,12 @@ func (c *CasIdx) rebuildIndex() {
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (c *CasIdx) Load(defs []idx.MetricDefinition, now time.Time) []idx.MetricDefinition {
+func (c *CasIdx) Load(defs []idx.MetricDefinitionInterned, now time.Time) []idx.MetricDefinitionInterned {
 	iter := c.Session.Query(fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s", c.Config.Table)).Iter()
 	return c.load(defs, iter, now)
 }
 
-func (c *CasIdx) LoadPartitions(partitions []int32, defs []idx.MetricDefinition, now time.Time) []idx.MetricDefinition {
+func (c *CasIdx) LoadPartitions(partitions []int32, defs []idx.MetricDefinitionInterned, now time.Time) []idx.MetricDefinitionInterned {
 	placeholders := make([]string, len(partitions))
 	for i, p := range partitions {
 		placeholders[i] = strconv.Itoa(int(p))
@@ -387,8 +387,8 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []idx.MetricDefinition,
 	return c.load(defs, iter, now)
 }
 
-func (c *CasIdx) load(defs []idx.MetricDefinition, iter cqlIterator, now time.Time) []idx.MetricDefinition {
-	defsByNames := make(map[string][]*idx.MetricDefinition)
+func (c *CasIdx) load(defs []idx.MetricDefinitionInterned, iter cqlIterator, now time.Time) []idx.MetricDefinitionInterned {
+	defsByNames := make(map[string][]*idx.MetricDefinitionInterned)
 	var id, name, unit, mtype string
 	var orgId, interval int
 	var partition int32
@@ -404,7 +404,7 @@ func (c *CasIdx) load(defs []idx.MetricDefinition, iter cqlIterator, now time.Ti
 			orgId = int(idx.OrgIdPublic)
 		}
 
-		mdef := &idx.MetricDefinition{
+		mdef := &idx.MetricDefinitionInterned{
 			Id:         mkey,
 			OrgId:      uint32(orgId),
 			Partition:  partition,
@@ -450,8 +450,8 @@ NAMES:
 
 // ArchiveDefs writes each of the provided defs to the archive table and
 // then deletes the defs from the metric_idx table.
-func (c *CasIdx) ArchiveDefs(defs []idx.MetricDefinition) (int, error) {
-	defChan := make(chan *idx.MetricDefinition, c.Config.NumConns)
+func (c *CasIdx) ArchiveDefs(defs []idx.MetricDefinitionInterned) (int, error) {
+	defChan := make(chan *idx.MetricDefinitionInterned, c.Config.NumConns)
 	g, ctx := errgroup.WithContext(context.Background())
 
 	// keep track of how many defs were successfully archived.
@@ -554,7 +554,7 @@ func (c *CasIdx) processWriteQueue() {
 				success = true
 				statQueryInsertExecDuration.Value(time.Since(pre))
 				statQueryInsertOk.Inc()
-				req.def.ReleaseSafeArchive()
+				req.def.ReleaseArchiveInterned()
 				if log.IsLevelEnabled(log.DebugLevel) {
 					log.Debugf("cassandra-idx: metricDef %s saved to cassandra", req.def.Id)
 				}
@@ -565,7 +565,7 @@ func (c *CasIdx) processWriteQueue() {
 	c.wg.Done()
 }
 
-func (c *CasIdx) addDefToArchive(def idx.MetricDefinition) error {
+func (c *CasIdx) addDefToArchive(def idx.MetricDefinitionInterned) error {
 	insertQry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate, archived_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.ArchiveTable)
 	maxAttempts := 5
 	now := time.Now().UTC().Unix()
@@ -624,7 +624,7 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) (int, error) {
 
 	defCount := len(defs)
 	for i := range defs {
-		defs[i].ReleaseSafeArchive()
+		defs[i].ReleaseArchiveInterned()
 	}
 
 	return defCount, err
@@ -677,7 +677,7 @@ func (c *CasIdx) prune() {
 	for now := range ticker.C {
 		defs, _ := c.Prune(now)
 		for i := range defs {
-			defs[i].ReleaseSafeArchive()
+			defs[i].ReleaseArchiveInterned()
 		}
 	}
 }
