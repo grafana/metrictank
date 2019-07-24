@@ -139,6 +139,12 @@ func (z *MetricDefinitionInterned) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "Interval")
 				return
 			}
+		case "unit":
+			err = dc.ReadExtension(&z.Unit)
+			if err != nil {
+				err = msgp.WrapError(err, "Unit")
+				return
+			}
 		case "tagkeyvalues":
 			err = dc.ReadExtension(&z.Tags)
 			if err != nil {
@@ -170,9 +176,9 @@ func (z *MetricDefinitionInterned) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *MetricDefinitionInterned) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 7
+	// map header, size 8
 	// write "Id"
-	err = en.Append(0x87, 0xa2, 0x49, 0x64)
+	err = en.Append(0x88, 0xa2, 0x49, 0x64)
 	if err != nil {
 		return
 	}
@@ -211,6 +217,16 @@ func (z *MetricDefinitionInterned) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "Interval")
 		return
 	}
+	// write "unit"
+	err = en.Append(0xa4, 0x75, 0x6e, 0x69, 0x74)
+	if err != nil {
+		return
+	}
+	err = en.WriteExtension(&z.Unit)
+	if err != nil {
+		err = msgp.WrapError(err, "Unit")
+		return
+	}
 	// write "tagkeyvalues"
 	err = en.Append(0xac, 0x74, 0x61, 0x67, 0x6b, 0x65, 0x79, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73)
 	if err != nil {
@@ -247,9 +263,9 @@ func (z *MetricDefinitionInterned) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *MetricDefinitionInterned) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 7
+	// map header, size 8
 	// string "Id"
-	o = append(o, 0x87, 0xa2, 0x49, 0x64)
+	o = append(o, 0x88, 0xa2, 0x49, 0x64)
 	o, err = z.Id.MarshalMsg(o)
 	if err != nil {
 		err = msgp.WrapError(err, "Id")
@@ -268,6 +284,13 @@ func (z *MetricDefinitionInterned) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Interval"
 	o = append(o, 0xa8, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c)
 	o = msgp.AppendInt(o, z.Interval)
+	// string "unit"
+	o = append(o, 0xa4, 0x75, 0x6e, 0x69, 0x74)
+	o, err = msgp.AppendExtension(o, &z.Unit)
+	if err != nil {
+		err = msgp.WrapError(err, "Unit")
+		return
+	}
 	// string "tagkeyvalues"
 	o = append(o, 0xac, 0x74, 0x61, 0x67, 0x6b, 0x65, 0x79, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73)
 	o, err = msgp.AppendExtension(o, &z.Tags)
@@ -326,6 +349,12 @@ func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error
 				err = msgp.WrapError(err, "Interval")
 				return
 			}
+		case "unit":
+			bts, err = msgp.ReadExtensionBytes(bts, &z.Unit)
+			if err != nil {
+				err = msgp.WrapError(err, "Unit")
+				return
+			}
 		case "tagkeyvalues":
 			bts, err = msgp.ReadExtensionBytes(bts, &z.Tags)
 			if err != nil {
@@ -358,7 +387,7 @@ func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *MetricDefinitionInterned) Msgsize() (s int) {
-	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.ExtensionPrefixSize + z.Name.Len() + 9 + msgp.IntSize + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
+	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.ExtensionPrefixSize + z.Name.Len() + 9 + msgp.IntSize + 5 + msgp.ExtensionPrefixSize + z.Unit.Len() + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
 	return
 }
 

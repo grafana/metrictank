@@ -367,7 +367,7 @@ type MetricDefinitionInterned struct {
 	// if there is another way we should explore that
 	Name       MetricName `msg:"name,extension"`
 	Interval   int
-	unit       Unit
+	Unit       Unit `msg:"unit,extension"`
 	mtype      mType
 	Tags       TagKeyValues `msg:"tagkeyvalues,extension"`
 	LastUpdate int64
@@ -445,15 +445,11 @@ func (md *MetricDefinitionInterned) Mtype() string {
 	}
 }
 
-func (md *MetricDefinitionInterned) Unit() string {
-	return md.unit.String()
-}
-
 // SetUnit takes a string, interns it in an object store
 // and then uses it to store the unit.
 func (md *MetricDefinitionInterned) SetUnit(unit string) {
 	if unit == "" {
-		md.unit = 0
+		md.Unit = 0
 		return
 	}
 
@@ -461,11 +457,11 @@ func (md *MetricDefinitionInterned) SetUnit(unit string) {
 	if err != nil {
 		log.Errorf("idx: Failed to intern Unit %v. %v", unit, err)
 		internError.Inc()
-		md.unit = 0
+		md.Unit = 0
 		return
 	}
 
-	md.unit = Unit(sz)
+	md.Unit = Unit(sz)
 }
 
 // SetMetricName interns the MetricName in an
@@ -545,7 +541,7 @@ func (md *MetricDefinitionInterned) SetId() {
 	sort.Sort(md.Tags.KeyValues)
 	buffer := bytes.NewBufferString(md.Name.String())
 	buffer.WriteByte(0)
-	buffer.WriteString(md.Unit())
+	buffer.WriteString(md.Unit.String())
 	buffer.WriteByte(0)
 	buffer.WriteString(md.Mtype())
 	buffer.WriteByte(0)
@@ -579,7 +575,7 @@ func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition 
 		OrgId:      md.OrgId,
 		Name:       md.Name.String(),
 		Interval:   md.Interval,
-		Unit:       md.Unit(),
+		Unit:       md.Unit.String(),
 		Mtype:      md.Mtype(),
 		Tags:       md.Tags.Strings(),
 		LastUpdate: atomic.LoadInt64(&md.LastUpdate),
@@ -601,7 +597,7 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	clone.OrgId = md.OrgId
 	clone.Name = md.Name
 	clone.Interval = md.Interval
-	clone.unit = md.unit
+	clone.Unit = md.Unit
 	clone.mtype = md.mtype
 	clone.Tags = md.Tags
 	clone.LastUpdate = atomic.LoadInt64(&md.LastUpdate)
@@ -611,7 +607,7 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	for i := range clone.Tags.KeyValues {
 		IdxIntern.IncRefCntBatch([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.IncRefCnt(uintptr(clone.unit))
+	IdxIntern.IncRefCnt(uintptr(clone.Unit))
 
 	return clone
 }
@@ -628,7 +624,7 @@ func (md *MetricDefinitionInterned) ReleaseInterned() {
 	for i := range md.Tags.KeyValues {
 		IdxIntern.DeleteBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.Delete(uintptr(md.unit))
+	IdxIntern.Delete(uintptr(md.Unit))
 
 	metricDefinitionInternedPool.Put(md)
 }
