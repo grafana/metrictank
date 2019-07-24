@@ -607,7 +607,10 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	for i := range clone.Tags.KeyValues {
 		IdxIntern.IncRefCntBatchUnsafe([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.IncRefCntUnsafe(uintptr(clone.Unit))
+
+	if clone.Unit != 0 {
+		IdxIntern.IncRefCntUnsafe(uintptr(clone.Unit))
+	}
 
 	return clone
 }
@@ -624,7 +627,10 @@ func (md *MetricDefinitionInterned) ReleaseInterned() {
 	for i := range md.Tags.KeyValues {
 		IdxIntern.DeleteBatchUnsafe([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.DeleteUnsafe(uintptr(md.Unit))
+
+	if md.Unit != 0 {
+		IdxIntern.DeleteUnsafe(uintptr(md.Unit))
+	}
 
 	metricDefinitionInternedPool.Put(md)
 }
