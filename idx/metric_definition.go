@@ -545,9 +545,13 @@ func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition 
 	return smd
 }
 
-// CloneInterned() returns a copy of the MetricDefinition
-// It uses atomic operations to read certain properties that get updated atomically
-// and also increases the reference count of all interned values
+// CloneInterned() creates a new safe copy of the interned
+// archive. A safe copy in this context means that when accessing
+// the copy one does not need to worry about atomics or the string
+// interning.
+// It is important that .ReleaseInterned() gets called before it
+// goes out of scope to return its memory back to the pools and to
+// update the reference counts of interned values correctly
 func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	clone := metricDefinitionInternedPool.Get().(*MetricDefinitionInterned)
 	clone.Id = md.Id
@@ -569,6 +573,13 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	return clone
 }
 
+// ReleaseInterned() should be called whenever an instance of
+// ArchiveInterned goes out of scope (before it gets GCed).
+// It is also improtant that ReleaseInterned() only gets called
+// exactly once when an ArchiveInterned goes out of scope,
+// and not more than that.
+// It updates the refence counts of the interned struct
+// properties, or deletes the interned values when necessary.
 func (md *MetricDefinitionInterned) ReleaseInterned() {
 	IdxIntern.DeleteBatch(md.Name.Nodes())
 	for i := range md.Tags.KeyValues {

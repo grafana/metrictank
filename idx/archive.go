@@ -53,8 +53,9 @@ func (a *ArchiveInterned) GetArchive() Archive {
 // archive. A safe copy in this context means that when accessing
 // the copy one does not need to worry about atomics or the string
 // interning.
-// It is important that ArchiveInterned.ReleaseInterned() gets called
-// before it goes out of scope to return its memory back to the pools.
+// It is important that .ReleaseInterned() gets called before it
+// goes out of scope to return its memory back to the pools and to
+// update the reference counts of interned values correctly
 func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 	safeArchive := archiveInternedPool.Get().(*ArchiveInterned)
 	safeArchive.SchemaId = a.SchemaId
@@ -67,8 +68,15 @@ func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 	return safeArchive
 }
 
-func (s *ArchiveInterned) ReleaseInterned() {
-	s.MetricDefinitionInterned.ReleaseInterned()
-	archiveInternedPool.Put(s)
+// ReleaseInterned() should be called whenever an instance of
+// ArchiveInterned goes out of scope (before it gets GCed).
+// It is also improtant that ReleaseInterned() only gets called
+// exactly once when an ArchiveInterned goes out of scope,
+// and not more than that.
+// It updates the refence counts of the interned struct
+// properties, or deletes the interned values when necessary.
+func (a *ArchiveInterned) ReleaseInterned() {
+	a.MetricDefinitionInterned.ReleaseInterned()
+	archiveInternedPool.Put(a)
 	archiveInternedCount.DecUint32(1)
 }
