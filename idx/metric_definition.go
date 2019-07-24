@@ -20,6 +20,7 @@ import (
 func init() {
 	msgp.RegisterExtension(95, func() msgp.Extension { return &MetricName{} })
 	msgp.RegisterExtension(90, func() msgp.Extension { return &TagKeyValues{} })
+	msgp.RegisterExtension(96, func() msgp.Extension { return new(Unit) })
 }
 
 type mType uint8
@@ -38,6 +39,39 @@ var metricDefinitionInternedPool = sync.Pool{
 	New: func() interface{} {
 		return new(MetricDefinitionInterned)
 	},
+}
+
+type Unit uintptr
+
+func (u *Unit) ExtensionType() int8 {
+	return 96
+}
+
+func (u *Unit) Len() int {
+	return len(u.String())
+}
+
+func (u *Unit) MarshalBinaryTo(b []byte) error {
+	copy(b, []byte(u.String()))
+	return nil
+}
+
+func (u *Unit) UnmarshalBinary(value []byte) error {
+	ptr, err := IdxIntern.AddOrGet(value, false)
+	if err != nil {
+		return fmt.Errorf("idx: Failed to get string from unit ptr: %s", err.Error())
+	}
+	*u = Unit(ptr)
+	return nil
+}
+
+func (u *Unit) String() string {
+	res, err := IdxIntern.GetStringFromPtr(uintptr(*u))
+	if err != nil {
+		log.Errorf("idx: Failed to acquire interned string from unit: %s", err)
+		return ""
+	}
+	return res
 }
 
 // MetricName stores the name as a []uintptr to strings interned in an object store.
@@ -329,7 +363,7 @@ type MetricDefinitionInterned struct {
 	// if there is another way we should explore that
 	Name       MetricName `msg:"name,extension"`
 	Interval   int
-	Unit       string
+	unit       Unit
 	mtype      mType
 	Tags       TagKeyValues `msg:"tagkeyvalues,extension"`
 	LastUpdate int64
@@ -407,22 +441,27 @@ func (md *MetricDefinitionInterned) Mtype() string {
 	}
 }
 
+func (md *MetricDefinitionInterned) Unit() string {
+	return md.unit.String()
+}
+
 // SetUnit takes a string, interns it in an object store
 // and then uses it to store the unit.
 func (md *MetricDefinitionInterned) SetUnit(unit string) {
 	if unit == "" {
-		md.Unit = ""
+		md.unit = 0
 		return
 	}
 
-	sz, err := IdxIntern.AddOrGetString([]byte(unit), false)
+	sz, err := IdxIntern.AddOrGet([]byte(unit), false)
 	if err != nil {
 		log.Errorf("idx: Failed to intern Unit %v. %v", unit, err)
 		internError.Inc()
-		md.Unit = unit
+		md.unit = 0
 		return
 	}
-	md.Unit = sz
+
+	md.unit = Unit(sz)
 }
 
 // SetMetricName interns the MetricName in an
@@ -502,7 +541,7 @@ func (md *MetricDefinitionInterned) SetId() {
 	sort.Sort(md.Tags.KeyValues)
 	buffer := bytes.NewBufferString(md.Name.String())
 	buffer.WriteByte(0)
-	buffer.WriteString(md.Unit)
+	buffer.WriteString(md.Unit())
 	buffer.WriteByte(0)
 	buffer.WriteString(md.Mtype())
 	buffer.WriteByte(0)
@@ -536,7 +575,7 @@ func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition 
 		OrgId:      md.OrgId,
 		Name:       md.Name.String(),
 		Interval:   md.Interval,
-		Unit:       md.Unit,
+		Unit:       md.Unit(),
 		Mtype:      md.Mtype(),
 		Tags:       md.Tags.Strings(),
 		LastUpdate: atomic.LoadInt64(&md.LastUpdate),
@@ -558,7 +597,7 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	clone.OrgId = md.OrgId
 	clone.Name = md.Name
 	clone.Interval = md.Interval
-	clone.Unit = md.Unit
+	clone.unit = md.unit
 	clone.mtype = md.mtype
 	clone.Tags = md.Tags
 	clone.LastUpdate = atomic.LoadInt64(&md.LastUpdate)
@@ -568,7 +607,7 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	for i := range clone.Tags.KeyValues {
 		IdxIntern.IncRefCntBatch([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.IncRefCntByString(clone.Unit)
+	IdxIntern.IncRefCnt(uintptr(clone.unit))
 
 	return clone
 }
@@ -585,7 +624,7 @@ func (md *MetricDefinitionInterned) ReleaseInterned() {
 	for i := range md.Tags.KeyValues {
 		IdxIntern.DeleteBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.DeleteByString(md.Unit)
+	IdxIntern.Delete(uintptr(md.unit))
 
 	metricDefinitionInternedPool.Put(md)
 }
