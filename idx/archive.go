@@ -24,7 +24,7 @@ type Archive struct {
 	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
 }
 
-// used primarily by tests, for convenience
+// NewArchiveBare is used primarily by tests, for convenience
 func NewArchiveBare(name string) Archive {
 	arc := Archive{}
 	arc.Name = name
@@ -49,7 +49,7 @@ func (a *ArchiveInterned) GetArchive() Archive {
 	}
 }
 
-// CloneInterned() creates a new safe copy of the interned
+// CloneInterned creates a new safe copy of the interned
 // archive. A safe copy in this context means that when accessing
 // the copy one does not need to worry about atomics or the string
 // interning.
@@ -68,7 +68,7 @@ func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 	return safeArchive
 }
 
-// ReleaseInterned() should be called whenever an instance of
+// ReleaseInterned should be called whenever an instance of
 // ArchiveInterned goes out of scope (before it gets GCed).
 // It is also improtant that ReleaseInterned() only gets called
 // exactly once when an ArchiveInterned goes out of scope,
