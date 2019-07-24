@@ -603,11 +603,11 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	clone.LastUpdate = atomic.LoadInt64(&md.LastUpdate)
 	clone.Partition = atomic.LoadInt32(&md.Partition)
 
-	IdxIntern.IncRefCntBatch(clone.Name.Nodes())
+	IdxIntern.IncRefCntBatchUnsafe(clone.Name.Nodes())
 	for i := range clone.Tags.KeyValues {
-		IdxIntern.IncRefCntBatch([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
+		IdxIntern.IncRefCntBatchUnsafe([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.IncRefCnt(uintptr(clone.Unit))
+	IdxIntern.IncRefCntUnsafe(uintptr(clone.Unit))
 
 	return clone
 }
@@ -620,11 +620,11 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 // It updates the refence counts of the interned struct
 // properties, or deletes the interned values when necessary.
 func (md *MetricDefinitionInterned) ReleaseInterned() {
-	IdxIntern.DeleteBatch(md.Name.Nodes())
+	IdxIntern.DeleteBatchUnsafe(md.Name.Nodes())
 	for i := range md.Tags.KeyValues {
-		IdxIntern.DeleteBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
+		IdxIntern.DeleteBatchUnsafe([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
 	}
-	IdxIntern.Delete(uintptr(md.Unit))
+	IdxIntern.DeleteUnsafe(uintptr(md.Unit))
 
 	metricDefinitionInternedPool.Put(md)
 }
