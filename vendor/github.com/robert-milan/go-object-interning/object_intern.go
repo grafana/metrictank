@@ -12,9 +12,6 @@ import (
 	"github.com/tmthrgd/shoco"
 )
 
-// InitialRefCount is appended to all new objects inserted into the store
-var InitialRefCount = []byte{0x1, 0x0, 0x0, 0x0}
-
 // ObjectIntern stores a map of uintptrs to interned objects.
 // The string key itself uses an interned object for its data pointer
 type ObjectIntern struct {
@@ -106,7 +103,7 @@ func (oi *ObjectIntern) getAndIncrement(obj []byte) (uintptr, bool) {
 	addr, ok := oi.objIndex[string(obj)]
 	if ok {
 		// increment reference count by 1
-		atomic.AddUint32((*uint32)(unsafe.Pointer(addr+uintptr(len(obj)))), 1)
+		atomic.AddUint32((*uint32)(unsafe.Pointer(addr)), 1)
 		return addr, true
 	}
 	return 0, false
@@ -127,15 +124,16 @@ func (oi *ObjectIntern) add(obj []byte) (uintptr, error) {
 	// The object store backend has no knowledge of a reference count, so
 	// we need to manage it at this layer. Here we add 4 bytes to be used
 	// henceforth as the reference count for this object. Reference count is
-	// always placed as the LAST 4 bytes of an object and is NEVER compressed.
-	obj = append(obj, InitialRefCount...)
+	// always placed as the FIRST 4 bytes of an object and is NEVER compressed.
+	obj = append([]byte{0x1, 0x0, 0x0, 0x0}, obj...)
 	addr, err := oi.store.Add(obj)
 	if err != nil {
 		return 0, err
 	}
 
 	// set objString data to the object inside the object store
-	((*reflect.StringHeader)(unsafe.Pointer(&objString))).Data = addr
+	// we need to add 4 at the beginning for the reference count
+	((*reflect.StringHeader)(unsafe.Pointer(&objString))).Data = addr + 4
 
 	// add the object to the index
 	oi.objIndex[objString] = addr
@@ -269,7 +267,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 			addr, ok := oi.getAndIncrement(obj)
 			if ok {
 				stringHeader := &reflect.StringHeader{
-					Data: addr,
+					// add 4 for reference count
+					Data: addr + 4,
 					Len:  len(obj),
 				}
 				oi.RUnlock()
@@ -299,7 +298,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 			if oi.conf.Compression == None {
 				// create a StringHeader and set its values appropriately
 				stringHeader := &reflect.StringHeader{
-					Data: addr,
+					// add 4 for reference count
+					Data: addr + 4,
 					Len:  len(objComp),
 				}
 				oi.RUnlock()
@@ -320,7 +320,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 			if oi.conf.Compression == None {
 				// create a StringHeader and set its values appropriately
 				stringHeader := &reflect.StringHeader{
-					Data: addr,
+					// add 4 for reference count
+					Data: addr + 4,
 					Len:  len(objComp),
 				}
 				oi.Unlock()
@@ -345,7 +346,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 
 		// create a StringHeader and set its values appropriately
 		stringHeader := &reflect.StringHeader{
-			Data: addr,
+			// add 4 for reference count
+			Data: addr + 4,
 			Len:  len(objComp),
 		}
 		return (*(*string)(unsafe.Pointer(stringHeader))), nil
@@ -359,7 +361,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 	if ok {
 		// create a StringHeader and set its values appropriately
 		stringHeader := &reflect.StringHeader{
-			Data: addr,
+			// add 4 for reference count
+			Data: addr + 4,
 			Len:  len(obj),
 		}
 		oi.RUnlock()
@@ -375,7 +378,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 	if ok {
 		// create a StringHeader and set its values appropriately
 		stringHeader := &reflect.StringHeader{
-			Data: addr,
+			// add 4 for reference count
+			Data: addr + 4,
 			Len:  len(obj),
 		}
 		oi.Unlock()
@@ -390,7 +394,8 @@ func (oi *ObjectIntern) AddOrGetString(obj []byte, safe bool) (string, error) {
 
 	// create a StringHeader and set its values appropriately
 	stringHeader := &reflect.StringHeader{
-		Data: addr,
+		// add 4 for reference count
+		Data: addr + 4,
 		Len:  len(obj),
 	}
 
@@ -449,8 +454,8 @@ func (oi *ObjectIntern) GetStringFromPtr(objAddr uintptr) (string, error) {
 	}
 
 	if oi.conf.Compression != None {
-		// get decompressed []byte after removing the trailing 4 bytes for the reference count
-		b, err = oi.decompress(b[:len(b)-4])
+		// get decompressed []byte after removing the leading 4 bytes for the reference count
+		b, err = oi.decompress(b[4:])
 		// because compression is turned on we can't just set string's Data to the address,
 		// we need to actually create a new string from the decompressed []byte
 		return string(b), err
@@ -458,7 +463,8 @@ func (oi *ObjectIntern) GetStringFromPtr(objAddr uintptr) (string, error) {
 
 	// create a StringHeader and set its values appropriately
 	stringHeader := &reflect.StringHeader{
-		Data: objAddr,
+		// add 4 for reference count
+		Data: objAddr + 4,
 		Len:  len(b) - 4,
 	}
 	return (*(*string)(unsafe.Pointer(stringHeader))), nil
@@ -488,9 +494,9 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	}
 
 	// most likely case is that we will just decrement the reference count and return
-	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4)))) > 1 {
+	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr))) > 1 {
 		// decrement reference count by 1
-		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4))), ^uint32(0))
+		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr)), ^uint32(0))
 
 		oi.RUnlock()
 		return false, nil
@@ -508,9 +514,9 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	}
 
 	// most likely case is that we will just decrement the reference count and return
-	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4)))) > 1 {
+	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr))) > 1 {
 		// decrement reference count by 1
-		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4))), ^uint32(0))
+		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr)), ^uint32(0))
 
 		oi.Unlock()
 		return false, nil
@@ -526,8 +532,8 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	// the same memory pointed to by the key stored in the ObjIndex. When you try to
 	// access the key to delete it from the ObjIndex you will get a SEGFAULT
 	//
-	// remove 4 trailing bytes for reference count since ObjIndex does not store reference count in the key
-	delete(oi.objIndex, string(obj[:len(obj)-4]))
+	// remove 4 leading bytes for reference count since ObjIndex does not store reference count in the key
+	delete(oi.objIndex, string(obj[4:]))
 
 	// delete object from object store
 	err = oi.store.Delete(objAddr)
@@ -540,6 +546,7 @@ func (oi *ObjectIntern) Delete(objAddr uintptr) (bool, error) {
 	return false, err
 }
 
+// DeleteBatch decrements the reference count or deletes the objects from the store
 func (oi *ObjectIntern) DeleteBatch(ptrs []uintptr) {
 	var obj []byte
 	var err error
@@ -557,9 +564,9 @@ func (oi *ObjectIntern) DeleteBatch(ptrs []uintptr) {
 		}
 
 		// most likely case is that we will just decrement the reference count and return
-		if atomic.LoadUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4)))) > 1 {
+		if atomic.LoadUint32((*uint32)(unsafe.Pointer(p))) > 1 {
 			// decrement reference count by 1
-			atomic.AddUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4))), ^uint32(0))
+			atomic.AddUint32((*uint32)(unsafe.Pointer(p)), ^uint32(0))
 			continue
 		}
 
@@ -580,9 +587,9 @@ func (oi *ObjectIntern) DeleteBatch(ptrs []uintptr) {
 			}
 
 			// most likely case is that we will just decrement the reference count and return
-			if atomic.LoadUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4)))) > 1 {
+			if atomic.LoadUint32((*uint32)(unsafe.Pointer(p))) > 1 {
 				// decrement reference count by 1
-				atomic.AddUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4))), ^uint32(0))
+				atomic.AddUint32((*uint32)(unsafe.Pointer(p)), ^uint32(0))
 				continue
 			}
 
@@ -596,8 +603,8 @@ func (oi *ObjectIntern) DeleteBatch(ptrs []uintptr) {
 			// the same memory pointed to by the key stored in the ObjIndex. When you try to
 			// access the key to delete it from the ObjIndex you will get a SEGFAULT
 			//
-			// remove 4 trailing bytes for reference count since ObjIndex does not store reference count in the key
-			delete(oi.objIndex, string(obj[:len(obj)-4]))
+			// remove 4 leading bytes for reference count since ObjIndex does not store reference count in the key
+			delete(oi.objIndex, string(obj[4:]))
 
 			// delete object from object store
 			err = oi.store.Delete(p)
@@ -605,6 +612,120 @@ func (oi *ObjectIntern) DeleteBatch(ptrs []uintptr) {
 
 		oi.Unlock()
 	}
+}
+
+// DeleteBatchUnsafe does the same thing as DeleteBatch, but saves time by not acquiring
+// read locks if the objects only need their reference count decremented. This is not safe, and it
+// is up to the caller to ensure the objects actually exist in the store. If you are unsure, don't use this
+// method.
+func (oi *ObjectIntern) DeleteBatchUnsafe(ptrs []uintptr) {
+
+	toDelete := ptrs[:0]
+
+	for _, p := range ptrs {
+		// most likely case is that we will just decrement the reference count and return
+		if atomic.LoadUint32((*uint32)(unsafe.Pointer(p))) > 1 {
+			// decrement reference count by 1
+			atomic.AddUint32((*uint32)(unsafe.Pointer(p)), ^uint32(0))
+			continue
+		}
+
+		toDelete = append(toDelete, p)
+	}
+
+	// this should happen infrequently in most cases
+	if len(toDelete) > 0 {
+
+		var obj []byte
+		var err error
+
+		oi.Lock()
+
+		for _, p := range toDelete {
+			// re-check if object exists in the object store
+			obj, err = oi.store.Get(p)
+			if err != nil {
+				continue
+			}
+
+			// most likely case is that we will just decrement the reference count and return
+			if atomic.LoadUint32((*uint32)(unsafe.Pointer(p))) > 1 {
+				// decrement reference count by 1
+				atomic.AddUint32((*uint32)(unsafe.Pointer(p)), ^uint32(0))
+				continue
+			}
+
+			// if reference count is 1 or less, delete the object and remove it from index
+			// If one of these operations fails it is still safe to perform the other
+			// Once we get to this point we are just going to remove all traces of the object
+
+			// delete object from index first
+			// If you delete all of the objects in the slab then the slab will be deleted
+			// When this happens the memory that the slab was using is MUnmapped, which is
+			// the same memory pointed to by the key stored in the ObjIndex. When you try to
+			// access the key to delete it from the ObjIndex you will get a SEGFAULT
+			//
+			// remove 4 leading bytes for reference count since ObjIndex does not store reference count in the key
+			delete(oi.objIndex, string(obj[4:]))
+
+			// delete object from object store
+			err = oi.store.Delete(p)
+		}
+
+		oi.Unlock()
+	}
+}
+
+// DeleteUnsafe is just like Delete but it doesn't acquire read locks or perform
+// checks to ensure that the object at the address exists. This is a dangerous method and
+// should only be used if you know what you are doing.
+func (oi *ObjectIntern) DeleteUnsafe(objAddr uintptr) (bool, error) {
+	// most likely case is that we will just decrement the reference count and return
+	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr))) > 1 {
+		// decrement reference count by 1
+		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr)), ^uint32(0))
+		return false, nil
+	}
+
+	oi.Lock()
+
+	obj, err := oi.store.Get(objAddr)
+	if err != nil {
+		oi.Unlock()
+		return false, err
+	}
+
+	// most likely case is that we will just decrement the reference count and return
+	if atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr))) > 1 {
+		// decrement reference count by 1
+		atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr)), ^uint32(0))
+
+		oi.Unlock()
+		return false, nil
+	}
+
+	// if reference count is 1 or less, delete the object and remove it from index
+	// If one of these operations fails it is still safe to perform the other
+	// Once we get to this point we are just going to remove all traces of the object
+
+	// delete object from index first
+	// If you delete all of the objects in the slab then the slab will be deleted
+	// When this happens the memory that the slab was using is MUnmapped, which is
+	// the same memory pointed to by the key stored in the ObjIndex. When you try to
+	// access the key to delete it from the ObjIndex you will get a SEGFAULT
+	//
+	// remove 4 leading bytes for reference count since ObjIndex does not store reference count in the key
+	delete(oi.objIndex, string(obj[4:]))
+
+	// delete object from object store
+	err = oi.store.Delete(objAddr)
+
+	oi.Unlock()
+
+	if err == nil {
+		return true, nil
+	}
+	return false, err
 }
 
 // DeleteByByte decrements the reference count of an object identified by its value as a []byte.
@@ -685,30 +806,39 @@ func (oi *ObjectIntern) RefCnt(objAddr uintptr) (uint32, error) {
 	defer oi.RUnlock()
 
 	// check if object exists in the object store
-	compObj, err := oi.store.Get(objAddr)
+	_, err := oi.store.Get(objAddr)
 	if err != nil {
 		return 0, err
 	}
 
-	// remove 4 trailing bytes for reference count
-	return atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr + uintptr(len(compObj)-4)))), nil
+	return atomic.LoadUint32((*uint32)(unsafe.Pointer(objAddr))), nil
 }
 
 // IncRefCnt increments the reference count of an object interned in the store.
 // On failure it returns false and an error, on success it returns true and nil
 func (oi *ObjectIntern) IncRefCnt(objAddr uintptr) (bool, error) {
 	oi.RLock()
-	obj, err := oi.store.Get(objAddr)
+	_, err := oi.store.Get(objAddr)
 	if err != nil {
 		oi.RUnlock()
 		return false, err
 	}
 
 	// increment reference count by 1
-	atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr+uintptr(len(obj)-4))), 1)
+	atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr)), 1)
 
 	oi.RUnlock()
 	return true, nil
+}
+
+// IncRefCntUnsafe increments the reference count of an object interned in the store.
+// This method does not perform any safety checks and it is upon the user to ensure
+// that the object actually exists in the store. There is no return value because
+// if used improperly this will likely result in corrupt data or a panic. This method
+// is dangerous, use at your own risk.
+func (oi *ObjectIntern) IncRefCntUnsafe(objAddr uintptr) {
+	// increment reference count by 1
+	atomic.AddUint32((*uint32)(unsafe.Pointer(objAddr)), 1)
 }
 
 // IncRefCntByString increments the reference count of an object interned in the store.
@@ -732,20 +862,31 @@ func (oi *ObjectIntern) IncRefCntByString(obj string) (bool, error) {
 	return oi.IncRefCnt(addr)
 }
 
+// IncRefCntBatch increments the reference count of objects interned in the store.
 func (oi *ObjectIntern) IncRefCntBatch(ptrs []uintptr) {
 	oi.RLock()
 	for _, p := range ptrs {
 
-		obj, err := oi.store.Get(p)
+		_, err := oi.store.Get(p)
 		if err != nil {
 			continue
 		}
 
 		// increment reference count by 1
-		atomic.AddUint32((*uint32)(unsafe.Pointer(p+uintptr(len(obj)-4))), 1)
+		atomic.AddUint32((*uint32)(unsafe.Pointer(p)), 1)
 
 	}
 	oi.RUnlock()
+}
+
+// IncRefCntBatchUnsafe increments the reference count of objects interned in the store.
+// Since these operations are atomic we don't need to acquire any read locks, but it is
+// up to the caller to ensure the objects actually exist. If you are not sure, use the safer method.
+func (oi *ObjectIntern) IncRefCntBatchUnsafe(ptrs []uintptr) {
+	for _, p := range ptrs {
+		// increment reference count by 1
+		atomic.AddUint32((*uint32)(unsafe.Pointer(p)), 1)
+	}
 }
 
 // ObjBytes returns a []byte and nil on success.
@@ -768,13 +909,13 @@ func (oi *ObjectIntern) ObjBytes(objAddr uintptr) ([]byte, error) {
 	}
 
 	if oi.conf.Compression != None {
-		// remove 4 trailing bytes for reference count and decompress
-		b, err = oi.decompress(b[:len(b)-4])
+		// remove 4 leading bytes for reference count and decompress
+		b, err = oi.decompress(b[4:])
 		return b, err
 	}
 
-	// remove 4 trailing bytes for reference count
-	return b[:len(b)-4], nil
+	// remove 4 leading bytes for reference count
+	return b[4:], nil
 }
 
 // ObjString returns a string and nil on success.
@@ -792,15 +933,15 @@ func (oi *ObjectIntern) ObjString(objAddr uintptr) (string, error) {
 	}
 
 	if oi.conf.Compression != None {
-		// remove 4 trailing bytes for reference count and decompress
-		b, err := oi.decompress(b[:len(b)-4])
+		// remove 4 leading bytes for reference count and decompress
+		b, err := oi.decompress(b[4:])
 		if err != nil {
 			return "", err
 		}
 		return string(b), nil
 	}
 
-	return string(b[:len(b)-4]), nil
+	return string(b[4:]), nil
 }
 
 // Len takes a slice of object addresses, it assumes that compression is turned off.
@@ -819,7 +960,7 @@ func (oi *ObjectIntern) Len(ptrs []uintptr) (retLn []int, all bool) {
 		if err != nil {
 			return retLn, false
 		}
-		// remove 4 trailing bytes of reference count
+		// remove 4 leading bytes of reference count
 		retLn[idx] = len(b) - 4
 	}
 	return
@@ -890,12 +1031,12 @@ func (oi *ObjectIntern) joinStringsUncompressed(nodes []uintptr, sep string) (st
 
 	stringHeader := (*reflect.StringHeader)(unsafe.Pointer(&tmpString))
 
-	stringHeader.Data = nodes[0]
+	stringHeader.Data = nodes[0] + 4
 	stringHeader.Len = lengths[0]
 	bld.WriteString(tmpString)
 
 	for idx, nodePtr := range nodes[1:] {
-		stringHeader.Data = nodePtr
+		stringHeader.Data = nodePtr + 4
 		stringHeader.Len = lengths[idx+1]
 		bld.WriteString(sep)
 		bld.WriteString(tmpString)
