@@ -4,11 +4,9 @@ package idx
 
 import (
 	"regexp"
-	"sync"
 	"time"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 	goi "github.com/robert-milan/go-object-interning"
 )
@@ -19,19 +17,6 @@ var OrgIdPublic = uint32(0)
 //
 // Default config does not use compression
 var IdxIntern = goi.NewObjectIntern(goi.NewConfig())
-var archiveInternedCount = stats.NewGauge32("idx.archive_interned_pool")
-
-var archiveInternedPool = sync.Pool{
-	New: func() interface{} {
-		return new(ArchiveInterned)
-	},
-}
-
-var metricDefinitionInternedPool = sync.Pool{
-	New: func() interface{} {
-		return new(MetricDefinitionInterned)
-	},
-}
 
 //msgp:ignore Md5Hash
 
@@ -179,23 +164,4 @@ type MetricIndex interface {
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
 	MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord
-}
-
-// InternReleaseMetricDefinition releases all previously acquired strings
-// into the interning layer so that their reference count can be
-// decreased by 1 and they can eventually be deleted
-func InternReleaseMetricDefinition(md MetricDefinitionInterned) {
-	IdxIntern.DeleteBatch(md.Name.Nodes())
-	for i := range md.Tags.KeyValues {
-		IdxIntern.DeleteBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
-	}
-	IdxIntern.DeleteByString(md.Unit)
-}
-
-func InternIncMetricDefinitionRefCounts(md MetricDefinitionInterned) {
-	IdxIntern.IncRefCntBatch(md.Name.Nodes())
-	for i := range md.Tags.KeyValues {
-		IdxIntern.IncRefCntBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
-	}
-	IdxIntern.IncRefCntByString(md.Unit)
 }

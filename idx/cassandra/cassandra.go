@@ -554,7 +554,7 @@ func (c *CasIdx) processWriteQueue() {
 				success = true
 				statQueryInsertExecDuration.Value(time.Since(pre))
 				statQueryInsertOk.Inc()
-				req.def.ReleaseArchiveInterned()
+				req.def.ReleaseInterned()
 				if log.IsLevelEnabled(log.DebugLevel) {
 					log.Debugf("cassandra-idx: metricDef %s saved to cassandra", req.def.Id)
 				}
@@ -624,7 +624,7 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) (int, error) {
 
 	defCount := len(defs)
 	for i := range defs {
-		defs[i].ReleaseArchiveInterned()
+		defs[i].ReleaseInterned()
 	}
 
 	return defCount, err
@@ -677,7 +677,7 @@ func (c *CasIdx) prune() {
 	for now := range ticker.C {
 		defs, _ := c.Prune(now)
 		for i := range defs {
-			defs[i].ReleaseArchiveInterned()
+			defs[i].ReleaseInterned()
 		}
 	}
 }

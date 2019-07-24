@@ -1492,7 +1492,7 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 
 		// this is a special case where the MetricDefinitions need to be
 		// released outside of the normal Delete() path.
-		idx.InternReleaseMetricDefinition(*deleted[i].MetricDefinitionInterned)
+		deleted[i].ReleaseInterned()
 	}
 
 	return res

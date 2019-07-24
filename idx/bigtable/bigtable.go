@@ -381,7 +381,7 @@ func (b *BigtableIdx) processWriteQueue() {
 		for i, req := range buffer {
 			statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
 			key, cols := SchemaToRow(req.def.MetricDefinitionInterned)
-			req.def.ReleaseArchiveInterned()
+			req.def.ReleaseInterned()
 			rowKeys[i] = key
 			mut := bigtable.NewMutation()
 			for col, val := range cols {
@@ -483,7 +483,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 
 	defCount := len(defs)
 	for i := range defs {
-		defs[i].ReleaseArchiveInterned()
+		defs[i].ReleaseInterned()
 	}
 
 	return defCount, err
@@ -530,7 +530,7 @@ func (b *BigtableIdx) prune() {
 		case now := <-ticker.C:
 			defs, _ := b.Prune(now)
 			for i := range defs {
-				defs[i].ReleaseArchiveInterned()
+				defs[i].ReleaseInterned()
 			}
 		case <-b.shutdown:
 			return

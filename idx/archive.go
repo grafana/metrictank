@@ -1,10 +1,20 @@
 package idx
 
 import (
+	"sync"
 	"sync/atomic"
 
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/schema"
 )
+
+var archiveInternedCount = stats.NewGauge32("idx.archive_interned_pool")
+
+var archiveInternedPool = sync.Pool{
+	New: func() interface{} {
+		return new(ArchiveInterned)
+	},
+}
 
 type Archive struct {
 	schema.MetricDefinition
@@ -43,7 +53,7 @@ func (a *ArchiveInterned) GetArchive() Archive {
 // archive. A safe copy in this context means that when accessing
 // the copy one does not need to worry about atomics or the string
 // interning.
-// It is important that ArchiveInterned.ReleaseArchiveInterned() gets called
+// It is important that ArchiveInterned.ReleaseInterned() gets called
 // before it goes out of scope to return its memory back to the pools.
 func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 	safeArchive := archiveInternedPool.Get().(*ArchiveInterned)
@@ -51,20 +61,14 @@ func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 	safeArchive.AggId = a.AggId
 	safeArchive.IrId = a.IrId
 	safeArchive.LastSave = atomic.LoadUint32(&a.LastSave)
-
-	InternIncMetricDefinitionRefCounts(*a.MetricDefinitionInterned)
-	metricDefinition := metricDefinitionInternedPool.Get().(*MetricDefinitionInterned)
-	*metricDefinition = *(a.MetricDefinitionInterned.CloneInterned())
-	safeArchive.MetricDefinitionInterned = metricDefinition
+	safeArchive.MetricDefinitionInterned = a.MetricDefinitionInterned.CloneInterned()
 
 	archiveInternedCount.AddUint32(1)
-
 	return safeArchive
 }
 
-func (s *ArchiveInterned) ReleaseArchiveInterned() {
-	InternReleaseMetricDefinition(*s.MetricDefinitionInterned)
-	metricDefinitionInternedPool.Put(s.MetricDefinitionInterned)
+func (s *ArchiveInterned) ReleaseInterned() {
+	s.MetricDefinitionInterned.ReleaseInterned()
 	archiveInternedPool.Put(s)
 	archiveInternedCount.DecUint32(1)
 }

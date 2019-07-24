@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/raintank/schema"
@@ -32,6 +33,12 @@ const (
 	MTypeCounter
 	MTypeTimestamp
 )
+
+var metricDefinitionInternedPool = sync.Pool{
+	New: func() interface{} {
+		return new(MetricDefinitionInterned)
+	},
+}
 
 // MetricName stores the name as a []uintptr to strings interned in an object store.
 // Each word is stored as a separate interned string without the '.'. The whole name
@@ -542,17 +549,34 @@ func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition 
 // It uses atomic operations to read certain properties that get updated atomically
 // and also increases the reference count of all interned values
 func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
-	return &MetricDefinitionInterned{
-		Id:         md.Id,
-		OrgId:      md.OrgId,
-		Name:       md.Name,
-		Interval:   md.Interval,
-		Unit:       md.Unit,
-		mtype:      md.mtype,
-		Tags:       md.Tags,
-		LastUpdate: atomic.LoadInt64(&md.LastUpdate),
-		Partition:  atomic.LoadInt32(&md.Partition),
+	clone := metricDefinitionInternedPool.Get().(*MetricDefinitionInterned)
+	clone.Id = md.Id
+	clone.OrgId = md.OrgId
+	clone.Name = md.Name
+	clone.Interval = md.Interval
+	clone.Unit = md.Unit
+	clone.mtype = md.mtype
+	clone.Tags = md.Tags
+	clone.LastUpdate = atomic.LoadInt64(&md.LastUpdate)
+	clone.Partition = atomic.LoadInt32(&md.Partition)
+
+	IdxIntern.IncRefCntBatch(clone.Name.Nodes())
+	for i := range clone.Tags.KeyValues {
+		IdxIntern.IncRefCntBatch([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
 	}
+	IdxIntern.IncRefCntByString(clone.Unit)
+
+	return clone
+}
+
+func (md *MetricDefinitionInterned) ReleaseInterned() {
+	IdxIntern.DeleteBatch(md.Name.Nodes())
+	for i := range md.Tags.KeyValues {
+		IdxIntern.DeleteBatch([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
+	}
+	IdxIntern.DeleteByString(md.Unit)
+
+	metricDefinitionInternedPool.Put(md)
 }
 
 // MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition
