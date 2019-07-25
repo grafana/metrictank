@@ -1183,7 +1183,7 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 		t.Fatalf("Expected the index to have no nodes after delete, but it had %d", len(foundNodes))
 	}
 
-	// there should now still be data in ther interning, because we didn't release
+	// there should now still be data in the interning, because we didn't release
 	// the previously returned interned archives yet
 	statsStep2 := idx.IdxIntern.MemStatsPerPool()
 	if len(statsStep2) == 0 {
