@@ -18,7 +18,6 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/test"
 	"github.com/raintank/schema"
-	goi "github.com/robert-milan/go-object-interning"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -1111,9 +1110,9 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 		ix = nil
 	}()
 
-	idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+	idx.IdxIntern.Reset()
 
-	mds := make([]schema.MetricData, 10)
+	mds := make([]schema.MetricData, 1000)
 	mkeys := make([]schema.MKey, len(mds))
 	var archivesInterned []*idx.ArchiveInterned
 
