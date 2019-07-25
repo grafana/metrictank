@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -263,7 +264,7 @@ func (s *Server) getTargetsLocal(ctx context.Context, ss *models.StorageStats, r
 	log.Debugf("DP getTargetsLocal: handling %d reqs locally", len(reqs))
 	rCtx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
 	defer span.Finish()
-	span.SetTag("num_reqs", len(reqs))
+	span.LogFields(traceLog.Int("num_reqs", len(reqs)))
 	responses := make(chan getTargetsResp, len(reqs))
 
 	var wg sync.WaitGroup

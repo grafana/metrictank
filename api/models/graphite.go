@@ -2,6 +2,7 @@ package models
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"strconv"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"gopkg.in/macaron.v1"
 )
 
@@ -133,8 +135,10 @@ type GraphiteTagDelSeries struct {
 }
 
 func (g GraphiteTagDelSeries) Trace(span opentracing.Span) {
-	span.SetTag("paths", g.Paths)
-	span.SetTag("propagate", g.Propagate)
+	span.LogFields(
+		traceLog.String("paths", fmt.Sprintf("%q", g.Paths)),
+		traceLog.Bool("propagate", g.Propagate),
+	)
 }
 
 func (g GraphiteTagDelSeries) TraceDebug(span opentracing.Span) {
