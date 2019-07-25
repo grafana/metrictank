@@ -314,9 +314,6 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 	tmp := make([]TagKeyValue, len(tags))
 	t.KeyValues = tmp
 	for i, tag := range tags {
-		if strings.HasPrefix(tag, "name=") {
-			continue
-		}
 		if tag == "=" || tag == "" {
 			log.Error("idx: Empty tag, ignoring: ", tag)
 			invalidTag.Inc()
