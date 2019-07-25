@@ -497,9 +497,6 @@ func (md *MetricDefinitionInterned) SetTags(tags []string) {
 	md.Tags.KeyValues = append(md.Tags.KeyValues, TagKeyValue{Key: nameKey, Value: nameValue})
 
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "name=") {
-			continue
-		}
 		if tag == "=" || tag == "" {
 			log.Error("idx: SetTags: Empty tag, ignoring: ", tag)
 			invalidTag.Inc()
@@ -509,6 +506,10 @@ func (md *MetricDefinitionInterned) SetTags(tags []string) {
 		if eqPos < 0 {
 			log.Errorf("idx: SetTags: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
+			continue
+		}
+
+		if tag[:eqPos] == "name" {
 			continue
 		}
 
