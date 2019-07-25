@@ -28,7 +28,7 @@ type ObjectIntern struct {
 func NewObjectIntern(c ObjectInternConfig) *ObjectIntern {
 	oi := ObjectIntern{
 		conf:     c,
-		store:    gos.NewObjectStore(100),
+		store:    gos.NewObjectStore(c.SlabSize),
 		objIndex: make(map[string]uintptr),
 	}
 
@@ -1044,6 +1044,36 @@ func (oi *ObjectIntern) joinStringsUncompressed(nodes []uintptr, sep string) (st
 
 	oi.RUnlock()
 	return bld.String(), nil
+}
+
+// Reset empties the object store and index and re-initializes them.
+// This method should really only be used during testing, or if you
+// are absolutely certain that no one is going to try to reference a
+// previously interned object.
+// Returns nil on success and an error on failure.
+func (oi *ObjectIntern) Reset() error {
+	var err error
+	oi.Lock()
+	for obj, addr := range oi.objIndex {
+		// delete object from index first
+		// If you delete all of the objects in the slab then the slab will be deleted
+		// When this happens the memory that the slab was using is MUnmapped, which is
+		// the same memory pointed to by the key stored in the ObjIndex. When you try to
+		// access the key to delete it from the ObjIndex you will get a SEGFAULT
+		delete(oi.objIndex, obj)
+
+		// delete object from object store
+		err = oi.store.Delete(addr)
+		if err != nil {
+			return err
+		}
+	}
+
+	oi.store = gos.NewObjectStore(oi.conf.SlabSize)
+	oi.objIndex = make(map[string]uintptr)
+
+	oi.Unlock()
+	return nil
 }
 
 func (oi *ObjectIntern) FragStatsByObjSize(objSize uint8) (float32, error) {

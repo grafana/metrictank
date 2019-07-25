@@ -314,9 +314,6 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 	tmp := make([]TagKeyValue, len(tags))
 	t.KeyValues = tmp
 	for i, tag := range tags {
-		if strings.HasPrefix(tag, "name=") {
-			continue
-		}
 		if tag == "=" || tag == "" {
 			log.Error("idx: Empty tag, ignoring: ", tag)
 			invalidTag.Inc()
@@ -492,8 +489,13 @@ func (md *MetricDefinitionInterned) SetMetricName(name string) error {
 // is a separate Key/Value pair. Do not combine multiple Key/Value pairs
 // into a single index in the []string.
 func (md *MetricDefinitionInterned) SetTags(tags []string) {
-	md.Tags.KeyValues = make([]TagKeyValue, 0, len(tags))
+	md.Tags.KeyValues = make([]TagKeyValue, 0, len(tags)+1)
 	sort.Strings(tags)
+
+	nameKey, _ := IdxIntern.AddOrGet([]byte("name"), false)
+	nameValue, _ := IdxIntern.AddOrGet([]byte(schema.SanitizeNameAsTagValue(md.Name.String())), false)
+	md.Tags.KeyValues = append(md.Tags.KeyValues, TagKeyValue{Key: nameKey, Value: nameValue})
+
 	for _, tag := range tags {
 		if tag == "=" || tag == "" {
 			log.Error("idx: SetTags: Empty tag, ignoring: ", tag)
@@ -504,6 +506,10 @@ func (md *MetricDefinitionInterned) SetTags(tags []string) {
 		if eqPos < 0 {
 			log.Errorf("idx: SetTags: Tag %q has an invalid format, ignoring", tag)
 			invalidTag.Inc()
+			continue
+		}
+
+		if tag[:eqPos] == "name" {
 			continue
 		}
 

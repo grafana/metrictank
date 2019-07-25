@@ -605,10 +605,6 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinitionInterned) {
 	for _, tag := range def.Tags.KeyValues {
 		tags.addTagId(tag.Key, tag.Value, def.Id)
 	}
-	// TODO: add special case to handle name and intern each node separately
-	nameKey, _ := idx.IdxIntern.AddOrGet([]byte("name"), false)
-	nameValue, _ := idx.IdxIntern.AddOrGet([]byte(schema.SanitizeNameAsTagValue(def.Name.String())), false)
-	tags.addTagId(nameKey, nameValue, def.Id)
 
 	// Added sort here to accommodate a case where out of order tags are set after
 	// a call to SetId (which would sort it)
@@ -627,20 +623,6 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefin
 	for _, tag := range def.Tags.KeyValues {
 		tags.delTagId(tag.Key, tag.Value, def.Id)
 	}
-
-	nameKey, err := idx.IdxIntern.GetPtrFromByte([]byte("name"))
-	if err != nil {
-		log.Error("memory-idx: Failed to retrieve interned string for tag key: ", err)
-		internError.Inc()
-		return true
-	}
-	nameValue, err := idx.IdxIntern.GetPtrFromByte([]byte(schema.SanitizeNameAsTagValue(def.Name.String())))
-	if err != nil {
-		log.Error("memory-idx: Failed to retrieve interned string for tag value: ", err)
-		internError.Inc()
-		return true
-	}
-	tags.delTagId(nameKey, nameValue, def.Id)
 
 	m.defByTagSet.del(def)
 
@@ -715,7 +697,9 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.ArchiveInterned) {
 		// same underlying object in m.defById and m.defByTagSet
 		m.indexTags(archive.MetricDefinitionInterned)
 
-		if len(def.Tags.KeyValues) > 0 {
+		// there will always be at least one KeyValue because
+		// we always add the "name" tag
+		if len(def.Tags.KeyValues) > 1 {
 			if _, ok := m.defById[def.Id]; !ok {
 				m.defById[def.Id] = archive
 				statAdd.Inc()
@@ -1736,7 +1720,9 @@ DEFS:
 			continue DEFS
 		}
 
-		if len(def.Tags.KeyValues) == 0 {
+		// this will always be at least 1 because we
+		// always add the "name" tag.
+		if len(def.Tags.KeyValues) == 1 {
 			tree, ok := m.tree[def.OrgId]
 			if !ok {
 				continue DEFS

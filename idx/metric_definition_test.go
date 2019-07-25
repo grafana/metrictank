@@ -74,9 +74,14 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		Convey(fmt.Sprintf("reference counts should be at %d", num), func() {
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
+					current, _ := IdxIntern.GetStringFromPtr(ptr)
 					cnt, err := IdxIntern.RefCnt(ptr)
 					So(err, ShouldBeNil)
-					So(cnt, ShouldEqual, num)
+					if current != "name" {
+						So(cnt, ShouldEqual, num)
+					} else {
+						So(cnt, ShouldEqual, num*2)
+					}
 				}
 
 			}
@@ -89,9 +94,14 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 			defs = defs[num/2:]
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
+					current, _ := IdxIntern.GetStringFromPtr(ptr)
 					cnt, err := IdxIntern.RefCnt(ptr)
 					So(err, ShouldBeNil)
-					So(cnt, ShouldEqual, num/2)
+					if current != "name" {
+						So(cnt, ShouldEqual, num/2)
+					} else {
+						So(cnt, ShouldEqual, num)
+					}
 				}
 
 			}
@@ -149,9 +159,14 @@ func TestMetricNameAndTagAddresses(t *testing.T) {
 		Convey("reference counts should be at 5", func() {
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
+					current, _ := IdxIntern.GetStringFromPtr(ptr)
 					cnt, err := IdxIntern.RefCnt(ptr)
 					So(err, ShouldBeNil)
-					So(cnt, ShouldEqual, 5)
+					if current != "name" {
+						So(cnt, ShouldEqual, 5)
+					} else {
+						So(cnt, ShouldEqual, 10)
+					}
 				}
 
 			}
@@ -164,6 +179,7 @@ func TestTagKeyValuesAndNameWithTags(t *testing.T) {
 	defs := genMetricDefinitionsWithSameName(1)
 	tags := genTags(5)
 	defs[0].SetTags(tags)
+	tags = append([]string{fmt.Sprintf("name=%s", defs[0].Name.String())}, tags...)
 
 	Convey("After adding tags to a MetricDefinition", t, func() {
 		Convey("the Strings() function of TagKeyValues should resemble the original []string", func() {

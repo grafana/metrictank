@@ -1097,6 +1097,111 @@ func TestMemoryIndexHeapUsageWithTagsUniqueAll5(t *testing.T) {
 	testMemoryIndexHeapUsageWithTags(t, 1.0, 5)
 }
 
+func TestThatInternedObjectsGetCleanedUp(t *testing.T) {
+	withAndWithoutPartitonedIndex(testThatInternedObjectsGetCleanedUp)(t)
+}
+
+func testThatInternedObjectsGetCleanedUp(t *testing.T) {
+	TagSupport = true
+	ix := New()
+	ix.Init()
+	defer func() {
+		ix.Stop()
+		ix = nil
+	}()
+
+	idx.IdxIntern.Reset()
+
+	mds := make([]schema.MetricData, 1000)
+	mkeys := make([]schema.MKey, len(mds))
+	var archivesInterned []*idx.ArchiveInterned
+
+	// add a bunch of metrics into the index via AddOrUpdate
+	// keep the returned interned archive references, but don't release them yet
+	for i := range mds {
+		mds[i].Name = fmt.Sprintf("some.id.of.a.metric.%d", i)
+		mds[i].OrgId = 1
+		mds[i].Tags = []string{"tag1=abc", "tag2=abc", fmt.Sprintf("differentValues=value%d", i)}
+		mds[i].Unit = "unit"
+		mds[i].SetId()
+
+		var err error
+		mkeys[i], err = schema.MKeyFromString(mds[i].Id)
+		if err != nil {
+			t.Fatalf("Failed to get AMKey from ID (%s): %s", mds[i].Id, err)
+		}
+
+		arch, _, _ := ix.AddOrUpdate(mkeys[i], &mds[i], 1)
+		archivesInterned = append(archivesInterned, arch)
+	}
+
+	// add a bunch of metric points into the index via Update
+	// keep the returned interned archive references, but don't release them yet
+	for i := range mds {
+		for j := 100; j < 200; j++ {
+			arch, _, exists := ix.Update(schema.MetricPoint{
+				MKey:  mkeys[i],
+				Value: float64(j),
+				Time:  uint32(j),
+			}, 1)
+			if !exists {
+				t.Fatalf("Metric was expected to be present in index, but it was not: %s", mkeys[i].String())
+			}
+			archivesInterned = append(archivesInterned, arch)
+		}
+	}
+
+	statsStep1 := idx.IdxIntern.MemStatsPerPool()
+	if len(statsStep1) == 0 {
+		t.Fatalf("Expecting data in interning, but stats show it's empty")
+	}
+
+	foundNonEmptyPool := false
+	for i := range statsStep1 {
+		foundNonEmptyPool = foundNonEmptyPool || statsStep1[i].MemUsed > 0
+		t.Logf("Pool %d has obj size %d and mem used %d", i, statsStep1[i].ObjSize, statsStep1[i].MemUsed)
+	}
+
+	if !foundNonEmptyPool {
+		t.Fatalf("Expected interning to have non-empty pools, but it did not")
+	}
+
+	// delete all metrics via DeleteTagged, but don't release the references yet
+	// that have been returned by previous calls
+	queryAll, err := tagquery.NewQueryFromStrings([]string{"name=~.+"}, 0)
+	if err != nil {
+		t.Fatalf("Failed to instantiate query: %s", err)
+	}
+
+	deleted := ix.DeleteTagged(1, queryAll)
+	if len(deleted) != len(mds) {
+		t.Fatalf("Expected number of deleted metrics to be %d, but was %d", len(mds), len(deleted))
+	}
+
+	foundNodes := ix.FindByTag(1, queryAll)
+	if len(foundNodes) != 0 {
+		t.Fatalf("Expected the index to have no nodes after delete, but it had %d", len(foundNodes))
+	}
+
+	// there should now still be data in the interning, because we didn't release
+	// the previously returned interned archives yet
+	statsStep2 := idx.IdxIntern.MemStatsPerPool()
+	if len(statsStep2) == 0 {
+		t.Fatalf("Expecting data in interning, but there wasn't any")
+	}
+
+	// now release all the interned archives that have been
+	// returned by previous calls
+	for i := range archivesInterned {
+		archivesInterned[i].ReleaseInterned()
+	}
+
+	statsStep3 := idx.IdxIntern.MemStatsPerPool()
+	if len(statsStep3) != 0 {
+		t.Fatalf("Expecting interning to have no data, but there was:\n%+v", statsStep3)
+	}
+}
+
 var globalMemoryIndex MemoryIndex
 
 func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {

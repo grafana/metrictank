@@ -18,6 +18,7 @@ type ObjectInternConfig struct {
 	Compression  Compression
 	Index        bool
 	MaxIndexSize uint32
+	SlabSize     uint
 }
 
 // NewConfig returns a new configuration with default settings
@@ -30,5 +31,6 @@ func NewConfig() ObjectInternConfig {
 		Compression:  None,
 		Index:        true,
 		MaxIndexSize: 157286400, // 150 MiB
+		SlabSize:     100,
 	}
 }
