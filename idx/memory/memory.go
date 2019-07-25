@@ -605,10 +605,6 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinitionInterned) {
 	for _, tag := range def.Tags.KeyValues {
 		tags.addTagId(tag.Key, tag.Value, def.Id)
 	}
-	// TODO: add special case to handle name and intern each node separately
-	nameKey, _ := idx.IdxIntern.AddOrGet([]byte("name"), false)
-	nameValue, _ := idx.IdxIntern.AddOrGet([]byte(schema.SanitizeNameAsTagValue(def.Name.String())), false)
-	tags.addTagId(nameKey, nameValue, def.Id)
 
 	// Added sort here to accommodate a case where out of order tags are set after
 	// a call to SetId (which would sort it)
