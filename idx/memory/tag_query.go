@@ -282,16 +282,20 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 		query := q.equal[0]
 		q.equal = q.equal[1:]
 		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-			internError.Inc()
+		if err != nil || key == 0 {
+			// if query key has not been interned it is safe to assume that
+			// it is not present in the index at all, so this query must
+			// result in an empty result set
+			close(idCh)
 			q.wg.Done()
 			return nil, nil
 		}
 		value, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Value))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
-			internError.Inc()
+		if err != nil || value == 0 {
+			// if query value has not been interned it is safe to assume that
+			// it is not present in the index at all, so this query must
+			// result in an empty result set
+			close(idCh)
 			q.wg.Done()
 			return nil, nil
 		}
@@ -301,9 +305,11 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 		query := q.prefix[0]
 		q.prefix = q.prefix[1:]
 		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-			internError.Inc()
+		if err != nil || key == 0 {
+			// if query key has not been interned it is safe to assume that
+			// it is not present in the index at all, so this query must
+			// result in an empty result set
+			close(idCh)
 			q.wg.Done()
 			return nil, nil
 		}
@@ -312,9 +318,11 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 		query := q.match[0]
 		q.match = q.match[1:]
 		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-			internError.Inc()
+		if err != nil || key == 0 {
+			// if query key has not been interned it is safe to assume that
+			// it is not present in the index at all, so this query must
+			// result in an empty result set
+			close(idCh)
 			q.wg.Done()
 			return nil, nil
 		}
@@ -620,15 +628,21 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 func (q *TagQueryContext) sortByCost() {
 	for i, kv := range q.equal {
 		key, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Key))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-			internError.Inc()
+		if err != nil || key == 0 {
+			// if query key has not been interned it is safe to assume that
+			// it is not present in the index at all, so this expression
+			// is going to be cheap to evaluate, we should run it first to
+			// minimize the result set
+			q.match[i].cost = 0
 			continue
 		}
 		value, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Value))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
-			internError.Inc()
+		if err != nil || value == 0 {
+			// if query value has not been interned it is safe to assume that
+			// it is not present in the index at all, so this expression
+			// is going to be cheap to evaluate, we should run it first to
+			// minimize the result set
+			q.match[i].cost = 0
 			continue
 		}
 		q.equal[i].cost = uint(len(q.index[key][value]))
@@ -639,9 +653,12 @@ func (q *TagQueryContext) sortByCost() {
 	// cardinality of the key
 	for i, kv := range q.prefix {
 		key, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Key))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-			internError.Inc()
+		if err != nil || key == 0 {
+			// if query key has not been interned it is safe to assume that
+			// it is not present in the index at all, so this expression
+			// is going to be cheap to evaluate, we should run it first to
+			// minimize the result set
+			q.match[i].cost = 0
 			continue
 		}
 		q.prefix[i].cost = uint(len(q.index[key]))
@@ -649,9 +666,12 @@ func (q *TagQueryContext) sortByCost() {
 
 	for i, kvRe := range q.match {
 		key, err := idx.IdxIntern.GetPtrFromByte([]byte(kvRe.Key))
-		if err != nil {
-			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
-			internError.Inc()
+		if err != nil || key == 0 {
+			// if query key has not been interned it is safe to assume that
+			// it is not present in the index at all, so this expression
+			// is going to be cheap to evaluate, we should run it first to
+			// minimize the result set
+			q.match[i].cost = 0
 			continue
 		}
 		q.match[i].cost = uint(len(q.index[key]))
