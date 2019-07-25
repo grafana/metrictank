@@ -500,6 +500,9 @@ func (md *MetricDefinitionInterned) SetTags(tags []string) {
 	md.Tags.KeyValues = append(md.Tags.KeyValues, TagKeyValue{Key: nameKey, Value: nameValue})
 
 	for _, tag := range tags {
+		if strings.HasPrefix(tag, "name=") {
+			continue
+		}
 		if tag == "=" || tag == "" {
 			log.Error("idx: SetTags: Empty tag, ignoring: ", tag)
 			invalidTag.Inc()
