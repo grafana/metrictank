@@ -332,11 +332,12 @@ func (m *UnpartitionedMemoryIdx) Init() error {
 
 	// gather memory and fragmentation statistics on the object store every minute
 	go func(shutdown chan struct{}) {
+		ticker := time.NewTicker(time.Minute)
 		for {
 			select {
 			case <-shutdown:
 				return
-			default:
+			case <-ticker.C:
 				m.Lock()
 				for _, internMemStat := range idx.IdxIntern.MemStatsPerPool() {
 					statInternMemory[internMemStat.ObjSize].SetUint64(internMemStat.MemUsed)
@@ -346,7 +347,6 @@ func (m *UnpartitionedMemoryIdx) Init() error {
 				}
 				m.Unlock()
 			}
-			time.Sleep(time.Minute)
 		}
 	}(m.shutdown)
 
