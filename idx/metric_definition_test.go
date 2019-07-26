@@ -64,7 +64,7 @@ func TestCreateDeleteMetricDefinition1000(t *testing.T) {
 }
 
 func testCreateDeleteMetricDefinition(t *testing.T, num int) {
-	IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+	IdxIntern.Reset()
 	defs := genMetricDefinitionsWithSameName(num)
 	name := "anotheryetlonger.short.metric.name"
 
@@ -74,16 +74,10 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 		Convey(fmt.Sprintf("reference counts should be at %d", num), func() {
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
-					current, _ := IdxIntern.GetStringFromPtr(ptr)
 					cnt, err := IdxIntern.RefCnt(ptr)
 					So(err, ShouldBeNil)
-					if current != "name" {
-						So(cnt, ShouldEqual, num)
-					} else {
-						So(cnt, ShouldEqual, num*2)
-					}
+					So(cnt, ShouldEqual, num)
 				}
-
 			}
 		})
 		Convey(fmt.Sprintf("After deleting half of the metricdefinitions reference count should be %d", num/2), func() {
@@ -94,14 +88,9 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 			defs = defs[num/2:]
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
-					current, _ := IdxIntern.GetStringFromPtr(ptr)
 					cnt, err := IdxIntern.RefCnt(ptr)
 					So(err, ShouldBeNil)
-					if current != "name" {
-						So(cnt, ShouldEqual, num/2)
-					} else {
-						So(cnt, ShouldEqual, num)
-					}
+					So(cnt, ShouldEqual, num/2)
 				}
 
 			}
@@ -159,14 +148,9 @@ func TestMetricNameAndTagAddresses(t *testing.T) {
 		Convey("reference counts should be at 5", func() {
 			for _, md := range defs {
 				for _, ptr := range md.Name.Nodes() {
-					current, _ := IdxIntern.GetStringFromPtr(ptr)
 					cnt, err := IdxIntern.RefCnt(ptr)
 					So(err, ShouldBeNil)
-					if current != "name" {
-						So(cnt, ShouldEqual, 5)
-					} else {
-						So(cnt, ShouldEqual, 10)
-					}
+					So(cnt, ShouldEqual, 5)
 				}
 
 			}
@@ -179,7 +163,6 @@ func TestTagKeyValuesAndNameWithTags(t *testing.T) {
 	defs := genMetricDefinitionsWithSameName(1)
 	tags := genTags(5)
 	defs[0].SetTags(tags)
-	tags = append([]string{fmt.Sprintf("name=%s", defs[0].Name.String())}, tags...)
 
 	Convey("After adding tags to a MetricDefinition", t, func() {
 		Convey("the Strings() function of TagKeyValues should resemble the original []string", func() {

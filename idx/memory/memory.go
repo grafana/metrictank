@@ -168,15 +168,60 @@ func (ids IdSet) String() string {
 type TagValues map[uintptr]IdSet    // value -> set of ids
 type TagIndex map[uintptr]TagValues // key -> list of values
 
+// addTagId takes a tag and value (their corresponding pointers)
+// and a schema key. Then it adds that schema key to the tag index
+// under the given tag & value
 func (t *TagIndex) addTagId(name, value uintptr, id schema.MKey) {
 	ti := *t
 	if _, ok := ti[name]; !ok {
 		ti[name] = make(TagValues)
+		idx.IdxIntern.IncRefCnt(name)
 	}
 	if _, ok := ti[name][value]; !ok {
 		ti[name][value] = make(IdSet)
+		idx.IdxIntern.IncRefCnt(value)
 	}
 	ti[name][value][id] = struct{}{}
+}
+
+// addTagIdForName does the same as addTagId, but for the special
+// that "name" which indexes the metric's name value.
+// it needs to be treated differently because, unlike normal tags,
+// it is not guaranteed that the name value has already been
+// interned at this point
+func (t *TagIndex) addTagIdForName(name string, id schema.MKey) {
+	ti := *t
+
+	var namePtr, valuePtr uintptr
+	namePtr, _ = idx.IdxIntern.GetPtrFromByte([]byte("name"))
+	newlyInterned := false
+	if namePtr == 0 {
+		namePtr, _ = idx.IdxIntern.AddOrGet([]byte("name"), false)
+		newlyInterned = true
+	}
+
+	if _, ok := ti[namePtr]; !ok {
+		ti[namePtr] = make(TagValues)
+		if !newlyInterned {
+			idx.IdxIntern.IncRefCnt(namePtr)
+		}
+	}
+
+	valuePtr, _ = idx.IdxIntern.GetPtrFromByte([]byte(name))
+	newlyInterned = false
+	if valuePtr == 0 {
+		valuePtr, _ = idx.IdxIntern.AddOrGet([]byte(name), false)
+		newlyInterned = true
+	}
+
+	if _, ok := ti[namePtr][valuePtr]; !ok {
+		ti[namePtr][valuePtr] = make(IdSet)
+		if !newlyInterned {
+			idx.IdxIntern.IncRefCnt(valuePtr)
+		}
+	}
+
+	ti[namePtr][valuePtr][id] = struct{}{}
 }
 
 func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey) {
@@ -186,8 +231,37 @@ func (t *TagIndex) delTagId(name, value uintptr, id schema.MKey) {
 
 	if len(ti[name][value]) == 0 {
 		delete(ti[name], value)
+		idx.IdxIntern.Delete(value)
 		if len(ti[name]) == 0 {
 			delete(ti, name)
+			idx.IdxIntern.Delete(name)
+		}
+	}
+}
+
+func (t *TagIndex) delTagIdForName(name string, id schema.MKey) {
+	ti := *t
+
+	namePtr, err := idx.IdxIntern.GetPtrFromByte([]byte("name"))
+	if err != nil || namePtr == 0 {
+		log.Error("memory-idx: Failed to retrieve interned string for 'name' key: ", err)
+		internError.Inc()
+	}
+
+	valuePtr, err := idx.IdxIntern.GetPtrFromByte([]byte(name))
+	if err != nil || valuePtr == 0 {
+		log.Error("memory-idx: Failed to retrieve interned string for 'name' value: ", err)
+		internError.Inc()
+	}
+
+	delete(ti[namePtr][valuePtr], id)
+
+	if len(ti[namePtr][valuePtr]) == 0 {
+		delete(ti[namePtr], valuePtr)
+		idx.IdxIntern.Delete(valuePtr)
+		if len(ti[namePtr]) == 0 {
+			delete(ti, namePtr)
+			idx.IdxIntern.Delete(namePtr)
 		}
 	}
 }
@@ -606,6 +680,8 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *idx.MetricDefinitionInterned) {
 		tags.addTagId(tag.Key, tag.Value, def.Id)
 	}
 
+	tags.addTagIdForName(schema.SanitizeNameAsTagValue(def.Name.String()), def.Id)
+
 	// Added sort here to accommodate a case where out of order tags are set after
 	// a call to SetId (which would sort it)
 	// e.g. the case where somebody sent us a MD with an id already set and out-of-order tags
@@ -623,6 +699,8 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *idx.MetricDefin
 	for _, tag := range def.Tags.KeyValues {
 		tags.delTagId(tag.Key, tag.Value, def.Id)
 	}
+
+	tags.delTagIdForName(schema.SanitizeNameAsTagValue(def.Name.String()), def.Id)
 
 	m.defByTagSet.del(def)
 
@@ -697,9 +775,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.ArchiveInterned) {
 		// same underlying object in m.defById and m.defByTagSet
 		m.indexTags(archive.MetricDefinitionInterned)
 
-		// there will always be at least one KeyValue because
-		// we always add the "name" tag
-		if len(def.Tags.KeyValues) > 1 {
+		if len(def.Tags.KeyValues) > 0 {
 			if _, ok := m.defById[def.Id]; !ok {
 				m.defById[def.Id] = archive
 				statAdd.Inc()
@@ -1720,9 +1796,7 @@ DEFS:
 			continue DEFS
 		}
 
-		// this will always be at least 1 because we
-		// always add the "name" tag.
-		if len(def.Tags.KeyValues) == 1 {
+		if len(def.Tags.KeyValues) == 0 {
 			tree, ok := m.tree[def.OrgId]
 			if !ok {
 				continue DEFS
