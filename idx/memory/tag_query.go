@@ -633,7 +633,7 @@ func (q *TagQueryContext) sortByCost() {
 			// it is not present in the index at all, so this expression
 			// is going to be cheap to evaluate, we should run it first to
 			// minimize the result set
-			q.match[i].cost = 0
+			q.equal[i].cost = 0
 			continue
 		}
 		value, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Value))
@@ -642,7 +642,7 @@ func (q *TagQueryContext) sortByCost() {
 			// it is not present in the index at all, so this expression
 			// is going to be cheap to evaluate, we should run it first to
 			// minimize the result set
-			q.match[i].cost = 0
+			q.equal[i].cost = 0
 			continue
 		}
 		q.equal[i].cost = uint(len(q.index[key][value]))
@@ -658,7 +658,7 @@ func (q *TagQueryContext) sortByCost() {
 			// it is not present in the index at all, so this expression
 			// is going to be cheap to evaluate, we should run it first to
 			// minimize the result set
-			q.match[i].cost = 0
+			q.prefix[i].cost = 0
 			continue
 		}
 		q.prefix[i].cost = uint(len(q.index[key]))
