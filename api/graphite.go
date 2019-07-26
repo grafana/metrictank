@@ -29,6 +29,7 @@ import (
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )
@@ -136,24 +137,48 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 	return series, nil
 }
 
+func (s *Server) proxyToGraphite(ctx *middleware.Context) {
+	proxyCtx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "graphiteproxy")
+	tags.SpanKindRPCClient.Set(span)
+	tags.PeerService.Set(span, "graphite")
+	ctx.Req = macaron.Request{ctx.Req.WithContext(proxyCtx)}
+	ctx.Req.Request.Body = ctx.Body
+	carrier := opentracing.HTTPHeadersCarrier(ctx.Req.Header)
+	err := s.Tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier)
+	if err != nil {
+		log.Errorf("HTTP renderMetrics failed to inject span into headers: %s", err.Error())
+	}
+	graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
+	if span != nil {
+		span.Finish()
+	}
+	renderReqProxied.Inc()
+}
+
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
+	// retrieve te span that was created by the api Middleware handler.  The handler will
+	// call span.Finish()
 	span := opentracing.SpanFromContext(ctx.Req.Context())
+
+	span.SetTag("orgid", ctx.OrgId)
 
 	// note: the model is already validated to assure at least one of them has len >0
 	if len(request.Targets) == 0 {
 		request.Targets = request.TargetsRails
 	}
 
-	span.SetTag("from", request.FromTo.From)
-	span.SetTag("until", request.FromTo.Until)
-	span.SetTag("to", request.FromTo.To)
-	span.SetTag("tz", request.FromTo.Tz)
-	span.SetTag("mdp", request.MaxDataPoints)
-	span.SetTag("targets", request.Targets)
-	span.SetTag("format", request.Format)
-	span.SetTag("noproxy", request.NoProxy)
-	span.SetTag("process", request.Process)
-	span.SetTag("orgid", ctx.OrgId)
+	// log information about the request.
+	span.LogFields(
+		traceLog.String("from", request.FromTo.From),
+		traceLog.String("until", request.FromTo.Until),
+		traceLog.String("to", request.FromTo.To),
+		traceLog.String("tz", request.FromTo.Tz),
+		traceLog.Int32("mdp", int32(request.MaxDataPoints)),
+		traceLog.String("targets", fmt.Sprintf("%q", request.Targets)),
+		traceLog.String("format", request.Format),
+		traceLog.Bool("noproxy", request.NoProxy),
+		traceLog.String("process", request.Process),
+	)
 
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
@@ -168,9 +193,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		return
 	}
 
-	span.SetTag("fromUnix", fromUnix)
-	span.SetTag("toUnix", toUnix)
-	span.SetTag("span", toUnix-fromUnix)
+	span.LogFields(
+		traceLog.Int32("fromUnix", int32(fromUnix)),
+		traceLog.Int32("toUnix", int32(toUnix)),
+		traceLog.Int32("span", int32(toUnix-fromUnix)),
+	)
 
 	// render API is modeled after graphite, so from exclusive, to inclusive.
 	// in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
@@ -187,9 +214,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	reqRenderTargetCount.Value(len(request.Targets))
 
 	if request.Process == "none" {
-		ctx.Req.Request.Body = ctx.Body
-		graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
-		renderReqProxied.Inc()
+		s.proxyToGraphite(ctx)
 		return
 	}
 
@@ -207,40 +232,30 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 				ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
 				return
 			}
-			newctx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "graphiteproxy")
-			tags.SpanKindRPCClient.Set(span)
-			tags.PeerService.Set(span, "graphite")
-			ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
-			ctx.Req.Request.Body = ctx.Body
-			graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)
-			if span != nil {
-				span.Finish()
-			}
+			s.proxyToGraphite(ctx)
 			proxyStats.Miss(string(fun))
-			renderReqProxied.Inc()
 			return
 		}
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	newctx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
-	defer span.Finish()
-	ctx.Req = macaron.Request{ctx.Req.WithContext(newctx)}
-	out, meta, err := s.executePlan(ctx.Req.Context(), ctx.OrgId, plan)
+	execCtx, execSpan := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
+	defer execSpan.Finish()
+	out, meta, err := s.executePlan(execCtx, ctx.OrgId, plan)
 	if err != nil {
 		err := response.WrapError(err)
 		if err.Code() != http.StatusBadRequest {
-			tracing.Failure(span)
+			tracing.Failure(execSpan)
 		}
-		tracing.Error(span, err)
+		tracing.Error(execSpan, err)
 		response.Write(ctx, err)
 		return
 	}
 
 	// check to see if the request has been canceled, if so abort now.
 	select {
-	case <-newctx.Done():
+	case <-execCtx.Done():
 		//request canceled
 		response.Write(ctx, response.RequestCanceledErr)
 		return

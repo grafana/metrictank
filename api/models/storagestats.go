@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/metrictank/mdata/cache"
 	opentracing "github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 )
 
 //go:generate msgp
@@ -73,10 +74,12 @@ func (ss *StorageStats) MarshalJSONFastRaw(b []byte) ([]byte, error) {
 }
 
 func (ss *StorageStats) Trace(span opentracing.Span) {
-	span.SetTag("cache-miss", atomic.LoadUint32(&ss.CacheMiss))
-	span.SetTag("cache-hit-partial", atomic.LoadUint32(&ss.CacheHitPartial))
-	span.SetTag("cache-hit", atomic.LoadUint32(&ss.CacheHit))
-	span.SetTag("chunks-from-tank", atomic.LoadUint32(&ss.ChunksFromTank))
-	span.SetTag("chunks-from-cache", atomic.LoadUint32(&ss.ChunksFromCache))
-	span.SetTag("chunks-from-store", atomic.LoadUint32(&ss.ChunksFromStore))
+	span.LogFields(
+		traceLog.Int32("cache-miss", int32(atomic.LoadUint32(&ss.CacheMiss))),
+		traceLog.Int32("cache-hit-partial", int32(atomic.LoadUint32(&ss.CacheHitPartial))),
+		traceLog.Int32("cache-hit", int32(atomic.LoadUint32(&ss.CacheHit))),
+		traceLog.Int32("chunks-from-tank", int32(atomic.LoadUint32(&ss.ChunksFromTank))),
+		traceLog.Int32("chunks-from-cache", int32(atomic.LoadUint32(&ss.ChunksFromCache))),
+		traceLog.Int32("chunks-from-store", int32(atomic.LoadUint32(&ss.ChunksFromStore))),
+	)
 }

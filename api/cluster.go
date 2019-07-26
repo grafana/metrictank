@@ -16,6 +16,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/tracing"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -471,6 +472,8 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 	errorChan := make(chan error, 1)
 
 	go func() {
+		ctx, peerSpan := tracing.NewSpan(ctx, s.Tracer, name+" peerQuery")
+		defer peerSpan.Finish()
 		defer close(errorChan)
 		defer close(resultChan)
 
@@ -480,7 +483,8 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 			errorChan <- err
 			return
 		}
-		log.Debugf("HTTP %s across %d instances", name, len(peerGroups)-1)
+		peerSpan.SetTag("peerGroups", len(peerGroups))
+		log.Debugf("HTTP %s across %d instances", name, len(peerGroups))
 
 		reqCtx, cancel := context.WithCancel(ctx)
 		defer cancel()

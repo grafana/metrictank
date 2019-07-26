@@ -1,8 +1,11 @@
 package models
 
 import (
+	"fmt"
+
 	"github.com/grafana/metrictank/cluster"
 	opentracing "github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/raintank/schema"
 )
 
@@ -30,7 +33,7 @@ type IndexList struct {
 }
 
 func (i IndexList) Trace(span opentracing.Span) {
-	span.SetTag("org", i.OrgId)
+	span.SetTag("orgId", i.OrgId)
 }
 
 func (i IndexList) TraceDebug(span opentracing.Span) {
@@ -43,9 +46,11 @@ type IndexFindByTag struct {
 }
 
 func (t IndexFindByTag) Trace(span opentracing.Span) {
-	span.SetTag("org", t.OrgId)
-	span.SetTag("expressions", t.Expr)
-	span.SetTag("from", t.From)
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(
+		traceLog.Int64("from", t.From),
+		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
+	)
 }
 
 func (i IndexFindByTag) TraceDebug(span opentracing.Span) {
@@ -59,10 +64,12 @@ type IndexTagDetails struct {
 }
 
 func (t IndexTagDetails) Trace(span opentracing.Span) {
-	span.SetTag("org", t.OrgId)
-	span.SetTag("filter", t.Filter)
-	span.SetTag("tag", t.Tag)
-	span.SetTag("from", t.From)
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(
+		traceLog.Int64("from", t.From),
+		traceLog.String("filter", t.Filter),
+		traceLog.String("tag", t.Tag),
+	)
 }
 
 func (i IndexTagDetails) TraceDebug(span opentracing.Span) {
@@ -75,9 +82,11 @@ type IndexTags struct {
 }
 
 func (t IndexTags) Trace(span opentracing.Span) {
-	span.SetTag("org", t.OrgId)
-	span.SetTag("filter", t.Filter)
-	span.SetTag("from", t.From)
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(
+		traceLog.Int64("from", t.From),
+		traceLog.String("filter", t.Filter),
+	)
 }
 
 func (i IndexTags) TraceDebug(span opentracing.Span) {
@@ -92,11 +101,13 @@ type IndexAutoCompleteTags struct {
 }
 
 func (t IndexAutoCompleteTags) Trace(span opentracing.Span) {
-	span.SetTag("org", t.OrgId)
-	span.SetTag("Prefix", t.Prefix)
-	span.SetTag("expressions", t.Expr)
-	span.SetTag("from", t.From)
-	span.SetTag("limit", t.Limit)
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(
+		traceLog.Int64("from", t.From),
+		traceLog.String("prefix", t.Prefix),
+		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
+		traceLog.Int("limit", int(t.Limit)),
+	)
 }
 
 func (i IndexAutoCompleteTags) TraceDebug(span opentracing.Span) {
@@ -112,12 +123,14 @@ type IndexAutoCompleteTagValues struct {
 }
 
 func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
-	span.SetTag("org", t.OrgId)
-	span.SetTag("Prefix", t.Prefix)
-	span.SetTag("tag", t.Tag)
-	span.SetTag("expressions", t.Expr)
-	span.SetTag("from", t.From)
-	span.SetTag("limit", t.Limit)
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(
+		traceLog.Int64("from", t.From),
+		traceLog.String("prefix", t.Prefix),
+		traceLog.String("tag", t.Tag),
+		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
+		traceLog.Int("limit", int(t.Limit)),
+	)
 }
 
 func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
@@ -129,8 +142,8 @@ type IndexTagDelSeries struct {
 }
 
 func (t IndexTagDelSeries) Trace(span opentracing.Span) {
-	span.SetTag("org", t.OrgId)
-	span.SetTag("paths", t.Paths)
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(traceLog.String("paths", fmt.Sprintf("%q", t.Paths)))
 }
 
 func (i IndexTagDelSeries) TraceDebug(span opentracing.Span) {
@@ -147,9 +160,11 @@ type IndexFind struct {
 }
 
 func (i IndexFind) Trace(span opentracing.Span) {
-	span.SetTag("q", i.Patterns)
-	span.SetTag("org", i.OrgId)
-	span.SetTag("from", i.From)
+	span.SetTag("orgId", i.OrgId)
+	span.LogFields(
+		traceLog.Int64("from", i.From),
+		traceLog.String("q", fmt.Sprintf("%q", i.Patterns)),
+	)
 }
 
 func (i IndexFind) TraceDebug(span opentracing.Span) {
@@ -160,7 +175,7 @@ type GetData struct {
 }
 
 func (g GetData) Trace(span opentracing.Span) {
-	span.SetTag("num_reqs", len(g.Requests))
+	span.LogFields(traceLog.Int("num_reqs", len(g.Requests)))
 }
 
 func (g GetData) TraceDebug(span opentracing.Span) {
@@ -181,8 +196,8 @@ type IndexDelete struct {
 }
 
 func (i IndexDelete) Trace(span opentracing.Span) {
-	span.SetTag("q", i.Query)
-	span.SetTag("org", i.OrgId)
+	span.SetTag("orgId", i.OrgId)
+	span.LogFields(traceLog.String("q", i.Query))
 }
 
 func (i IndexDelete) TraceDebug(span opentracing.Span) {

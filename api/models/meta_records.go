@@ -1,7 +1,10 @@
 package models
 
 import (
+	"fmt"
+
 	opentracing "github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 )
 
 type MetaTagRecordUpsert struct {
@@ -11,9 +14,11 @@ type MetaTagRecordUpsert struct {
 }
 
 func (m MetaTagRecordUpsert) Trace(span opentracing.Span) {
-	span.SetTag("metaTags", m.MetaTags)
-	span.SetTag("queries", m.Queries)
-	span.SetTag("propagate", m.Propagate)
+	span.LogFields(
+		traceLog.String("metaTags", fmt.Sprintf("%q", m.MetaTags)),
+		traceLog.String("queries", fmt.Sprintf("%q", m.Queries)),
+		traceLog.Bool("propagate", m.Propagate),
+	)
 }
 
 func (m MetaTagRecordUpsert) TraceDebug(span opentracing.Span) {
@@ -39,9 +44,11 @@ type IndexMetaTagRecordUpsert struct {
 }
 
 func (m IndexMetaTagRecordUpsert) Trace(span opentracing.Span) {
-	span.SetTag("org", m.OrgId)
-	span.SetTag("metaTags", m.MetaTags)
-	span.SetTag("queries", m.Queries)
+	span.SetTag("orgId", m.OrgId)
+	span.LogFields(
+		traceLog.String("metaTags", fmt.Sprintf("%q", m.MetaTags)),
+		traceLog.String("queries", fmt.Sprintf("%q", m.Queries)),
+	)
 }
 
 func (m IndexMetaTagRecordUpsert) TraceDebug(span opentracing.Span) {

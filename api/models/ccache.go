@@ -1,7 +1,10 @@
 package models
 
 import (
+	"fmt"
+
 	opentracing "github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 )
 
 type CCacheDelete struct {
@@ -14,9 +17,11 @@ type CCacheDelete struct {
 }
 
 func (cd CCacheDelete) Trace(span opentracing.Span) {
-	span.SetTag("patterns", cd.Patterns)
-	span.SetTag("org", cd.OrgId)
-	span.SetTag("propagate", cd.Propagate)
+	span.LogFields(
+		traceLog.String("patterns", fmt.Sprintf("%q", cd.Patterns)),
+		traceLog.Int32("org", int32(cd.OrgId)),
+		traceLog.Bool("propagate", cd.Propagate),
+	)
 }
 
 func (cd CCacheDelete) TraceDebug(span opentracing.Span) {
