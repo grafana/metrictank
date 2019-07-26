@@ -244,12 +244,14 @@ func (t *TagIndex) delTagIdForName(name string, id schema.MKey) {
 
 	namePtr, err := idx.IdxIntern.GetPtrFromByte([]byte("name"))
 	if err != nil || namePtr == 0 {
-		log.Error("panic corrupt!")
+		log.Error("memory-idx: Failed to retrieve interned string for 'name' key: ", err)
+		internError.Inc()
 	}
 
 	valuePtr, err := idx.IdxIntern.GetPtrFromByte([]byte(name))
 	if err != nil || valuePtr == 0 {
-		log.Error("panic corrupt")
+		log.Error("memory-idx: Failed to retrieve interned string for 'name' value: ", err)
+		internError.Inc()
 	}
 
 	delete(ti[namePtr][valuePtr], id)
