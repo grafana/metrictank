@@ -15,6 +15,7 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/test"
 	"github.com/raintank/schema"
@@ -150,7 +151,7 @@ func printMemUsage(t *testing.T) {
 	t.Logf("Sys = \t\t\t%v MB\t\t %v KB\t %v B\n", (m.Sys / 1024 / 1024), (m.Sys / 1024), m.Sys)
 	t.Logf("Live Heap Objects = \t%v\n", (m.Mallocs - m.Frees))
 	t.Logf("NumGC = \t\t%v\n\n", m.NumGC)
-	memTotalObjectStore, err := idx.IdxIntern.MemStatsTotal()
+	memTotalObjectStore, err := interning.IdxIntern.MemStatsTotal()
 	if err == nil {
 		t.Logf("Total Memory Used By Object Store = \t\t%v MB\t\t %v KB\t %v B\n", (memTotalObjectStore / 1024 / 1024), (memTotalObjectStore / 1024), memTotalObjectStore)
 		t.Logf("Total Memory Used = \t\t\t\t%v MB\t\t %v KB\t %v B\n\n\n", ((memTotalObjectStore + m.HeapAlloc) / 1024 / 1024), ((memTotalObjectStore + m.HeapAlloc) / 1024), memTotalObjectStore+m.HeapAlloc)
@@ -244,7 +245,7 @@ func testGetAddKey(t *testing.T) {
 				query, err := tagquery.NewQueryFromStrings([]string{"name!="}, 0)
 				So(err, ShouldBeNil)
 				nodes := ix.FindByTag(1, query)
-				defs := make([]idx.Archive, 0, len(nodes))
+				defs := make([]interning.Archive, 0, len(nodes))
 				for i := range nodes {
 					defs = append(defs, nodes[i].Defs...)
 				}
@@ -884,7 +885,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 		So(err, ShouldBeNil)
 		nodes := ix.FindByTag(1, query)
 		So(nodes, ShouldHaveLength, 1)
-		defs := make([]idx.Archive, 0, len(nodes))
+		defs := make([]interning.Archive, 0, len(nodes))
 		for i := range nodes {
 			defs = append(defs, nodes[i].Defs...)
 		}
@@ -1110,11 +1111,11 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 		ix = nil
 	}()
 
-	idx.IdxIntern.Reset()
+	interning.IdxIntern.Reset()
 
 	mds := make([]schema.MetricData, 1000)
 	mkeys := make([]schema.MKey, len(mds))
-	var archivesInterned []*idx.ArchiveInterned
+	var archivesInterned []*interning.ArchiveInterned
 
 	// add a bunch of metrics into the index via AddOrUpdate
 	// keep the returned interned archive references, but don't release them yet
@@ -1151,7 +1152,7 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 		}
 	}
 
-	statsStep1 := idx.IdxIntern.MemStatsPerPool()
+	statsStep1 := interning.IdxIntern.MemStatsPerPool()
 	if len(statsStep1) == 0 {
 		t.Fatalf("Expecting data in interning, but stats show it's empty")
 	}
@@ -1185,7 +1186,7 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 
 	// there should now still be data in the interning, because we didn't release
 	// the previously returned interned archives yet
-	statsStep2 := idx.IdxIntern.MemStatsPerPool()
+	statsStep2 := interning.IdxIntern.MemStatsPerPool()
 	if len(statsStep2) == 0 {
 		t.Fatalf("Expecting data in interning, but there wasn't any")
 	}
@@ -1196,7 +1197,7 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 		archivesInterned[i].ReleaseInterned()
 	}
 
-	statsStep3 := idx.IdxIntern.MemStatsPerPool()
+	statsStep3 := interning.IdxIntern.MemStatsPerPool()
 	if len(statsStep3) != 0 {
 		t.Fatalf("Expecting interning to have no data, but there was:\n%+v", statsStep3)
 	}
@@ -1415,11 +1416,11 @@ func testMatchSchemaWithTags(t *testing.T) {
 	ix.Init()
 	defer ix.Stop()
 
-	data := make([]*idx.MetricDefinitionInterned, 10)
-	archives := make([]*idx.ArchiveInterned, 10)
+	data := make([]*interning.MetricDefinitionInterned, 10)
+	archives := make([]*interning.ArchiveInterned, 10)
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
-		data[i] = &idx.MetricDefinitionInterned{
+		data[i] = &interning.MetricDefinitionInterned{
 			OrgId:     1,
 			Interval:  1,
 			Partition: getPartitionFromName(name),

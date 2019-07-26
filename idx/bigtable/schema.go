@@ -9,6 +9,7 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 )
 
@@ -18,7 +19,7 @@ func FormatRowKey(mkey schema.MKey, partition int32) string {
 }
 
 // SchemaToRow takes a metricDefintion and returns a rowKey and column data.
-func SchemaToRow(def *idx.MetricDefinitionInterned) (string, map[string][]byte) {
+func SchemaToRow(def *interning.MetricDefinitionInterned) (string, map[string][]byte) {
 	row := map[string][]byte{
 		//"Id" omitted as it is part of the rowKey
 		"OrgId":      make([]byte, 8),
@@ -51,7 +52,7 @@ func DecodeRowKey(key string) (schema.MKey, int32, error) {
 }
 
 // RowToSchema takes a row and unmarshals the data into the provided MetricDefinition.
-func RowToSchema(row bigtable.Row, def *idx.MetricDefinitionInterned) error {
+func RowToSchema(row bigtable.Row, def *interning.MetricDefinitionInterned) error {
 	if def == nil {
 		return fmt.Errorf("cant write row to nil MetricDefinition")
 	}
@@ -59,7 +60,7 @@ func RowToSchema(row bigtable.Row, def *idx.MetricDefinitionInterned) error {
 	if !ok {
 		return fmt.Errorf("no columns in columnFamly %s", COLUMN_FAMILY)
 	}
-	*def = idx.MetricDefinitionInterned{}
+	*def = interning.MetricDefinitionInterned{}
 	var err error
 	var val int64
 

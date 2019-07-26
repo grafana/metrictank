@@ -1,4 +1,4 @@
-package idx
+package interning
 
 import (
 	"bytes"
@@ -14,6 +14,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )
+
+//msgp:ignore Md5Hash
+
+// Md5Hash is a structure for more compactly storing an md5 hash than using a string
+type Md5Hash struct {
+	Upper uint64
+	Lower uint64
+}
 
 //go:generate msgp
 

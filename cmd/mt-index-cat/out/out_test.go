@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
-
-	"github.com/grafana/metrictank/idx"
 )
 
 func genTags(num int) []string {
@@ -17,10 +16,10 @@ func genTags(num int) []string {
 	return tags
 }
 
-func genMetricDefinitions(num int) []idx.MetricDefinitionInterned {
-	defs := make([]idx.MetricDefinitionInterned, num)
+func genMetricDefinitions(num int) []interning.MetricDefinitionInterned {
+	defs := make([]interning.MetricDefinitionInterned, num)
 	for i := 0; i < num; i++ {
-		defs[i] = idx.MetricDefinitionInterned{
+		defs[i] = interning.MetricDefinitionInterned{
 			OrgId:      1,
 			Interval:   10,
 			LastUpdate: 0,
@@ -35,7 +34,7 @@ func genMetricDefinitions(num int) []idx.MetricDefinitionInterned {
 	return defs
 }
 
-func compareSchemaWithIdxMd(smd schema.MetricDefinition, imd idx.MetricDefinitionInterned) error {
+func compareSchemaWithIdxMd(smd schema.MetricDefinition, imd interning.MetricDefinitionInterned) error {
 	if smd.Id != imd.Id {
 		return fmt.Errorf("Id not equal. schema: %d, idx: %d", smd.Id, imd.Id)
 	}

@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -67,12 +67,12 @@ type TagQueryContext struct {
 	notMatch []kvRe // NOT_MATCH
 	prefix   []kv   // PREFIX
 
-	index     TagIndex                             // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId      map[schema.MKey]*idx.ArchiveInterned // the metric index by ID, set by Run()/RunGetTags()
-	tagClause tagquery.ExpressionOperator          // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	tagMatch  kvRe                                 // only used for /metrics/tags with regex in filter param
-	tagPrefix string                               // only used for auto complete of tags to match exact prefix
-	startWith tagquery.ExpressionOperator          // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	index     TagIndex                                   // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId      map[schema.MKey]*interning.ArchiveInterned // the metric index by ID, set by Run()/RunGetTags()
+	tagClause tagquery.ExpressionOperator                // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
+	tagMatch  kvRe                                       // only used for /metrics/tags with regex in filter param
+	tagPrefix string                                     // only used for auto complete of tags to match exact prefix
+	startWith tagquery.ExpressionOperator                // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
 	wg        *sync.WaitGroup
 }
 
@@ -141,7 +141,7 @@ func (q *TagQueryContext) getInitialByPrefix(key uintptr, exprvalue string, idCh
 
 VALUES:
 	for v, ids := range q.index[key] {
-		value, err := idx.IdxIntern.GetStringFromPtr(v)
+		value, err := interning.IdxIntern.GetStringFromPtr(v)
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
@@ -187,7 +187,7 @@ func (q *TagQueryContext) getInitialByMatch(key uintptr, expr kvRe, idCh chan sc
 
 VALUES2:
 	for v, ids := range q.index[key] {
-		value, err := idx.IdxIntern.GetStringFromPtr(v)
+		value, err := interning.IdxIntern.GetStringFromPtr(v)
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
@@ -216,7 +216,7 @@ func (q *TagQueryContext) getInitialByTagPrefix(idCh chan schema.MKey, stopCh ch
 
 TAGS:
 	for tag, values := range q.index {
-		key, err := idx.IdxIntern.GetStringFromPtr(tag)
+		key, err := interning.IdxIntern.GetStringFromPtr(tag)
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
@@ -247,7 +247,7 @@ func (q *TagQueryContext) getInitialByTagMatch(idCh chan schema.MKey, stopCh cha
 
 TAGS:
 	for tag, values := range q.index {
-		key, err := idx.IdxIntern.GetStringFromPtr(tag)
+		key, err := interning.IdxIntern.GetStringFromPtr(tag)
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
@@ -281,7 +281,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 	case tagquery.EQUAL:
 		query := q.equal[0]
 		q.equal = q.equal[1:]
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(query.Key))
 		if err != nil || key == 0 {
 			// if query key has not been interned it is safe to assume that
 			// it is not present in the index at all, so this query must
@@ -290,7 +290,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 			q.wg.Done()
 			return nil, nil
 		}
-		value, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Value))
+		value, err := interning.IdxIntern.GetPtrFromByte([]byte(query.Value))
 		if err != nil || value == 0 {
 			// if query value has not been interned it is safe to assume that
 			// it is not present in the index at all, so this query must
@@ -304,7 +304,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 		var err error
 		query := q.prefix[0]
 		q.prefix = q.prefix[1:]
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(query.Key))
 		if err != nil || key == 0 {
 			// if query key has not been interned it is safe to assume that
 			// it is not present in the index at all, so this query must
@@ -317,7 +317,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 	case tagquery.MATCH:
 		query := q.match[0]
 		q.match = q.match[1:]
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(query.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(query.Key))
 		if err != nil || key == 0 {
 			// if query key has not been interned it is safe to assume that
 			// it is not present in the index at all, so this query must
@@ -340,7 +340,7 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 // all required tests in order to decide whether this metric should be part
 // of the final result set or not
 // in map/reduce terms this is the reduce function
-func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.ArchiveInterned, omitTagFilters bool) bool {
+func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *interning.ArchiveInterned, omitTagFilters bool) bool {
 	if !q.testByFrom(def) {
 		return false
 	}
@@ -382,7 +382,7 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.ArchiveI
 
 // testByMatch filters a given metric by matching a regular expression against
 // the values of specific associated tags
-func (q *TagQueryContext) testByMatch(def *idx.ArchiveInterned, exprs []kvRe, not bool) bool {
+func (q *TagQueryContext) testByMatch(def *interning.ArchiveInterned, exprs []kvRe, not bool) bool {
 EXPRS:
 	for _, e := range exprs {
 		if e.Key == "name" {
@@ -400,7 +400,7 @@ EXPRS:
 		}
 
 		for _, tag := range def.Tags.KeyValues {
-			key, err := idx.IdxIntern.GetStringFromPtr(tag.Key)
+			key, err := interning.IdxIntern.GetStringFromPtr(tag.Key)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
@@ -425,7 +425,7 @@ EXPRS:
 
 			// Regex == nil means that this expression can be short cut
 			// by not evaluating it
-			value, err := idx.IdxIntern.GetStringFromPtr(tag.Value)
+			value, err := interning.IdxIntern.GetStringFromPtr(tag.Value)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 				internError.Inc()
@@ -456,7 +456,7 @@ EXPRS:
 
 // testByTagMatch filters a given metric by matching a regular expression against
 // the associated tags
-func (q *TagQueryContext) testByTagMatch(def *idx.ArchiveInterned) bool {
+func (q *TagQueryContext) testByTagMatch(def *interning.ArchiveInterned) bool {
 	// special case for tag "name"
 	if _, ok := q.tagMatch.missCache.Load("name"); !ok {
 		if _, ok := q.tagMatch.matchCache.Load("name"); ok || q.tagMatch.Regex.MatchString("name") {
@@ -479,7 +479,7 @@ func (q *TagQueryContext) testByTagMatch(def *idx.ArchiveInterned) bool {
 			continue
 		}
 
-		key, err := idx.IdxIntern.GetStringFromPtr(tag.Key)
+		key, err := interning.IdxIntern.GetStringFromPtr(tag.Key)
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
@@ -505,13 +505,13 @@ func (q *TagQueryContext) testByTagMatch(def *idx.ArchiveInterned) bool {
 }
 
 // testByFrom filters a given metric by its LastUpdate time
-func (q *TagQueryContext) testByFrom(def *idx.ArchiveInterned) bool {
+func (q *TagQueryContext) testByFrom(def *interning.ArchiveInterned) bool {
 	return q.from <= atomic.LoadInt64(&def.LastUpdate)
 }
 
 // testByPrefix filters a given metric by matching prefixes against the values
 // of a specific tag
-func (q *TagQueryContext) testByPrefix(def *idx.ArchiveInterned, exprs []kv) bool {
+func (q *TagQueryContext) testByPrefix(def *interning.ArchiveInterned, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
 		if e.Key == "name" && strings.HasPrefix(schema.SanitizeNameAsTagValue(def.Name.String()), e.Value) {
@@ -519,7 +519,7 @@ EXPRS:
 		}
 
 		for _, tag := range def.Tags.KeyValues {
-			key, err := idx.IdxIntern.GetStringFromPtr(tag.Key)
+			key, err := interning.IdxIntern.GetStringFromPtr(tag.Key)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
@@ -528,7 +528,7 @@ EXPRS:
 			if e.Key != key {
 				continue
 			}
-			value, err := idx.IdxIntern.GetStringFromPtr(tag.Value)
+			value, err := interning.IdxIntern.GetStringFromPtr(tag.Value)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 				internError.Inc()
@@ -545,7 +545,7 @@ EXPRS:
 }
 
 // testByTagPrefix filters a given metric by matching prefixes against its tags
-func (q *TagQueryContext) testByTagPrefix(def *idx.ArchiveInterned) bool {
+func (q *TagQueryContext) testByTagPrefix(def *interning.ArchiveInterned) bool {
 	if strings.HasPrefix("name", q.tagPrefix) {
 		return true
 	}
@@ -562,13 +562,13 @@ func (q *TagQueryContext) testByTagPrefix(def *idx.ArchiveInterned) bool {
 // testByEqual filters a given metric by the defined "=" expressions
 func (q *TagQueryContext) testByEqual(id schema.MKey, exprs []kv, not bool) bool {
 	for _, e := range exprs {
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(e.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(e.Key))
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 			internError.Inc()
 			continue
 		}
-		value, err := idx.IdxIntern.GetPtrFromByte([]byte(e.Value))
+		value, err := interning.IdxIntern.GetPtrFromByte([]byte(e.Value))
 		if err != nil {
 			log.Error("memory-idx: Failed to retrieve uintptr for interned tag value: ", err)
 			internError.Inc()
@@ -601,7 +601,7 @@ func (q *TagQueryContext) testByEqual(id schema.MKey, exprs []kv, not bool) bool
 // it returns the final result set via the given resCh parameter
 func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	for id := range idCh {
-		var def *idx.ArchiveInterned
+		var def *interning.ArchiveInterned
 		var ok bool
 
 		if def, ok = q.byId[id]; !ok {
@@ -627,7 +627,7 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 // already reduced set of results
 func (q *TagQueryContext) sortByCost() {
 	for i, kv := range q.equal {
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(kv.Key))
 		if err != nil || key == 0 {
 			// if query key has not been interned it is safe to assume that
 			// it is not present in the index at all, so this expression
@@ -636,7 +636,7 @@ func (q *TagQueryContext) sortByCost() {
 			q.equal[i].cost = 0
 			continue
 		}
-		value, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Value))
+		value, err := interning.IdxIntern.GetPtrFromByte([]byte(kv.Value))
 		if err != nil || value == 0 {
 			// if query value has not been interned it is safe to assume that
 			// it is not present in the index at all, so this expression
@@ -652,7 +652,7 @@ func (q *TagQueryContext) sortByCost() {
 	// without actually evaluating them, so we estimate based on
 	// cardinality of the key
 	for i, kv := range q.prefix {
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(kv.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(kv.Key))
 		if err != nil || key == 0 {
 			// if query key has not been interned it is safe to assume that
 			// it is not present in the index at all, so this expression
@@ -665,7 +665,7 @@ func (q *TagQueryContext) sortByCost() {
 	}
 
 	for i, kvRe := range q.match {
-		key, err := idx.IdxIntern.GetPtrFromByte([]byte(kvRe.Key))
+		key, err := interning.IdxIntern.GetPtrFromByte([]byte(kvRe.Key))
 		if err != nil || key == 0 {
 			// if query key has not been interned it is safe to assume that
 			// it is not present in the index at all, so this expression
@@ -685,7 +685,7 @@ func (q *TagQueryContext) sortByCost() {
 }
 
 // Run executes the tag query on the given index and returns a list of ids
-func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.ArchiveInterned) IdSet {
+func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*interning.ArchiveInterned) IdSet {
 	q.index = index
 	q.byId = byId
 
@@ -730,7 +730,7 @@ func (q *TagQueryContext) getMaxTagCount() int {
 
 	if q.tagClause == tagquery.PREFIX_TAG && len(q.tagPrefix) > 0 {
 		for tag := range q.index {
-			key, err := idx.IdxIntern.GetStringFromPtr(tag)
+			key, err := interning.IdxIntern.GetStringFromPtr(tag)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
@@ -743,7 +743,7 @@ func (q *TagQueryContext) getMaxTagCount() int {
 		}
 	} else if q.tagClause == tagquery.MATCH_TAG {
 		for tag := range q.index {
-			key, err := idx.IdxIntern.GetStringFromPtr(tag)
+			key, err := interning.IdxIntern.GetStringFromPtr(tag)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
@@ -771,7 +771,7 @@ func (q *TagQueryContext) filterTagsFromChan(idCh chan schema.MKey, tagCh chan s
 
 IDS:
 	for id := range idCh {
-		var def *idx.ArchiveInterned
+		var def *interning.ArchiveInterned
 		var ok bool
 
 		if def, ok = q.byId[id]; !ok {
@@ -786,7 +786,7 @@ IDS:
 		// tag filter condition
 		metricTags := make(map[string]struct{}, 0)
 		for _, tag := range def.Tags.KeyValues {
-			key, err := idx.IdxIntern.GetStringFromPtr(tag.Key)
+			key, err := interning.IdxIntern.GetStringFromPtr(tag.Key)
 			if err != nil {
 				log.Error("memory-idx: Failed to retrieve uintptr for interned tag key: ", err)
 				internError.Inc()
@@ -879,7 +879,7 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.ArchiveInterned) map[string]struct{} {
+func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*interning.ArchiveInterned) map[string]struct{} {
 	q.index = index
 	q.byId = byId
 

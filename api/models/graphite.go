@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-macaron/binding"
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
 	"gopkg.in/macaron.v1"
@@ -156,7 +156,7 @@ type MetricsDelete struct {
 	Query string `json:"query" form:"query" binding:"Required"`
 }
 
-type MetricNames []idx.Archive
+type MetricNames []interning.Archive
 
 func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	seen := make(map[string]struct{})

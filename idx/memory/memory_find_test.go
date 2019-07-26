@@ -14,7 +14,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 	goi "github.com/robert-milan/go-object-interning"
 	log "github.com/sirupsen/logrus"
@@ -173,8 +173,8 @@ func InitSmallIndex() {
 		}
 		ix = nil
 
-		idx.IdxIntern = nil
-		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		interning.IdxIntern = nil
+		interning.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1})
@@ -185,8 +185,8 @@ func InitSmallIndex() {
 
 		currentIndex = 1
 	} else {
-		idx.IdxIntern = nil
-		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		interning.IdxIntern = nil
+		interning.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 		runtime.GC()
 		ix.PurgeFindCache()
 		ix.Init()
@@ -229,8 +229,8 @@ func InitLargeIndex() {
 		}
 		ix = nil
 
-		idx.IdxIntern = nil
-		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		interning.IdxIntern = nil
+		interning.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1, 2, 3, 4, 5, 6, 7})
@@ -241,8 +241,8 @@ func InitLargeIndex() {
 
 		currentIndex = 2
 	} else {
-		idx.IdxIntern = nil
-		idx.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		interning.IdxIntern = nil
+		interning.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
 		runtime.GC()
 		ix.PurgeFindCache()
 		ix.Init()
@@ -527,9 +527,9 @@ func testTagSorting(t *testing.T) {
 		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
 	}
 
-	md2 := []idx.MetricDefinitionInterned{
+	md2 := []interning.MetricDefinitionInterned{
 		{
-			Tags:       idx.TagKeyValues{},
+			Tags:       interning.TagKeyValues{},
 			Interval:   10,
 			OrgId:      1,
 			LastUpdate: int64(123),
@@ -541,22 +541,22 @@ func testTagSorting(t *testing.T) {
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	var k, v uintptr
-	md2[0].Tags = idx.TagKeyValues{}
-	k, _ = idx.IdxIntern.AddOrGet([]byte("5"), false)
-	v, _ = idx.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
-	k, _ = idx.IdxIntern.AddOrGet([]byte("1"), false)
-	v, _ = idx.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
-	k, _ = idx.IdxIntern.AddOrGet([]byte("2"), false)
-	v, _ = idx.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
-	k, _ = idx.IdxIntern.AddOrGet([]byte("4"), false)
-	v, _ = idx.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
-	k, _ = idx.IdxIntern.AddOrGet([]byte("3"), false)
-	v, _ = idx.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, idx.TagKeyValue{Key: k, Value: v})
+	md2[0].Tags = interning.TagKeyValues{}
+	k, _ = interning.IdxIntern.AddOrGet([]byte("5"), false)
+	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
+	k, _ = interning.IdxIntern.AddOrGet([]byte("1"), false)
+	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
+	k, _ = interning.IdxIntern.AddOrGet([]byte("2"), false)
+	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
+	k, _ = interning.IdxIntern.AddOrGet([]byte("4"), false)
+	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
+	k, _ = interning.IdxIntern.AddOrGet([]byte("3"), false)
+	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
+	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
 	index.LoadPartition(0, md2)
 
 	query, err = tagquery.NewQueryFromStrings([]string{"3=a"}, 0)

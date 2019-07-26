@@ -11,9 +11,9 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
 	"github.com/grafana/metrictank/conf"
-	metricIndex "github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/interning"
 	"github.com/grafana/metrictank/logger"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
@@ -170,7 +170,7 @@ func main() {
 		}
 	}
 
-	var show func(d metricIndex.MetricDefinitionInterned)
+	var show func(d interning.MetricDefinitionInterned)
 
 	switch format {
 	case "dump":
@@ -238,7 +238,7 @@ func main() {
 		}
 	}
 
-	var defs []metricIndex.MetricDefinitionInterned
+	var defs []interning.MetricDefinitionInterned
 	if len(partitions) == 0 {
 		defs = idx.Load(nil, time.Now())
 	} else {
