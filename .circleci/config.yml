@@ -25,8 +25,8 @@ jobs:
     steps:
       - checkout
       - run:
-          command: go test -v -race -timeout 20m $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
-          no_output_timeout: 20m
+          command: go test -v -race -timeout 30m $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
+          no_output_timeout: 30m
 
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
