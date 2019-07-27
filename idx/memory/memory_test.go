@@ -199,7 +199,7 @@ func testGetAddKey(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -263,7 +263,7 @@ func testFind(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -416,7 +416,7 @@ func testDelete(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -447,7 +447,7 @@ func testDeleteTagged(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -499,7 +499,7 @@ func TestDeleteNodeWith100kChildren(t *testing.T) {
 }
 
 func testDeleteNodeWith100kChildren(t *testing.T) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -549,7 +549,7 @@ func TestMixedBranchLeaf(t *testing.T) {
 }
 
 func testMixedBranchLeaf(t *testing.T) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -611,7 +611,7 @@ func TestMixedBranchLeafDelete(t *testing.T) {
 }
 
 func testMixedBranchLeafDelete(t *testing.T) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -719,7 +719,7 @@ func testPruneTaggedSeries(t *testing.T) {
 			MaxStale: 0,
 		},
 	}
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -842,7 +842,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 		},
 	}
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -919,7 +919,7 @@ func testPrune(t *testing.T) {
 		},
 	}
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -1003,7 +1003,7 @@ func TestSingleNodeMetric(t *testing.T) {
 }
 
 func testSingleNodeMetric(t *testing.T) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -1025,12 +1025,9 @@ func TestMetricNameStartingWithTilde(t *testing.T) {
 }
 
 func testMetricNameStartingWithTilde(t *testing.T) {
-	ix := New()
+	ix = New()
 	ix.Init()
-	defer func() {
-		ix.Stop()
-		ix = nil
-	}()
+	defer ix.Stop()
 
 	metricName := "~~~weird~.~metric~"
 	expectedNameTag := "weird~.~metric~"
@@ -1104,7 +1101,7 @@ func TestThatInternedObjectsGetCleanedUp(t *testing.T) {
 
 func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 	TagSupport = true
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer func() {
 		ix.Stop()
@@ -1203,8 +1200,6 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 	}
 }
 
-var globalMemoryIndex MemoryIndex
-
 func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 	// turn partitioning off
 	Partitioned = false
@@ -1212,9 +1207,9 @@ func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 	// turn tag support on
 	TagSupport = true
 
-	globalMemoryIndex = New()
-	globalMemoryIndex.Init()
-	defer globalMemoryIndex.Stop()
+	ix = New()
+	ix.Init()
+	defer ix.Stop()
 
 	series := getMetricDataWithCustomTags(1, 2, count, 10, "somekindof.longereven.metricname.butinstead.ofashorterone.bunchofthingsandstuff", unique)
 
@@ -1226,7 +1221,7 @@ func testMemoryIndexHeapUsageWithTags(t *testing.T, unique float32, count int) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		globalMemoryIndex.AddOrUpdate(mkey, data, 0)
+		ix.AddOrUpdate(mkey, data, 0)
 	}
 
 	t.Log("Memory stats after AddOrUpdate called")
@@ -1259,7 +1254,7 @@ func BenchmarkIndexing(b *testing.B) {
 }
 
 func benchmarkIndexing(b *testing.B) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer func() {
 		ix.Stop()
@@ -1291,7 +1286,7 @@ func BenchmarkDeletes(b *testing.B) {
 }
 
 func benchmarkDeletes(b *testing.B) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -1322,7 +1317,7 @@ func BenchmarkPrune(b *testing.B) {
 }
 
 func benchmarkPrune(b *testing.B) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -1360,7 +1355,7 @@ func BenchmarkPruneLongSeriesNames(b *testing.B) {
 }
 
 func benchmarkPruneLongSeriesNames(b *testing.B) {
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
@@ -1412,7 +1407,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 		},
 	})
 
-	ix := New()
+	ix = New()
 	ix.Init()
 	defer ix.Stop()
 
