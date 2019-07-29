@@ -123,6 +123,8 @@ func ConfigProcess() {
 			KeepAlive: 30 * time.Second,
 		}).Dial,
 		TLSHandshakeTimeout: time.Second,
+		MaxIdleConns:        1000,
+		MaxIdleConnsPerHost: 100,
 	}
 	client = http.Client{
 		Transport: transport,
