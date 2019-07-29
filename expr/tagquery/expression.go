@@ -9,7 +9,11 @@ import (
 	"github.com/raintank/schema"
 )
 
-const invalidExpressionError = "Invalid expression: %s"
+type InvalidExpressionError string
+
+func (i InvalidExpressionError) Error() string {
+	return fmt.Sprintf("Invalid expression: %q", i)
+}
 
 type Expressions []Expression
 
@@ -152,13 +156,13 @@ FIND_OPERATOR:
 			prefix = true
 			break FIND_OPERATOR
 		case ';':
-			return nil, fmt.Errorf(invalidExpressionError, expr)
+			return nil, InvalidExpressionError(expr)
 		}
 	}
 
 	// key must not be empty
 	if pos == 0 {
-		return nil, fmt.Errorf(invalidExpressionError, expr)
+		return nil, InvalidExpressionError(expr)
 	}
 
 	resCommon.key = expr[:pos]
@@ -173,14 +177,14 @@ FIND_OPERATOR:
 	}
 
 	if len(expr) <= pos || expr[pos] != '=' {
-		return nil, fmt.Errorf(invalidExpressionError, expr)
+		return nil, InvalidExpressionError(expr)
 	}
 	pos++
 
 	if len(expr) > pos && expr[pos] == '~' {
 		// ^=~ is not a valid operator
 		if prefix {
-			return nil, fmt.Errorf(invalidExpressionError, expr)
+			return nil, InvalidExpressionError(expr)
 		}
 		regex = true
 		pos++
@@ -190,7 +194,7 @@ FIND_OPERATOR:
 	for ; pos < len(expr); pos++ {
 		// disallow ; in value
 		if expr[pos] == 59 {
-			return nil, fmt.Errorf(invalidExpressionError, expr)
+			return nil, InvalidExpressionError(expr)
 		}
 	}
 	resCommon.value = expr[valuePos:]
@@ -222,7 +226,7 @@ FIND_OPERATOR:
 		// currently ! (not) queries on tags are not supported
 		// and unlike normal queries a value must be set
 		if not {
-			return nil, fmt.Errorf(invalidExpressionError, expr)
+			return nil, InvalidExpressionError(expr)
 		}
 
 		switch effectiveOperator {
@@ -240,7 +244,7 @@ FIND_OPERATOR:
 			}
 		case EQUAL:
 			if len(resCommon.value) == 0 {
-				return nil, fmt.Errorf(invalidExpressionError, expr)
+				return nil, InvalidExpressionError(expr)
 			}
 
 			// "__tag=abc", should internatlly be translated into "abc!="
@@ -301,7 +305,7 @@ FIND_OPERATOR:
 			return &expressionNotMatch{expressionCommonRe: expressionCommonRe{expressionCommon: resCommon, valueRe: valueRe, matchesEmpty: matchesEmpty}}, nil
 		case MATCH_TAG:
 			if matchesEmpty {
-				return nil, fmt.Errorf(invalidExpressionError, expr)
+				return nil, InvalidExpressionError(expr)
 			}
 			return &expressionMatchTag{expressionCommonRe: expressionCommonRe{expressionCommon: resCommon, valueRe: valueRe, matchesEmpty: matchesEmpty}}, nil
 		}
