@@ -33,10 +33,6 @@ func (e *expressionNotMatch) GetCostMultiplier() uint32 {
 	return 10
 }
 
-func (e *expressionNotMatch) HasRe() bool {
-	return true
-}
-
 func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
 	return e.matchesEmpty
 }
