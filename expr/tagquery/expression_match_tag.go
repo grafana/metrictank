@@ -24,10 +24,6 @@ func (e *expressionMatchTag) GetCostMultiplier() uint32 {
 	return 20
 }
 
-func (e *expressionMatchTag) HasRe() bool {
-	return true
-}
-
 func (e *expressionMatchTag) OperatesOnTag() bool {
 	return true
 }

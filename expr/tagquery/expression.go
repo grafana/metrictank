@@ -108,9 +108,6 @@ type Expression interface {
 
 	GetCostMultiplier() uint32
 
-	// HasRe indicates whether the evaluation of this expression involves regular expressions
-	HasRe() bool
-
 	// OperatesOnTag returns whether this expression operators on the tag key
 	// (if not, it operates on the value)
 	OperatesOnTag() bool

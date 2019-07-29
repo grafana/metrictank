@@ -32,10 +32,6 @@ func (e *expressionMatchAll) GetCostMultiplier() uint32 {
 	return 50
 }
 
-func (e *expressionMatchAll) HasRe() bool {
-	return false
-}
-
 func (e *expressionMatchAll) RequiresNonEmptyValue() bool {
 	return false
 }

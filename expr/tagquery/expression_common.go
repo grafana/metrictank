@@ -15,11 +15,6 @@ func (e *expressionCommon) GetValue() string {
 	return e.value
 }
 
-func (e *expressionCommon) HasRe() bool {
-	// by default assume false, unless a concrete type overrides this method
-	return false
-}
-
 func (e *expressionCommon) OperatesOnTag() bool {
 	// by default assume false, unless a concrete type overrides this method
 	return false
