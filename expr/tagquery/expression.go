@@ -98,7 +98,7 @@ type Expression interface {
 	// in the expression "tag1=value" GetKey() would return "tag1" and OperatesOnTag() returns "false"
 	GetKey() string
 
-	// GetValue the value part of the expression
+	// GetValue returns the value part of the expression
 	// example:
 	// in the expression "abc!=cba" this would return "cba"
 	GetValue() string
@@ -111,18 +111,16 @@ type Expression interface {
 	// HasRe indicates whether the evaluation of this expression involves regular expressions
 	HasRe() bool
 
-	// OperatesOnTag returns true if this expression operators on the tag keys,
-	// or false if it operates on the values
+	// OperatesOnTag returns whether this expression operators on the tag key
+	// (if not, it operates on the value)
 	OperatesOnTag() bool
 
-	// RequiresNonEmptyValue returns boolean indicating whether this expression requires a non-empty
-	// value. Every query must have at least one expression requiring a non-empty value, otherwise
-	// the query is considered invalid
+	// RequiresNonEmptyValue returns whether this expression requires a non-empty value.
+	// Every valid query must have at least one expression requiring a non-empty value.
 	RequiresNonEmptyValue() bool
 
 	// ValuePasses takes a string which should either be a tag key or value depending on the return
-	// value of OperatesOnTag(), then it returns a bool to indicate whether the given value satisfies
-	// this expression
+	// value of OperatesOnTag(), then it returns whether whether the given value satisfies this expression
 	ValuePasses(string) bool
 
 	ValueMatchesExactly() bool
