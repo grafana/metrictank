@@ -16,6 +16,7 @@ var archiveInternedPool = sync.Pool{
 	},
 }
 
+//go:generate msgp
 type Archive struct {
 	schema.MetricDefinition
 	SchemaId uint16 // index in mdata.schemas (not persisted)
