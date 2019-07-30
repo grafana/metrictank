@@ -31,6 +31,9 @@ func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord,
 	return res, nil
 }
 
+// Equals takes another MetaTagRecord and compares all its properties to its
+// own properties. It is assumed that the expressions of both meta tag records
+// are already sorted.
 func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
 	if len(m.MetaTags) != len(other.MetaTags) {
 		return false
