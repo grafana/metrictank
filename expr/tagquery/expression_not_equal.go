@@ -48,7 +48,7 @@ func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) Metri
 		}
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return func(id schema.MKey, _ string, _ []string) FilterDecision {
 			if lookup(id, e.key, e.value) {
 				return Fail

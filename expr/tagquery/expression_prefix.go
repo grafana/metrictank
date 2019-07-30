@@ -47,7 +47,7 @@ func (e *expressionPrefix) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefini
 	}
 
 	resultIfTagIsAbsent := None
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		resultIfTagIsAbsent = Fail
 	}
 

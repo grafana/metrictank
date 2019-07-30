@@ -58,7 +58,7 @@ func (e *expressionMatch) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinit
 	}
 
 	resultIfTagIsAbsent := None
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		resultIfTagIsAbsent = Fail
 	}
 
@@ -84,14 +84,14 @@ func (e *expressionMatch) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinit
 			}
 
 			if e.valueRe.MatchString(value) {
-				if atomic.LoadInt32(&currentMatchCacheSize) < int32(matchCacheSize) {
+				if atomic.LoadInt32(&currentMatchCacheSize) < int32(MatchCacheSize) {
 					matchCache.Store(value, struct{}{})
 					atomic.AddInt32(&currentMatchCacheSize, 1)
 				}
 				return Pass
 			}
 
-			if atomic.LoadInt32(&currentMissCacheSize) < int32(matchCacheSize) {
+			if atomic.LoadInt32(&currentMissCacheSize) < int32(MatchCacheSize) {
 				missCache.Store(value, struct{}{})
 				atomic.AddInt32(&currentMissCacheSize, 1)
 			}
