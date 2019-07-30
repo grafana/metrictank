@@ -96,10 +96,9 @@ type Expression interface {
 	//    final result set, so it returns "fail".
 	GetDefaultDecision() FilterDecision
 
-	// GetKey returns tag to who's values this expression get's applied if it operates on the value
-	// (OperatorsOnTag returns "false")
+	// GetKey returns tag to who's values this expression get's applied to
 	// example:
-	// in the expression "tag1=value" GetKey() would return "tag1" and OperatesOnTag() returns "false"
+	// in the expression "tag1=value" GetKey() would return "tag1"
 	GetKey() string
 
 	// GetValue returns the value part of the expression
