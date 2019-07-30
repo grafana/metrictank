@@ -39,17 +39,8 @@ func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
 		return false
 	}
 
-	foundTags := make([]bool, len(m.MetaTags))
-	for i, tag := range m.MetaTags {
-		for _, otherTag := range other.MetaTags {
-			if tag == otherTag {
-				foundTags[i] = true
-			}
-		}
-	}
-
-	for i := range foundTags {
-		if !foundTags[i] {
+	for i := range m.MetaTags {
+		if m.MetaTags[i] != other.MetaTags[i] {
 			return false
 		}
 	}
