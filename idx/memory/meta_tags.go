@@ -45,7 +45,7 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		if existingRecord, ok := m[id+recordId(i)]; ok {
-			if record.MatchesQueries(&existingRecord) {
+			if record.EqualExpressions(&existingRecord) {
 				oldRecord = &existingRecord
 				oldId = id + recordId(i)
 				delete(m, oldId)

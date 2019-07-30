@@ -45,7 +45,7 @@ func NewQuery(expressions Expressions, from int64) (Query, error) {
 	foundExpressionRequiringNonEmptyValue := false
 	for i := 0; i < len(expressions); i++ {
 		// skip duplicate expression
-		if i > 0 && ExpressionsAreEqual(expressions[i], expressions[i-1]) {
+		if i > 0 && expressions[i].Equals(expressions[i-1]) {
 			expressions = append(expressions[:i], expressions[i+1:]...)
 			i--
 			continue

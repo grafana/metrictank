@@ -53,6 +53,10 @@ func (e Expressions) Sort() {
 }
 
 type Expression interface {
+	// Equals takes another expression and compares it against itself. Returns true if they are equal
+	// or false otherwise
+	Equals(Expression) bool
+
 	// GetDefaultDecision defines what decision should be made if the filter has not come to a conclusive
 	// decision based on a single index. When looking at more than one tag index in order of decreasing
 	// priority to decide whether a metric should be part of the final result set, some operators and metric
@@ -326,10 +330,6 @@ FIND_OPERATOR:
 	}
 
 	return nil, fmt.Errorf("ParseExpression: Invalid operator in expression %s", expr)
-}
-
-func ExpressionsAreEqual(expr1, expr2 Expression) bool {
-	return expr1.GetKey() == expr2.GetKey() && expr1.GetOperator() == expr2.GetOperator() && expr1.GetValue() == expr2.GetValue()
 }
 
 // MetricDefinitionFilter takes a metric name together with its tags and returns a FilterDecision

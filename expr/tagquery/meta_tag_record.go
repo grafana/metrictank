@@ -9,7 +9,7 @@ type MetaTagRecord struct {
 	Expressions Expressions
 }
 
-func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, error) {
+func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord, error) {
 	res := MetaTagRecord{}
 	var err error
 
@@ -18,7 +18,7 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 		return res, err
 	}
 
-	res.Expressions, err = ParseExpressions(queries)
+	res.Expressions, err = ParseExpressions(expressions)
 	if err != nil {
 		return res, err
 	}
@@ -30,16 +30,41 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 	return res, nil
 }
 
-// MatchesQueries compares another tag record's queries to this
-// one's queries. Returns true if they are equal, otherwise false.
-// It is assumed that all the queries are already sorted
-func (m *MetaTagRecord) MatchesQueries(other *MetaTagRecord) bool {
+func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
+	if len(m.MetaTags) != len(other.MetaTags) {
+		return false
+	}
+
+	foundTags := make([]bool, len(m.MetaTags))
+	for i, tag := range m.MetaTags {
+		for _, otherTag := range other.MetaTags {
+			if tag == otherTag {
+				foundTags[i] = true
+			}
+		}
+	}
+
+	for i := range foundTags {
+		if !foundTags[i] {
+			return false
+		}
+	}
+
+	return m.EqualExpressions(other)
+
+}
+
+// EqualExpressions compares another meta tag record's expressions to
+// this one's expressions
+// Returns true if they are equal, otherwise false
+// It is assumed that all the expressions are already sorted
+func (m *MetaTagRecord) EqualExpressions(other *MetaTagRecord) bool {
 	if len(m.Expressions) != len(other.Expressions) {
 		return false
 	}
 
-	for i, query := range m.Expressions {
-		if !ExpressionsAreEqual(query, other.Expressions[i]) {
+	for i, expression := range m.Expressions {
+		if !expression.Equals(other.Expressions[i]) {
 			return false
 		}
 	}

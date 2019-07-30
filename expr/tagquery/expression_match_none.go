@@ -12,6 +12,10 @@ type expressionMatchNone struct {
 	originalOperator ExpressionOperator
 }
 
+func (e *expressionMatchNone) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionMatchNone) GetDefaultDecision() FilterDecision {
 	return Fail
 }

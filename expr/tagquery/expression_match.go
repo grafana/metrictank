@@ -12,6 +12,10 @@ type expressionMatch struct {
 	expressionCommonRe
 }
 
+func (e *expressionMatch) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionMatch) GetDefaultDecision() FilterDecision {
 	// if the pattern matches "" (f.e. "tag=~.*) then a metric which
 	// does not have the tag "tag" at all should also be part of the

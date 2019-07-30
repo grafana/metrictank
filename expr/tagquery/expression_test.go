@@ -261,7 +261,7 @@ func TestExpression_IsEqualTo(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Unexpected parsing error of \"%s\": %s", tc.expression, err)
 			}
-			if !ExpressionsAreEqual(e1, e2) {
+			if !e1.Equals(e2) {
 				t.Fatalf("Expected two instantiations of expressions to be equal, but they were not: \"%s\"", tc.expression)
 			}
 
@@ -271,7 +271,7 @@ func TestExpression_IsEqualTo(t *testing.T) {
 					t.Fatalf("Unexpected parsing error of \"%s\": %s", tc.notEqual[j], err)
 				}
 
-				if ExpressionsAreEqual(e1, other) || ExpressionsAreEqual(e2, other) {
+				if e1.Equals(other) || e2.Equals(other) {
 					t.Fatalf("Expressions are supposed to not be equal, but they were: \"%s\"/\"%s\"", tc.expression, tc.notEqual[j])
 				}
 			}
