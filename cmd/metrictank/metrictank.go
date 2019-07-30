@@ -15,8 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/grafana/metrictank/expr/tagquery"
-
 	"github.com/Dieterbe/profiletrigger/heap"
 	"github.com/Shopify/sarama"
 	"github.com/grafana/globalconf"
@@ -106,9 +104,6 @@ func main() {
 
 	// input handlers
 	input.ConfigSetup()
-
-	// tagquery handling
-	tagquery.ConfigSetup()
 
 	// load config for metric ingestors
 	inCarbon.ConfigSetup()

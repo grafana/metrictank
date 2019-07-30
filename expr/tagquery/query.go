@@ -8,6 +8,8 @@ import (
 
 var (
 	errInvalidQuery = errors.New("invalid query")
+	MatchCacheSize  int
+	MetaTagSupport  bool
 )
 
 type Query struct {

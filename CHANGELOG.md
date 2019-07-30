@@ -1,7 +1,6 @@
 # master
 
 ## breaking changes
-* version v0.12.0-182-ged2adc5b and later move the option `memory-idx.match-cache-size` to the new config section `tag-query.match-cache-size`.
 * version v0.12.0-96-g998933c3 introduces config options for the cassandra/scylladb index table names.
   The default settings and schemas match the previous behavior, but people who have customized the schema-idx template files
   should know that we now no longer only expand the keyspace (and assume a hardcoded table name).
