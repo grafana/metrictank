@@ -63,9 +63,19 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 
 	sort.Slice(costs, func(i, j int) bool { return costs[i].cost < costs[j].cost })
 
+	// the number of filters / default decisions is equal to the number of expressions - 1
+	// because one of the expressions will be chosen to be the one that we start with.
+	// we don't need to filter function, nor the default decision, of the expression which
+	// we start with.
+	// all the remaining expressions will be used as filter expressions, for which we need
+	// to obtain their filter functions and their default decisions.
 	q.filters = make([]tagquery.MetricDefinitionFilter, len(q.query.Expressions)-1)
 	q.defaultDecisions = make([]tagquery.FilterDecision, len(q.query.Expressions)-1)
 
+	// Every tag query has at least one expression which requires a non-empty value according to:
+	// https://graphite.readthedocs.io/en/latest/tags.html#querying
+	// This rule is enforced by tagquery.NewQuery, here we trust that the queries which get passed
+	// into the index have already been validated
 	i := 0
 	for _, cost := range costs {
 		if q.startWith < 0 && q.query.Expressions[cost.expressionIdx].RequiresNonEmptyValue() {
