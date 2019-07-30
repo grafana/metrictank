@@ -10,6 +10,10 @@ type expressionNotEqual struct {
 	expressionCommon
 }
 
+func (e *expressionNotEqual) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionNotEqual) GetDefaultDecision() FilterDecision {
 	return Pass
 }

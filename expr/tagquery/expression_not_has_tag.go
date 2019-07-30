@@ -10,6 +10,10 @@ type expressionNotHasTag struct {
 	expressionCommon
 }
 
+func (e *expressionNotHasTag) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionNotHasTag) GetDefaultDecision() FilterDecision {
 	return Pass
 }

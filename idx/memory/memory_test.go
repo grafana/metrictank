@@ -1037,7 +1037,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	if !created {
 		t.Fatalf("Expected record to have been created, but it has not")
 	}
-	if !metaTagRecordsAreEqual(&createdRecord, &record1) {
+	if !createdRecord.Equals(&record1) {
 		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record1, createdRecord)
 	}
 
@@ -1048,7 +1048,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	if !created {
 		t.Fatalf("Expected record to have been created, but it has not")
 	}
-	if !metaTagRecordsAreEqual(&createdRecord, &record2) {
+	if !createdRecord.Equals(&record2) {
 		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record2, createdRecord)
 	}
 
@@ -1059,10 +1059,10 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 
 	var found1, found2 bool
 	for _, mtr := range metaTagRecords {
-		if metaTagRecordsAreEqual(&mtr, &record1) {
+		if mtr.Equals(&record1) {
 			found1 = true
 		}
-		if metaTagRecordsAreEqual(&mtr, &record2) {
+		if mtr.Equals(&record2) {
 			found2 = true
 		}
 	}
@@ -1096,7 +1096,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	if created {
 		t.Fatalf("Expected record to not have been created, but it has")
 	}
-	if !metaTagRecordsAreEqual(&createdRecord, &record3) {
+	if !createdRecord.Equals(&record3) {
 		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record3, createdRecord)
 	}
 

@@ -12,6 +12,10 @@ type expressionMatchAll struct {
 	originalOperator ExpressionOperator
 }
 
+func (e *expressionMatchAll) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionMatchAll) GetDefaultDecision() FilterDecision {
 	return Pass
 }

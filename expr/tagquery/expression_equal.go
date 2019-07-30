@@ -10,6 +10,10 @@ type expressionEqual struct {
 	expressionCommon
 }
 
+func (e *expressionEqual) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionEqual) GetDefaultDecision() FilterDecision {
 	return Fail
 }

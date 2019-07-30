@@ -10,6 +10,10 @@ type expressionHasTag struct {
 	expressionCommon
 }
 
+func (e *expressionHasTag) Equals(other Expression) bool {
+	return e.key == other.GetKey() && e.GetOperator() == other.GetOperator() && e.value == other.GetValue()
+}
+
 func (e *expressionHasTag) GetDefaultDecision() FilterDecision {
 	return Fail
 }

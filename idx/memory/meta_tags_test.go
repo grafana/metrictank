@@ -36,7 +36,7 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 		t.Fatalf("We expected the record to be found at the index of its hash, but it wasn't")
 	}
 
-	if !metaTagRecordsAreEqual(&recordToInsert, record) {
+	if !recordToInsert.Equals(record) {
 		t.Fatalf("Inserted meta tag record has unexpectedly been modified")
 	}
 }
@@ -70,10 +70,10 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	var found1, found2 bool
 	var recordIdToUpdate recordId
 	for i, record := range metaTagRecords {
-		if metaTagRecordsAreEqual(&record, &recordToInsert1) {
+		if record.Equals(&recordToInsert1) {
 			found1 = true
 			recordIdToUpdate = i
-		} else if metaTagRecordsAreEqual(&record, &recordToInsert2) {
+		} else if record.Equals(&recordToInsert2) {
 			found2 = true
 		}
 	}
@@ -95,7 +95,7 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	if oldId != id {
 		t.Fatalf("Expected the new id after updating to be %d (same as the old id), but it was %d", oldId, id)
 	}
-	if oldRecord == nil || !metaTagRecordsAreEqual(oldRecord, &recordToInsert1) {
+	if oldRecord == nil || !oldRecord.Equals(&recordToInsert1) {
 		t.Fatalf("Expected the old record to not be nil, but it was")
 	}
 	if len(metaTagRecords) != 2 {
@@ -105,10 +105,10 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	// the order of the records may have changed again due to sorting by id
 	found1, found2 = false, false
 	for _, record := range metaTagRecords {
-		if metaTagRecordsAreEqual(&record, &recordToUpdate) {
+		if record.Equals(&recordToUpdate) {
 			found1 = true
 		}
-		if metaTagRecordsAreEqual(&record, &recordToInsert2) {
+		if record.Equals(&recordToInsert2) {
 			found2 = true
 		}
 	}
@@ -208,7 +208,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// check if the returned new record looks as expected
-	if !metaTagRecordsAreEqual(returnedRecord, &record) {
+	if !returnedRecord.Equals(&record) {
 		t.Fatalf("New record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, returnedRecord)
 	}
 	if oldId != 3 {
@@ -217,7 +217,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 
 	// check if the returned old record looks as expected
 	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
-	if !metaTagRecordsAreEqual(oldRecord, &record) {
+	if !oldRecord.Equals(&record) {
 		t.Fatalf("Old record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, oldRecord)
 	}
 	if len(metaTagRecords) != 3 {
@@ -248,7 +248,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 	if len(returnedRecord.MetaTags) != 0 {
 		t.Fatalf("Expected returned meta tag record to have 0 meta tags, but it had %d", len(returnedRecord.MetaTags))
 	}
-	if !metaTagRecordsAreEqual(returnedRecord, &record) {
+	if !returnedRecord.Equals(&record) {
 		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", record.Expressions, returnedRecord.Expressions)
 	}
 	if oldId != idOfRecord2 {
@@ -261,27 +261,4 @@ func TestDeletingMetaRecord(t *testing.T) {
 	if ok {
 		t.Fatalf("Expected returned record id to not be present, but it was")
 	}
-}
-
-func metaTagRecordsAreEqual(record1, record2 *tagquery.MetaTagRecord) bool {
-	if len(record1.MetaTags) != len(record2.MetaTags) {
-		return false
-	}
-
-	foundTags := make([]bool, len(record1.MetaTags))
-	for i, tag := range record1.MetaTags {
-		for _, otherTag := range record2.MetaTags {
-			if tag == otherTag {
-				foundTags[i] = true
-			}
-		}
-	}
-
-	for i := range foundTags {
-		if !foundTags[i] {
-			return false
-		}
-	}
-
-	return record1.MatchesQueries(record2)
 }
