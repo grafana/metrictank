@@ -2,6 +2,7 @@ package tagquery
 
 import (
 	"fmt"
+	"strings"
 )
 
 type MetaTagRecord struct {
@@ -51,7 +52,22 @@ func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
 	}
 
 	return m.EqualExpressions(other)
+}
 
+// HashExpressions returns a hash of all expressions in this meta tag record
+// It is assumed that the expressions are already sorted
+func (m *MetaTagRecord) HashExpressions() uint32 {
+	builder := strings.Builder{}
+	for _, query := range m.Expressions {
+		query.StringIntoBuilder(&builder)
+
+		// trailing ";" doesn't matter, this is only hash input
+		builder.WriteString(";")
+	}
+
+	h := QueryHash()
+	h.Write([]byte(builder.String()))
+	return h.Sum32()
 }
 
 // EqualExpressions compares another meta tag record's expressions to

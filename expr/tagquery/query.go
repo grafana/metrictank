@@ -2,6 +2,8 @@ package tagquery
 
 import (
 	"errors"
+	"hash"
+	"hash/fnv"
 
 	"github.com/raintank/schema"
 )
@@ -10,7 +12,15 @@ var (
 	errInvalidQuery = errors.New("invalid query")
 	MatchCacheSize  int
 	MetaTagSupport  bool
+
+	// the function we use to get the hash for hashing the meta records
+	// it can be replaced for mocking in tests
+	QueryHash func() hash.Hash32
 )
+
+func init() {
+	QueryHash = fnv.New32a
+}
 
 type Query struct {
 	// clause that operates on LastUpdate field
