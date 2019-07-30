@@ -31,7 +31,7 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 		t.Fatalf("metaTagRecords was expected to have 1 entry, but it had %d", len(metaTagRecords))
 	}
 
-	_, ok := metaTagRecords[metaTagRecords.hashMetaTagRecord(*record)]
+	_, ok := metaTagRecords[recordId(record.HashExpressions())]
 	if !ok {
 		t.Fatalf("We expected the record to be found at the index of its hash, but it wasn't")
 	}
@@ -155,10 +155,10 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	defer func() { collisionAvoidanceWindow = originalCollisionAvoidanceWindow }()
 	collisionAvoidanceWindow = 3
 
-	originalHash := queryHash
-	defer func() { queryHash = originalHash }()
+	originalHash := tagquery.QueryHash
+	defer func() { tagquery.QueryHash = originalHash }()
 
-	queryHash = func() hash.Hash32 {
+	tagquery.QueryHash = func() hash.Hash32 {
 		return &mockHash{
 			returnValues: []uint32{1}, // keep returning 1
 		}
