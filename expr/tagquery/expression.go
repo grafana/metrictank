@@ -134,6 +134,14 @@ type Expression interface {
 	// Every valid query must have at least one expression requiring a non-empty value.
 	RequiresNonEmptyValue() bool
 
+	// ResultIsSmallerWhenNegated returns a bool indicating whether the result set after evaluating
+	// this expression will likely be bigger than half of the tested index entries or smaller.
+	// This is never guaranteed to actually be correct, it is only an assumption based on which we
+	// can optimize performance.
+	// F.e. operators = / =~ / __tag=   would return false
+	//      operators != / !=~          would return true
+	ResultIsSmallerWhenNegated() bool
+
 	// Matches takes a string which should either be a tag key or value depending on the return
 	// value of OperatesOnTag(), then it returns whether the given string satisfies this expression
 	Matches(string) bool

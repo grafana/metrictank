@@ -34,6 +34,10 @@ func (e *expressionNotHasTag) RequiresNonEmptyValue() bool {
 	return false
 }
 
+func (e *expressionNotHasTag) ResultIsSmallerWhenNegated() bool {
+	return true
+}
+
 func (e *expressionNotHasTag) Matches(value string) bool {
 	return value == e.key
 }
