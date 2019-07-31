@@ -434,7 +434,9 @@ func (a *AggMetric) persist(pos int) {
 func (a *AggMetric) Add(ts uint32, val float64) {
 	if ts < a.ingestAfterNextChunkT0 {
 		// TODO: add metric to keep track of the # of points discarded
-		log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-after. First chunk considered starts at %d", ts, val, a.ingestAfterNextChunkT0)
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-after. First chunk considered starts at %d", ts, val, a.ingestAfterNextChunkT0)
+		}
 		return
 	}
 
