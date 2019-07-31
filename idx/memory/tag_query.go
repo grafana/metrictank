@@ -25,9 +25,12 @@ type TagQueryContext struct {
 	filters          []tagquery.MetricDefinitionFilter
 	defaultDecisions []tagquery.FilterDecision
 
-	index     TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId      map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-	startWith int                          // the expression index to start with
+	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	mti         metaTagIndex                 // the meta tag index
+	metaRecords metaTagRecords               // meta tag records keyed by their recordID
+	startWith   int                          // the expression index to start with
+	subQuery    bool                         // true if this is a subquery created from the expressions of a meta tag record
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -125,40 +128,127 @@ func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
 func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struct{}) {
 	expr := q.query.Expressions[q.startWith]
 
+	// this wait group is used to wait for all id producing go routines to complete
+	// their respective jobs, once they're done we can close the id chan
+	closeIdChanWg := sync.WaitGroup{}
+	closeIdChanWg.Add(2)
+	go func() {
+		closeIdChanWg.Wait()
+		close(idCh)
+	}()
+
+	// query the metric tag index for the initial query expression
 	q.wg.Add(1)
 	go func() {
-		defer close(idCh)
+		defer closeIdChanWg.Done()
 		defer q.wg.Done()
 
-		key := expr.GetKey()
+		q.getInitialByTagValueFromMetricTagIndex(idCh, stopCh, expr)
+	}()
 
-		if expr.MatchesExactly() {
-			value := expr.GetValue()
+	// if this is a sub query we want to ignore the meta tag index,
+	// otherwise we'd risk to create a loop of sub queries creating
+	// each other
+	if tagquery.MetaTagSupport && !q.subQuery {
+		// query the meta tag index for the initial query expression
+		q.wg.Add(1)
+		go func() {
+			defer closeIdChanWg.Done()
+			defer q.wg.Done()
 
-			for id := range q.index[key][value] {
+			q.getInitialByTagValueFromMetaTagIndex(idCh, stopCh, expr, &closeIdChanWg)
+		}()
+	} else {
+		closeIdChanWg.Done()
+	}
+}
+
+func (q *TagQueryContext) getInitialByTagValueFromMetricTagIndex(idCh chan schema.MKey, stopCh chan struct{}, expr tagquery.Expression) {
+	if expr.MatchesExactly() {
+		for id := range q.index[expr.GetKey()][expr.GetValue()] {
+			select {
+			case <-stopCh:
+				break
+			case idCh <- id:
+			}
+		}
+	} else {
+	OUTER:
+		for value, ids := range q.index[expr.GetKey()] {
+			if !expr.Matches(value) {
+				continue
+			}
+
+			for id := range ids {
 				select {
 				case <-stopCh:
-					break
+					break OUTER
 				case idCh <- id:
 				}
 			}
-		} else {
-		OUTER:
-			for value, ids := range q.index[key] {
-				if !expr.Matches(value) {
-					continue
+		}
+	}
+}
+
+func (q *TagQueryContext) getInitialByTagValueFromMetaTagIndex(idCh chan schema.MKey, stopCh chan struct{}, expr tagquery.Expression, closeIdChanWg *sync.WaitGroup) {
+OUTER:
+	for value, records := range q.mti[expr.GetKey()] {
+		select {
+		// abort if query has been stopped
+		case <-stopCh:
+			break OUTER
+		default:
+		}
+
+		if !expr.Matches(value) {
+			continue
+		}
+
+		for _, metaRecordId := range records {
+			record, ok := q.metaRecords[metaRecordId]
+			if !ok {
+				corruptIndex.Inc()
+				continue
+			}
+
+			closeIdChanWg.Add(1)
+			go func() {
+				defer closeIdChanWg.Done()
+
+				query, err := q.subQueryFromExpressions(record.Expressions)
+				if err != nil {
+					return
 				}
 
-				for id := range ids {
+				resCh := query.Run(q.index, q.byId, q.mti, q.metaRecords)
+
+				for id := range resCh {
 					select {
+					// abort if query has been stopped
 					case <-stopCh:
-						break OUTER
+						break
 					case idCh <- id:
 					}
 				}
-			}
+			}()
 		}
-	}()
+	}
+}
+
+func (q *TagQueryContext) subQueryFromExpressions(expressions tagquery.Expressions) (TagQueryContext, error) {
+	var queryCtx TagQueryContext
+
+	query, err := tagquery.NewQuery(expressions, q.query.From)
+	if err != nil {
+		// this means we've stored a meta record containing invalid queries
+		corruptIndex.Inc()
+		return queryCtx, err
+	}
+
+	queryCtx = NewTagQueryContext(query)
+	queryCtx.subQuery = true
+
+	return queryCtx, nil
 }
 
 // getInitialByTag generates an initial ID set which is later filtered down
@@ -263,9 +353,11 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 }
 
 // Run executes the tag query on the given index and returns a list of ids
-func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
+func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords) IdSet {
 	q.index = index
 	q.byId = byId
+	q.mti = mti
+	q.metaRecords = metaRecords
 	q.prepareExpressions(index)
 
 	idCh, _ := q.getInitialIds()
@@ -422,9 +514,11 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
+func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords) map[string]struct{} {
 	q.index = index
 	q.byId = byId
+	q.mti = mti
+	q.metaRecords = metaRecords
 	q.prepareExpressions(index)
 
 	maxTagCount := int32(math.MaxInt32)
