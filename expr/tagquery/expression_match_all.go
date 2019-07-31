@@ -40,6 +40,10 @@ func (e *expressionMatchAll) RequiresNonEmptyValue() bool {
 	return false
 }
 
+func (e *expressionMatchAll) ResultIsSmallerWhenNegated() bool {
+	return true
+}
+
 func (e *expressionMatchAll) Matches(value string) bool {
 	return true
 }
