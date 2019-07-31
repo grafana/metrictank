@@ -96,10 +96,12 @@ func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 
 // getMetaRecordIdsByExpression takes an expression and returns all meta record
 // ids of the records which match it.
-// It is important to note that negative expressions get evaluated as their
-// positive equivalent, f.e. != gets evaluated as =, to reduce the size of the
-// result set. The caller will then need to handle the negation according to the
-// expression type.
+// It is important to note that if an expression indicates that the result set will likely
+// be smaller if it's negated, then this returns the negative of the actual result set to
+// reduce the size of the returned result set.
+// The caller, after receiving the result set, needs to check whether this expression
+// indicates that the result set will likely be smaller if it's negated in order to be able
+// to interpret the result.
 func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression) []recordId {
 	if expr.OperatesOnTag() {
 		return m.getByTag(expr)
@@ -108,12 +110,19 @@ func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression) []r
 }
 
 func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
+	// TODO implement negated results
 	var res []recordId
 
 	for key := range m {
 
-		if !expr.Matches(key) {
-			continue
+		if expr.ResultIsSmallerWhenNegated() {
+			if expr.Matches(key) {
+				continue
+			}
+		} else {
+			if !expr.Matches(key) {
+				continue
+			}
 		}
 
 		for _, ids := range m[key] {
@@ -125,13 +134,21 @@ func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
 }
 
 func (m metaTagIndex) getByTagValue(expr tagquery.Expression) []recordId {
+	negateResults := expr.ResultIsSmallerWhenNegated()
+
 	if expr.MatchesExactly() {
 		return m[expr.GetKey()][expr.GetValue()]
 	}
 
 	var res []recordId
 	for value, ids := range m[expr.GetKey()] {
-		if !expr.Matches(value) {
+		passes := expr.Matches(value)
+
+		if negateResults {
+			passes = !passes
+		}
+
+		if !passes {
 			continue
 		}
 
