@@ -3,6 +3,8 @@ package tagquery
 import (
 	"fmt"
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type MetaTagRecord struct {
@@ -86,4 +88,33 @@ func (m *MetaTagRecord) EqualExpressions(other *MetaTagRecord) bool {
 // meta tags, otherwise it returns false
 func (m *MetaTagRecord) HasMetaTags() bool {
 	return len(m.MetaTags) > 0
+}
+
+func (m *MetaTagRecord) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {
+	filters := make([]MetricDefinitionFilter, len(m.Expressions))
+	defaultDecisions := make([]FilterDecision, len(m.Expressions))
+	for i, expr := range m.Expressions {
+		filters[i] = expr.GetMetricDefinitionFilter(lookup)
+		defaultDecisions[i] = expr.GetDefaultDecision()
+	}
+
+	return func(id schema.MKey, name string, tags []string) FilterDecision {
+		for i := range filters {
+			decision := filters[i](id, name, tags)
+
+			if decision == None {
+				return defaultDecisions[i]
+			}
+
+			if decision == Pass {
+				continue
+			}
+
+			if decision == Fail {
+				return Fail
+			}
+		}
+
+		return Pass
+	}
 }

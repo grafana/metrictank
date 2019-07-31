@@ -93,3 +93,50 @@ func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 
 	values[keyValue.Value] = append(values[keyValue.Value], id)
 }
+
+// getMetaRecordIdsByExpression takes an expression and returns all meta record
+// ids of the records which match it.
+// It is important to note that negative expressions get evaluated as their
+// positive equivalent, f.e. != gets evaluated as =, to reduce the size of the
+// result set. The caller will then need to handle the negation according to the
+// expression type.
+func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression) []recordId {
+	if expr.OperatesOnTag() {
+		return m.getByTag(expr)
+	}
+	return m.getByTagValue(expr)
+}
+
+func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
+	var res []recordId
+
+	for key := range m {
+
+		if !expr.Matches(key) {
+			continue
+		}
+
+		for _, ids := range m[key] {
+			res = append(res, ids...)
+		}
+	}
+
+	return res
+}
+
+func (m metaTagIndex) getByTagValue(expr tagquery.Expression) []recordId {
+	if expr.MatchesExactly() {
+		return m[expr.GetKey()][expr.GetValue()]
+	}
+
+	var res []recordId
+	for value, ids := range m[expr.GetKey()] {
+		if !expr.Matches(value) {
+			continue
+		}
+
+		res = append(res, ids...)
+	}
+
+	return res
+}
