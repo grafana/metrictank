@@ -889,7 +889,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	// probably allocating more than necessary, still better than growing
 	res := make([]string, 0, len(tags))
 
-	resMap := queryCtx.RunGetTags(tags, m.defById)
+	resMap := queryCtx.RunGetTags(tags, m.defById, m.metaTags[orgId], m.metaTagRecords[orgId])
 	for tag := range resMap {
 		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
 			res = append(res, tag)
@@ -956,7 +956,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return nil
 	}
 
-	ids := queryCtx.Run(tags, m.defById)
+	ids := queryCtx.Run(tags, m.defById, m.metaTags[orgId], m.metaTagRecords[orgId])
 	valueMap := make(map[string]struct{})
 	tagPrefix := tag + "=" + prefix
 	for id := range ids {
@@ -1123,7 +1123,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 		return nil
 	}
 
-	return query.Run(tags, m.defById)
+	return query.Run(tags, m.defById, m.metaTags[orgId], m.metaTagRecords[orgId])
 }
 
 func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
