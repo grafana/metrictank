@@ -8,15 +8,15 @@ import (
 )
 
 type MetaTagRecordUpsert struct {
-	MetaTags  []string `json:"metaTags" binding:"Required"`
-	Queries   []string `json:"queries" binding:"Required"`
-	Propagate bool     `json:"propagate"`
+	MetaTags    []string `json:"metaTags" binding:"Required"`
+	Expressions []string `json:"expressions" binding:"Required"`
+	Propagate   bool     `json:"propagate"`
 }
 
 func (m MetaTagRecordUpsert) Trace(span opentracing.Span) {
 	span.LogFields(
 		traceLog.String("metaTags", fmt.Sprintf("%q", m.MetaTags)),
-		traceLog.String("queries", fmt.Sprintf("%q", m.Queries)),
+		traceLog.String("expressions", fmt.Sprintf("%q", m.Expressions)),
 		traceLog.Bool("propagate", m.Propagate),
 	)
 }
