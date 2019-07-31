@@ -21,9 +21,8 @@ import (
 type TagQueryContext struct {
 	wg sync.WaitGroup
 
-	query            tagquery.Query
-	filters          []tagquery.MetricDefinitionFilter
-	defaultDecisions []tagquery.FilterDecision
+	query   tagquery.Query
+	filters []filter
 
 	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
@@ -31,6 +30,24 @@ type TagQueryContext struct {
 	metaRecords metaTagRecords               // meta tag records keyed by their recordID
 	startWith   int                          // the expression index to start with
 	subQuery    bool                         // true if this is a subquery created from the expressions of a meta tag record
+}
+
+type filter struct {
+	// expr is the expression based on which this filter has been generated
+	expr tagquery.Expression
+
+	// test is a filter function which takes a MetricDefinition and returns a
+	// tagquery.FilterDecision type indicating whether the MD
+	// satisfies this expression or not
+	test tagquery.MetricDefinitionFilter
+
+	// testByMetaTags is a slice of filter functions which have been generated
+	// from the meta records that match this filter's expression
+	testByMetaTags []tagquery.MetricDefinitionFilter
+
+	// the default decision which should be applied if none of test & testByMetaTags
+	// have come to a conclusive decision
+	defaultDecision tagquery.FilterDecision
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -81,14 +98,13 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 		return costs[i].operatorCost < costs[j].operatorCost
 	})
 
-	// the number of filters / default decisions is equal to the number of expressions - 1
-	// because one of the expressions will be chosen to be the one that we start with.
-	// we don't need to filter function, nor the default decision, of the expression which
+	// the number of filters is equal to the number of expressions - 1 because one of the
+	// expressions will be chosen to be the one that we start with.
+	// we don't need the filter function, nor the default decision, of the expression which
 	// we start with.
 	// all the remaining expressions will be used as filter expressions, for which we need
 	// to obtain their filter functions and their default decisions.
-	q.filters = make([]tagquery.MetricDefinitionFilter, len(q.query.Expressions)-1)
-	q.defaultDecisions = make([]tagquery.FilterDecision, len(q.query.Expressions)-1)
+	q.filters = make([]filter, len(q.query.Expressions)-1)
 
 	// Every tag query has at least one expression which requires a non-empty value according to:
 	// https://graphite.readthedocs.io/en/latest/tags.html#querying
@@ -99,8 +115,27 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 		if q.startWith < 0 && q.query.Expressions[cost.expressionIdx].RequiresNonEmptyValue() {
 			q.startWith = cost.expressionIdx
 		} else {
-			q.filters[i] = q.query.Expressions[cost.expressionIdx].GetMetricDefinitionFilter(idx.idHasTag)
-			q.defaultDecisions[i] = q.query.Expressions[cost.expressionIdx].GetDefaultDecision()
+			expr := q.query.Expressions[cost.expressionIdx]
+			q.filters[i] = filter{
+				expr:            expr,
+				test:            expr.GetMetricDefinitionFilter(idx.idHasTag),
+				defaultDecision: expr.GetDefaultDecision(),
+			}
+			if tagquery.MetaTagSupport {
+				recordIds := q.mti.getMetaRecordIdsByExpression(expr)
+				var filters []tagquery.MetricDefinitionFilter
+				for _, id := range recordIds {
+					record, ok := q.metaRecords[id]
+					if !ok {
+						corruptIndex.Inc()
+						log.Errorf("TagQueryContext: Tried to lookup a meta tag record id that does not exist, index is corrupted")
+						continue
+					}
+
+					filters = append(filters, record.GetMetricDefinitionFilter(idx.idHasTag))
+				}
+				q.filters[i].testByMetaTags = filters
+			}
 			i++
 		}
 	}
@@ -303,11 +338,7 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 	}
 
 	for i := range q.filters {
-		decision := q.filters[i](id, schema.SanitizeNameAsTagValue(def.Name), def.Tags)
-
-		if decision == tagquery.None {
-			decision = q.defaultDecisions[i]
-		}
+		decision := q.filters[i].test(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags)
 
 		if decision == tagquery.Pass {
 			continue
@@ -316,6 +347,24 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 		if decision == tagquery.Fail {
 			return false
 		}
+
+		for j := range q.filters[i].testByMetaTags {
+			decision = q.filters[i].testByMetaTags[j](id, def.Name, def.Tags)
+
+			if decision == tagquery.Pass {
+				continue
+			}
+
+			if decision == tagquery.Fail {
+				return false
+			}
+		}
+
+		if q.filters[i].defaultDecision == tagquery.Pass {
+			return true
+		}
+
+		return false
 	}
 
 	return true
