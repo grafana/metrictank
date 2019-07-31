@@ -41,9 +41,9 @@ type filter struct {
 	// satisfies this expression or not
 	test tagquery.MetricDefinitionFilter
 
-	// testByMetaTags is a slice of filter functions which have been generated
+	// testByMetaTags is a filter function which has been generated
 	// from the meta records that match this filter's expression
-	testByMetaTags []tagquery.MetricDefinitionFilter
+	testByMetaTags tagquery.MetricDefinitionFilter
 
 	// the default decision which should be applied if none of test & testByMetaTags
 	// have come to a conclusive decision
@@ -123,7 +123,7 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 			}
 			if tagquery.MetaTagSupport {
 				recordIds := q.mti.getMetaRecordIdsByExpression(expr)
-				var filters []tagquery.MetricDefinitionFilter
+				var expressionFilters []tagquery.MetricDefinitionFilter
 				for _, id := range recordIds {
 					record, ok := q.metaRecords[id]
 					if !ok {
@@ -132,9 +132,39 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 						continue
 					}
 
-					filters = append(filters, record.GetMetricDefinitionFilter(idx.idHasTag))
+					expressionFilters = append(expressionFilters, record.GetMetricDefinitionFilter(idx.idHasTag))
 				}
-				q.filters[i].testByMetaTags = filters
+
+				if expr.ResultIsSmallerWhenNegated() {
+					q.filters[i].testByMetaTags = func(id schema.MKey, name string, tags []string) tagquery.FilterDecision {
+						for _, expressionFilter := range expressionFilters {
+							decision := expressionFilter(id, name, tags)
+							if decision == tagquery.None {
+								decision = q.filters[i].expr.GetDefaultDecision()
+							}
+
+							if decision == tagquery.Fail {
+								return tagquery.Pass
+							}
+						}
+
+						return tagquery.Fail
+					}
+				} else {
+					q.filters[i].testByMetaTags = func(id schema.MKey, name string, tags []string) tagquery.FilterDecision {
+						for _, expressionFilter := range expressionFilters {
+							decision := expressionFilter(id, name, tags)
+							if decision == tagquery.None {
+								decision = q.filters[i].expr.GetDefaultDecision()
+							}
+
+							if decision == tagquery.Fail {
+								return tagquery.Fail
+							}
+						}
+						return tagquery.Pass
+					}
+				}
 			}
 			i++
 		}
@@ -348,20 +378,14 @@ func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive,
 			return false
 		}
 
-		for j := range q.filters[i].testByMetaTags {
-			decision = q.filters[i].testByMetaTags[j](id, def.Name, def.Tags)
+		decision = q.filters[i].testByMetaTags(id, def.Name, def.Tags)
 
-			if decision == tagquery.Pass {
-				continue
-			}
-
-			if decision == tagquery.Fail {
-				return false
-			}
+		if decision == tagquery.None {
+			decision = q.filters[i].defaultDecision
 		}
 
-		if q.filters[i].defaultDecision == tagquery.Pass {
-			return true
+		if decision == tagquery.Pass {
+			continue
 		}
 
 		return false
