@@ -501,14 +501,6 @@ schema-file = /etc/metrictank/schema-idx-cassandra.toml
 disable-initial-host-lookup = false
 ```
 
-### tag query evaluation
-
-```
-[tag-query]
-# size of regular expression cache in tag query evaluation
-match-cache-size = 1000
-```
-
 ### in-memory only
 
 ```
@@ -516,8 +508,12 @@ match-cache-size = 1000
 enabled = false
 # enables/disables querying based on tags
 tag-support = false
+# enables/disables querying based on meta tags
+meta-tag-support = false
 # number of workers to spin up to evaluate tag queries
 tag-query-workers = 50
+# size of regular expression cache in tag query evaluation
+match-cache-size = 1000
 # path to index-rules.conf file
 rules-file = /etc/metrictank/index-rules.conf
 # maximum duration each second a prune job can lock the index.
