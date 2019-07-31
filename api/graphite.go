@@ -1333,7 +1333,7 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 }
 
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
-	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Queries)
+	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Expressions)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -1372,7 +1372,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 	indexUpsertRequest := models.IndexMetaTagRecordUpsert{
 		OrgId:    ctx.OrgId,
 		MetaTags: upsertRequest.MetaTags,
-		Queries:  upsertRequest.Queries,
+		Queries:  upsertRequest.Expressions,
 	}
 
 	results, errors := s.peerQuery(ctx.Req.Context(), indexUpsertRequest, "metaTagRecordUpsert", "/index/metaTags/upsert")
