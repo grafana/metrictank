@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 )
 
@@ -17,25 +18,8 @@ var OrgIdPublic = uint32(0)
 type Node struct {
 	Path        string
 	Leaf        bool
-	Defs        []Archive
+	Defs        []interning.Archive
 	HasChildren bool
-}
-
-type Archive struct {
-	schema.MetricDefinition
-	SchemaId uint16 // index in mdata.schemas (not persisted)
-	AggId    uint16 // index in mdata.aggregations (not persisted)
-	IrId     uint16 // index in mdata.indexrules (not persisted)
-	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
-}
-
-// used primarily by tests, for convenience
-func NewArchiveBare(name string) Archive {
-	return Archive{
-		MetricDefinition: schema.MetricDefinition{
-			Name: name,
-		},
-	}
 }
 
 // The MetricIndex interface supports Graphite style queries.
@@ -57,24 +41,28 @@ type MetricIndex interface {
 
 	// Update updates an existing archive, if found.
 	// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-	Update(point schema.MetricPoint, partition int32) (Archive, int32, bool)
+	Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (Archive, int32, bool)
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool)
 
 	// Get returns the archive for the requested id.
-	Get(key schema.MKey) (Archive, bool)
+	Get(key schema.MKey) (interning.Archive, bool)
 
 	// GetPath returns the archives under the given path.
-	GetPath(orgId uint32, path string) []Archive
+	GetPath(orgId uint32, path string) []interning.Archive
 
 	// Delete deletes items from the index
 	// If the pattern matches a branch node, then
 	// all leaf nodes on that branch are deleted. So if the pattern is
 	// "*", all items in the index are deleted.
-	// It returns a copy of all of the Archives deleted.
-	Delete(orgId uint32, pattern string) ([]Archive, error)
+	// It returns the number of Archives that were deleted.
+	Delete(orgId uint32, pattern string) (int, error)
+
+	// DeletePersistent deletes items from the index
+	// It returns the deleted items in a []interning.Archive
+	DeletePersistent(orgId uint32, pattern string) ([]*interning.ArchiveInterned, error)
 
 	// Find searches the index for matching nodes.
 	// * orgId describes the org to search in (public data in orgIdPublic is automatically included)
@@ -83,11 +71,11 @@ type MetricIndex interface {
 	Find(orgId uint32, pattern string, from int64) ([]Node, error)
 
 	// List returns all Archives for the passed OrgId and the public orgId
-	List(orgId uint32) []Archive
+	List(orgId uint32) []interning.Archive
 
 	// Prune deletes all metrics that haven't been seen since the given timestamp.
 	// It returns all Archives deleted and any error encountered.
-	Prune(oldest time.Time) ([]Archive, error)
+	Prune(oldest time.Time) ([]*interning.ArchiveInterned, error)
 
 	// FindByTag takes a query object and executes the query on the index. The query
 	// is composed of one or many query expressions, plus a "from condition" defining
@@ -144,7 +132,7 @@ type MetricIndex interface {
 
 	// DeleteTagged deletes the series returned by the given query from the tag index
 	// and also the DefById index.
-	DeleteTagged(orgId uint32, query tagquery.Query) []Archive
+	DeleteTagged(orgId uint32, query tagquery.Query) []interning.Archive
 
 	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
 	// whether it already exists or is new. The identity of a record is determined

@@ -24,7 +24,9 @@ jobs:
       - image: circleci/golang:1.11.4
     steps:
       - checkout
-      - run: go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
+      - run:
+          command: go test -v -race -timeout 30m $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
+          no_output_timeout: 30m
 
   qa:
     working_directory: /go/src/github.com/grafana/metrictank

@@ -11,9 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/schema"
-	macaron "gopkg.in/macaron.v1"
-
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
@@ -23,6 +20,7 @@ import (
 	"github.com/grafana/metrictank/expr"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
@@ -31,7 +29,9 @@ import (
 	tags "github.com/opentracing/opentracing-go/ext"
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/raintank/dur"
+	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
+	macaron "gopkg.in/macaron.v1"
 )
 
 var MissingOrgHeaderErr = errors.New("orgId not set in headers")
@@ -341,7 +341,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 }
 
-func (s *Server) listLocal(orgId uint32) []idx.Archive {
+func (s *Server) listLocal(orgId uint32) []interning.Archive {
 
 	// query nodes have no data
 	if s.MetricIndex == nil {
@@ -351,7 +351,7 @@ func (s *Server) listLocal(orgId uint32) []idx.Archive {
 	return s.MetricIndex.List(orgId)
 }
 
-func (s *Server) listRemote(ctx context.Context, orgId uint32, peer cluster.Node) ([]idx.Archive, error) {
+func (s *Server) listRemote(ctx context.Context, orgId uint32, peer cluster.Node) ([]interning.Archive, error) {
 	log.Debugf("HTTP IndexJson() querying %s/index/list for %d", peer.GetName(), orgId)
 	buf, err := peer.Post(ctx, "listRemote", "/index/list", models.IndexList{OrgId: orgId})
 	if err != nil {
@@ -364,9 +364,9 @@ func (s *Server) listRemote(ctx context.Context, orgId uint32, peer cluster.Node
 		return nil, nil
 	default:
 	}
-	result := make([]idx.Archive, 0)
+	result := make([]interning.Archive, 0)
 	for len(buf) != 0 {
-		var def idx.Archive
+		var def interning.Archive
 		buf, err = def.UnmarshalMsg(buf)
 		if err != nil {
 			log.Errorf("HTTP IndexJson() error unmarshaling body from %s/index/list: %q", peer.GetName(), err.Error())
@@ -386,7 +386,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	reqCtx, cancel := context.WithCancel(ctx.Req.Context())
 	defer cancel()
 	responses := make(chan struct {
-		series []idx.Archive
+		series []interning.Archive
 		err    error
 	}, 1)
 	var wg sync.WaitGroup
@@ -396,7 +396,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 			go func() {
 				result := s.listLocal(ctx.OrgId)
 				responses <- struct {
-					series []idx.Archive
+					series []interning.Archive
 					err    error
 				}{result, nil}
 				wg.Done()
@@ -408,7 +408,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 					cancel()
 				}
 				responses <- struct {
-					series []idx.Archive
+					series []interning.Archive
 					err    error
 				}{result, err}
 				wg.Done()
@@ -422,7 +422,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 		close(responses)
 	}()
 
-	series := make([]idx.Archive, 0)
+	series := make([]interning.Archive, 0)
 	seenDefs := make(map[schema.MKey]struct{})
 	for resp := range responses {
 		if resp.err != nil {
@@ -619,8 +619,7 @@ func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
 		return 0, nil
 	}
 
-	defs, err := s.MetricIndex.Delete(orgId, query)
-	return len(defs), err
+	return s.MetricIndex.Delete(orgId, query)
 }
 
 func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query string, peer cluster.Node) (int, error) {

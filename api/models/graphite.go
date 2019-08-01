@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-macaron/binding"
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
@@ -160,7 +160,7 @@ type MetricsDelete struct {
 	Query string `json:"query" form:"query" binding:"Required"`
 }
 
-type MetricNames []idx.Archive
+type MetricNames []interning.Archive
 
 func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	seen := make(map[string]struct{})
@@ -168,10 +168,11 @@ func (defs MetricNames) MarshalJSONFast(b []byte) ([]byte, error) {
 	names := make([]string, 0, len(defs))
 
 	for i := 0; i < len(defs); i++ {
-		_, ok := seen[defs[i].Name]
+		name := defs[i].Name
+		_, ok := seen[name]
 		if !ok {
-			names = append(names, defs[i].Name)
-			seen[defs[i].Name] = struct{}{}
+			names = append(names, name)
+			seen[name] = struct{}{}
 		}
 	}
 	sort.Strings(names)

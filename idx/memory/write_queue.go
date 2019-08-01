@@ -4,13 +4,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 )
 
 type WriteQueue struct {
 	sync.RWMutex
-	archives    map[schema.MKey]*idx.Archive
+	archives    map[schema.MKey]*interning.ArchiveInterned
 	shutdown    chan struct{}
 	done        chan struct{}
 	maxBuffered int
@@ -24,7 +24,7 @@ type WriteQueue struct {
 // in batches
 func NewWriteQueue(index *UnpartitionedMemoryIdx, maxDelay time.Duration, maxBuffered int) *WriteQueue {
 	wq := &WriteQueue{
-		archives:    make(map[schema.MKey]*idx.Archive),
+		archives:    make(map[schema.MKey]*interning.ArchiveInterned),
 		shutdown:    make(chan struct{}),
 		done:        make(chan struct{}),
 		maxBuffered: maxBuffered,
@@ -41,7 +41,7 @@ func (wq *WriteQueue) Stop() {
 	<-wq.done
 }
 
-func (wq *WriteQueue) Queue(archive *idx.Archive) {
+func (wq *WriteQueue) Queue(archive *interning.ArchiveInterned) {
 	wq.Lock()
 	wq.archives[archive.Id] = archive
 	if len(wq.archives) >= wq.maxBuffered {
@@ -50,7 +50,7 @@ func (wq *WriteQueue) Queue(archive *idx.Archive) {
 	wq.Unlock()
 }
 
-func (wq *WriteQueue) Get(id schema.MKey) (*idx.Archive, bool) {
+func (wq *WriteQueue) Get(id schema.MKey) (*interning.ArchiveInterned, bool) {
 	wq.RLock()
 	a, ok := wq.archives[id]
 	wq.RUnlock()
@@ -75,7 +75,7 @@ func (wq *WriteQueue) flush() {
 		wq.idx.add(archive)
 	}
 	wq.idx.Unlock()
-	wq.archives = make(map[schema.MKey]*idx.Archive)
+	wq.archives = make(map[schema.MKey]*interning.ArchiveInterned)
 	wq.flushed <- struct{}{}
 }
 

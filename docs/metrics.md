@@ -200,6 +200,10 @@ a counter of findCache hits
 a counter of findCache misses
 * `idx.memory.get`:  
 the duration of a get of one metric in the memory idx
+* `idx.memory.intern.fragmentation`:  
+the total fragmentation percent of the object store used by the interning layer by object size
+* `idx.memory.intern.memory`:  
+the total memory used by the interning layer in bytes by object size
 * `idx.memory.list`:  
 the duration of memory idx listings
 * `idx.memory.ops.add`:  
@@ -278,6 +282,10 @@ with an incorrect consolidator specified
 * `recovered_errors.idx.memory.corrupt-index`:  
 how many times
 a corruption has been detected in one of the internal index structures
+each time this happens, an error is logged with more details.
+* `recovered_errors.idx.memory.intern-error`:  
+how many times
+an error is encountered while attempting to intern a string.
 each time this happens, an error is logged with more details.
 * `recovered_errors.idx.memory.invalid-tag`:  
 how many times
