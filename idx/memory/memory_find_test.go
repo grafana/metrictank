@@ -170,6 +170,8 @@ func InitSmallIndex() {
 	if currentIndex != 1 || currentlyPartitioned != Partitioned {
 		interning.IdxIntern = nil
 		interning.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		interning.IdxInternQueue = new(interning.InterningQueue)
+		interning.IdxInternQueue.Init()
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1})
@@ -180,6 +182,8 @@ func InitSmallIndex() {
 
 		currentIndex = 1
 	} else {
+		interning.IdxInternQueue = new(interning.InterningQueue)
+		interning.IdxInternQueue.Init()
 		runtime.GC()
 		ix.PurgeFindCache()
 		ix.Init()
@@ -218,6 +222,8 @@ func InitLargeIndex() {
 	// if the current index is not the large index then initialize it
 	if currentIndex != 2 || currentlyPartitioned != Partitioned {
 		interning.IdxIntern.Reset()
+		interning.IdxInternQueue = new(interning.InterningQueue)
+		interning.IdxInternQueue.Init()
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1, 2, 3, 4, 5, 6, 7})
@@ -228,6 +234,8 @@ func InitLargeIndex() {
 
 		currentIndex = 2
 	} else {
+		interning.IdxInternQueue = new(interning.InterningQueue)
+		interning.IdxInternQueue.Init()
 		ix.PurgeFindCache()
 		runtime.GC()
 		ix.Init()

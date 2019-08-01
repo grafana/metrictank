@@ -1194,6 +1194,8 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 		archivesInterned[i].ReleaseInterned()
 	}
 
+	time.Sleep(time.Second * 2)
+
 	statsStep3 := interning.IdxIntern.MemStatsPerPool()
 	if len(statsStep3) != 0 {
 		t.Fatalf("Expecting interning to have no data, but there was:\n%+v", statsStep3)

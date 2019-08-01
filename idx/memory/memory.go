@@ -402,6 +402,10 @@ func (m *UnpartitionedMemoryIdx) Init() error {
 	if writeQueueEnabled {
 		m.writeQueue = NewWriteQueue(m, writeQueueDelay, writeMaxBatchSize)
 	}
+	if interning.IdxInternQueue == nil {
+		interning.IdxInternQueue = new(interning.InterningQueue)
+		interning.IdxInternQueue.Init()
+	}
 
 	m.shutdown = make(chan struct{})
 
@@ -438,6 +442,11 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 		m.writeQueue = nil
 	}
 	close(m.shutdown)
+
+	if interning.IdxInternQueue != nil {
+		interning.IdxInternQueue.Stop()
+		interning.IdxInternQueue = nil
+	}
 
 	return
 }

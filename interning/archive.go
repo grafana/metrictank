@@ -77,7 +77,7 @@ func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 // It updates the refence counts of the interned struct
 // properties, or deletes the interned values when necessary.
 func (a *ArchiveInterned) ReleaseInterned() {
-	a.MetricDefinitionInterned.ReleaseInterned()
+	IdxInternQueue.Queue <- MDIQueueItem{a.MetricDefinitionInterned, false}
 	archiveInternedPool.Put(a)
 	archiveInternedCount.DecUint32(1)
 }

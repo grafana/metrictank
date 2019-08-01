@@ -613,14 +613,7 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	clone.LastUpdate = atomic.LoadInt64(&md.LastUpdate)
 	clone.Partition = atomic.LoadInt32(&md.Partition)
 
-	IdxIntern.IncRefCntBatchUnsafe(clone.Name.Nodes())
-	for i := range clone.Tags.KeyValues {
-		IdxIntern.IncRefCntBatchUnsafe([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
-	}
-
-	if clone.Unit != 0 {
-		IdxIntern.IncRefCntUnsafe(uintptr(clone.Unit))
-	}
+	IdxInternQueue.Queue <- MDIQueueItem{clone, true}
 
 	return clone
 }
