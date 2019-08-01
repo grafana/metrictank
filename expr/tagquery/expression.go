@@ -52,6 +52,12 @@ func (e Expressions) Sort() {
 	})
 }
 
+// Expression represents one expression inside a query of one or many expressions.
+// It provides all the necessary methods that are required to do a tag lookup from an index keyed by
+// tags & values, such as the type memory.TagIndex or the type memory.metaTagIndex.
+// It is also comes with a method to generate a filter which decides whether a given MetricDefinition
+// matches the requirements defined by this expression or not. This filter can be obtained from the
+// method GetMetricDefinitionFilter().
 type Expression interface {
 	// Equals takes another expression and compares it against itself. Returns true if they are equal
 	// or false otherwise
@@ -112,7 +118,13 @@ type Expression interface {
 	GetCostMultiplier() uint32
 
 	// OperatesOnTag returns whether this expression operators on the tag key
-	// (if not, it operates on the value)
+	// (if not, it operates on the value).
+	// Expressions such has expressionHasTag, expressionMatchTag, expressionPrefixTag would return true,
+	// because in order to make a decision regarding whether a metric should be part of the result set
+	// they need to look at a metric's tags, as opposed to looking at the values associated with some
+	// specified tag.
+	// If this returns true, then tags shall be passed into ValuePasses(), other values associated with
+	// the tag returned by GetKey() shall be passed into ValuePasses().
 	OperatesOnTag() bool
 
 	// RequiresNonEmptyValue returns whether this expression requires a non-empty value.
@@ -120,7 +132,7 @@ type Expression interface {
 	RequiresNonEmptyValue() bool
 
 	// ValuePasses takes a string which should either be a tag key or value depending on the return
-	// value of OperatesOnTag(), then it returns whether whether the given value satisfies this expression
+	// value of OperatesOnTag(), then it returns whether the given value satisfies this expression
 	ValuePasses(string) bool
 
 	ValueMatchesExactly() bool
