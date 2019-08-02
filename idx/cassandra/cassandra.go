@@ -256,7 +256,7 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (schema.MKey,
 
 	if !c.Config.updateCassIdx {
 		statUpdateDuration.Value(time.Since(pre))
-		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+		return id, lastSave, oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -269,13 +269,13 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (schema.MKey,
 
 		// check if we need to save to cassandra.
 		now := uint32(time.Now().Unix())
-		if atomic.LoadUint32(&lastSave) < (now - c.updateInterval32) {
-			c.updateCassandra(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
+		if lastSave < (now - c.updateInterval32) {
+			c.updateCassandra(now, inMemory, id, partition, lastSave)
 		}
 	}
 
 	statUpdateDuration.Value(time.Since(pre))
-	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+	return id, lastSave, oldPartition, inMemory
 }
 
 func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool) {
@@ -290,7 +290,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 
 	if !c.Config.updateCassIdx {
 		stat.Value(time.Since(pre))
-		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+		return id, lastSave, oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -304,12 +304,12 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 
 	// check if we need to save to cassandra.
 	now := uint32(time.Now().Unix())
-	if atomic.LoadUint32(&lastSave) < (now - c.updateInterval32) {
-		c.updateCassandra(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
+	if lastSave < (now - c.updateInterval32) {
+		c.updateCassandra(now, inMemory, id, partition, lastSave)
 	}
 
 	stat.Value(time.Since(pre))
-	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+	return id, lastSave, oldPartition, inMemory
 }
 
 // updateCassandra saves the archive to cassandra and
@@ -317,7 +317,7 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 func (c *CasIdx) updateCassandra(now uint32, inMemory bool, id schema.MKey, partition int32, lastSave uint32) {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if atomic.LoadUint32(&lastSave) < (now - c.updateInterval32 - c.updateInterval32/2) {
+	if lastSave < (now - c.updateInterval32 - c.updateInterval32/2) {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("cassandra-idx: updating def %s in index.", id)
 		}

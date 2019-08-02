@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/bigtable"
@@ -213,7 +212,7 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (schema.
 
 	if !b.cfg.UpdateBigtableIdx {
 		statUpdateDuration.Value(time.Since(pre))
-		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+		return id, lastSave, oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -230,13 +229,13 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (schema.
 		}
 		// check if we need to save to bigtable.
 		now := uint32(time.Now().Unix())
-		if atomic.LoadUint32(&lastSave) < (now - b.cfg.updateInterval32) {
-			b.updateBigtable(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
+		if lastSave < (now - b.cfg.updateInterval32) {
+			b.updateBigtable(now, inMemory, id, partition, lastSave)
 		}
 	}
 
 	statUpdateDuration.Value(time.Since(pre))
-	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+	return id, lastSave, oldPartition, inMemory
 }
 
 func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool) {
@@ -251,7 +250,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 	if !b.cfg.UpdateBigtableIdx {
 		stat.Value(time.Since(pre))
-		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+		return id, lastSave, oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -270,12 +269,12 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 	// check if we need to save to bigtable.
 	now := uint32(time.Now().Unix())
-	if atomic.LoadUint32(&lastSave) < (now - b.cfg.updateInterval32) {
-		b.updateBigtable(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
+	if lastSave < (now - b.cfg.updateInterval32) {
+		b.updateBigtable(now, inMemory, id, partition, lastSave)
 	}
 
 	stat.Value(time.Since(pre))
-	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
+	return id, lastSave, oldPartition, inMemory
 }
 
 // updateBigtable saves the archive to bigtable and
@@ -283,7 +282,7 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, id schema.MKey, partition int32, lastSave uint32) {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if atomic.LoadUint32(&lastSave) < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
+	if lastSave < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("bigtable-idx: updating def %s in index.", id)
 		}

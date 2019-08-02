@@ -869,12 +869,13 @@ func (m *UnpartitionedMemoryIdx) add(archive *interning.ArchiveInterned) {
 func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (*interning.ArchiveInterned, bool) {
 	pre := time.Now()
 	m.RLock()
-	defer m.RUnlock()
 	def, ok := m.defById[id]
 	statGetDuration.Value(time.Since(pre))
 	if ok {
+		m.RUnlock()
 		return def, ok
 	}
+	m.RUnlock()
 	return nil, ok
 }
 
