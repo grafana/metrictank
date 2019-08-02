@@ -60,7 +60,7 @@ var (
 
 	// Data:
 	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
-	ingestAfterStr    = flag.String("ingest-after", "", "discards data from an org id received before the next chunk boundary after the specified unix timestamp (in seconds since 1 Jan 1970); syntax: org-id:timestamp")
+	ingestAfterStr    = flag.String("ingest-after", "", "only ingest data with timestamps belonging to the chunk starting after the timestamp specified for an org id; syntax: [ORG_ID]:[TIMESTAMP],[ORG_ID]:[TIMESTAMP],...")
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
