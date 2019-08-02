@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/bigtable"
@@ -205,14 +206,14 @@ func (b *BigtableIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (schema.MKey, uint32, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := b.MemoryIndex.Update(point, partition)
+	id, lastSave, oldPartition, inMemory := b.MemoryIndex.Update(point, partition)
 
 	if !b.cfg.UpdateBigtableIdx {
 		statUpdateDuration.Value(time.Since(pre))
-		return archive, oldPartition, inMemory
+		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -221,36 +222,36 @@ func (b *BigtableIdx) Update(point schema.MetricPoint, partition int32) (*intern
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			go func() {
-				err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
+				err := b.deleteRow(FormatRowKey(id, oldPartition))
 				if err != nil {
-					log.Errorf("bigtable-idx: Failed to delete row %s: %s", archive.Id, err)
+					log.Errorf("bigtable-idx: Failed to delete row %s: %s", id, err)
 				}
 			}()
 		}
 		// check if we need to save to bigtable.
 		now := uint32(time.Now().Unix())
-		if archive.LastSave < (now - b.cfg.updateInterval32) {
-			archive = b.updateBigtable(now, inMemory, archive, partition)
+		if atomic.LoadUint32(&lastSave) < (now - b.cfg.updateInterval32) {
+			b.updateBigtable(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
 		}
 	}
 
 	statUpdateDuration.Value(time.Since(pre))
-	return archive, oldPartition, inMemory
+	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 }
 
-func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := b.MemoryIndex.AddOrUpdate(mkey, data, partition)
+	id, lastSave, oldPartition, inMemory := b.MemoryIndex.AddOrUpdate(mkey, data, partition)
 
 	stat := statUpdateDuration
 	if !inMemory {
 		stat = statAddDuration
 	}
 
-	if !b.cfg.UpdateBigtableIdx || archive == nil {
+	if !b.cfg.UpdateBigtableIdx {
 		stat.Value(time.Since(pre))
-		return archive, oldPartition, inMemory
+		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -259,9 +260,9 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 		// So we need to explicitly delete the old entry.
 		if oldPartition != partition {
 			go func() {
-				err := b.deleteRow(FormatRowKey(archive.Id, oldPartition))
+				err := b.deleteRow(FormatRowKey(id, oldPartition))
 				if err != nil {
-					log.Errorf("bigtable-idx: Failed to delete row %s: %s", archive.Id, err)
+					log.Errorf("bigtable-idx: Failed to delete row %s: %s", id, err)
 				}
 			}()
 		}
@@ -269,26 +270,28 @@ func (b *BigtableIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, par
 
 	// check if we need to save to bigtable.
 	now := uint32(time.Now().Unix())
-	if archive.LastSave < (now - b.cfg.updateInterval32) {
-		archive = b.updateBigtable(now, inMemory, archive, partition)
+	if atomic.LoadUint32(&lastSave) < (now - b.cfg.updateInterval32) {
+		b.updateBigtable(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
 	}
 
 	stat.Value(time.Since(pre))
-	return archive, oldPartition, inMemory
+	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 }
 
 // updateBigtable saves the archive to bigtable and
 // updates the memory index with the updated fields.
-func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *interning.ArchiveInterned, partition int32) *interning.ArchiveInterned {
+func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, id schema.MKey, partition int32, lastSave uint32) {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if archive.LastSave < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
+	if atomic.LoadUint32(&lastSave) < (now - b.cfg.updateInterval32 - (b.cfg.updateInterval32 / 2)) {
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("bigtable-idx: updating def %s in index.", archive.Id)
+			log.Debugf("bigtable-idx: updating def %s in index.", id)
 		}
-		b.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}
-		archive.LastSave = now
-		b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
+		arc, ok := b.MemoryIndex.Get(id)
+		if ok {
+			b.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}
+			b.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
+		}
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -296,19 +299,24 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive *interni
 		// we will try and save again.  This will continue until we are successful or the
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
 		// do a blocking write to the queue.
-		select {
-		case b.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}:
-			archive.LastSave = now
-			b.MemoryIndex.UpdateArchiveLastSave(archive.Id, archive.Partition, now)
-		default:
-			statSaveSkipped.Inc()
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("bigtable-idx: writeQueue is full, update of %s not saved this time", archive.Id)
+		arc, ok := b.MemoryIndex.Get(id)
+		if ok {
+			select {
+			// note: this attempt to write actually creates the struct, which calls
+			// Now() and CloneInterned(), even if the write fails
+			case b.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}:
+				b.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
+			default:
+				// if the attempt to write to the queue failed we now need to decrement the
+				// reference count of the archive
+				arc.ReleaseInterned()
+				statSaveSkipped.Inc()
+				if log.IsLevelEnabled(log.DebugLevel) {
+					log.Debugf("bigtable-idx: writeQueue is full, update of %s not saved this time", id)
+				}
 			}
 		}
 	}
-
-	return archive
 }
 
 func (b *BigtableIdx) rebuildIndex() {

@@ -467,8 +467,8 @@ func updateExisting(existing *interning.ArchiveInterned, partition int32, lastUp
 }
 
 // Update updates an existing archive, if found.
-// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool) {
+// It returns whether it was found, and - if so - the associated MKey, LastSave and its old partition
+func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (schema.MKey, uint32, int32, bool) {
 	pre := time.Now()
 
 	m.RLock()
@@ -480,7 +480,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 		}
 
 		oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-		return existing.CloneInterned(), oldPart, true
+		return existing.Id, atomic.LoadUint32(&existing.LastSave), oldPart, true
 	}
 
 	if m.writeQueue != nil {
@@ -492,7 +492,7 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 				log.Debugf("memory-idx: metricDef with id %v is in the writeQueue", point.MKey)
 			}
 			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-			return existing.CloneInterned(), oldPart, true
+			return existing.Id, atomic.LoadUint32(&existing.LastSave), oldPart, true
 		}
 
 		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
@@ -505,17 +505,17 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 				log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
 			}
 			oldPart := updateExisting(existing, partition, int64(point.Time), pre)
-			return existing.CloneInterned(), oldPart, true
+			return existing.Id, atomic.LoadUint32(&existing.LastSave), oldPart, true
 		}
 	}
 
-	return nil, 0, false
+	return schema.MKey{}, 0, 0, false
 }
 
-// AddOrUpdate returns the corresponding Archive for the MetricData.
+// AddOrUpdate returns the corresponding MKey for the Archive for the MetricData.
 // if it is existing -> updates lastUpdate based on .Time, and partition
 // if was new        -> adds new MetricDefinition to index
-func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool) {
 	pre := time.Now()
 
 	// we only need a lock while reading the m.defById map. All future operations on the archive
@@ -528,12 +528,12 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 			log.Debugf("memory-idx: metricDef with id %s already in the index", mkey)
 		}
 		oldPart := updateExisting(existing, partition, data.Time, pre)
-		return existing.CloneInterned(), oldPart, ok
+		return existing.Id, atomic.LoadUint32(&existing.LastSave), oldPart, ok
 	}
 
 	def, err := interning.MetricDefinitionFromMetricDataWithMKey(mkey, data)
 	if err != nil {
-		return nil, 0, false
+		return schema.MKey{}, 0, 0, false
 	}
 	def.Partition = partition
 
@@ -550,7 +550,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 		m.writeQueue.Queue(archive)
 	}
 
-	return archive.CloneInterned(), 0, false
+	return archive.Id, atomic.LoadUint32(&archive.LastSave), 0, false
 }
 
 // UpdateArchiveLastSave updates the LastSave timestamp of the archive
@@ -864,18 +864,18 @@ func (m *UnpartitionedMemoryIdx) add(archive *interning.ArchiveInterned) {
 	return
 }
 
-// Get returns an interning.Archive that matches the supplied schema.MKey.
-// Upon failure it returns an empty interning.Archive
-func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (interning.Archive, bool) {
+// Get returns an *interning.ArchiveInterned that matches the supplied schema.MKey.
+// Upon failure it returns nil and false
+func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (*interning.ArchiveInterned, bool) {
 	pre := time.Now()
 	m.RLock()
 	defer m.RUnlock()
 	def, ok := m.defById[id]
 	statGetDuration.Value(time.Since(pre))
 	if ok {
-		return def.GetArchive(), ok
+		return def, ok
 	}
-	return interning.Archive{}, ok
+	return nil, ok
 }
 
 // GetPath returns the node under the given org and path.

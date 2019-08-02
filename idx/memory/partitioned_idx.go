@@ -54,13 +54,13 @@ func (p *PartitionedMemoryIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (schema.MKey, uint32, int32, bool) {
 	return p.Partition[partition].Update(point, partition)
 }
 
 // AddOrUpdate makes sure a metric is known in the index,
 // and should be called for every received metric.
-func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool) {
 	return p.Partition[partition].AddOrUpdate(mkey, data, partition)
 }
 
@@ -70,14 +70,14 @@ func (p *PartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition i
 }
 
 // Get returns the archive for the requested id.
-func (p *PartitionedMemoryIdx) Get(key schema.MKey) (interning.Archive, bool) {
+func (p *PartitionedMemoryIdx) Get(key schema.MKey) (*interning.ArchiveInterned, bool) {
 	g, _ := errgroup.WithContext(context.Background())
-	resultChan := make(chan *interning.Archive, len(p.Partition))
+	resultChan := make(chan *interning.ArchiveInterned, len(p.Partition))
 	for _, m := range p.Partition {
 		m := m
 		g.Go(func() error {
 			if a, ok := m.Get(key); ok {
-				resultChan <- &a
+				resultChan <- a
 			}
 			return nil
 		})
@@ -97,10 +97,10 @@ func (p *PartitionedMemoryIdx) Get(key schema.MKey) (interning.Archive, bool) {
 		if e != nil {
 			log.Errorf("memory-idx: failed to get Archive with key %v. %s", key, e)
 		}
-		return interning.Archive{}, false
+		return nil, false
 	}
 
-	return *result, true
+	return result, true
 }
 
 // GetPath returns the archives under the given path.

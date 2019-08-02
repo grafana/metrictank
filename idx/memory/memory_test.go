@@ -1043,9 +1043,13 @@ func testMetricNameStartingWithTilde(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	arch, _, _ := ix.AddOrUpdate(mkey, data, getPartition(data))
-	if arch.Name.String() != metricName {
-		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, arch.Name)
+	id, _, _, _ := ix.AddOrUpdate(mkey, data, getPartition(data))
+	arc, ok := ix.Get(id)
+	if !ok {
+		t.Fatalf("Failed to retrieve ArchiveInterned with MKey %v", id)
+	}
+	if arc.Name.String() != metricName {
+		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, arc.Name.String())
 	}
 
 	// query by the name minus the leading ~ characters
@@ -1129,15 +1133,19 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 			t.Fatalf("Failed to get AMKey from ID (%s): %s", mds[i].Id, err)
 		}
 
-		arch, _, _ := ix.AddOrUpdate(mkeys[i], &mds[i], 1)
-		archivesInterned = append(archivesInterned, arch)
+		id, _, _, _ := ix.AddOrUpdate(mkeys[i], &mds[i], 1)
+		arc, ok := ix.Get(id)
+		if !ok {
+			t.Fatalf("Failed to get ArchiveInterned from MKey %v", id)
+		}
+		archivesInterned = append(archivesInterned, arc.CloneInterned())
 	}
 
 	// add a bunch of metric points into the index via Update
 	// keep the returned interned archive references, but don't release them yet
 	for i := range mds {
 		for j := 100; j < 200; j++ {
-			arch, _, exists := ix.Update(schema.MetricPoint{
+			id, _, _, exists := ix.Update(schema.MetricPoint{
 				MKey:  mkeys[i],
 				Value: float64(j),
 				Time:  uint32(j),
@@ -1145,7 +1153,11 @@ func testThatInternedObjectsGetCleanedUp(t *testing.T) {
 			if !exists {
 				t.Fatalf("Metric was expected to be present in index, but it was not: %s", mkeys[i].String())
 			}
-			archivesInterned = append(archivesInterned, arch)
+			arc, ok := ix.Get(id)
+			if !ok {
+				t.Fatalf("Failed to get ArchiveInterned from MKey %v", id)
+			}
+			archivesInterned = append(archivesInterned, arc.CloneInterned())
 		}
 	}
 

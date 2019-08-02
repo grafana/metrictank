@@ -249,14 +249,14 @@ func (c *CasIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (schema.MKey, uint32, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := c.MemoryIndex.Update(point, partition)
+	id, lastSave, oldPartition, inMemory := c.MemoryIndex.Update(point, partition)
 
 	if !c.Config.updateCassIdx {
 		statUpdateDuration.Value(time.Since(pre))
-		return archive, oldPartition, inMemory
+		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -269,28 +269,28 @@ func (c *CasIdx) Update(point schema.MetricPoint, partition int32) (*interning.A
 
 		// check if we need to save to cassandra.
 		now := uint32(time.Now().Unix())
-		if archive.LastSave < (now - c.updateInterval32) {
-			archive = c.updateCassandra(now, inMemory, archive, partition)
+		if atomic.LoadUint32(&lastSave) < (now - c.updateInterval32) {
+			c.updateCassandra(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
 		}
 	}
 
 	statUpdateDuration.Value(time.Since(pre))
-	return archive, oldPartition, inMemory
+	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 }
 
-func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool) {
 	pre := time.Now()
 
-	archive, oldPartition, inMemory := c.MemoryIndex.AddOrUpdate(mkey, data, partition)
+	id, lastSave, oldPartition, inMemory := c.MemoryIndex.AddOrUpdate(mkey, data, partition)
 
 	stat := statUpdateDuration
 	if !inMemory {
 		stat = statAddDuration
 	}
 
-	if !c.Config.updateCassIdx || archive == nil {
+	if !c.Config.updateCassIdx {
 		stat.Value(time.Since(pre))
-		return archive, oldPartition, inMemory
+		return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 	}
 
 	if inMemory {
@@ -304,26 +304,28 @@ func (c *CasIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partitio
 
 	// check if we need to save to cassandra.
 	now := uint32(time.Now().Unix())
-	if archive.LastSave < (now - c.updateInterval32) {
-		archive = c.updateCassandra(now, inMemory, archive, partition)
+	if atomic.LoadUint32(&lastSave) < (now - c.updateInterval32) {
+		c.updateCassandra(now, inMemory, id, partition, atomic.LoadUint32(&lastSave))
 	}
 
 	stat.Value(time.Since(pre))
-	return archive, oldPartition, inMemory
+	return id, atomic.LoadUint32(&lastSave), oldPartition, inMemory
 }
 
 // updateCassandra saves the archive to cassandra and
 // updates the memory index with the updated fields.
-func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive *interning.ArchiveInterned, partition int32) *interning.ArchiveInterned {
+func (c *CasIdx) updateCassandra(now uint32, inMemory bool, id schema.MKey, partition int32, lastSave uint32) {
 	// if the entry has not been saved for 1.5x updateInterval
 	// then perform a blocking save.
-	if archive.LastSave < (now - c.updateInterval32 - c.updateInterval32/2) {
+	if atomic.LoadUint32(&lastSave) < (now - c.updateInterval32 - c.updateInterval32/2) {
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("cassandra-idx: updating def %s in index.", archive.MetricDefinitionInterned.Id)
+			log.Debugf("cassandra-idx: updating def %s in index.", id)
 		}
-		c.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}
-		archive.LastSave = now
-		c.MemoryIndex.UpdateArchiveLastSave(archive.MetricDefinitionInterned.Id, archive.Partition, now)
+		arc, ok := c.MemoryIndex.Get(id)
+		if ok {
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}
+			c.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
+		}
 	} else {
 		// perform a non-blocking write to the writeQueue. If the queue is full, then
 		// this will fail and we won't update the LastSave timestamp. The next time
@@ -331,17 +333,22 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive *interning.A
 		// we will try and save again.  This will continue until we are successful or the
 		// lastSave timestamp become more then 1.5 x UpdateInterval, in which case we will
 		// do a blocking write to the queue.
-		select {
-		case c.writeQueue <- writeReq{recvTime: time.Now(), def: archive.CloneInterned()}:
-			archive.LastSave = now
-			c.MemoryIndex.UpdateArchiveLastSave(archive.MetricDefinitionInterned.Id, archive.Partition, now)
-		default:
-			statSaveSkipped.Inc()
-			log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", archive.MetricDefinitionInterned.Id)
+		arc, ok := c.MemoryIndex.Get(id)
+		if ok {
+			select {
+			// note: this attempt to write actually creates the struct, which calls
+			// Now() and CloneInterned(), even if the write fails
+			case c.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}:
+				c.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
+			default:
+				// if the attempt to write to the queue failed we now need to decrement the
+				// reference count of the archive
+				arc.ReleaseInterned()
+				statSaveSkipped.Inc()
+				log.Debugf("cassandra-idx: writeQueue is full, update of %s not saved this time.", id)
+			}
 		}
 	}
-
-	return archive
 }
 
 func (c *CasIdx) rebuildIndex() {

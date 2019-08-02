@@ -40,15 +40,15 @@ type MetricIndex interface {
 	Stop()
 
 	// Update updates an existing archive, if found.
-	// It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-	Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool)
+	// It returns whether it was found, and - if so - the associated MKey, LastSave and its old partition
+	Update(point schema.MetricPoint, partition int32) (schema.MKey, uint32, int32, bool)
 
 	// AddOrUpdate makes sure a metric is known in the index,
 	// and should be called for every received metric.
-	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool)
+	AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (schema.MKey, uint32, int32, bool)
 
 	// Get returns the archive for the requested id.
-	Get(key schema.MKey) (interning.Archive, bool)
+	Get(key schema.MKey) (*interning.ArchiveInterned, bool)
 
 	// GetPath returns the archives under the given path.
 	GetPath(orgId uint32, path string) []interning.Archive
