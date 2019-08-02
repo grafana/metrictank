@@ -872,11 +872,25 @@ func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (*interning.ArchiveInterned
 	def, ok := m.defById[id]
 	statGetDuration.Value(time.Since(pre))
 	if ok {
+		arc := def.CloneInterned()
 		m.RUnlock()
-		return def, ok
+		return arc, ok
 	}
 	m.RUnlock()
 	return nil, ok
+}
+
+// GetIds returns SchemaId, AggId, and Interval of the archive matching the supplied schema.MKey.
+// Upon failure it returns 0s and false
+func (m *UnpartitionedMemoryIdx) GetIds(id schema.MKey) (uint16, uint16, int, bool) {
+	m.RLock()
+	def, ok := m.defById[id]
+	if ok {
+		m.RUnlock()
+		return def.SchemaId, def.AggId, def.Interval, true
+	}
+	m.RUnlock()
+	return 0, 0, 0, false
 }
 
 // GetPath returns the node under the given org and path.

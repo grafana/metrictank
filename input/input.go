@@ -105,11 +105,11 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 		return
 	}
 
-	arc, ok := in.metricIndex.Get(id)
+	schemaId, aggId, interval, ok := in.metricIndex.GetIds(id)
 	if !ok {
 		return
 	}
-	m := in.metrics.GetOrCreate(id, arc.SchemaId, arc.AggId, uint32(arc.Interval))
+	m := in.metrics.GetOrCreate(id, schemaId, aggId, uint32(interval))
 	m.Add(point.Time, point.Value)
 }
 

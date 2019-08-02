@@ -103,6 +103,46 @@ func (p *PartitionedMemoryIdx) Get(key schema.MKey) (*interning.ArchiveInterned,
 	return result, true
 }
 
+// GetIds returns SchemaId, AggId, and Interval of the archive matching the supplied schema.MKey.
+// Upon failure it returns 0s and false
+func (p *PartitionedMemoryIdx) GetIds(key schema.MKey) (uint16, uint16, int, bool) {
+	g, _ := errgroup.WithContext(context.Background())
+	type ids struct {
+		SchemaId uint16
+		AggId    uint16
+		Interval int
+	}
+	resultChan := make(chan ids, len(p.Partition))
+	for _, m := range p.Partition {
+		m := m
+		g.Go(func() error {
+			if sche, agg, intr, ok := m.GetIds(key); ok {
+				resultChan <- ids{sche, agg, intr}
+			}
+			return nil
+		})
+	}
+
+	var err atomic.Value
+	go func() {
+		if e := g.Wait(); e != nil {
+			err.Store(e)
+		}
+		close(resultChan)
+	}()
+
+	result, ok := <-resultChan
+	if !ok {
+		e := err.Load()
+		if e != nil {
+			log.Errorf("memory-idx: failed to get Archive IDs with key %v. %s", key, e)
+		}
+		return 0, 0, 0, false
+	}
+
+	return result.SchemaId, result.AggId, result.Interval, true
+}
+
 // GetPath returns the archives under the given path.
 func (p *PartitionedMemoryIdx) GetPath(orgId uint32, path string) []interning.Archive {
 	g, _ := errgroup.WithContext(context.Background())

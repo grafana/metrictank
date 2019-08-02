@@ -288,7 +288,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, id schema.MKey, 
 		}
 		arc, ok := b.MemoryIndex.Get(id)
 		if ok {
-			b.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}
+			b.writeQueue <- writeReq{recvTime: time.Now(), def: arc}
 			b.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 		}
 	} else {
@@ -303,7 +303,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, id schema.MKey, 
 			select {
 			// note: this attempt to write actually creates the struct, which calls
 			// Now() and CloneInterned(), even if the write fails
-			case b.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}:
+			case b.writeQueue <- writeReq{recvTime: time.Now(), def: arc}:
 				b.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 			default:
 				// if the attempt to write to the queue failed we now need to decrement the

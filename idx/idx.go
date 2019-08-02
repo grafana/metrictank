@@ -50,6 +50,9 @@ type MetricIndex interface {
 	// Get returns the archive for the requested id.
 	Get(key schema.MKey) (*interning.ArchiveInterned, bool)
 
+	// GetIds returns the SchemaId, AggId, and Interval for the requested id.
+	GetIds(key schema.MKey) (uint16, uint16, int, bool)
+
 	// GetPath returns the archives under the given path.
 	GetPath(orgId uint32, path string) []interning.Archive
 

@@ -323,7 +323,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, id schema.MKey, part
 		}
 		arc, ok := c.MemoryIndex.Get(id)
 		if ok {
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: arc}
 			c.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 		}
 	} else {
@@ -338,7 +338,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, id schema.MKey, part
 			select {
 			// note: this attempt to write actually creates the struct, which calls
 			// Now() and CloneInterned(), even if the write fails
-			case c.writeQueue <- writeReq{recvTime: time.Now(), def: arc.CloneInterned()}:
+			case c.writeQueue <- writeReq{recvTime: time.Now(), def: arc}:
 				c.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 			default:
 				// if the attempt to write to the queue failed we now need to decrement the
