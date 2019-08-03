@@ -11,11 +11,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/stacktest/docker"
 	"github.com/grafana/metrictank/stacktest/fakemetrics"
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
+	"github.com/grafana/metrictank/test"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
 	cmd := exec.Command("docker-compose", "up", "--force-recreate")
-	cmd.Dir = docker.Path("docker/docker-dev")
+	cmd.Dir = test.Path("docker/docker-dev")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
+	"github.com/grafana/metrictank/test"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,7 +44,7 @@ func TestMain(m *testing.M) {
 
 	fmt.Println("stopping docker-chaos stack should it be running...")
 	cmd := exec.CommandContext(ctx, "docker-compose", "down")
-	cmd.Dir = docker.Path("docker/docker-chaos")
+	cmd.Dir = test.Path("docker/docker-chaos")
 	err := cmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
