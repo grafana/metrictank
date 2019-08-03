@@ -1,6 +1,9 @@
 package graphite
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // Response is a convenience type:
 // it provides original http and json decode errors, if applicable
@@ -11,6 +14,18 @@ type Response struct {
 	Code      int
 	TraceID   string
 	Decoded   Data
+}
+
+func (r Response) StringWithoutData() string {
+	data := "{"
+	for i, serie := range r.Decoded {
+		if i > 0 {
+			data += ","
+		}
+		data += fmt.Sprintf("%q", serie.Target)
+	}
+	data += "}"
+	return fmt.Sprintf("<Response>{HTTPErr: %v, DecodeErr: %v, Code: %d, TraceID: %s, Decoded: %s}", r.HTTPErr, r.DecodeErr, r.Code, r.TraceID, data)
 }
 
 type Validator func(resp Response) bool
