@@ -1,6 +1,7 @@
 package tagquery
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -50,6 +51,12 @@ func (e Expressions) Sort() {
 		}
 		return e[i].GetKey() < e[j].GetKey()
 	})
+}
+
+// MarshalJSON satisfies the json.Marshaler interface
+// it is used by the api endpoint /metaTags to list the meta tag records
+func (e Expressions) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.Strings())
 }
 
 // Expression represents one expression inside a query of one or many expressions.

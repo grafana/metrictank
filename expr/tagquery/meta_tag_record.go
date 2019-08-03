@@ -8,8 +8,8 @@ import (
 )
 
 type MetaTagRecord struct {
-	MetaTags    Tags
-	Expressions Expressions
+	MetaTags    Tags        `json:"metaTags"`
+	Expressions Expressions `json:"expressions"`
 }
 
 func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord, error) {
