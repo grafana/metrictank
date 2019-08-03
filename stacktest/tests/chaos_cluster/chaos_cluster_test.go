@@ -52,6 +52,7 @@ func TestMain(m *testing.M) {
 
 	fmt.Println("launching docker-chaos stack...")
 	cmd = exec.CommandContext(ctx, "docker-compose", "up", "--force-recreate", "-V")
+	cmd.Dir = test.Path("docker/docker-chaos")
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
@@ -85,7 +86,7 @@ func TestClusterStartup(t *testing.T) {
 		{Str: "metrictank3_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank4_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$"},
-		{Str: "grafana.*Initializing HTTP Server.*:3000"},
+		{Str: "grafana.*HTTP Server Listen.*3000"},
 	}
 	select {
 	case <-tracker.Match(matchers):
