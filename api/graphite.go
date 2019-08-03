@@ -1070,7 +1070,7 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 	default:
 	}
 
-	var resp models.GraphiteTagsResp
+	resp := make(models.GraphiteTagsResp, 0)
 	for _, tag := range tags {
 		resp = append(resp, models.GraphiteTagResp{Tag: tag})
 	}
@@ -1103,6 +1103,8 @@ func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string, f
 		}
 	}
 
+	// we want to make an empty list, because this results in the json response "[]" if it's empty
+	// if we initialize "tags" with "var tags []string" the json response (if empty) is "nil" instead of "[]"
 	tags := make([]string, 0, len(tagSet))
 	for t := range tagSet {
 		tags = append(tags, t)
