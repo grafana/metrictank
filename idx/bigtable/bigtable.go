@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/bigtable"
@@ -190,6 +191,7 @@ func (b *BigtableIdx) Init() error {
 }
 
 func (b *BigtableIdx) Stop() {
+	log.Info("bigtable-idx: stopping")
 	b.MemoryIndex.Stop()
 	close(b.shutdown)
 	if b.cfg.UpdateBigtableIdx {
@@ -289,6 +291,7 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, id schema.MKey, 
 		arc, ok := b.MemoryIndex.Get(id)
 		if ok {
 			b.writeQueue <- writeReq{recvTime: time.Now(), def: arc}
+			atomic.StoreUint32(&arc.LastSave, now)
 			b.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 		}
 	} else {
@@ -301,9 +304,8 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, id schema.MKey, 
 		arc, ok := b.MemoryIndex.Get(id)
 		if ok {
 			select {
-			// note: this attempt to write actually creates the struct, which calls
-			// Now() and CloneInterned(), even if the write fails
 			case b.writeQueue <- writeReq{recvTime: time.Now(), def: arc}:
+				atomic.StoreUint32(&arc.LastSave, now)
 				b.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 			default:
 				// if the attempt to write to the queue failed we now need to decrement the

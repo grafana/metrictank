@@ -666,6 +666,7 @@ func testMixedBranchLeafDelete(t *testing.T) {
 		deletedIds := make([]schema.MKey, len(defs))
 		for i, d := range defs {
 			deletedIds[i] = d.Id
+			d.ReleaseInterned()
 		}
 		So(test.MustMKeyFromString(series[0].Id), test.ShouldContainMKey, deletedIds)
 		So(test.MustMKeyFromString(series[1].Id), test.ShouldContainMKey, deletedIds)
@@ -691,6 +692,9 @@ func testMixedBranchLeafDelete(t *testing.T) {
 		So(defs, ShouldHaveLength, 1)
 		if defs[0].Id != mkeys[3] {
 			t.Fatalf("%v must equal %v", defs[0].Id, mkeys[3])
+		}
+		for _, a := range defs {
+			a.ReleaseInterned()
 		}
 
 		Convey("deleted series should not be present in the metricDef index", func() {

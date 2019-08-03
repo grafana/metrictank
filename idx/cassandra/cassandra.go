@@ -64,6 +64,7 @@ type CasIdx struct {
 	cluster          *gocql.ClusterConfig
 	Session          *gocql.Session
 	writeQueue       chan writeReq
+	shutdown         chan struct{}
 	wg               sync.WaitGroup
 	updateInterval32 uint32
 }
@@ -102,6 +103,7 @@ func New(cfg *IdxConfig) *CasIdx {
 		Config:           cfg,
 		cluster:          cluster,
 		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),
+		shutdown:         make(chan struct{}),
 	}
 	if cfg.updateCassIdx {
 		idx.writeQueue = make(chan writeReq, cfg.writeQueueSize)
@@ -230,6 +232,7 @@ func (c *CasIdx) Init() error {
 	c.rebuildIndex()
 
 	if memory.IndexRules.Prunable() {
+		c.wg.Add(1)
 		go c.prune()
 	}
 	return nil
@@ -238,6 +241,7 @@ func (c *CasIdx) Init() error {
 func (c *CasIdx) Stop() {
 	log.Info("cassandra-idx: stopping")
 	c.MemoryIndex.Stop()
+	close(c.shutdown)
 
 	// if updateCassIdx is disabled then writeQueue should never have been initialized
 	if c.Config.updateCassIdx {
@@ -324,6 +328,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, id schema.MKey, part
 		arc, ok := c.MemoryIndex.Get(id)
 		if ok {
 			c.writeQueue <- writeReq{recvTime: time.Now(), def: arc}
+			atomic.StoreUint32(&arc.LastSave, now)
 			c.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 		}
 	} else {
@@ -336,9 +341,8 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, id schema.MKey, part
 		arc, ok := c.MemoryIndex.Get(id)
 		if ok {
 			select {
-			// note: this attempt to write actually creates the struct, which calls
-			// Now() and CloneInterned(), even if the write fails
 			case c.writeQueue <- writeReq{recvTime: time.Now(), def: arc}:
+				atomic.StoreUint32(&arc.LastSave, now)
 				c.MemoryIndex.UpdateArchiveLastSave(id, partition, now)
 			default:
 				// if the attempt to write to the queue failed we now need to decrement the
@@ -521,14 +525,9 @@ func (c *CasIdx) ArchiveDefs(defs []interning.MetricDefinitionInterned) (int, er
 func (c *CasIdx) processWriteQueue() {
 	var success bool
 	var attempts int
-	var err error
 	var req writeReq
 	qry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.Table)
 	for req = range c.writeQueue {
-		if err != nil {
-			log.Errorf("Failed to marshal metricDef: %s. value was: %+v", err, *req.def)
-			continue
-		}
 		statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
 		pre := time.Now()
 		success = false
@@ -582,9 +581,6 @@ func (c *CasIdx) addDefToArchive(def interning.MetricDefinitionInterned) error {
 	for attempts := 0; attempts < maxAttempts; attempts++ {
 		if attempts > 0 {
 			sleepTime := 100 * attempts
-			if sleepTime > 2000 {
-				sleepTime = 2000
-			}
 			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 		}
 
@@ -593,12 +589,12 @@ func (c *CasIdx) addDefToArchive(def interning.MetricDefinitionInterned) error {
 			def.Id.String(),
 			def.OrgId,
 			def.Partition,
-			def.Name,
+			def.Name.String(),
 			def.Interval,
 			def.Unit.String(),
-			def.Mtype,
-			def.Tags,
-			def.LastUpdate,
+			def.Mtype(),
+			def.Tags.Strings(),
+			atomic.LoadInt64(&def.LastUpdate),
 			now).Exec()
 
 		if err == nil {
@@ -681,11 +677,17 @@ func (c *CasIdx) Prune(now time.Time) ([]*interning.ArchiveInterned, error) {
 }
 
 func (c *CasIdx) prune() {
+	defer c.wg.Done()
 	ticker := time.NewTicker(c.Config.pruneInterval)
-	for now := range ticker.C {
-		defs, _ := c.Prune(now)
-		for i := range defs {
-			defs[i].ReleaseInterned()
+	for {
+		select {
+		case now := <-ticker.C:
+			defs, _ := c.Prune(now)
+			for i := range defs {
+				defs[i].ReleaseInterned()
+			}
+		case <-c.shutdown:
+			return
 		}
 	}
 }

@@ -182,11 +182,11 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		return
 	}
 
-	arc, ok := in.metricIndex.Get(id)
+	schemaId, aggId, interval, ok := in.metricIndex.GetIds(id)
 	if !ok {
 		return
 	}
 
-	m := in.metrics.GetOrCreate(mkey, arc.SchemaId, arc.AggId, uint32(md.Interval))
+	m := in.metrics.GetOrCreate(mkey, schemaId, aggId, uint32(interval))
 	m.Add(uint32(md.Time), md.Value)
 }

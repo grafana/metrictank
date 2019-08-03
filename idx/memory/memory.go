@@ -1659,6 +1659,9 @@ func (m *UnpartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) 
 
 func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) (int, error) {
 	arcs, err := m.DeletePersistent(orgId, pattern)
+	for _, a := range arcs {
+		a.ReleaseInterned()
+	}
 	return len(arcs), err
 }
 
