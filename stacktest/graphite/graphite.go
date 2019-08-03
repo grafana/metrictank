@@ -48,15 +48,15 @@ func ExecuteRenderQuery(req *http.Request) Response {
 	var r Response
 	resp, err := renderClient.Do(req)
 	if err != nil {
-		r.httpErr = err
+		r.HTTPErr = err
 		return r
 	}
-	r.code = resp.StatusCode
+	r.Code = resp.StatusCode
 	traceHeader := resp.Header["Trace-Id"]
 	if len(traceHeader) > 0 {
-		r.traceID = traceHeader[0]
+		r.TraceID = traceHeader[0]
 	}
-	r.decodeErr = json.NewDecoder(resp.Body).Decode(&r.r)
+	r.DecodeErr = json.NewDecoder(resp.Body).Decode(&r.Decoded)
 	resp.Body.Close()
 	return r
 }
@@ -114,14 +114,14 @@ func checkWorker(req *http.Request, wg *sync.WaitGroup, cr *checkResultsTemp, va
 		}
 	}
 	// if not valid, try to categorize in the common buckets, or fall back to 'other'
-	if r.httpErr == nil && r.decodeErr == nil && len(r.r) == 0 {
+	if r.HTTPErr == nil && r.DecodeErr == nil && len(r.Decoded) == 0 {
 		cr.Lock()
 		cr.empty += 1
 		cr.Unlock()
 		return
 	}
-	if r.httpErr != nil {
-		if err2, ok := r.httpErr.(*url.Error); ok {
+	if r.HTTPErr != nil {
+		if err2, ok := r.HTTPErr.(*url.Error); ok {
 			if err3, ok := err2.Err.(net.Error); ok {
 				if err3.Timeout() {
 					cr.Lock()

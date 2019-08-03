@@ -6,11 +6,11 @@ import "math"
 // it provides original http and json decode errors, if applicable
 // and also the decoded response body, if any
 type Response struct {
-	httpErr   error
-	decodeErr error
-	code      int
-	traceID   string
-	r         Data
+	HTTPErr   error
+	DecodeErr error
+	Code      int
+	TraceID   string
+	Decoded   Data
 }
 
 type Validator func(resp Response) bool
@@ -18,13 +18,13 @@ type Validator func(resp Response) bool
 // ValidateTargets returns a function that validates that the response contains exactly all named targets
 func ValidateTargets(targets []string) Validator {
 	return func(resp Response) bool {
-		if resp.httpErr != nil || resp.decodeErr != nil || resp.code != 200 {
+		if resp.HTTPErr != nil || resp.DecodeErr != nil || resp.Code != 200 {
 			return false
 		}
-		if len(resp.r) != len(targets) {
+		if len(resp.Decoded) != len(targets) {
 			return false
 		}
-		for i, r := range resp.r {
+		for i, r := range resp.Decoded {
 			if r.Target != targets[i] {
 				return false
 			}
@@ -46,13 +46,13 @@ func ValidateTargets(targets []string) Validator {
 // for sufficiently long series, e.g. 15 points or so.
 func ValidateCorrect(num float64) Validator {
 	return func(resp Response) bool {
-		if resp.httpErr != nil || resp.decodeErr != nil || resp.code != 200 {
+		if resp.HTTPErr != nil || resp.DecodeErr != nil || resp.Code != 200 {
 			return false
 		}
-		if len(resp.r) != 1 {
+		if len(resp.Decoded) != 1 {
 			return false
 		}
-		points := resp.r[0].Datapoints
+		points := resp.Decoded[0].Datapoints
 		// first 4 points can sometimes be null (or some of them, so that sums don't add up)
 		// We should at some point be more strict and clean that up,
 		// but that's not in scope for these tests which focus on cluster related problems
@@ -75,7 +75,7 @@ func ValidateCorrect(num float64) Validator {
 // ValidaterCode returns a validator that validates whether the response has the given code
 func ValidateCode(code int) Validator {
 	return func(resp Response) bool {
-		return resp.code == code
+		return resp.Code == code
 	}
 }
 
@@ -107,7 +107,7 @@ func ValidatorAvgWindowed(numPoints int, cmp Comparator) Validator {
 		return false
 	}
 	return func(resp Response) bool {
-		for _, series := range resp.r {
+		for _, series := range resp.Decoded {
 			if len(series.Datapoints) != numPoints {
 				return false
 			}
@@ -123,7 +123,7 @@ func ValidatorAvgWindowed(numPoints int, cmp Comparator) Validator {
 // within the response, has a length of l and no more than prefix nulls up front.
 func ValidatorLenNulls(prefix, l int) Validator {
 	return func(resp Response) bool {
-		for _, series := range resp.r {
+		for _, series := range resp.Decoded {
 			if len(series.Datapoints) != l {
 				return false
 			}
