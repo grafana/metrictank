@@ -495,10 +495,10 @@ func shutdown() {
 	}
 
 	if cluster.Mode != cluster.ModeQuery {
+		// The MetricIndex is already closed when we call apiServer.Stop()
+		// So we only need to stop the store
 		log.Info("closing store")
 		store.Stop()
-		log.Info("closing index")
-		metricIndex.Stop()
 	}
 	log.Info("terminating.")
 }
