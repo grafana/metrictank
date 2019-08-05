@@ -563,6 +563,14 @@ prune-interval = 3h
 create-cf = true
 ```
 
+### Interning layer
+
+```
+[intern]
+# Enable compression in the interning layer
+compression = false
+```
+
 # index-rules.conf
 
 ```

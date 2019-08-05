@@ -125,7 +125,31 @@ func (mn *MetricName) string(bld *strings.Builder) string {
 // in MetricName.nodes
 func (mn *MetricName) setMetricName(name string) error {
 	nodes := strings.Split(name, ".")
-	mn.nodes = make([]uintptr, len(nodes))
+	var offset int
+
+	if len(nodes) > 3 {
+		pre := strings.Join(nodes[:3], ".")
+		nodePtr, err := IdxIntern.AddOrGet([]byte(pre), false)
+		if err != nil {
+			log.Error("idx: Failed to acquire interned string for node name: ", err)
+			internError.Inc()
+			return fmt.Errorf("idx: Failed to acquire interned string for first three nodes %v", err)
+		}
+
+		// still need to allocate for the first three nodes, which is now 1,
+		// so we subtract 2
+		mn.nodes = make([]uintptr, len(nodes)-2)
+		mn.nodes[0] = nodePtr
+
+		// re-slice and add all the other nodes
+		nodes = nodes[3:]
+
+		// add one to the offset
+		offset++
+	} else {
+		mn.nodes = make([]uintptr, len(nodes))
+	}
+
 	for i, node := range nodes {
 		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
 		if err != nil {
@@ -133,7 +157,7 @@ func (mn *MetricName) setMetricName(name string) error {
 			internError.Inc()
 			return fmt.Errorf("idx: Failed to acquire interned string for node %v, %v", node, err)
 		}
-		mn.nodes[i] = nodePtr
+		mn.nodes[i+offset] = nodePtr
 	}
 
 	return nil
@@ -474,7 +498,31 @@ func (md *MetricDefinitionInterned) SetUnit(unit string) {
 // in MetricName.nodes
 func (md *MetricDefinitionInterned) SetMetricName(name string) error {
 	nodes := strings.Split(name, ".")
-	md.Name.nodes = make([]uintptr, len(nodes))
+	var offset int
+
+	if len(nodes) > 3 {
+		pre := strings.Join(nodes[:3], ".")
+		nodePtr, err := IdxIntern.AddOrGet([]byte(pre), false)
+		if err != nil {
+			log.Error("idx: Failed to acquire interned string for node name: ", err)
+			internError.Inc()
+			return fmt.Errorf("idx: Failed to acquire interned string for first three nodes %v", err)
+		}
+
+		// still need to allocate for the first three nodes, which is now 1,
+		// so we subtract 2
+		md.Name.nodes = make([]uintptr, len(nodes)-2)
+		md.Name.nodes[0] = nodePtr
+
+		// re-slice and add all the other nodes
+		nodes = nodes[3:]
+
+		// add one to the offset
+		offset++
+	} else {
+		md.Name.nodes = make([]uintptr, len(nodes))
+	}
+
 	for i, node := range nodes {
 		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
 		if err != nil {
@@ -482,7 +530,7 @@ func (md *MetricDefinitionInterned) SetMetricName(name string) error {
 			internError.Inc()
 			return fmt.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
 		}
-		md.Name.nodes[i] = nodePtr
+		md.Name.nodes[i+offset] = nodePtr
 	}
 
 	return nil

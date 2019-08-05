@@ -102,6 +102,7 @@ func ConfigSetup() {
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
+	interning.ConfigSetup()
 }
 
 func ConfigProcess() {
@@ -125,6 +126,8 @@ func ConfigProcess() {
 	if findCacheInvalidateMaxSize >= findCacheInvalidateQueueSize {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
+
+	interning.ConfigProcess()
 
 }
 
