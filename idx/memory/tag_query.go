@@ -322,9 +322,18 @@ func (q *TagQueryContext) subQueryFromExpressions(expressions tagquery.Expressio
 func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) {
 	expr := q.query.Expressions[q.startWith]
 
+	// this wait group is used to wait for all id producing go routines to complete
+	// their respective jobs, once they're done we can close the id chan
+	closeIdChanWg := sync.WaitGroup{}
+	closeIdChanWg.Add(2)
+	go func() {
+		closeIdChanWg.Wait()
+		close(idCh)
+	}()
+
 	q.wg.Add(1)
 	go func() {
-		defer close(idCh)
+		defer closeIdChanWg.Done()
 		defer q.wg.Done()
 
 		if expr.MatchesExactly() {
@@ -356,6 +365,57 @@ func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan str
 			}
 		}
 	}()
+
+	if tagquery.MetaTagSupport && !q.subQuery {
+		q.wg.Add(1)
+		go func() {
+			defer closeIdChanWg.Done()
+			defer q.wg.Done()
+			q.getInitialByTagFromMetaTagIndex(idCh, stopCh, expr, &closeIdChanWg)
+		}()
+	} else {
+		closeIdChanWg.Done()
+	}
+}
+
+func (q *TagQueryContext) getInitialByTagFromMetaTagIndex(idCh chan schema.MKey, stopCh chan struct{}, expr tagquery.Expression, closeIdChanWg *sync.WaitGroup) {
+OUTER:
+	for tag := range q.mti {
+		if !expr.Matches(tag) {
+			continue OUTER
+		}
+
+		for _, records := range q.mti[tag] {
+			for _, metaRecordId := range records {
+				record, ok := q.metaRecords[metaRecordId]
+				if !ok {
+					corruptIndex.Inc()
+					continue
+				}
+
+				closeIdChanWg.Add(1)
+				go func() {
+					defer closeIdChanWg.Done()
+
+					query, err := q.subQueryFromExpressions(record.Expressions)
+					if err != nil {
+						return
+					}
+
+					resCh := query.Run(q.index, q.byId, q.mti, q.metaRecords)
+
+					for id := range resCh {
+						select {
+						// abort if query has been stopped
+						case <-stopCh:
+							break
+						case idCh <- id:
+						}
+					}
+				}()
+			}
+		}
+	}
 }
 
 // testByAllExpressions takes and id and a MetricDefinition and runs it through
