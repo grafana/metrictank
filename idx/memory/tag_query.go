@@ -52,13 +52,13 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 		costs[i].expressionIdx = i
 
 		if expr.OperatesOnTag() {
-			if expr.ValueMatchesExactly() {
+			if expr.MatchesExactly() {
 				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
 			} else {
 				costs[i].cost = uint32(len(idx)) * expr.GetCostMultiplier()
 			}
 		} else {
-			if expr.ValueMatchesExactly() {
+			if expr.MatchesExactly() {
 				costs[i].cost = uint32(len(idx[expr.GetKey()][expr.GetValue()])) * expr.GetCostMultiplier()
 			} else {
 				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
@@ -122,7 +122,7 @@ func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh cha
 
 		key := expr.GetKey()
 
-		if expr.ValueMatchesExactly() {
+		if expr.MatchesExactly() {
 			value := expr.GetValue()
 
 			for id := range q.index[key][value] {
@@ -135,7 +135,7 @@ func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh cha
 		} else {
 		OUTER:
 			for value, ids := range q.index[key] {
-				if !expr.ValuePasses(value) {
+				if !expr.Matches(value) {
 					continue
 				}
 
@@ -162,7 +162,7 @@ func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan str
 		defer close(idCh)
 		defer q.wg.Done()
 
-		if expr.ValueMatchesExactly() {
+		if expr.MatchesExactly() {
 			for _, ids := range q.index[expr.GetKey()] {
 				for id := range ids {
 					select {
@@ -175,7 +175,7 @@ func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan str
 		} else {
 		OUTER:
 			for tag := range q.index {
-				if !expr.ValuePasses(tag) {
+				if !expr.Matches(tag) {
 					continue
 				}
 
@@ -298,7 +298,7 @@ func (q *TagQueryContext) getMaxTagCount() int {
 
 	var maxTagCount int
 	for tag := range q.index {
-		if tagClause.ValuePasses(tag) {
+		if tagClause.Matches(tag) {
 			maxTagCount++
 		}
 	}
@@ -346,7 +346,7 @@ IDS:
 				continue
 			}
 
-			if tagClause != nil && !tagClause.ValuePasses(key) {
+			if tagClause != nil && !tagClause.Matches(key) {
 				continue
 			}
 
@@ -407,7 +407,7 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 		return true
 	}
 
-	return tagClause.ValuePasses("name")
+	return tagClause.Matches("name")
 }
 
 // RunGetTags executes the tag query and returns all the tags of the

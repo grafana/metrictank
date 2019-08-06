@@ -40,7 +40,7 @@ func (e *expressionMatchAll) RequiresNonEmptyValue() bool {
 	return false
 }
 
-func (e *expressionMatchAll) ValuePasses(value string) bool {
+func (e *expressionMatchAll) Matches(value string) bool {
 	return true
 }
 

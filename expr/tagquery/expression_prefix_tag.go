@@ -36,7 +36,7 @@ func (e *expressionPrefixTag) RequiresNonEmptyValue() bool {
 	return true
 }
 
-func (e *expressionPrefixTag) ValuePasses(tag string) bool {
+func (e *expressionPrefixTag) Matches(tag string) bool {
 	return strings.HasPrefix(tag, e.value)
 }
 

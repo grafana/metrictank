@@ -36,7 +36,7 @@ func (e *expressionMatchTag) RequiresNonEmptyValue() bool {
 	return !e.matchesEmpty
 }
 
-func (e *expressionMatchTag) ValuePasses(tag string) bool {
+func (e *expressionMatchTag) Matches(tag string) bool {
 	return e.valueRe.MatchString(tag)
 }
 

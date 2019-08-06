@@ -25,7 +25,7 @@ func (e *expressionCommon) RequiresNonEmptyValue() bool {
 	return true
 }
 
-func (e *expressionCommon) ValueMatchesExactly() bool {
+func (e *expressionCommon) MatchesExactly() bool {
 	return false
 }
 

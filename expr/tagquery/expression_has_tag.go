@@ -30,11 +30,11 @@ func (e *expressionHasTag) OperatesOnTag() bool {
 	return true
 }
 
-func (e *expressionHasTag) ValuePasses(value string) bool {
+func (e *expressionHasTag) Matches(value string) bool {
 	return value == e.key
 }
 
-func (e *expressionHasTag) ValueMatchesExactly() bool {
+func (e *expressionHasTag) MatchesExactly() bool {
 	return true
 }
 
