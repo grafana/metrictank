@@ -115,7 +115,10 @@ type Expression interface {
 	// GetOperator returns the operator of this expression
 	GetOperator() ExpressionOperator
 
-	GetCostMultiplier() uint32
+	// GetOperatorCost returns a value which should roughly reflect the cost of this operator compared
+	// to other operators. F.e. = is cheaper than =~. Keep in mind that this is only a very rough
+	// estimate and will never be accurate.
+	GetOperatorCost() uint32
 
 	// OperatesOnTag returns whether this expression operators on the tag key
 	// (if not, it operates on the value).

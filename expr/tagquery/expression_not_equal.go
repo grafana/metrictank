@@ -22,7 +22,7 @@ func (e *expressionNotEqual) GetOperator() ExpressionOperator {
 	return NOT_EQUAL
 }
 
-func (e *expressionNotEqual) GetCostMultiplier() uint32 {
+func (e *expressionNotEqual) GetOperatorCost() uint32 {
 	return 1
 }
 

@@ -43,7 +43,8 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 
 func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 	type expressionCost struct {
-		cost          uint32
+		operatorCost  uint32
+		cardinality   uint32
 		expressionIdx int
 	}
 	costs := make([]expressionCost, len(q.query.Expressions))
@@ -53,20 +54,29 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 
 		if expr.OperatesOnTag() {
 			if expr.MatchesExactly() {
-				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
+				costs[i].operatorCost = expr.GetOperatorCost()
+				costs[i].cardinality = uint32(len(idx[expr.GetKey()]))
 			} else {
-				costs[i].cost = uint32(len(idx)) * expr.GetCostMultiplier()
+				costs[i].operatorCost = expr.GetOperatorCost()
+				costs[i].cardinality = uint32(len(idx))
 			}
 		} else {
 			if expr.MatchesExactly() {
-				costs[i].cost = uint32(len(idx[expr.GetKey()][expr.GetValue()])) * expr.GetCostMultiplier()
+				costs[i].operatorCost = expr.GetOperatorCost()
+				costs[i].cardinality = uint32(len(idx[expr.GetKey()][expr.GetValue()]))
 			} else {
-				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
+				costs[i].operatorCost = expr.GetOperatorCost()
+				costs[i].cardinality = uint32(len(idx[expr.GetKey()]))
 			}
 		}
 	}
 
-	sort.Slice(costs, func(i, j int) bool { return costs[i].cost < costs[j].cost })
+	sort.Slice(costs, func(i, j int) bool {
+		if costs[i].operatorCost == costs[j].operatorCost {
+			return costs[i].cardinality < costs[j].cardinality
+		}
+		return costs[i].operatorCost < costs[j].operatorCost
+	})
 
 	// the number of filters / default decisions is equal to the number of expressions - 1
 	// because one of the expressions will be chosen to be the one that we start with.

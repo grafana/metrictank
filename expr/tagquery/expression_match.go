@@ -33,8 +33,8 @@ func (e *expressionMatch) GetOperator() ExpressionOperator {
 	return MATCH
 }
 
-func (e *expressionMatch) GetCostMultiplier() uint32 {
-	return 0
+func (e *expressionMatch) GetOperatorCost() uint32 {
+	return 10
 }
 
 func (e *expressionMatch) RequiresNonEmptyValue() bool {

@@ -32,7 +32,7 @@ func (e *expressionMatchAll) GetOperator() ExpressionOperator {
 	return MATCH_ALL
 }
 
-func (e *expressionMatchAll) GetCostMultiplier() uint32 {
+func (e *expressionMatchAll) GetOperatorCost() uint32 {
 	return 50
 }
 

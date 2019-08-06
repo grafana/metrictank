@@ -24,7 +24,7 @@ func (e *expressionMatchTag) GetOperator() ExpressionOperator {
 	return MATCH_TAG
 }
 
-func (e *expressionMatchTag) GetCostMultiplier() uint32 {
+func (e *expressionMatchTag) GetOperatorCost() uint32 {
 	return 20
 }
 
