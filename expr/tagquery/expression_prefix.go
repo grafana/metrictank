@@ -22,7 +22,7 @@ func (e *expressionPrefix) GetOperator() ExpressionOperator {
 	return PREFIX
 }
 
-func (e *expressionPrefix) GetCostMultiplier() uint32 {
+func (e *expressionPrefix) GetOperatorCost() uint32 {
 	return 2
 }
 

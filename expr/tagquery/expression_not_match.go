@@ -33,7 +33,7 @@ func (e *expressionNotMatch) GetOperator() ExpressionOperator {
 	return NOT_MATCH
 }
 
-func (e *expressionNotMatch) GetCostMultiplier() uint32 {
+func (e *expressionNotMatch) GetOperatorCost() uint32 {
 	return 10
 }
 

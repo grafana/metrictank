@@ -22,8 +22,8 @@ func (e *expressionPrefixTag) GetOperator() ExpressionOperator {
 	return PREFIX_TAG
 }
 
-func (e *expressionPrefixTag) GetCostMultiplier() uint32 {
-	return 3
+func (e *expressionPrefixTag) GetOperatorCost() uint32 {
+	return 15
 }
 
 func (e *expressionPrefixTag) OperatesOnTag() bool {
