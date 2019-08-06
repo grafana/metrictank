@@ -32,7 +32,7 @@ func (e *expressionPrefix) RequiresNonEmptyValue() bool {
 	return true
 }
 
-func (e *expressionPrefix) ValuePasses(value string) bool {
+func (e *expressionPrefix) Matches(value string) bool {
 	return strings.HasPrefix(value, e.value)
 }
 

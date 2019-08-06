@@ -34,7 +34,7 @@ func (e *expressionNotHasTag) RequiresNonEmptyValue() bool {
 	return false
 }
 
-func (e *expressionNotHasTag) ValuePasses(value string) bool {
+func (e *expressionNotHasTag) Matches(value string) bool {
 	return value == e.key
 }
 

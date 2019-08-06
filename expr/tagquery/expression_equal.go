@@ -26,11 +26,11 @@ func (e *expressionEqual) GetCostMultiplier() uint32 {
 	return 1
 }
 
-func (e *expressionEqual) ValuePasses(value string) bool {
+func (e *expressionEqual) Matches(value string) bool {
 	return value == e.value
 }
 
-func (e *expressionEqual) ValueMatchesExactly() bool {
+func (e *expressionEqual) MatchesExactly() bool {
 	return true
 }
 

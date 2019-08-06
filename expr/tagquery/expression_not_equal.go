@@ -30,7 +30,7 @@ func (e *expressionNotEqual) RequiresNonEmptyValue() bool {
 	return false
 }
 
-func (e *expressionNotEqual) ValuePasses(value string) bool {
+func (e *expressionNotEqual) Matches(value string) bool {
 	return value != e.value
 }
 

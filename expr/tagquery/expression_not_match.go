@@ -41,7 +41,7 @@ func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
 	return e.matchesEmpty
 }
 
-func (e *expressionNotMatch) ValuePasses(value string) bool {
+func (e *expressionNotMatch) Matches(value string) bool {
 	return !e.valueRe.MatchString(value)
 }
 

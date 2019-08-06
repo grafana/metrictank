@@ -131,11 +131,20 @@ type Expression interface {
 	// Every valid query must have at least one expression requiring a non-empty value.
 	RequiresNonEmptyValue() bool
 
-	// ValuePasses takes a string which should either be a tag key or value depending on the return
-	// value of OperatesOnTag(), then it returns whether the given value satisfies this expression
-	ValuePasses(string) bool
+	// Matches takes a string which should either be a tag key or value depending on the return
+	// value of OperatesOnTag(), then it returns whether the given string satisfies this expression
+	Matches(string) bool
 
-	ValueMatchesExactly() bool
+	// MatchesExactly returns a bool to indicate whether the key / value of this expression (depending
+	// on OperatesOnTag()) needs to be an exact match with the key / value of the metrics it evaluates
+	// F.e:
+	// in the case of the expression "tag1=value1" we're only looking for metrics where the value
+	// associated with tag key "tag1" is exactly "value1", so a simple string comparison is sufficient.
+	// in other cases like "tag1=~val.*" or "tag^=val" this isn't the case, a simple string comparison
+	// is not sufficient to decide whether a metric should be part of the result set or not.
+	// since simple string comparisons are cheaper than other comparison methods, whenever possible we
+	// want to use string comparison.
+	MatchesExactly() bool
 
 	// GetMetricDefinitionFilter returns a MetricDefinitionFilter
 	// The MetricDefinitionFilter takes a metric definition, looks at its tags and returns a decision
