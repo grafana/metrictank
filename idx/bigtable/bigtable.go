@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/interning"
 	"github.com/grafana/metrictank/stats"
+	"github.com/jpillora/backoff"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -394,6 +395,12 @@ func (b *BigtableIdx) processWriteQueue() {
 		pre := time.Now()
 		complete := false
 		attempts := 0
+		boff := &backoff.Backoff{
+			Min:    100 * time.Millisecond,
+			Max:    2 * time.Minute,
+			Factor: 3,
+			Jitter: true,
+		}
 		for !complete {
 			errs, err := b.tbl.ApplyBulk(context.Background(), rowKeys, mutations)
 			if err != nil {
@@ -415,11 +422,7 @@ func (b *BigtableIdx) processWriteQueue() {
 				rowKeys = failedRowKeys
 				mutations = failedMutations
 
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				time.Sleep(boff.Duration())
 				attempts++
 			} else {
 				complete = true

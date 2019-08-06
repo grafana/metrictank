@@ -442,6 +442,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:ebd0081aed1cd0af2f65a362c0ceea985eae9fe72efb28cefb84eca3b98dd3a3"
+  name = "github.com/jpillora/backoff"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "8eab2debe79d12b7bd3d10653910df25fa9552ba"
+  version = "1.0.0"
+
+[[projects]]
   digest = "1:395b1480ae42c3fec6fff19823e66e173819f85826811387f9045c88515a7f0f"
   name = "github.com/jtolds/gls"
   packages = ["."]
@@ -1183,6 +1191,7 @@
     "github.com/hailocab/go-hostpool",
     "github.com/hashicorp/golang-lru",
     "github.com/hashicorp/memberlist",
+    "github.com/jpillora/backoff",
     "github.com/kisielk/og-rek",
     "github.com/kisielk/whisper-go/whisper",
     "github.com/metrics20/go-metrics20/carbon20",
