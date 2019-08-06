@@ -1219,14 +1219,12 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 
 	type testCase struct {
 		prefix string
-		expr   []string
 		from   int64
 		expRes []string
 	}
 
 	tc := testCase{
 		prefix: "di",
-		expr:   []string{},
 		from:   100,
 		expRes: []string{"direction", "disk"},
 	}
@@ -1235,7 +1233,7 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, tc.from, 2, tc.expRes)
+		autoCompleteTagsAndCompare(b, n, tc.prefix, tc.from, 2, tc.expRes)
 	}
 }
 
