@@ -345,14 +345,6 @@
   revision = "7a1aae0695d90c7ce662097c9589dfe1ae3c4f47"
 
 [[projects]]
-  branch = "master"
-  digest = "1:e03c439efbb9b1c8e3d0e79f79009326ca7d0c5d87d018e4b1000ad284b6444e"
-  name = "github.com/grafana/go-generic-object-store"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "621898ab1f81b74f59b474c62a6ee76dc24f3e43"
-
-[[projects]]
   digest = "1:a191ed8e21025522d5857d14c3ec0a6513f83bea2ff45967f301fb701f3849dd"
   name = "github.com/grpc-ecosystem/grpc-gateway"
   packages = [
@@ -713,14 +705,14 @@
   revision = "05a94bb32ad1f23f4b01edb2edd06862d4a484d2"
 
 [[projects]]
-  digest = "1:15afa966195a6145a563152d2cffbb87894d352359c108fcc7ebf8b89bb88c04"
+  digest = "1:79cd8a8ab808d2806d7201bb39f5d0c7de4aadf067c1ca9793ea40f9654412b5"
   name = "github.com/raintank/schema"
   packages = [
     ".",
     "msg",
   ]
   pruneopts = "NUT"
-  revision = "e4e977e96e9b1512771d288b3cee6810e00196db"
+  revision = "172e29ac645828b87130d8ae8b41e0a3727ad40d"
 
 [[projects]]
   branch = "master"
@@ -729,14 +721,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
-
-[[projects]]
-  branch = "master"
-  digest = "1:f21380d5b378d695281b693e28e3c5a0ee53fa2929f799555167e4aa8aac573a"
-  name = "github.com/robert-milan/go-object-interning"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "5521e5013f7596b5ff1bdd946774f83343d795d1"
 
 [[projects]]
   digest = "1:c5741d3d03a06220bcca801547f28de803103249b739eb5537e54b77e89f435a"
@@ -810,14 +794,6 @@
   version = "v1.1.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:a62c8b826167e33e30b613271688b7ce0bd63e500040cb3b710ce845b2f64da4"
-  name = "github.com/tmthrgd/shoco"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "9d48cea723d956736cddbeb2b82d3f8c19f1cb73"
-
-[[projects]]
   digest = "1:4e11e08e1d82b2c2adee55dac1e3ce963864951b618c6679307f4663b5aa553e"
   name = "github.com/uber/jaeger-client-go"
   packages = [
@@ -852,13 +828,6 @@
   revision = "0e30338a695636fe5bcf7301e8030ce8dd2a8530"
   source = "https://github.com/jaegertracing/jaeger-lib.git"
   version = "v2.0.0"
-
-[[projects]]
-  digest = "1:0f4299df39f2e222cdd1b802126a7ae9cadcb4f11f65d657adb48a4e07c9bfb7"
-  name = "github.com/willf/bitset"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "3fb80c4041d4fce1c027ff1c416cca3e0dccd97e"
 
 [[projects]]
   digest = "1:d04de18a0e0bf8fcdb79e8dc755c9b15dbe7f1b2ea3f8fbf11e55ea2d26ac182"
@@ -1206,7 +1175,6 @@
     "github.com/raintank/met/helper",
     "github.com/raintank/schema",
     "github.com/raintank/schema/msg",
-    "github.com/robert-milan/go-object-interning",
     "github.com/rs/cors",
     "github.com/sergi/go-diff/diffmatchpatch",
     "github.com/sirupsen/logrus",

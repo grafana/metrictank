@@ -7,32 +7,33 @@ import (
 	"text/template"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/grafana/metrictank/interning"
+
+	"github.com/raintank/schema"
 )
 
 var QueryTime int64
 
-func Dump(d interning.MetricDefinitionInterned) {
-	spew.Dump(d.ConvertToSchemaMd())
+func Dump(d schema.MetricDefinition) {
+	spew.Dump(d)
 }
 
-func List(d interning.MetricDefinitionInterned) {
+func List(d schema.MetricDefinition) {
 	fmt.Println(d.OrgId, d.NameWithTags())
 }
 
-func GetVegetaRender(addr, from string) func(d interning.MetricDefinitionInterned) {
-	return func(d interning.MetricDefinitionInterned) {
-		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, d.Name.String(), from, d.OrgId)
+func GetVegetaRender(addr, from string) func(d schema.MetricDefinition) {
+	return func(d schema.MetricDefinition) {
+		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, d.Name, from, d.OrgId)
 	}
 }
 
-func GetVegetaRenderPattern(addr, from string) func(d interning.MetricDefinitionInterned) {
-	return func(d interning.MetricDefinitionInterned) {
-		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, pattern(d.Name.String()), from, d.OrgId)
+func GetVegetaRenderPattern(addr, from string) func(d schema.MetricDefinition) {
+	return func(d schema.MetricDefinition) {
+		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, pattern(d.Name), from, d.OrgId)
 	}
 }
 
-func Template(format string) func(d interning.MetricDefinitionInterned) {
+func Template(format string) func(d schema.MetricDefinition) {
 	funcs := make(map[string]interface{})
 	funcs["pattern"] = pattern
 	funcs["patternCustom"] = patternCustom
@@ -44,9 +45,8 @@ func Template(format string) func(d interning.MetricDefinitionInterned) {
 
 	tpl := template.Must(template.New("format").Funcs(funcs).Parse(format))
 
-	return func(d interning.MetricDefinitionInterned) {
-		md := d.ConvertToSchemaMd()
-		err := tpl.Execute(os.Stdout, &md)
+	return func(d schema.MetricDefinition) {
+		err := tpl.Execute(os.Stdout, &d)
 		if err != nil {
 			panic(err)
 		}

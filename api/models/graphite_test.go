@@ -4,35 +4,35 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/grafana/metrictank/interning"
+	"github.com/grafana/metrictank/idx"
 )
 
 func TestGraphiteNames(t *testing.T) {
 
 	cases := []struct {
-		in  []interning.Archive
+		in  []idx.Archive
 		out string
 	}{
 		{
-			in:  []interning.Archive{},
+			in:  []idx.Archive{},
 			out: `[]`,
 		},
 		{
-			in: []interning.Archive{
-				interning.NewArchiveBare("foo"),
+			in: []idx.Archive{
+				idx.NewArchiveBare("foo"),
 			},
 			out: `["foo"]`,
 		},
 		{
-			in: []interning.Archive{
-				interning.NewArchiveBare("foo"),
-				interning.NewArchiveBare("bar"),
+			in: []idx.Archive{
+				idx.NewArchiveBare("foo"),
+				idx.NewArchiveBare("bar"),
 			},
 			out: `["bar","foo"]`,
 		},
 		{
-			in: []interning.Archive{
-				interning.NewArchiveBare(`a\b`),
+			in: []idx.Archive{
+				idx.NewArchiveBare(`a\b`),
 			},
 			out: `["a\\b"]`,
 		},
