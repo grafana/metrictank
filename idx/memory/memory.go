@@ -724,13 +724,13 @@ func (m *UnpartitionedMemoryIdx) Load(defs []interning.MetricDefinitionInterned)
 	var pre time.Time
 	var num int
 	for i := range defs {
-		def := defs[i]
+		def := &defs[i]
 		pre = time.Now()
 		if _, ok := m.defById[def.Id]; ok {
 			continue
 		}
 
-		m.add(createArchive(&def))
+		m.add(createArchive(def))
 
 		// or after this time.  For metrics that are sent at or close to real time (the typical
 		// use case), then the value will be within a couple of seconds of the true lastSave.
@@ -748,7 +748,7 @@ func createArchive(def *interning.MetricDefinitionInterned) *interning.ArchiveIn
 	irId, _ := IndexRules.Match(path)
 
 	return &interning.ArchiveInterned{
-		MetricDefinitionInterned: def,
+		MetricDefinitionInterned: *def,
 		SchemaId:                 schemaId,
 		AggId:                    aggId,
 		IrId:                     irId,
@@ -770,14 +770,14 @@ func (m *UnpartitionedMemoryIdx) add(archive *interning.ArchiveInterned) {
 
 	statMetricsActive.Inc()
 
-	def := archive.MetricDefinitionInterned
+	def := &archive.MetricDefinitionInterned
 	path := def.NameWithTags()
 
 	if TagSupport {
 		// Even if there are no tags, index at least "name". It's important to use the definition
 		// in the archive pointer that we add to defById, because the pointers must reference the
 		// same underlying object in m.defById and m.defByTagSet
-		m.indexTags(archive.MetricDefinitionInterned)
+		m.indexTags(def)
 
 		if len(def.Tags.KeyValues) > 0 {
 			if _, ok := m.defById[def.Id]; !ok {
@@ -1595,7 +1595,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 			// while we switched from read to write lock
 			continue
 		}
-		if !m.deindexTags(tags, def.MetricDefinitionInterned) {
+		if !m.deindexTags(tags, &def.MetricDefinitionInterned) {
 			continue
 		}
 		deletedDefs = append(deletedDefs, def)

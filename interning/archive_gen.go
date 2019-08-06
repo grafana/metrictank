@@ -232,22 +232,10 @@ func (z *ArchiveInterned) DecodeMsg(dc *msgp.Reader) (err error) {
 		}
 		switch msgp.UnsafeString(field) {
 		case "MetricDefinitionInterned":
-			if dc.IsNil() {
-				err = dc.ReadNil()
-				if err != nil {
-					err = msgp.WrapError(err, "MetricDefinitionInterned")
-					return
-				}
-				z.MetricDefinitionInterned = nil
-			} else {
-				if z.MetricDefinitionInterned == nil {
-					z.MetricDefinitionInterned = new(MetricDefinitionInterned)
-				}
-				err = z.MetricDefinitionInterned.DecodeMsg(dc)
-				if err != nil {
-					err = msgp.WrapError(err, "MetricDefinitionInterned")
-					return
-				}
+			err = z.MetricDefinitionInterned.DecodeMsg(dc)
+			if err != nil {
+				err = msgp.WrapError(err, "MetricDefinitionInterned")
+				return
 			}
 		case "SchemaId":
 			z.SchemaId, err = dc.ReadUint16()
@@ -292,17 +280,10 @@ func (z *ArchiveInterned) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	if z.MetricDefinitionInterned == nil {
-		err = en.WriteNil()
-		if err != nil {
-			return
-		}
-	} else {
-		err = z.MetricDefinitionInterned.EncodeMsg(en)
-		if err != nil {
-			err = msgp.WrapError(err, "MetricDefinitionInterned")
-			return
-		}
+	err = z.MetricDefinitionInterned.EncodeMsg(en)
+	if err != nil {
+		err = msgp.WrapError(err, "MetricDefinitionInterned")
+		return
 	}
 	// write "SchemaId"
 	err = en.Append(0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x64)
@@ -353,14 +334,10 @@ func (z *ArchiveInterned) MarshalMsg(b []byte) (o []byte, err error) {
 	// map header, size 5
 	// string "MetricDefinitionInterned"
 	o = append(o, 0x85, 0xb8, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x65, 0x64)
-	if z.MetricDefinitionInterned == nil {
-		o = msgp.AppendNil(o)
-	} else {
-		o, err = z.MetricDefinitionInterned.MarshalMsg(o)
-		if err != nil {
-			err = msgp.WrapError(err, "MetricDefinitionInterned")
-			return
-		}
+	o, err = z.MetricDefinitionInterned.MarshalMsg(o)
+	if err != nil {
+		err = msgp.WrapError(err, "MetricDefinitionInterned")
+		return
 	}
 	// string "SchemaId"
 	o = append(o, 0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x64)
@@ -396,21 +373,10 @@ func (z *ArchiveInterned) UnmarshalMsg(bts []byte) (o []byte, err error) {
 		}
 		switch msgp.UnsafeString(field) {
 		case "MetricDefinitionInterned":
-			if msgp.IsNil(bts) {
-				bts, err = msgp.ReadNilBytes(bts)
-				if err != nil {
-					return
-				}
-				z.MetricDefinitionInterned = nil
-			} else {
-				if z.MetricDefinitionInterned == nil {
-					z.MetricDefinitionInterned = new(MetricDefinitionInterned)
-				}
-				bts, err = z.MetricDefinitionInterned.UnmarshalMsg(bts)
-				if err != nil {
-					err = msgp.WrapError(err, "MetricDefinitionInterned")
-					return
-				}
+			bts, err = z.MetricDefinitionInterned.UnmarshalMsg(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "MetricDefinitionInterned")
+				return
 			}
 		case "SchemaId":
 			z.SchemaId, bts, err = msgp.ReadUint16Bytes(bts)
@@ -450,12 +416,6 @@ func (z *ArchiveInterned) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *ArchiveInterned) Msgsize() (s int) {
-	s = 1 + 25
-	if z.MetricDefinitionInterned == nil {
-		s += msgp.NilSize
-	} else {
-		s += z.MetricDefinitionInterned.Msgsize()
-	}
-	s += 9 + msgp.Uint16Size + 6 + msgp.Uint16Size + 5 + msgp.Uint16Size + 9 + msgp.Uint32Size
+	s = 1 + 25 + z.MetricDefinitionInterned.Msgsize() + 9 + msgp.Uint16Size + 6 + msgp.Uint16Size + 5 + msgp.Uint16Size + 9 + msgp.Uint32Size
 	return
 }

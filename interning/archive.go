@@ -33,7 +33,7 @@ func NewArchiveBare(name string) Archive {
 }
 
 type ArchiveInterned struct {
-	*MetricDefinitionInterned
+	MetricDefinitionInterned
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
@@ -63,7 +63,7 @@ func (a *ArchiveInterned) CloneInterned() *ArchiveInterned {
 	safeArchive.AggId = a.AggId
 	safeArchive.IrId = a.IrId
 	safeArchive.LastSave = atomic.LoadUint32(&a.LastSave)
-	safeArchive.MetricDefinitionInterned = a.MetricDefinitionInterned.CloneInterned()
+	safeArchive.MetricDefinitionInterned = CloneInterned(a.MetricDefinitionInterned)
 
 	archiveInternedCount.AddUint32(1)
 	return safeArchive

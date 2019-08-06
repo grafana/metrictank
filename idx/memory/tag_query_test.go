@@ -59,7 +59,6 @@ func getTestIndex() (TagIndex, map[schema.MKey]*interning.ArchiveInterned) {
 
 	for i, d := range data {
 		byId[d.id] = &interning.ArchiveInterned{}
-		byId[d.id].MetricDefinitionInterned = new(interning.MetricDefinitionInterned)
 		byId[d.id].SetMetricName(fmt.Sprintf("metric%d", i))
 		byId[d.id].SetTags(d.tags)
 		byId[d.id].LastUpdate = d.lastUpdate

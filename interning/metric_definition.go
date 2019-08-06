@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/raintank/schema"
@@ -42,12 +41,6 @@ const (
 	MTypeCounter
 	MTypeTimestamp
 )
-
-var metricDefinitionInternedPool = sync.Pool{
-	New: func() interface{} {
-		return new(MetricDefinitionInterned)
-	},
-}
 
 type Unit uintptr
 
@@ -586,8 +579,8 @@ func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition 
 // It is important that .ReleaseInterned() gets called before it
 // goes out of scope to return its memory back to the pools and to
 // update the reference counts of interned values correctly
-func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
-	clone := metricDefinitionInternedPool.Get().(*MetricDefinitionInterned)
+func CloneInterned(md MetricDefinitionInterned) MetricDefinitionInterned {
+	clone := MetricDefinitionInterned{}
 	clone.Id = md.Id
 	clone.OrgId = md.OrgId
 	clone.Name = md.Name
@@ -626,8 +619,6 @@ func (md *MetricDefinitionInterned) ReleaseInterned() {
 	if md.Unit != 0 {
 		IdxIntern.DeleteUnsafe(uintptr(md.Unit))
 	}
-
-	metricDefinitionInternedPool.Put(md)
 }
 
 // MetricDefinitionFromMetricDataWithMKey takes an MKey and MetricData and returns a MetricDefinition

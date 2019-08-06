@@ -19,7 +19,7 @@ func FormatRowKey(mkey schema.MKey, partition int32) string {
 }
 
 // SchemaToRow takes a metricDefintion and returns a rowKey and column data.
-func SchemaToRow(def *interning.MetricDefinitionInterned) (string, map[string][]byte) {
+func SchemaToRow(def interning.MetricDefinitionInterned) (string, map[string][]byte) {
 	row := map[string][]byte{
 		//"Id" omitted as it is part of the rowKey
 		"OrgId":      make([]byte, 8),

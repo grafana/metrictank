@@ -480,7 +480,7 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) (int, error) {
 	}
 	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
-			delErr := b.deleteDef(def.MetricDefinitionInterned)
+			delErr := b.deleteDef(&def.MetricDefinitionInterned)
 			// the last error encountered will be passed back to the caller
 			if delErr != nil {
 				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinitionInterned.Id, err)
