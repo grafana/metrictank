@@ -127,8 +127,8 @@ func (z *MetricDefinitionInterned) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "OrgId")
 				return
 			}
-		case "name":
-			err = dc.ReadExtension(&z.Name)
+		case "Name":
+			z.Name, err = dc.ReadString()
 			if err != nil {
 				err = msgp.WrapError(err, "Name")
 				return
@@ -197,12 +197,12 @@ func (z *MetricDefinitionInterned) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "OrgId")
 		return
 	}
-	// write "name"
-	err = en.Append(0xa4, 0x6e, 0x61, 0x6d, 0x65)
+	// write "Name"
+	err = en.Append(0xa4, 0x4e, 0x61, 0x6d, 0x65)
 	if err != nil {
 		return
 	}
-	err = en.WriteExtension(&z.Name)
+	err = en.WriteString(z.Name)
 	if err != nil {
 		err = msgp.WrapError(err, "Name")
 		return
@@ -274,13 +274,9 @@ func (z *MetricDefinitionInterned) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "OrgId"
 	o = append(o, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
 	o = msgp.AppendUint32(o, z.OrgId)
-	// string "name"
-	o = append(o, 0xa4, 0x6e, 0x61, 0x6d, 0x65)
-	o, err = msgp.AppendExtension(o, &z.Name)
-	if err != nil {
-		err = msgp.WrapError(err, "Name")
-		return
-	}
+	// string "Name"
+	o = append(o, 0xa4, 0x4e, 0x61, 0x6d, 0x65)
+	o = msgp.AppendString(o, z.Name)
 	// string "Interval"
 	o = append(o, 0xa8, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c)
 	o = msgp.AppendInt(o, z.Interval)
@@ -337,8 +333,8 @@ func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error
 				err = msgp.WrapError(err, "OrgId")
 				return
 			}
-		case "name":
-			bts, err = msgp.ReadExtensionBytes(bts, &z.Name)
+		case "Name":
+			z.Name, bts, err = msgp.ReadStringBytes(bts)
 			if err != nil {
 				err = msgp.WrapError(err, "Name")
 				return
@@ -387,90 +383,7 @@ func (z *MetricDefinitionInterned) UnmarshalMsg(bts []byte) (o []byte, err error
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *MetricDefinitionInterned) Msgsize() (s int) {
-	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.ExtensionPrefixSize + z.Name.Len() + 9 + msgp.IntSize + 5 + msgp.ExtensionPrefixSize + z.Unit.Len() + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
-	return
-}
-
-// DecodeMsg implements msgp.Decodable
-func (z *MetricName) DecodeMsg(dc *msgp.Reader) (err error) {
-	var field []byte
-	_ = field
-	var zb0001 uint32
-	zb0001, err = dc.ReadMapHeader()
-	if err != nil {
-		err = msgp.WrapError(err)
-		return
-	}
-	for zb0001 > 0 {
-		zb0001--
-		field, err = dc.ReadMapKeyPtr()
-		if err != nil {
-			err = msgp.WrapError(err)
-			return
-		}
-		switch msgp.UnsafeString(field) {
-		default:
-			err = dc.Skip()
-			if err != nil {
-				err = msgp.WrapError(err)
-				return
-			}
-		}
-	}
-	return
-}
-
-// EncodeMsg implements msgp.Encodable
-func (z MetricName) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 0
-	err = en.Append(0x80)
-	if err != nil {
-		return
-	}
-	return
-}
-
-// MarshalMsg implements msgp.Marshaler
-func (z MetricName) MarshalMsg(b []byte) (o []byte, err error) {
-	o = msgp.Require(b, z.Msgsize())
-	// map header, size 0
-	o = append(o, 0x80)
-	return
-}
-
-// UnmarshalMsg implements msgp.Unmarshaler
-func (z *MetricName) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	var field []byte
-	_ = field
-	var zb0001 uint32
-	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
-	if err != nil {
-		err = msgp.WrapError(err)
-		return
-	}
-	for zb0001 > 0 {
-		zb0001--
-		field, bts, err = msgp.ReadMapKeyZC(bts)
-		if err != nil {
-			err = msgp.WrapError(err)
-			return
-		}
-		switch msgp.UnsafeString(field) {
-		default:
-			bts, err = msgp.Skip(bts)
-			if err != nil {
-				err = msgp.WrapError(err)
-				return
-			}
-		}
-	}
-	o = bts
-	return
-}
-
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z MetricName) Msgsize() (s int) {
-	s = 1
+	s = 1 + 3 + z.Id.Msgsize() + 6 + msgp.Uint32Size + 5 + msgp.StringPrefixSize + len(z.Name) + 9 + msgp.IntSize + 5 + msgp.ExtensionPrefixSize + z.Unit.Len() + 13 + msgp.ExtensionPrefixSize + z.Tags.Len() + 11 + msgp.Int64Size + 10 + msgp.Int32Size
 	return
 }
 

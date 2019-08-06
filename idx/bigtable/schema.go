@@ -23,7 +23,7 @@ func SchemaToRow(def *interning.MetricDefinitionInterned) (string, map[string][]
 	row := map[string][]byte{
 		//"Id" omitted as it is part of the rowKey
 		"OrgId":      make([]byte, 8),
-		"Name":       []byte(def.Name.String()),
+		"Name":       []byte(def.Name),
 		"Interval":   make([]byte, 8),
 		"Unit":       []byte(def.Unit.String()),
 		"Mtype":      []byte(def.Mtype()),

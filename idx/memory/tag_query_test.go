@@ -70,7 +70,7 @@ func getTestIndex() (TagIndex, map[schema.MKey]*interning.ArchiveInterned) {
 			tagIdx.addTagId(k, v, d.id)
 		}
 		k, _ := interning.IdxIntern.AddOrGet([]byte("name"), false)
-		v, _ := interning.IdxIntern.AddOrGet([]byte(byId[d.id].Name.String()), false)
+		v, _ := interning.IdxIntern.AddOrGet([]byte(byId[d.id].Name), false)
 		tagIdx.addTagId(k, v, d.id)
 	}
 

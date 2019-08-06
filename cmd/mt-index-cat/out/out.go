@@ -22,13 +22,13 @@ func List(d interning.MetricDefinitionInterned) {
 
 func GetVegetaRender(addr, from string) func(d interning.MetricDefinitionInterned) {
 	return func(d interning.MetricDefinitionInterned) {
-		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, d.Name.String(), from, d.OrgId)
+		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, d.Name, from, d.OrgId)
 	}
 }
 
 func GetVegetaRenderPattern(addr, from string) func(d interning.MetricDefinitionInterned) {
 	return func(d interning.MetricDefinitionInterned) {
-		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, pattern(d.Name.String()), from, d.OrgId)
+		fmt.Printf("GET %s/render?target=%s&from=-%s\nX-Org-Id: %d\n\n", addr, pattern(d.Name), from, d.OrgId)
 	}
 }
 

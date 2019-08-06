@@ -41,8 +41,8 @@ func compareSchemaWithIdxMd(smd schema.MetricDefinition, imd interning.MetricDef
 	if smd.OrgId != imd.OrgId {
 		return fmt.Errorf("OrgId not equal. schema: %d, idx: %d", smd.OrgId, imd.OrgId)
 	}
-	if smd.Name != imd.Name.String() {
-		return fmt.Errorf("Name not equal. schema: %v, idx: %v", smd.Name, imd.Name.String())
+	if smd.Name != imd.Name {
+		return fmt.Errorf("Name not equal. schema: %v, idx: %v", smd.Name, imd.Name)
 	}
 	if smd.Interval != imd.Interval {
 		return fmt.Errorf("Interval not equal. schema: %d, idx: %d", smd.Interval, imd.Interval)

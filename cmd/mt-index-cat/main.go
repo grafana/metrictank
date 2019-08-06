@@ -252,7 +252,7 @@ func main() {
 	for _, d := range defs {
 		// note that prefix and substr can be "", meaning filter disabled.
 		// the conditions handle this fine as well.
-		name := d.Name.String()
+		name := d.Name
 		if !strings.HasPrefix(name, prefix) {
 			continue
 		}

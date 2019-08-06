@@ -684,7 +684,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *interning.MetricDefinitionIntern
 		tags.addTagId(tag.Key, tag.Value, def.Id)
 	}
 
-	tags.addTagIdForName(schema.SanitizeNameAsTagValue(def.Name.String()), def.Id)
+	tags.addTagIdForName(schema.SanitizeNameAsTagValue(def.Name), def.Id)
 
 	// Added sort here to accommodate a case where out of order tags are set after
 	// a call to SetId (which would sort it)
@@ -704,7 +704,7 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *interning.Metri
 		tags.delTagId(tag.Key, tag.Value, def.Id)
 	}
 
-	tags.delTagIdForName(schema.SanitizeNameAsTagValue(def.Name.String()), def.Id)
+	tags.delTagIdForName(schema.SanitizeNameAsTagValue(def.Name), def.Id)
 
 	m.defByTagSet.del(def)
 
@@ -1170,7 +1170,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		}
 
 		if tag == "name" {
-			name := schema.SanitizeNameAsTagValue(def.Name.String())
+			name := schema.SanitizeNameAsTagValue(def.Name)
 
 			if len(prefix) > 0 && !strings.HasPrefix(name, prefix) {
 				continue
@@ -1426,7 +1426,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 					}
 					if log.IsLevelEnabled(log.DebugLevel) {
 						lastSave := atomic.LoadUint32(&def.LastSave)
-						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name.String(), def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
+						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
 					}
 					idxNode.Defs = append(idxNode.Defs, def.GetArchive())
 				}
@@ -1824,7 +1824,7 @@ DEFS:
 				continue DEFS
 			}
 
-			n, ok := tree.Items[def.Name.String()]
+			n, ok := tree.Items[def.Name]
 			if !ok || !n.Leaf() {
 				continue DEFS
 			}

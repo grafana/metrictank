@@ -26,7 +26,6 @@ type Md5Hash struct {
 //go:generate msgp
 
 func init() {
-	msgp.RegisterExtension(95, func() msgp.Extension { return &MetricName{} })
 	msgp.RegisterExtension(90, func() msgp.Extension { return &TagKeyValues{} })
 	msgp.RegisterExtension(96, func() msgp.Extension { return new(Unit) })
 }
@@ -84,109 +83,6 @@ func (u *Unit) String() string {
 		return ""
 	}
 	return res
-}
-
-// MetricName stores the name as a []uintptr to strings interned in an object store.
-// Each word is stored as a separate interned string without the '.'. The whole name
-// can be retrieved by calling MetricName.String()
-type MetricName struct {
-	nodes []uintptr
-}
-
-// Nodes returns the []uintptr of interned string addresses
-// for the MetricName
-func (mn *MetricName) Nodes() []uintptr {
-	return mn.nodes
-}
-
-// String returns the full MetricName as a string
-// using data interned in the object store
-func (mn *MetricName) String() string {
-	if len(mn.nodes) == 0 {
-		return ""
-	}
-
-	var bld strings.Builder
-	return mn.string(&bld)
-}
-
-func (mn *MetricName) string(bld *strings.Builder) string {
-	name, err := IdxIntern.JoinStrings(mn.nodes, ".")
-	if err != nil {
-		bld.WriteString("invalid")
-		return bld.String()
-	}
-	bld.WriteString(name)
-	return bld.String()
-}
-
-// setMetricName interns the MetricName in an
-// object store and stores the addresses of those strings
-// in MetricName.nodes
-func (mn *MetricName) setMetricName(name string) error {
-	nodes := strings.Split(name, ".")
-	var offset int
-
-	if len(nodes) > 3 {
-		pre := strings.Join(nodes[:3], ".")
-		nodePtr, err := IdxIntern.AddOrGet([]byte(pre), false)
-		if err != nil {
-			log.Error("idx: Failed to acquire interned string for node name: ", err)
-			internError.Inc()
-			return fmt.Errorf("idx: Failed to acquire interned string for first three nodes %v", err)
-		}
-
-		// still need to allocate for the first three nodes, which is now 1,
-		// so we subtract 2
-		mn.nodes = make([]uintptr, len(nodes)-2)
-		mn.nodes[0] = nodePtr
-
-		// re-slice and add all the other nodes
-		nodes = nodes[3:]
-
-		// add one to the offset
-		offset++
-	} else {
-		mn.nodes = make([]uintptr, len(nodes))
-	}
-
-	for i, node := range nodes {
-		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
-		if err != nil {
-			log.Error("idx: Failed to acquire interned string for node name: ", err)
-			internError.Inc()
-			return fmt.Errorf("idx: Failed to acquire interned string for node %v, %v", node, err)
-		}
-		mn.nodes[i+offset] = nodePtr
-	}
-
-	return nil
-}
-
-// ExtensionType is required to use custom marshaling as an extension
-// with msgp
-func (mn *MetricName) ExtensionType() int8 {
-	return 95
-}
-
-// Len is required to use custom marshaling as an extension
-// with msgp
-func (mn *MetricName) Len() int {
-	return len(mn.String())
-}
-
-// MarshalBinaryTo is required to use custom marshaling as an extension
-// in msgp
-func (mn *MetricName) MarshalBinaryTo(b []byte) error {
-	copy(b, []byte(mn.String()))
-	return nil
-}
-
-// UnmarshalBinary is required to use custom marshaling as an extension
-// in msgp
-func (mn *MetricName) UnmarshalBinary(b []byte) error {
-	err := mn.setMetricName(string(b))
-	return err
 }
 
 //msgp:shim TagKeyValue as:string using:TagKeyValue.createTagKeyValue/parseTagKeyValue
@@ -390,11 +286,9 @@ func (t *TagKeyValues) UnmarshalBinary(b []byte) error {
 
 // MetricDefinitionInterned stores information which identifies a single metric
 type MetricDefinitionInterned struct {
-	Id    schema.MKey
-	OrgId uint32
-	// using custom marshalling for MetricName
-	// if there is another way we should explore that
-	Name       MetricName `msg:"name,extension"`
+	Id         schema.MKey
+	OrgId      uint32
+	Name       string
 	Interval   int
 	Unit       Unit `msg:"unit,extension"`
 	mtype      mType
@@ -408,7 +302,7 @@ type MetricDefinitionInterned struct {
 func (md *MetricDefinitionInterned) NameWithTags() string {
 	var bld strings.Builder
 
-	md.Name.string(&bld)
+	bld.WriteString(md.Name)
 	for _, tag := range md.Tags.KeyValues {
 		key, err := IdxIntern.GetStringFromPtr(tag.Key)
 		if err != nil {
@@ -493,46 +387,9 @@ func (md *MetricDefinitionInterned) SetUnit(unit string) {
 	md.Unit = Unit(sz)
 }
 
-// SetMetricName interns the MetricName in an
-// object store and stores the addresses of those strings
-// in MetricName.nodes
+// SetMetricName sets the MetricName for a MetricDefinition
 func (md *MetricDefinitionInterned) SetMetricName(name string) error {
-	nodes := strings.Split(name, ".")
-	var offset int
-
-	if len(nodes) > 3 {
-		pre := strings.Join(nodes[:3], ".")
-		nodePtr, err := IdxIntern.AddOrGet([]byte(pre), false)
-		if err != nil {
-			log.Error("idx: Failed to acquire interned string for node name: ", err)
-			internError.Inc()
-			return fmt.Errorf("idx: Failed to acquire interned string for first three nodes %v", err)
-		}
-
-		// still need to allocate for the first three nodes, which is now 1,
-		// so we subtract 2
-		md.Name.nodes = make([]uintptr, len(nodes)-2)
-		md.Name.nodes[0] = nodePtr
-
-		// re-slice and add all the other nodes
-		nodes = nodes[3:]
-
-		// add one to the offset
-		offset++
-	} else {
-		md.Name.nodes = make([]uintptr, len(nodes))
-	}
-
-	for i, node := range nodes {
-		nodePtr, err := IdxIntern.AddOrGet([]byte(node), false)
-		if err != nil {
-			log.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
-			internError.Inc()
-			return fmt.Errorf("idx: Failed to intern word in MetricName: %v, %v", node, err)
-		}
-		md.Name.nodes[i+offset] = nodePtr
-	}
-
+	md.Name = name
 	return nil
 }
 
@@ -597,7 +454,7 @@ func (md *MetricDefinitionInterned) SetTags(tags []string) {
 // SetId creates and sets the MKey which identifies a metric
 func (md *MetricDefinitionInterned) SetId() {
 	sort.Sort(md.Tags.KeyValues)
-	buffer := bytes.NewBufferString(md.Name.String())
+	buffer := bytes.NewBufferString(md.Name)
 	buffer.WriteByte(0)
 	buffer.WriteString(md.Unit.String())
 	buffer.WriteByte(0)
@@ -631,7 +488,7 @@ func (md *MetricDefinitionInterned) ConvertToSchemaMd() schema.MetricDefinition 
 	smd := schema.MetricDefinition{
 		Id:         md.Id,
 		OrgId:      md.OrgId,
-		Name:       md.Name.String(),
+		Name:       md.Name,
 		Interval:   md.Interval,
 		Unit:       md.Unit.String(),
 		Mtype:      md.Mtype(),
@@ -661,7 +518,6 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 	clone.LastUpdate = atomic.LoadInt64(&md.LastUpdate)
 	clone.Partition = atomic.LoadInt32(&md.Partition)
 
-	IdxIntern.IncRefCntBatchUnsafe(clone.Name.Nodes())
 	for i := range clone.Tags.KeyValues {
 		IdxIntern.IncRefCntBatchUnsafe([]uintptr{clone.Tags.KeyValues[i].Key, clone.Tags.KeyValues[i].Value})
 	}
@@ -681,7 +537,6 @@ func (md *MetricDefinitionInterned) CloneInterned() *MetricDefinitionInterned {
 // It updates the refence counts of the interned struct
 // properties, or deletes the interned values when necessary.
 func (md *MetricDefinitionInterned) ReleaseInterned() {
-	IdxIntern.DeleteBatchUnsafe(md.Name.Nodes())
 	for i := range md.Tags.KeyValues {
 		IdxIntern.DeleteBatchUnsafe([]uintptr{md.Tags.KeyValues[i].Key, md.Tags.KeyValues[i].Value})
 	}

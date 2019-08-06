@@ -386,7 +386,7 @@ func (q *TagQueryContext) testByMatch(def *interning.ArchiveInterned, exprs []kv
 EXPRS:
 	for _, e := range exprs {
 		if e.Key == "name" {
-			if e.Regex == nil || e.Regex.MatchString(schema.SanitizeNameAsTagValue(def.Name.String())) {
+			if e.Regex == nil || e.Regex.MatchString(schema.SanitizeNameAsTagValue(def.Name)) {
 				if not {
 					return false
 				}
@@ -514,7 +514,7 @@ func (q *TagQueryContext) testByFrom(def *interning.ArchiveInterned) bool {
 func (q *TagQueryContext) testByPrefix(def *interning.ArchiveInterned, exprs []kv) bool {
 EXPRS:
 	for _, e := range exprs {
-		if e.Key == "name" && strings.HasPrefix(schema.SanitizeNameAsTagValue(def.Name.String()), e.Value) {
+		if e.Key == "name" && strings.HasPrefix(schema.SanitizeNameAsTagValue(def.Name), e.Value) {
 			continue EXPRS
 		}
 

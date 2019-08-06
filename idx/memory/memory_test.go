@@ -1064,8 +1064,8 @@ func testMetricNameStartingWithTilde(t *testing.T) {
 	if !ok {
 		t.Fatalf("Failed to retrieve ArchiveInterned with MKey %v", id)
 	}
-	if arc.Name.String() != metricName {
-		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, arc.Name.String())
+	if arc.Name != metricName {
+		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, arc.Name)
 	}
 	arc.ReleaseInterned()
 
