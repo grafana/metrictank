@@ -68,16 +68,14 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 	defs := genMetricDefinitionsWithSameName(num)
 	name := "anotheryetlonger.short.metric.name"
 
-	originalNameAddress := defs[0].Name.Nodes()[0]
+	originalNameAddress := defs[0].Name
 
 	Convey("When creating MetricDefinitions", t, func() {
 		Convey(fmt.Sprintf("reference counts should be at %d", num), func() {
 			for _, md := range defs {
-				for _, ptr := range md.Name.Nodes() {
-					cnt, err := IdxIntern.RefCnt(ptr)
-					So(err, ShouldBeNil)
-					So(cnt, ShouldEqual, num)
-				}
+				cnt, err := IdxIntern.RefCnt(uintptr(md.Name))
+				So(err, ShouldBeNil)
+				So(cnt, ShouldEqual, num)
 			}
 		})
 		Convey(fmt.Sprintf("After deleting half of the metricdefinitions reference count should be %d", num/2), func() {
@@ -87,11 +85,9 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 			}
 			defs = defs[num/2:]
 			for _, md := range defs {
-				for _, ptr := range md.Name.Nodes() {
-					cnt, err := IdxIntern.RefCnt(ptr)
-					So(err, ShouldBeNil)
-					So(cnt, ShouldEqual, num/2)
-				}
+				cnt, err := IdxIntern.RefCnt(uintptr(md.Name))
+				So(err, ShouldBeNil)
+				So(cnt, ShouldEqual, num/2)
 
 			}
 		})
@@ -101,12 +97,12 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 			}
 		})
 		Convey("After deleting all of the metricdefinitions the name should be removed from the object store", func() {
-			nameAddr := defs[0].Name.Nodes()[0]
+			nameAddr := defs[0].Name
 			for i := 0; i < len(defs); i++ {
 				defs[i].ReleaseInterned()
 				defs[i] = nil
 			}
-			cnt, err := IdxIntern.RefCnt(nameAddr)
+			cnt, err := IdxIntern.RefCnt(uintptr(nameAddr))
 			So(err, ShouldNotBeNil)
 			So(cnt, ShouldEqual, 0)
 		})
@@ -115,7 +111,7 @@ func testCreateDeleteMetricDefinition(t *testing.T, num int) {
 			// MMap decides to use the same memory chunk. The string is the same length as what should be in slot 0.
 			IdxIntern.AddOrGetString([]byte("bopuifszfumpohfs"), false)
 			defs := genMetricDefinitionsWithSameName(num)
-			So(originalNameAddress, ShouldNotEqual, defs[0].Name.Nodes()[0])
+			So(originalNameAddress, ShouldNotEqual, defs[0].Name)
 		})
 	})
 }
@@ -141,18 +137,15 @@ func TestMetricNameAndTagAddresses(t *testing.T) {
 		Convey("names should be using the same object addresses", func() {
 			for _, md := range defs {
 				for _, mdd := range defs {
-					So(md.Name.Nodes(), ShouldResemble, mdd.Name.Nodes())
+					So(md.Name, ShouldResemble, mdd.Name)
 				}
 			}
 		})
 		Convey("reference counts should be at 5", func() {
 			for _, md := range defs {
-				for _, ptr := range md.Name.Nodes() {
-					cnt, err := IdxIntern.RefCnt(ptr)
-					So(err, ShouldBeNil)
-					So(cnt, ShouldEqual, 5)
-				}
-
+				cnt, err := IdxIntern.RefCnt(uintptr(md.Name))
+				So(err, ShouldBeNil)
+				So(cnt, ShouldEqual, 5)
 			}
 		})
 	})
