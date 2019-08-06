@@ -34,6 +34,10 @@ func (e *expressionHasTag) ValuePasses(value string) bool {
 	return value == e.key
 }
 
+func (e *expressionHasTag) ValueMatchesExactly() bool {
+	return true
+}
+
 func (e *expressionHasTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
 		return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
