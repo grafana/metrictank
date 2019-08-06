@@ -50,11 +50,16 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 
 	for i, expr := range q.query.Expressions {
 		costs[i].expressionIdx = i
-		if expr.ValueMatchesExactly() {
-			costs[i].cost = uint32(len(idx[expr.GetKey()][expr.GetValue()])) * expr.GetCostMultiplier()
-		} else {
-			if expr.OperatesOnTag() {
+
+		if expr.OperatesOnTag() {
+			if expr.ValueMatchesExactly() {
+				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
+			} else {
 				costs[i].cost = uint32(len(idx)) * expr.GetCostMultiplier()
+			}
+		} else {
+			if expr.ValueMatchesExactly() {
+				costs[i].cost = uint32(len(idx[expr.GetKey()][expr.GetValue()])) * expr.GetCostMultiplier()
 			} else {
 				costs[i].cost = uint32(len(idx[expr.GetKey()])) * expr.GetCostMultiplier()
 			}
@@ -157,18 +162,30 @@ func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan str
 		defer close(idCh)
 		defer q.wg.Done()
 
-	OUTER:
-		for tag := range q.index {
-			if !expr.ValuePasses(tag) {
-				continue
-			}
-
-			for _, ids := range q.index[tag] {
+		if expr.ValueMatchesExactly() {
+			for _, ids := range q.index[expr.GetKey()] {
 				for id := range ids {
 					select {
 					case <-stopCh:
-						break OUTER
+						break
 					case idCh <- id:
+					}
+				}
+			}
+		} else {
+		OUTER:
+			for tag := range q.index {
+				if !expr.ValuePasses(tag) {
+					continue
+				}
+
+				for _, ids := range q.index[tag] {
+					for id := range ids {
+						select {
+						case <-stopCh:
+							break OUTER
+						case idCh <- id:
+						}
 					}
 				}
 			}

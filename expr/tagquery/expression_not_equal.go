@@ -34,10 +34,6 @@ func (e *expressionNotEqual) ValuePasses(value string) bool {
 	return value != e.value
 }
 
-func (e *expressionNotEqual) ValueMatchesExactly() bool {
-	return true
-}
-
 func (e *expressionNotEqual) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {
 	if e.key == "name" {
 		if e.value == "" {
