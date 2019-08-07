@@ -16,10 +16,7 @@ func TestWriteQueue(t *testing.T) {
 	writeQueueEnabled = true
 	ix := New()
 	ix.Init()
-	defer func() {
-		ix.Stop()
-		ix = nil
-	}()
+	defer ix.Stop()
 
 	count := writeMaxBatchSize - 1
 	for i := 0; i < count; i++ {

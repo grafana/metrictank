@@ -10,7 +10,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -54,13 +53,13 @@ func (p *PartitionedMemoryIdx) Stop() {
 
 // Update updates an existing archive, if found.
 // It returns whether it was found, and - if so - the (updated) existing archive and its old partition
-func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (p *PartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	return p.Partition[partition].Update(point, partition)
 }
 
 // AddOrUpdate makes sure a metric is known in the index,
 // and should be called for every received metric.
-func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (*interning.ArchiveInterned, int32, bool) {
+func (p *PartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.MetricData, partition int32) (idx.Archive, int32, bool) {
 	return p.Partition[partition].AddOrUpdate(mkey, data, partition)
 }
 
@@ -70,9 +69,9 @@ func (p *PartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition i
 }
 
 // Get returns the archive for the requested id.
-func (p *PartitionedMemoryIdx) Get(key schema.MKey) (interning.Archive, bool) {
+func (p *PartitionedMemoryIdx) Get(key schema.MKey) (idx.Archive, bool) {
 	g, _ := errgroup.WithContext(context.Background())
-	resultChan := make(chan *interning.Archive, len(p.Partition))
+	resultChan := make(chan *idx.Archive, len(p.Partition))
 	for _, m := range p.Partition {
 		m := m
 		g.Go(func() error {
@@ -97,16 +96,16 @@ func (p *PartitionedMemoryIdx) Get(key schema.MKey) (interning.Archive, bool) {
 		if e != nil {
 			log.Errorf("memory-idx: failed to get Archive with key %v. %s", key, e)
 		}
-		return interning.Archive{}, false
+		return idx.Archive{}, false
 	}
 
 	return *result, true
 }
 
 // GetPath returns the archives under the given path.
-func (p *PartitionedMemoryIdx) GetPath(orgId uint32, path string) []interning.Archive {
+func (p *PartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]interning.Archive, len(p.Partition))
+	result := make([][]idx.Archive, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
@@ -126,7 +125,7 @@ func (p *PartitionedMemoryIdx) GetPath(orgId uint32, path string) []interning.Ar
 	for _, r := range result {
 		items += len(r)
 	}
-	response := make([]interning.Archive, 0, items)
+	response := make([]idx.Archive, 0, items)
 	for _, r := range result {
 		response = append(response, r...)
 	}
@@ -138,9 +137,9 @@ func (p *PartitionedMemoryIdx) GetPath(orgId uint32, path string) []interning.Ar
 // all leaf nodes on that branch are deleted. So if the pattern is
 // "*", all items in the index are deleted.
 // It returns a copy of all of the Archives deleted.
-func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) (int, error) {
+func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([]int, len(p.Partition))
+	result := make([][]idx.Archive, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
@@ -156,36 +155,6 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) (int, error)
 	}
 	if err := g.Wait(); err != nil {
 		log.Errorf("memory-idx: failed to Delete: orgId=%d pattern=%s. %s", orgId, pattern, err)
-		return 0, err
-	}
-
-	// get our total count, so we can allocate our response in one go.
-	items := 0
-	for _, r := range result {
-		items += r
-	}
-
-	return items, nil
-}
-
-func (p *PartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([]*interning.ArchiveInterned, error) {
-	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]*interning.ArchiveInterned, len(p.Partition))
-	var i int
-	for _, m := range p.Partition {
-		pos, m := i, m
-		g.Go(func() error {
-			deleted, err := m.DeletePersistent(orgId, pattern)
-			if err != nil {
-				return err
-			}
-			result[pos] = deleted
-			return nil
-		})
-		i++
-	}
-	if err := g.Wait(); err != nil {
-		log.Errorf("memory-idx: failed to DeletePersistent: orgId=%d pattern=%s. %s", orgId, pattern, err)
 		return nil, err
 	}
 
@@ -194,8 +163,7 @@ func (p *PartitionedMemoryIdx) DeletePersistent(orgId uint32, pattern string) ([
 	for _, r := range result {
 		items += len(r)
 	}
-
-	response := make([]*interning.ArchiveInterned, 0, items)
+	response := make([]idx.Archive, 0, items)
 	for _, r := range result {
 		response = append(response, r...)
 	}
@@ -258,9 +226,9 @@ func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([
 }
 
 // List returns all Archives for the passed OrgId and the public orgId
-func (p *PartitionedMemoryIdx) List(orgId uint32) []interning.Archive {
+func (p *PartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]interning.Archive, len(p.Partition))
+	result := make([][]idx.Archive, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
@@ -281,7 +249,7 @@ func (p *PartitionedMemoryIdx) List(orgId uint32) []interning.Archive {
 	for _, r := range result {
 		items += len(r)
 	}
-	response := make([]interning.Archive, 0, items)
+	response := make([]idx.Archive, 0, items)
 	for _, r := range result {
 		response = append(response, r...)
 	}
@@ -290,9 +258,9 @@ func (p *PartitionedMemoryIdx) List(orgId uint32) []interning.Archive {
 
 // Prune deletes all metrics that haven't been seen since the given timestamp.
 // It returns all Archives deleted and any error encountered.
-func (p *PartitionedMemoryIdx) Prune(oldest time.Time) ([]*interning.ArchiveInterned, error) {
+func (p *PartitionedMemoryIdx) Prune(oldest time.Time) ([]idx.Archive, error) {
 	// Prune each partition sequentially.
-	result := []*interning.ArchiveInterned{}
+	result := []idx.Archive{}
 	for _, m := range p.Partition {
 		found, err := m.Prune(oldest)
 		if err != nil {
@@ -491,9 +459,9 @@ func (p *PartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *rege
 
 // DeleteTagged deletes the specified series from the tag index and also the
 // DefById index.
-func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) []interning.Archive {
+func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) []idx.Archive {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([][]interning.Archive, len(p.Partition))
+	result := make([][]idx.Archive, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
@@ -511,7 +479,7 @@ func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) 
 		items += len(r)
 	}
 
-	response := make([]interning.Archive, 0, items)
+	response := make([]idx.Archive, 0, items)
 	for _, r := range result {
 		response = append(response, r...)
 	}
@@ -520,11 +488,11 @@ func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) 
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.
-func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []interning.MetricDefinitionInterned) int {
+func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.MetricDefinition) int {
 	return p.Partition[partition].Load(defs)
 }
 
-func (p *PartitionedMemoryIdx) add(archive *interning.ArchiveInterned) {
+func (p *PartitionedMemoryIdx) add(archive *idx.Archive) {
 	p.Partition[archive.Partition].add(archive)
 }
 

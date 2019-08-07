@@ -99,7 +99,7 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 
 	archive, _, ok := in.metricIndex.Update(point, partition)
 
-	if !ok || archive == nil {
+	if !ok {
 		in.unknownMP.Inc()
 		mdata.PromDiscardedSamples.WithLabelValues(unknownPointId, strconv.Itoa(int(point.MKey.Org))).Inc()
 		return
@@ -107,7 +107,6 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 
 	m := in.metrics.GetOrCreate(point.MKey, archive.SchemaId, archive.AggId, uint32(archive.Interval))
 	m.Add(point.Time, point.Value)
-	archive.ReleaseInterned()
 }
 
 // ProcessMetricData assures the data is stored and the metadata is in the index
@@ -175,11 +174,7 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 	}
 
 	archive, _, _ := in.metricIndex.AddOrUpdate(mkey, md, partition)
-	if archive == nil {
-		return
-	}
 
 	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId, uint32(md.Interval))
 	m.Add(uint32(md.Time), md.Value)
-	archive.ReleaseInterned()
 }

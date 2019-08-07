@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/interning"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/test"
 	"github.com/raintank/schema"
 )
@@ -34,7 +34,7 @@ func getTestIDs() []schema.MKey {
 	return ids
 }
 
-func getTestIndex() (TagIndex, map[schema.MKey]*interning.ArchiveInterned) {
+func getTestIndex() (TagIndex, map[schema.MKey]*idx.Archive) {
 	type testCase struct {
 		id         schema.MKey
 		lastUpdate int64
@@ -55,23 +55,18 @@ func getTestIndex() (TagIndex, map[schema.MKey]*interning.ArchiveInterned) {
 	}
 
 	tagIdx := make(TagIndex)
-	byId := make(map[schema.MKey]*interning.ArchiveInterned)
+	byId := make(map[schema.MKey]*idx.Archive)
 
 	for i, d := range data {
-		byId[d.id] = &interning.ArchiveInterned{}
-		byId[d.id].MetricDefinitionInterned = new(interning.MetricDefinitionInterned)
-		byId[d.id].SetMetricName(fmt.Sprintf("metric%d", i))
-		byId[d.id].SetTags(d.tags)
+		byId[d.id] = &idx.Archive{}
+		byId[d.id].Name = fmt.Sprintf("metric%d", i)
+		byId[d.id].Tags = d.tags
 		byId[d.id].LastUpdate = d.lastUpdate
 		for _, tag := range d.tags {
 			tagSplits := strings.Split(tag, "=")
-			k, _ := interning.IdxIntern.AddOrGet([]byte(tagSplits[0]), false)
-			v, _ := interning.IdxIntern.AddOrGet([]byte(tagSplits[1]), false)
-			tagIdx.addTagId(k, v, d.id)
+			tagIdx.addTagId(tagSplits[0], tagSplits[1], d.id)
 		}
-		k, _ := interning.IdxIntern.AddOrGet([]byte("name"), false)
-		v, _ := interning.IdxIntern.AddOrGet([]byte(byId[d.id].Name.String()), false)
-		tagIdx.addTagId(k, v, d.id)
+		tagIdx.addTagId("name", byId[d.id].Name, d.id)
 	}
 
 	return tagIdx, byId

@@ -9,7 +9,6 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
 )
 
@@ -19,15 +18,15 @@ func FormatRowKey(mkey schema.MKey, partition int32) string {
 }
 
 // SchemaToRow takes a metricDefintion and returns a rowKey and column data.
-func SchemaToRow(def *interning.MetricDefinitionInterned) (string, map[string][]byte) {
+func SchemaToRow(def *schema.MetricDefinition) (string, map[string][]byte) {
 	row := map[string][]byte{
 		//"Id" omitted as it is part of the rowKey
 		"OrgId":      make([]byte, 8),
-		"Name":       []byte(def.Name.String()),
+		"Name":       []byte(def.Name),
 		"Interval":   make([]byte, 8),
-		"Unit":       []byte(def.Unit.String()),
-		"Mtype":      []byte(def.Mtype()),
-		"Tags":       []byte(strings.Join(def.Tags.Strings(), ";")),
+		"Unit":       []byte(def.Unit),
+		"Mtype":      []byte(def.Mtype),
+		"Tags":       []byte(strings.Join(def.Tags, ";")),
 		"LastUpdate": make([]byte, 8),
 		//"Partition" omitted as it is part of te rowKey
 	}
@@ -52,7 +51,7 @@ func DecodeRowKey(key string) (schema.MKey, int32, error) {
 }
 
 // RowToSchema takes a row and unmarshals the data into the provided MetricDefinition.
-func RowToSchema(row bigtable.Row, def *interning.MetricDefinitionInterned) error {
+func RowToSchema(row bigtable.Row, def *schema.MetricDefinition) error {
 	if def == nil {
 		return fmt.Errorf("cant write row to nil MetricDefinition")
 	}
@@ -60,7 +59,7 @@ func RowToSchema(row bigtable.Row, def *interning.MetricDefinitionInterned) erro
 	if !ok {
 		return fmt.Errorf("no columns in columnFamly %s", COLUMN_FAMILY)
 	}
-	*def = interning.MetricDefinitionInterned{}
+	*def = schema.MetricDefinition{}
 	var err error
 	var val int64
 
@@ -81,10 +80,7 @@ func RowToSchema(row bigtable.Row, def *interning.MetricDefinitionInterned) erro
 				def.OrgId = uint32(val)
 			}
 		case "Name":
-			err := def.SetMetricName(string(col.Value))
-			if err != nil {
-				return err
-			}
+			def.Name = string(col.Value)
 		case "Interval":
 			val, err = binary.ReadVarint(bytes.NewReader(col.Value))
 			if err != nil {
@@ -92,14 +88,14 @@ func RowToSchema(row bigtable.Row, def *interning.MetricDefinitionInterned) erro
 			}
 			def.Interval = int(val)
 		case "Unit":
-			def.SetUnit(string(col.Value))
+			def.Unit = string(col.Value)
 		case "Mtype":
-			def.SetMType(string(col.Value))
+			def.Mtype = string(col.Value)
 		case "Tags":
 			if len(col.Value) == 0 {
-				def.Tags.KeyValues = nil
+				def.Tags = nil
 			} else {
-				def.SetTags(strings.Split(string(col.Value), ";"))
+				def.Tags = strings.Split(string(col.Value), ";")
 			}
 		case "LastUpdate":
 			def.LastUpdate, err = binary.ReadVarint(bytes.NewReader(col.Value))

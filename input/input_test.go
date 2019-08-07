@@ -1,7 +1,6 @@
 package input
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -14,8 +13,6 @@ import (
 	"github.com/grafana/metrictank/mdata/cache"
 	backendStore "github.com/grafana/metrictank/store"
 	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
-	"golang.org/x/sync/errgroup"
 )
 
 func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T) {
@@ -189,7 +186,6 @@ func getDefaultHandler(t *testing.T) (DefaultHandler, idx.MetricIndex, func()) {
 	oldTagSupport := memory.TagSupport
 	memory.TagSupport = true
 	index := memory.New()
-	index.Init()
 
 	reset := func() {
 		rejectInvalidTags = oldRejectInvalidTags
@@ -280,77 +276,4 @@ func BenchmarkProcessMetricDataSameMetric(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		in.ProcessMetricData(datas[i], 1)
 	}
-}
-
-func BenchmarkProcessMetricPoint(b *testing.B) {
-	metricCount := 100
-	cluster.Init("default", "test", time.Now(), "http", 6060)
-
-	store := backendStore.NewDevnullStore()
-
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 10000, 600, 10, 0))
-	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-
-	aggmetrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, 800, 8000, 0)
-	metricIndex := memory.New()
-	metricIndex.Init()
-	defer metricIndex.Stop()
-
-	in := NewDefaultHandler(aggmetrics, metricIndex, "BenchmarkProcess")
-
-	datas := make([]schema.MetricData, metricCount)
-	mkeys := make([]schema.MKey, metricCount)
-	var err error
-	for i := 0; i < metricCount; i++ {
-		name := fmt.Sprintf("fake.metric.%d", i)
-		metric := schema.MetricData{
-			Id:       "1.12345678901234567890123456789012",
-			OrgId:    500,
-			Name:     name,
-			Interval: 10,
-			Value:    1234.567,
-			Unit:     "ms",
-			Time:     int64((i + 1) * 10),
-			Mtype:    "gauge",
-			Tags:     []string{"some=tag", "ok=yes"},
-		}
-		datas[i] = metric
-		datas[i].SetId()
-		in.ProcessMetricData(&datas[i], 1)
-		mkeys[i], err = schema.MKeyFromString(datas[i].Id)
-		if err != nil {
-			b.Fatalf("Error getting MKey from MetricData: %s", err)
-		}
-	}
-
-	metricPoints := make(chan schema.MetricPoint, 100)
-	rootCtx := context.Background()
-	group, _ := errgroup.WithContext(rootCtx)
-	for i := 0; i < 10; i++ {
-		group.Go(func() error {
-			for point := range metricPoints {
-				in.ProcessMetricPoint(point, msg.FormatMetricPoint, 1)
-			}
-			return nil
-		})
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-
-	go func() {
-		for i := 0; i < b.N; i++ {
-			for j := 0; j < metricCount; j++ {
-				metricPoints <- schema.MetricPoint{
-					MKey:  mkeys[j],
-					Value: float64(i + 1),
-					Time:  uint32(i + 1),
-				}
-			}
-		}
-
-		close(metricPoints)
-	}()
-
-	group.Wait()
 }

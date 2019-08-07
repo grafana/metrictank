@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/interning"
+	"github.com/grafana/metrictank/idx"
 	"github.com/raintank/schema"
 )
 
@@ -135,9 +135,9 @@ func BenchmarkHttpRespFastJsonNulls(b *testing.B) {
 }
 
 func BenchmarkHttpRespFastJson1MMetricNames(b *testing.B) {
-	series := make([]interning.Archive, 1000000)
+	series := make([]idx.Archive, 1000000)
 	for i := 0; i < 1000000; i++ {
-		series[i] = interning.NewArchiveBare(fmt.Sprintf("this.is.the.name.of.a.random-graphite-series.%d", i))
+		series[i] = idx.NewArchiveBare(fmt.Sprintf("this.is.the.name.of.a.random-graphite-series.%d", i))
 	}
 	b.ResetTimer()
 	var resp *FastJson
@@ -151,9 +151,9 @@ func BenchmarkHttpRespFastJson1MMetricNames(b *testing.B) {
 }
 
 func BenchmarkHttpRespFastJson1MMetricNamesNeedEscaping(b *testing.B) {
-	series := make([]interning.Archive, 1000000)
+	series := make([]idx.Archive, 1000000)
 	for i := 0; i < 1000000; i++ {
-		series[i] = interning.NewArchiveBare(fmt.Sprintf(`this.is.the.name.of.\.random\graphite\series.%d`, i))
+		series[i] = idx.NewArchiveBare(fmt.Sprintf(`this.is.the.name.of.\.random\graphite\series.%d`, i))
 	}
 	b.ResetTimer()
 	var resp *FastJson
