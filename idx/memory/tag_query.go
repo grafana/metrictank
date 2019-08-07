@@ -23,7 +23,7 @@ type TagQueryContext struct {
 
 	query    tagquery.Query
 	selector *idSelector
-	filters  []filter
+	filter   *idFilter
 
 	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
@@ -31,24 +31,6 @@ type TagQueryContext struct {
 	metaRecords metaTagRecords               // meta tag records keyed by their recordID
 	startWith   int                          // the expression index to start with
 	subQuery    bool                         // true if this is a subquery created from the expressions of a meta tag record
-}
-
-type filter struct {
-	// expr is the expression based on which this filter has been generated
-	expr tagquery.Expression
-
-	// test is a filter function which takes a MetricDefinition and returns a
-	// tagquery.FilterDecision type indicating whether the MD
-	// satisfies this expression or not
-	test tagquery.MetricDefinitionFilter
-
-	// testByMetaTags is a filter function which has been generated
-	// from the meta records that match this filter's expression
-	testByMetaTags tagquery.MetricDefinitionFilter
-
-	// the default decision which should be applied if none of test & testByMetaTags
-	// have come to a conclusive decision
-	defaultDecision tagquery.FilterDecision
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -62,12 +44,13 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 	return ctx
 }
 
-func (q *TagQueryContext) prepareExpressions() {
-	type expressionCost struct {
-		operatorCost  uint32
-		cardinality   uint32
-		expressionIdx int
-	}
+type expressionCost struct {
+	operatorCost  uint32
+	cardinality   uint32
+	expressionIdx int
+}
+
+func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 	costs := make([]expressionCost, len(q.query.Expressions))
 
 	for i, expr := range q.query.Expressions {
@@ -99,115 +82,34 @@ func (q *TagQueryContext) prepareExpressions() {
 		return costs[i].operatorCost < costs[j].operatorCost
 	})
 
+	return costs
+}
+
+func (q *TagQueryContext) prepareExpressions() {
+	costs := q.evaluateExpressionCosts()
+
 	// the number of filters is equal to the number of expressions - 1 because one of the
 	// expressions will be chosen to be the one that we start with.
 	// we don't need the filter function, nor the default decision, of the expression which
 	// we start with.
 	// all the remaining expressions will be used as filter expressions, for which we need
 	// to obtain their filter functions and their default decisions.
-	q.filters = make([]filter, len(q.query.Expressions)-1)
+	filterExpressions := make([]tagquery.Expression, 0, len(q.query.Expressions)-1)
 
 	// Every tag query has at least one expression which requires a non-empty value according to:
 	// https://graphite.readthedocs.io/en/latest/tags.html#querying
 	// This rule is enforced by tagquery.NewQuery, here we trust that the queries which get passed
 	// into the index have already been validated
-	i := 0
 	for _, cost := range costs {
 		if q.startWith < 0 && q.query.Expressions[cost.expressionIdx].RequiresNonEmptyValue() {
 			q.startWith = cost.expressionIdx
 		} else {
-			expr := q.query.Expressions[cost.expressionIdx]
-			q.filters[i] = filter{
-				expr:            expr,
-				test:            expr.GetMetricDefinitionFilter(q.index.idHasTag),
-				defaultDecision: expr.GetDefaultDecision(),
-			}
-			if tagquery.MetaTagSupport {
-				recordIds := q.mti.getMetaRecordIdsByExpression(expr)
-				var expressionFilters []tagquery.MetricDefinitionFilter
-				for _, id := range recordIds {
-					record, ok := q.metaRecords[id]
-					if !ok {
-						corruptIndex.Inc()
-						log.Errorf("TagQueryContext: Tried to lookup a meta tag record id that does not exist, index is corrupted")
-						continue
-					}
-
-					expressionFilters = append(expressionFilters, record.GetMetricDefinitionFilter(q.index.idHasTag))
-				}
-
-				if expr.ResultIsSmallerWhenNegated() {
-					q.filters[i].testByMetaTags = func(id schema.MKey, name string, tags []string) tagquery.FilterDecision {
-						for _, expressionFilter := range expressionFilters {
-							decision := expressionFilter(id, name, tags)
-							if decision == tagquery.None {
-								decision = q.filters[i].expr.GetDefaultDecision()
-							}
-
-							if decision == tagquery.Fail {
-								return tagquery.Pass
-							}
-						}
-
-						return tagquery.Fail
-					}
-				} else {
-					q.filters[i].testByMetaTags = func(id schema.MKey, name string, tags []string) tagquery.FilterDecision {
-						for _, expressionFilter := range expressionFilters {
-							decision := expressionFilter(id, name, tags)
-							if decision == tagquery.None {
-								decision = q.filters[i].expr.GetDefaultDecision()
-							}
-
-							if decision == tagquery.Fail {
-								return tagquery.Fail
-							}
-						}
-						return tagquery.Pass
-					}
-				}
-			}
-			i++
+			filterExpressions = append(filterExpressions, q.query.Expressions[cost.expressionIdx])
 		}
 	}
 
 	q.selector = newIdSelector(q.query.Expressions[q.startWith], q)
-}
-
-// testByAllExpressions takes and id and a MetricDefinition and runs it through
-// all required tests in order to decide whether this metric should be part
-// of the final result set or not
-// in map/reduce terms this is the reduce function
-func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTagFilters bool) bool {
-	if !q.testByFrom(def) {
-		return false
-	}
-
-	for i := range q.filters {
-		decision := q.filters[i].test(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags)
-
-		if decision == tagquery.Pass {
-			continue
-		}
-
-		if decision == tagquery.Fail {
-			return false
-		}
-
-		decision = q.filters[i].testByMetaTags(id, def.Name, def.Tags)
-
-		if decision == tagquery.None {
-			decision = q.filters[i].defaultDecision
-		}
-
-		if decision == tagquery.Pass {
-			continue
-		}
-
-		return false
-	}
-
-	return true
+	q.filter = newIdFilter(filterExpressions, q)
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -232,8 +134,7 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 			continue
 		}
 
-		// we always omit tag filters because Run() does not support filtering by tags
-		if q.testByAllExpressions(id, def, false) {
+		if q.testByFrom(def) && q.filter.matches(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags) {
 			resCh <- id
 		}
 	}
@@ -364,7 +265,7 @@ IDS:
 		// the metric through all tag expression tests in order to decide
 		// whether those tags should be part of the final result set
 		if len(metricTags) > 0 {
-			if q.testByAllExpressions(id, def, omitTagFilters) {
+			if q.testByFrom(def) && q.filter.matches(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags) {
 				for key := range metricTags {
 					select {
 					case tagCh <- key:
