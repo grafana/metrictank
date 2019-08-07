@@ -97,11 +97,12 @@ func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 // getMetaRecordIdsByExpression takes an expression and returns all meta record
 // ids of the records which match it.
 // It is important to note that if an expression indicates that the result set will likely
-// be smaller if it's negated, then this returns the negative of the actual result set to
-// reduce the size of the returned result set.
+// be smaller if it's inverted, then this returns the negative (inverted set) of the actual
+// result set to reduce the size of the returned result set.
+// Minimizing the size of the returned result set will lead to a faster expression evaluation.
 // The caller, after receiving the result set, needs to check whether this expression
-// indicates that the result set will likely be smaller if it's negated in order to be able
-// to interpret the result.
+// indicates that the result set will likely be smaller if it's inverted in order to be able
+// to interpret the result correctly.
 func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression) []recordId {
 	if expr.OperatesOnTag() {
 		return m.getByTag(expr)
@@ -115,7 +116,7 @@ func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
 
 	for key := range m {
 
-		if expr.ResultIsSmallerWhenNegated() {
+		if expr.ResultIsSmallerWhenInverted() {
 			if expr.Matches(key) {
 				continue
 			}
@@ -134,7 +135,7 @@ func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
 }
 
 func (m metaTagIndex) getByTagValue(expr tagquery.Expression) []recordId {
-	negateResults := expr.ResultIsSmallerWhenNegated()
+	negateResults := expr.ResultIsSmallerWhenInverted()
 
 	if expr.MatchesExactly() {
 		return m[expr.GetKey()][expr.GetValue()]

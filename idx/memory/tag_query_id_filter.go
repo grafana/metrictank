@@ -76,8 +76,8 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
 		}
 
-		if expr.ResultIsSmallerWhenNegated() {
-			res.filters[i].testByMetaTags = metaRecordFilterNegated(metaRecordFilters, res.filters[i].defaultDecision)
+		if expr.ResultIsSmallerWhenInverted() {
+			res.filters[i].testByMetaTags = metaRecordFilterInverted(metaRecordFilters, res.filters[i].defaultDecision)
 		} else {
 			res.filters[i].testByMetaTags = metaRecordFilterNormal(metaRecordFilters, res.filters[i].defaultDecision)
 		}
@@ -86,7 +86,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 	return &res
 }
 
-func metaRecordFilterNegated(metaRecordFilters []tagquery.MetricDefinitionFilter, defaultDecision tagquery.FilterDecision) tagquery.MetricDefinitionFilter {
+func metaRecordFilterInverted(metaRecordFilters []tagquery.MetricDefinitionFilter, defaultDecision tagquery.FilterDecision) tagquery.MetricDefinitionFilter {
 	return func(id schema.MKey, name string, tags []string) tagquery.FilterDecision {
 		for _, metaRecordFilter := range metaRecordFilters {
 			decision := metaRecordFilter(id, name, tags)

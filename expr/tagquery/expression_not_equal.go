@@ -30,7 +30,7 @@ func (e *expressionNotEqual) RequiresNonEmptyValue() bool {
 	return false
 }
 
-func (e *expressionNotEqual) ResultIsSmallerWhenNegated() bool {
+func (e *expressionNotEqual) ResultIsSmallerWhenInverted() bool {
 	return true
 }
 

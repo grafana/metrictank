@@ -25,7 +25,7 @@ func (e *expressionCommon) RequiresNonEmptyValue() bool {
 	return true
 }
 
-func (e *expressionCommon) ResultIsSmallerWhenNegated() bool {
+func (e *expressionCommon) ResultIsSmallerWhenInverted() bool {
 	// by default assume false, unless a concrete type overrides this method
 	return false
 }

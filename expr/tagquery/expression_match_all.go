@@ -40,7 +40,7 @@ func (e *expressionMatchAll) RequiresNonEmptyValue() bool {
 	return false
 }
 
-func (e *expressionMatchAll) ResultIsSmallerWhenNegated() bool {
+func (e *expressionMatchAll) ResultIsSmallerWhenInverted() bool {
 	return true
 }
 

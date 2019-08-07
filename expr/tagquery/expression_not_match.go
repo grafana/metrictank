@@ -41,7 +41,7 @@ func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
 	return e.matchesEmpty
 }
 
-func (e *expressionNotMatch) ResultIsSmallerWhenNegated() bool {
+func (e *expressionNotMatch) ResultIsSmallerWhenInverted() bool {
 	return true
 }
 

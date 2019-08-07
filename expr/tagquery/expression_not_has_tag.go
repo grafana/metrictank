@@ -34,7 +34,7 @@ func (e *expressionNotHasTag) RequiresNonEmptyValue() bool {
 	return false
 }
 
-func (e *expressionNotHasTag) ResultIsSmallerWhenNegated() bool {
+func (e *expressionNotHasTag) ResultIsSmallerWhenInverted() bool {
 	return true
 }
 
