@@ -21,8 +21,9 @@ import (
 type TagQueryContext struct {
 	wg sync.WaitGroup
 
-	query   tagquery.Query
-	filters []filter
+	query    tagquery.Query
+	selector *idSelector
+	filters  []filter
 
 	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
@@ -61,7 +62,7 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 	return ctx
 }
 
-func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
+func (q *TagQueryContext) prepareExpressions() {
 	type expressionCost struct {
 		operatorCost  uint32
 		cardinality   uint32
@@ -75,18 +76,18 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 		if expr.OperatesOnTag() {
 			if expr.MatchesExactly() {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx[expr.GetKey()]))
+				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
 			} else {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx))
+				costs[i].cardinality = uint32(len(q.index))
 			}
 		} else {
 			if expr.MatchesExactly() {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx[expr.GetKey()][expr.GetValue()]))
+				costs[i].cardinality = uint32(len(q.index[expr.GetKey()][expr.GetValue()]))
 			} else {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx[expr.GetKey()]))
+				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
 			}
 		}
 	}
@@ -118,7 +119,7 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 			expr := q.query.Expressions[cost.expressionIdx]
 			q.filters[i] = filter{
 				expr:            expr,
-				test:            expr.GetMetricDefinitionFilter(idx.idHasTag),
+				test:            expr.GetMetricDefinitionFilter(q.index.idHasTag),
 				defaultDecision: expr.GetDefaultDecision(),
 			}
 			if tagquery.MetaTagSupport {
@@ -132,7 +133,7 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 						continue
 					}
 
-					expressionFilters = append(expressionFilters, record.GetMetricDefinitionFilter(idx.idHasTag))
+					expressionFilters = append(expressionFilters, record.GetMetricDefinitionFilter(q.index.idHasTag))
 				}
 
 				if expr.ResultIsSmallerWhenNegated() {
@@ -169,6 +170,8 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 			i++
 		}
 	}
+
+	q.selector = newIdSelector(q.query.Expressions[q.startWith], q)
 }
 
 // testByAllExpressions takes and id and a MetricDefinition and runs it through
@@ -244,15 +247,14 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 	q.byId = byId
 	q.mti = mti
 	q.metaRecords = metaRecords
-	q.prepareExpressions(index)
+	q.prepareExpressions()
 
 	// no initial expression has been chosen, returning empty result
 	if q.startWith < 0 || q.startWith >= len(q.query.Expressions) {
 		return make(IdSet)
 	}
 
-	selector := newIdSelector(q.query.Expressions[q.startWith], q)
-	idCh, _ := selector.getIds()
+	idCh, _ := q.selector.getIds()
 	if idCh == nil {
 		return make(IdSet)
 	}
@@ -415,7 +417,7 @@ func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.A
 	q.byId = byId
 	q.mti = mti
 	q.metaRecords = metaRecords
-	q.prepareExpressions(index)
+	q.prepareExpressions()
 
 	maxTagCount := int32(math.MaxInt32)
 
@@ -427,8 +429,7 @@ func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.A
 	q.wg.Add(1)
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
-	selector := newIdSelector(q.query.Expressions[q.startWith], q)
-	idCh, stopCh := selector.getIds()
+	idCh, stopCh := q.selector.getIds()
 	tagCh := make(chan string)
 
 	// we know there can only be 1 tag filter, so if we detect that the given
