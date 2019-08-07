@@ -14,9 +14,7 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/interning"
 	"github.com/raintank/schema"
-	goi "github.com/robert-milan/go-object-interning"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -168,8 +166,11 @@ func TestMain(m *testing.M) {
 func InitSmallIndex() {
 	// if the current index is not the small index then initialize it
 	if currentIndex != 1 || currentlyPartitioned != Partitioned {
-		interning.IdxIntern = nil
-		interning.IdxIntern = goi.NewObjectIntern(goi.NewConfig())
+		if ix != nil {
+			ix.Stop()
+		}
+		ix = nil
+
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1})
@@ -180,7 +181,6 @@ func InitSmallIndex() {
 
 		currentIndex = 1
 	} else {
-		runtime.GC()
 		ix.PurgeFindCache()
 		ix.Init()
 		return
@@ -217,7 +217,11 @@ func InitSmallIndex() {
 func InitLargeIndex() {
 	// if the current index is not the large index then initialize it
 	if currentIndex != 2 || currentlyPartitioned != Partitioned {
-		interning.IdxIntern.Reset()
+		if ix != nil {
+			ix.Stop()
+		}
+		ix = nil
+
 		// run GC because we only get 4G on CircleCI
 		runtime.GC()
 		cluster.Manager.SetPartitions([]int32{0, 1, 2, 3, 4, 5, 6, 7})
@@ -229,7 +233,6 @@ func InitLargeIndex() {
 		currentIndex = 2
 	} else {
 		ix.PurgeFindCache()
-		runtime.GC()
 		ix.Init()
 		return
 	}
@@ -488,37 +491,21 @@ func testTagSorting(t *testing.T) {
 		t.Fatalf("Wrong metric name returned.\nExpected: %s\nGot: %s\n", expected, res[0].Path)
 	}
 
-	md2 := []interning.MetricDefinitionInterned{
+	md2 := []schema.MetricDefinition{
 		{
-			Tags:       interning.TagKeyValues{},
+			Name:       "name2",
+			Tags:       []string{},
 			Interval:   10,
 			OrgId:      1,
 			LastUpdate: int64(123),
 		},
 	}
-	md2[0].SetMetricName("name2")
 	md2[0].SetId()
 
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
-	var k, v uintptr
-	md2[0].Tags = interning.TagKeyValues{}
-	k, _ = interning.IdxIntern.AddOrGet([]byte("5"), false)
-	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
-	k, _ = interning.IdxIntern.AddOrGet([]byte("1"), false)
-	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
-	k, _ = interning.IdxIntern.AddOrGet([]byte("2"), false)
-	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
-	k, _ = interning.IdxIntern.AddOrGet([]byte("4"), false)
-	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
-	k, _ = interning.IdxIntern.AddOrGet([]byte("3"), false)
-	v, _ = interning.IdxIntern.AddOrGet([]byte("a"), false)
-	md2[0].Tags.KeyValues = append(md2[0].Tags.KeyValues, interning.TagKeyValue{Key: k, Value: v})
-	index.LoadPartition(0, md2)
+	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}
+	index.LoadPartition(getPartitionFromName("name2"), md2)
 
 	query, err = tagquery.NewQueryFromStrings([]string{"3=a"}, 0)
 	if err != nil {
@@ -540,10 +527,6 @@ func TestAutoCompleteTags(t *testing.T) {
 
 func testAutoCompleteTags(t *testing.T) {
 	InitSmallIndex()
-	defer func() {
-		ix.Stop()
-		ix = nil
-	}()
 
 	type testCase struct {
 		prefix string
@@ -603,10 +586,7 @@ func TestAutoCompleteTagsWithQuery(t *testing.T) {
 
 func testAutoCompleteTagsWithQuery(t *testing.T) {
 	InitSmallIndex()
-	defer func() {
-		ix.Stop()
-		ix = nil
-	}()
+	defer ix.Stop()
 
 	type testCase struct {
 		prefix string
@@ -675,10 +655,6 @@ func TestAutoCompleteTagValues(t *testing.T) {
 
 func testAutoCompleteTagValues(t *testing.T) {
 	InitSmallIndex()
-	defer func() {
-		ix.Stop()
-		ix = nil
-	}()
 
 	type testCase struct {
 		tag    string
@@ -727,10 +703,7 @@ func TestAutoCompleteTagValuesWithQuery(t *testing.T) {
 
 func testAutoCompleteTagValuesWithQuery(t *testing.T) {
 	InitSmallIndex()
-	defer func() {
-		ix.Stop()
-		ix = nil
-	}()
+	defer ix.Stop()
 
 	type testCase struct {
 		tag    string
@@ -857,8 +830,7 @@ func BenchmarkTagsWithFromAndFilter(b *testing.B) {
 func benchmarkTagsWithFromAndFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
-	filters := []string{"^(?:d)", "^(?:di)", "^(?:c)"}
+	filters := []string{"d", "di", "c"}
 	expected := [][]string{
 		{"dc", "device", "direction", "disk"},
 		{"direction", "disk"},
@@ -881,7 +853,6 @@ func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
 func benchmarkTagsWithoutFromNorFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
 	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "name", "host"}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -913,7 +884,6 @@ func BenchmarkFind(b *testing.B) {
 func benchmarkFind(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
 	queryCount := len(queries)
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -942,7 +912,6 @@ func benchmarkConcurrent4Find(b *testing.B) {
 
 	InitLargeIndex()
 	defer ix.Stop()
-
 	queryCount := len(queries)
 	var wg sync.WaitGroup
 	ch := make(chan testQ)
@@ -976,10 +945,8 @@ func benchmarkConcurrent8Find(b *testing.B) {
 	defer func() {
 		TagSupport = _tagSupport
 	}()
-
 	InitLargeIndex()
 	defer ix.Stop()
-
 	queryCount := len(queries)
 	var wg sync.WaitGroup
 	ch := make(chan testQ)
@@ -1014,10 +981,8 @@ func benchmarkConcurrentInsertFind(b *testing.B) {
 		TagSupport = _tagSupport
 	}()
 	findCacheInvalidateQueueSize = 10
-
 	InitLargeIndex()
 	defer ix.Stop()
-
 	queryCount := len(queries)
 	var wg sync.WaitGroup
 	ch := make(chan testQ)
@@ -1095,7 +1060,6 @@ func BenchmarkTagFindSimpleIntersect(b *testing.B) {
 func benchmarkTagFindSimpleIntersect(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -1112,7 +1076,6 @@ func BenchmarkTagFindRegexIntersect(b *testing.B) {
 func benchmarkTagFindRegexIntersect(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -1129,7 +1092,6 @@ func BenchmarkTagFindMatchingAndFiltering(b *testing.B) {
 func benchmarkTagFindMatchingAndFiltering(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -1146,7 +1108,6 @@ func BenchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 func benchmarkTagFindMatchingAndFilteringWithRegex(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -1195,27 +1156,23 @@ func benchmarkTagQueryFilterAndIntersect(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
 
-	type testCase struct {
-		query           tagquery.Query
-		expectedResults int
-	}
-	var testCases []testCase
+	queries := make([]testQuery, 0)
 	for _, expressions := range permutations([]string{"direction!=~read", "device!=", "host=~host9[0-9]0", "dc=dc1", "disk!=disk1", "metric=disk_time"}) {
-		query, err := tagquery.NewQueryFromStrings(expressions, 150000)
-		if err != nil {
-			b.Fatalf("Failed to instantiate query: %s", err.Error())
-		}
-		testCases = append(testCases, testCase{query: query, expectedResults: 90})
+		queries = append(queries, testQuery{Expressions: expressions, ExpectedResults: 90})
 	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		tc := testCases[n%len(testCases)]
-		series := ix.FindByTag(1, tc.query)
-		if len(series) != tc.expectedResults {
-			b.Fatalf("%+v expected %d got %d results instead", tc.query, tc.expectedResults, len(series))
+		q := queries[n%len(queries)]
+		query, err := tagquery.NewQueryFromStrings(q.Expressions, 150000)
+		if err != nil {
+			b.Fatalf(err.Error())
+		}
+		series := ix.FindByTag(1, query)
+		if len(series) != q.ExpectedResults {
+			b.Fatalf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series))
 		}
 	}
 }
@@ -1228,7 +1185,6 @@ func BenchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 }
 
 func benchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
-	Partitioned = false
 	InitLargeIndex()
 	defer ix.Stop()
 
@@ -1248,7 +1204,7 @@ func benchmarkTagQueryFilterAndIntersectOnlyRegex(b *testing.B) {
 		}
 		series := ix.FindByTag(1, query)
 		if len(series) != q.ExpectedResults {
-			b.Fatalf("run %d: %+v expected %d got %d results instead", n, q.Expressions, q.ExpectedResults, len(series))
+			b.Fatalf("%+v expected %d got %d results instead", q.Expressions, q.ExpectedResults, len(series))
 		}
 	}
 }
@@ -1263,12 +1219,14 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 
 	type testCase struct {
 		prefix string
+		expr   []string
 		from   int64
 		expRes []string
 	}
 
 	tc := testCase{
 		prefix: "di",
+		expr:   []string{},
 		from:   100,
 		expRes: []string{"direction", "disk"},
 	}
@@ -1277,7 +1235,7 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsAndCompare(b, n, tc.prefix, tc.from, 2, tc.expRes)
+		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, tc.from, 2, tc.expRes)
 	}
 }
 
@@ -1308,80 +1266,5 @@ func benchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, tc.from, 2, tc.expRes)
-	}
-}
-
-func BenchmarkTagQueryFilterByEqualExpression(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterByEqualExpression)(b)
-}
-
-func benchmarkTagQueryFilterByEqualExpression(b *testing.B) {
-	InitLargeIndex()
-	defer ix.Stop()
-
-	query, err := tagquery.NewQueryFromStrings([]string{"dc=dc1", "cpu=cpu12"}, 0)
-	if err != nil {
-		b.Fatalf("Unexpected error when instantiating query: %s", err.Error())
-	}
-	expectedResults := 8000
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		series := ix.FindByTag(1, query)
-		if len(series) != expectedResults {
-			b.Fatalf("%+v expected %d got %d results instead", query, expectedResults, len(series))
-		}
-	}
-}
-
-func BenchmarkTagQueryFilterByMatchExpression(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterByMatchExpression)(b)
-}
-
-func benchmarkTagQueryFilterByMatchExpression(b *testing.B) {
-	InitLargeIndex()
-	defer ix.Stop()
-
-	query, err := tagquery.NewQueryFromStrings([]string{"dc=dc1", "cpu=~cpu[0-9]2"}, 0)
-	if err != nil {
-		b.Fatalf("Unexpected error when instantiating query: %s", err.Error())
-	}
-	expectedResults := 16000
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		series := ix.FindByTag(1, query)
-		if len(series) != expectedResults {
-			b.Fatalf("%+v expected %d got %d results instead", query, expectedResults, len(series))
-		}
-	}
-}
-
-func BenchmarkTagQueryFilterByHasTagExpression(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterByHasTagExpression)(b)
-}
-
-func benchmarkTagQueryFilterByHasTagExpression(b *testing.B) {
-	InitLargeIndex()
-	defer ix.Stop()
-
-	query, err := tagquery.NewQueryFromStrings([]string{"dc=dc1", "disk!="}, 0)
-	if err != nil {
-		b.Fatalf("Unexpected error when instantiating query: %s", err.Error())
-	}
-	expectedResults := 80000
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for n := 0; n < b.N; n++ {
-		series := ix.FindByTag(1, query)
-		if len(series) != expectedResults {
-			b.Fatalf("%+v expected %d got %d results instead", query, expectedResults, len(series))
-		}
 	}
 }

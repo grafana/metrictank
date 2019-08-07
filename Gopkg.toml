@@ -42,10 +42,6 @@ unused-packages = true
   revision = "08e90462da344fbb3880e8e47a0ddacc37508579"
 
 [[constraint]]
-  branch = "master"
-  name = "github.com/robert-milan/go-object-interning"
-
-[[constraint]]
   name = "github.com/alyu/configparser"
   branch = "master"
 
@@ -115,7 +111,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/raintank/schema"
-  revision = "e4e977e96e9b1512771d288b3cee6810e00196db"
+  revision = "172e29ac645828b87130d8ae8b41e0a3727ad40d"
 
 [[constraint]]
   name = "github.com/rs/cors"

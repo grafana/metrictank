@@ -13,7 +13,6 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/interning"
 	"github.com/grafana/metrictank/logger"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
@@ -170,7 +169,7 @@ func main() {
 		}
 	}
 
-	var show func(d interning.MetricDefinitionInterned)
+	var show func(d schema.MetricDefinition)
 
 	switch format {
 	case "dump":
@@ -238,7 +237,7 @@ func main() {
 		}
 	}
 
-	var defs []interning.MetricDefinitionInterned
+	var defs []schema.MetricDefinition
 	if len(partitions) == 0 {
 		defs = idx.Load(nil, time.Now())
 	} else {
@@ -252,27 +251,26 @@ func main() {
 	for _, d := range defs {
 		// note that prefix and substr can be "", meaning filter disabled.
 		// the conditions handle this fine as well.
-		name := d.Name.String()
-		if !strings.HasPrefix(name, prefix) {
+		if !strings.HasPrefix(d.Name, prefix) {
 			continue
 		}
-		if !strings.HasSuffix(name, suffix) {
+		if !strings.HasSuffix(d.Name, suffix) {
 			continue
 		}
-		if !strings.Contains(name, substr) {
+		if !strings.Contains(d.Name, substr) {
 			continue
 		}
-		if tags == "none" && len(d.Tags.KeyValues) != 0 {
+		if tags == "none" && len(d.Tags) != 0 {
 			continue
 		}
-		if tags == "some" && len(d.Tags.KeyValues) == 0 {
+		if tags == "some" && len(d.Tags) == 0 {
 			continue
 		}
-		if regex != nil && !regex.MatchString(name) {
+		if regex != nil && !regex.MatchString(d.Name) {
 			continue
 		}
 		if tags == "valid" || tags == "invalid" {
-			valid := schema.ValidateTags(d.Tags.Strings())
+			valid := schema.ValidateTags(d.Tags)
 
 			// skip the metric if the validation result is not what we want
 			if valid != (tags == "valid") {
@@ -283,7 +281,7 @@ func main() {
 			continue
 		}
 		show(d)
-		shown++
+		shown += 1
 		if shown == limit {
 			break
 		}
