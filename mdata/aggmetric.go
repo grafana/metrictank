@@ -31,20 +31,20 @@ type AggMetric struct {
 	store       Store
 	cachePusher cache.CachePusher
 	sync.RWMutex
-	key                   schema.AMKey
-	rob                   *ReorderBuffer
-	currentChunkPos       int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
-	numChunks             uint32 // max size of the circular buffer
-	chunkSpan             uint32 // span of individual chunks in seconds
-	chunks                []*chunk.Chunk
-	aggregators           []*Aggregator
-	dropFirstChunk        bool
-	ingestFromNextChunkT0 uint32
-	ttl                   uint32
-	lastSaveStart         uint32 // last chunk T0 that was added to the write Queue.
-	lastSaveFinish        uint32 // last chunk T0 successfully written to Cassandra.
-	lastWrite             uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
-	firstTs               uint32 // timestamp of first point seen
+	key             schema.AMKey
+	rob             *ReorderBuffer
+	currentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
+	numChunks       uint32 // max size of the circular buffer
+	chunkSpan       uint32 // span of individual chunks in seconds
+	chunks          []*chunk.Chunk
+	aggregators     []*Aggregator
+	dropFirstChunk  bool
+	ingestFromT0    uint32
+	ttl             uint32
+	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
+	lastSaveFinish  uint32 // last chunk T0 successfully written to Cassandra.
+	lastWrite       uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
+	firstTs         uint32 // timestamp of first point seen
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
@@ -56,22 +56,22 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
 
-	ingestFromNextChunkT0 := uint32(0)
+	ingestFromT0 := uint32(0)
 	if ingestFrom > 0 {
 		// compute start of next chunk after ingestFrom
-		ingestFromNextChunkT0 = uint32(ingestFrom-(ingestFrom%int64(ret.ChunkSpan))) + ret.ChunkSpan
+		ingestFromT0 = uint32(ingestFrom-(ingestFrom%int64(ret.ChunkSpan))) + ret.ChunkSpan
 	}
 
 	m := AggMetric{
-		cachePusher:           cachePusher,
-		store:                 store,
-		key:                   key,
-		chunkSpan:             ret.ChunkSpan,
-		numChunks:             ret.NumChunks,
-		chunks:                make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk:        dropFirstChunk,
-		ingestFromNextChunkT0: ingestFromNextChunkT0,
-		ttl:                   uint32(ret.MaxRetention()),
+		cachePusher:    cachePusher,
+		store:          store,
+		key:            key,
+		chunkSpan:      ret.ChunkSpan,
+		numChunks:      ret.NumChunks,
+		chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
+		dropFirstChunk: dropFirstChunk,
+		ingestFromT0:   ingestFromT0,
+		ttl:            uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
@@ -432,10 +432,10 @@ func (a *AggMetric) persist(pos int) {
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
-	if ts < a.ingestFromNextChunkT0 {
+	if ts < a.ingestFromT0 {
 		// TODO: add metric to keep track of the # of points discarded
 		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-from. First chunk considered starts at %d", ts, val, a.ingestFromNextChunkT0)
+			log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-from. First chunk considered starts at %d", ts, val, a.ingestFromT0)
 		}
 		return
 	}
