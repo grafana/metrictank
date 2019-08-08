@@ -58,8 +58,8 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 
 	ingestFromT0 := uint32(0)
 	if ingestFrom > 0 {
-		// compute start of next chunk after ingestFrom
-		ingestFromT0 = uint32(ingestFrom-(ingestFrom%int64(ret.ChunkSpan))) + ret.ChunkSpan
+		// compute next chunk boundary starting from 'ingestFrom'
+		ingestFromT0 = AggBoundary(uint32(ingestFrom), ret.ChunkSpan)
 	}
 
 	m := AggMetric{
