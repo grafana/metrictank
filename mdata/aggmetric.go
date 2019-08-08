@@ -56,12 +56,6 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
 
-	ingestFromT0 := uint32(0)
-	if ingestFrom > 0 {
-		// we only want to ingest data that will go into chunks with a t0 >= 'ingestFrom'.
-		ingestFromT0 = AggBoundary(uint32(ingestFrom), ret.ChunkSpan)
-	}
-
 	m := AggMetric{
 		cachePusher:    cachePusher,
 		store:          store,
@@ -70,11 +64,14 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		numChunks:      ret.NumChunks,
 		chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
 		dropFirstChunk: dropFirstChunk,
-		ingestFromT0:   ingestFromT0,
 		ttl:            uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
+	}
+	if ingestFrom > 0 {
+		// we only want to ingest data that will go into chunks with a t0 >= 'ingestFrom'.
+		m.ingestFromT0 = AggBoundary(uint32(ingestFrom), ret.ChunkSpan)
 	}
 	if reorderWindow != 0 {
 		m.rob = NewReorderBuffer(reorderWindow, interval)
