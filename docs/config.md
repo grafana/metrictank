@@ -40,6 +40,8 @@ instance = default
 # see https://github.com/grafana/metrictank/blob/master/docs/memory-server.md for more details
 # forego persisting of first received (and typically incomplete) chunk
 drop-first-chunk = false
+# only ingest data for chunks that have a t0 equal or higher to the given timestamp. Specified per org. syntax: orgID:timestamp[,...]
+ingest-from =
 # max age for a chunk before to be considered stale and to be persisted to Cassandra
 chunk-max-stale = 1h
 # max age for a metric before to be considered stale and to be purged from in-memory ring buffer.
