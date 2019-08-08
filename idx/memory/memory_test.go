@@ -185,8 +185,24 @@ func withAndWithoutPartitonedIndex(f func(*testing.T)) func(*testing.T) {
 	}
 }
 
+// withAndWithoutMetaTagSupport calls a test with the MetaTagSupport
+// setting turned on and off. This is to verify that something works as
+// expected with both settings.
+func withAndWithoutMetaTagSupport(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) {
+		t.Helper()
+		_metaTagSupport := tagquery.MetaTagSupport
+		defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+
+		tagquery.MetaTagSupport = false
+		t.Run("withoutMetaTagSupport", f)
+		tagquery.MetaTagSupport = true
+		t.Run("withMetaTagSupport", f)
+	}
+}
+
 func TestGetAddKey(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testGetAddKey))(t)
+	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(withAndWithoutTagSupport(testGetAddKey)))(t)
 }
 
 func testGetAddKey(t *testing.T) {
@@ -1251,6 +1267,19 @@ func benchWithAndWithoutPartitonedIndex(f func(*testing.B)) func(*testing.B) {
 		b.Run("partitioned", f)
 		Partitioned = false
 		b.Run("unPartitioned", f)
+	}
+}
+
+func benchWithAndWithoutMetaTagSupport(f func(*testing.B)) func(*testing.B) {
+	return func(b *testing.B) {
+		b.Helper()
+		_metaTagSupport := tagquery.MetaTagSupport
+		defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+
+		tagquery.MetaTagSupport = true
+		b.Run("withMetaTagSupport", f)
+		tagquery.MetaTagSupport = false
+		b.Run("withoutMetaTagSupport", f)
 	}
 }
 

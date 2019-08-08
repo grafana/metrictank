@@ -142,8 +142,34 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	q.wg.Done()
 }
 
-// Run executes the tag query on the given index and returns a list of ids
-func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords) IdSet {
+// RunNonBlocking executes the tag query on the given index and returns a list of ids
+// It takes the following arguments:
+// index:	    the tag index to operate on
+// byId:        a map keyed by schema.MKey referring to *idx.Archive
+// mti:         the meta tag index
+// metaRecords: the meta tag records
+// resCh:       a chan of schema.MKey into which the result set will be pushed
+//              this channel gets closed when the query execution is complete
+func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords, resCh chan schema.MKey) {
+	q.run(index, byId, mti, metaRecords, resCh)
+
+	go func() {
+		q.wg.Wait()
+		close(resCh)
+	}()
+}
+
+// RunBlocking is very similar to RunNonBlocking, but there are two notable differences:
+// 1) It only returns once the query execution is complete
+// 2) It does not close the resCh which has been passed to it on completion
+func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords, resCh chan schema.MKey) {
+	q.run(index, byId, mti, metaRecords, resCh)
+
+	q.wg.Wait()
+}
+
+// run implements the common parts of RunNonBlocking and RunBlocking
+func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords, resCh chan schema.MKey) {
 	q.index = index
 	q.byId = byId
 	q.mti = mti
@@ -152,15 +178,10 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 
 	// no initial expression has been chosen, returning empty result
 	if q.startWith < 0 || q.startWith >= len(q.query.Expressions) {
-		return make(IdSet)
+		return
 	}
 
 	idCh, _ := q.selector.getIds()
-	if idCh == nil {
-		return make(IdSet)
-	}
-
-	resCh := make(chan schema.MKey)
 
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
@@ -170,19 +191,6 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 	for i := 0; i < TagQueryWorkers; i++ {
 		go q.filterIdsFromChan(idCh, resCh)
 	}
-
-	go func() {
-		q.wg.Wait()
-		close(resCh)
-	}()
-
-	result := make(IdSet)
-
-	for id := range resCh {
-		result[id] = struct{}{}
-	}
-
-	return result
 }
 
 // getMaxTagCount calculates the maximum number of results (cardinality) a

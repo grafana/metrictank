@@ -12,11 +12,12 @@ import (
 // it is used to build the initial query set when running a tag query,
 // this result set may later be filtered down by other expressions.
 type idSelector struct {
-	ctx    *TagQueryContext
-	expr   tagquery.Expression
-	idChWg sync.WaitGroup
-	idCh   chan schema.MKey
-	stopCh chan struct{}
+	ctx      *TagQueryContext
+	expr     tagquery.Expression
+	rawResCh chan schema.MKey
+	resCh    chan schema.MKey
+	workerWg sync.WaitGroup
+	stopCh   chan struct{}
 }
 
 // newIdSelector initializes an id selector based on the given arguments.
@@ -24,10 +25,11 @@ type idSelector struct {
 // reusing it is not intended
 func newIdSelector(expr tagquery.Expression, ctx *TagQueryContext) *idSelector {
 	return &idSelector{
-		ctx:    ctx,
-		expr:   expr,
-		idCh:   make(chan schema.MKey),
-		stopCh: make(chan struct{}),
+		ctx:      ctx,
+		expr:     expr,
+		rawResCh: make(chan schema.MKey),
+		resCh:    make(chan schema.MKey),
+		stopCh:   make(chan struct{}),
 	}
 }
 
@@ -43,11 +45,27 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 	// we initially set it to 2 because there will be at least 1 routine to look up
 	// ids from the metric index and 1 to check the meta tag index. when looking up
 	// from the meta tag index this waitgroup may temporarily get further increased
-	i.idChWg.Add(2)
-	go func() {
-		i.idChWg.Wait()
-		close(i.idCh)
-	}()
+	i.workerWg.Add(2)
+
+	// if meta tag support is enabled, then this id selection process might create
+	// sub queries to lookup ids from the meta tag index. in order to prevent
+	// duplicate ids in the result channel, we start a separate thread that reads
+	// i.rawResCh and deduplicates its ids before inserting them into i.resCh.
+	// if meta tag support is not enabled, then this is not necessary and we don't
+	// need to start the deduplication routine.
+	if tagquery.MetaTagSupport {
+		go i.deduplicateRawResults()
+
+		go func() {
+			i.workerWg.Wait()
+			close(i.rawResCh)
+		}()
+	} else {
+		go func() {
+			i.workerWg.Wait()
+			close(i.rawResCh)
+		}()
+	}
 
 	if i.expr.OperatesOnTag() {
 		i.byTag()
@@ -55,7 +73,34 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 		i.byTagValue()
 	}
 
-	return i.idCh, i.stopCh
+	// if meta tag support is enabled we return i.resCh because that channel has
+	// been deduplicated by i.deduplicateRawResults()
+	if tagquery.MetaTagSupport {
+		return i.resCh, i.stopCh
+	}
+
+	// if meta tag support has not been enabled, then we can directly return the
+	// i.rawResCh because without meta tag supports its not possible that duplicate
+	// ids will end up in the raw result channel.
+	return i.rawResCh, i.stopCh
+}
+
+// deduplicateRawResults reads the channel i.rawResCh and deduplicates all the ids
+// in it, then it inserts the unique ids into the channel i.resCh. This is only
+// necessary for queries involving meta tag looksup, without meta tag lookups its
+// not possible that duplicate ids will end up in i.rawResCh
+func (i *idSelector) deduplicateRawResults() {
+	seen := make(map[schema.MKey]struct{})
+	for id := range i.rawResCh {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+
+		i.resCh <- id
+		seen[id] = struct{}{}
+	}
+
+	close(i.resCh)
 }
 
 // byTagValue looks up all ids matching the expression i.expr and pushes them into
@@ -69,7 +114,7 @@ func (i *idSelector) byTagValue() {
 	// each other
 	// same when meta tag support is disabled in the config
 	if !tagquery.MetaTagSupport || i.ctx.subQuery {
-		i.idChWg.Done()
+		i.workerWg.Done()
 		return
 	}
 
@@ -80,7 +125,7 @@ func (i *idSelector) byTagValue() {
 // from the metric index, it then pushes all of them into the id chan.
 // this method assumes that the expression i.expr operates on tag values
 func (i *idSelector) byTagValueFromMetricTagIndex() {
-	defer i.idChWg.Done()
+	defer i.workerWg.Done()
 
 	// if expression value matches exactly we can directly look up the ids by it as key.
 	// this is faster than having to call expr.Matches on each value
@@ -89,7 +134,7 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 			select {
 			case <-i.stopCh:
 				return
-			case i.idCh <- id:
+			case i.rawResCh <- id:
 			}
 		}
 
@@ -108,7 +153,7 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 			select {
 			case <-i.stopCh:
 				return
-			case i.idCh <- id:
+			case i.rawResCh <- id:
 			}
 		}
 	}
@@ -120,7 +165,7 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 // this function creates sub-queries based on the expressions associated with the
 // meta tags which match i.expr, it then merges all results of the subqueries
 func (i *idSelector) byTagValueFromMetaTagIndex() {
-	defer i.idChWg.Done()
+	defer i.workerWg.Done()
 
 	// if expression matches value exactly we can directly look up the ids by it as key.
 	// this is faster than having to call expr.Matches on each value
@@ -164,7 +209,7 @@ func (i *idSelector) byTag() {
 	// each other
 	// same when meta tag support is disabled in the config
 	if !tagquery.MetaTagSupport || i.ctx.subQuery {
-		i.idChWg.Done()
+		i.workerWg.Done()
 		return
 	}
 
@@ -175,7 +220,7 @@ func (i *idSelector) byTag() {
 // from the metric index, it then pushes all of them into the id chan.
 // this method assumes that the expression i.expr operates on tag keys
 func (i *idSelector) byTagFromMetricTagIndex() {
-	defer i.idChWg.Done()
+	defer i.workerWg.Done()
 
 	if i.expr.MatchesExactly() {
 		for _, ids := range i.ctx.index[i.expr.GetKey()] {
@@ -183,7 +228,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 				select {
 				case <-i.stopCh:
 					break
-				case i.idCh <- id:
+				case i.rawResCh <- id:
 				}
 			}
 		}
@@ -201,7 +246,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 				select {
 				case <-i.stopCh:
 					return
-				case i.idCh <- id:
+				case i.rawResCh <- id:
 				}
 			}
 		}
@@ -214,7 +259,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 // this function creates sub-queries based on the expressions associated with the
 // meta tags which match i.expr, it then merges all results of the subqueries
 func (i *idSelector) byTagFromMetaTagIndex() {
-	defer i.idChWg.Done()
+	defer i.workerWg.Done()
 
 	if i.expr.MatchesExactly() {
 		for _, records := range i.ctx.mti[i.expr.GetKey()] {
@@ -253,7 +298,7 @@ func (i *idSelector) evaluateMetaRecord(id recordId) {
 		return
 	}
 
-	i.idChWg.Add(1)
+	i.workerWg.Add(1)
 	go i.runSubQuery(query)
 }
 
@@ -280,16 +325,7 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 // runSubQuery takes a sub-query and executes it.
 // it reads the returned results and pushes them into the id chan
 func (i *idSelector) runSubQuery(query TagQueryContext) {
-	defer i.idChWg.Done()
+	defer i.workerWg.Done()
 
-	resCh := query.Run(i.ctx.index, i.ctx.byId, i.ctx.mti, i.ctx.metaRecords)
-
-	for id := range resCh {
-		select {
-		// abort if query has been stopped
-		case <-i.stopCh:
-			return
-		case i.idCh <- id:
-		}
-	}
+	query.RunBlocking(i.ctx.index, i.ctx.byId, i.ctx.mti, i.ctx.metaRecords, i.rawResCh)
 }
