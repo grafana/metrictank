@@ -4,13 +4,13 @@ import (
 	"testing"
 )
 
-func TestMustParseIngestAfterFlag(t *testing.T) {
+func TestParseIngestAfterFlag(t *testing.T) {
 	tests := []struct {
 		name              string
 		ingestAfterStr    string
 		expectedOrgID     uint32
 		expectedTimestamp int64
-		shouldPanic       bool
+		shouldErr         bool
 	}{
 		{"empty", "", 0, 0, false},
 		{"only zeroes", "0:0", 0, 0, false},
@@ -23,21 +23,18 @@ func TestMustParseIngestAfterFlag(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer func() {
-				r := recover()
-				if r == nil && test.shouldPanic {
-					t.Errorf("MustParseIngestAfterFlag() should have paniced but did not")
-				}
-				if r != nil && !test.shouldPanic {
-					t.Errorf("MustParseIngestAfterFlag() panic-ed but should not have = %v", r)
-				}
-			}()
-			orgID, timestamp := MustParseIngestAfterFlag(test.ingestAfterStr)
+			orgID, timestamp, err := ParseIngestAfterFlag(test.ingestAfterStr)
+			if err == nil && test.shouldErr {
+				t.Errorf("ParseIngestAfterFlag() should have errored but did not")
+			}
+			if err != nil && !test.shouldErr {
+				t.Errorf("ParseIngestAfterFlag() errored but should not have = %v", err)
+			}
 			if orgID != test.expectedOrgID {
-				t.Errorf("MustParseIngestAfterFlag() expected org id %d, got %d", test.expectedOrgID, orgID)
+				t.Errorf("ParseIngestAfterFlag() expected org id %d, got %d", test.expectedOrgID, orgID)
 			}
 			if timestamp != test.expectedTimestamp {
-				t.Errorf("MustParseIngestAfterFlag() expected timestamp %d, got %d", test.expectedOrgID, timestamp)
+				t.Errorf("ParseIngestAfterFlag() expected timestamp %d, got %d", test.expectedOrgID, timestamp)
 			}
 		})
 	}
