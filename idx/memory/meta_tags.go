@@ -94,29 +94,27 @@ func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 	values[keyValue.Value] = append(values[keyValue.Value], id)
 }
 
-// getMetaRecordIdsByExpression takes an expression and returns all meta record
-// ids of the records which match it.
-// It is important to note that if an expression indicates that the result set will likely
-// be smaller if it's inverted, then this returns the negative (inverted set) of the actual
-// result set to reduce the size of the returned result set.
-// Minimizing the size of the returned result set will lead to a faster expression evaluation.
-// The caller, after receiving the result set, needs to check whether this expression
-// indicates that the result set will likely be smaller if it's inverted in order to be able
-// to interpret the result correctly.
-func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression) []recordId {
+// getMetaRecordIdsByExpression takes an expression and a bool, it returns all meta record
+// ids of the records which match it. the bool indicates whether the result set should be
+// inverted. In some cases inverting the result set can minimize its size.
+// Minimizing the size of the returned result set will lead to a faster expression evaluation,
+// because less meta records will need to be checked against a given MetricDefinition.
+// The caller, after receiving the result set, needs to be aware of whether the result set
+// is inverted and interpret it accordingly.
+func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	if expr.OperatesOnTag() {
-		return m.getByTag(expr)
+		return m.getByTag(expr, invertSetOfMetaRecords)
 	}
-	return m.getByTagValue(expr)
+	return m.getByTagValue(expr, invertSetOfMetaRecords)
 }
 
-func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
+func (m metaTagIndex) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	// TODO implement negated results
 	var res []recordId
 
 	for key := range m {
 
-		if expr.ResultIsSmallerWhenInverted() {
+		if invertSetOfMetaRecords {
 			if expr.Matches(key) {
 				continue
 			}
@@ -134,9 +132,7 @@ func (m metaTagIndex) getByTag(expr tagquery.Expression) []recordId {
 	return res
 }
 
-func (m metaTagIndex) getByTagValue(expr tagquery.Expression) []recordId {
-	negateResults := expr.ResultIsSmallerWhenInverted()
-
+func (m metaTagIndex) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	if expr.MatchesExactly() {
 		return m[expr.GetKey()][expr.GetValue()]
 	}
@@ -145,7 +141,7 @@ func (m metaTagIndex) getByTagValue(expr tagquery.Expression) []recordId {
 	for value, ids := range m[expr.GetKey()] {
 		passes := expr.Matches(value)
 
-		if negateResults {
+		if invertSetOfMetaRecords {
 			passes = !passes
 		}
 

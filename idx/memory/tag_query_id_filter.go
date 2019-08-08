@@ -57,9 +57,23 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			continue
 		}
 
+		// this is a performacnce optimization:
+		// some expressions indicate that they'll likely result in a smaller result set
+		// if they get inverted.
+		// f.e. a!=b becomes a=b)
+		// in this case we want to get the inverted set of meta records that matches
+		// "expr", because when generating a off of this smaller result set less meta
+		// record expressions will need to be checked, which will improve the filter
+		// speed. if the meta record filter set has been generated from an inverted
+		// expression, then its result will need to be inverted again to get the
+		// correct result.
+		// f.e. if a!=b previously has been inverted to a=b, and for a given MD a=b
+		// results in true, then a!=b would result in false
+		invertSetOfMetaRecords := expr.ResultIsSmallerWhenInverted()
+
 		// if no meta records match this expression, then we don't need to generate
 		// a meta record filter for it
-		metaRecordIds := ctx.mti.getMetaRecordIdsByExpression(expr)
+		metaRecordIds := ctx.mti.getMetaRecordIdsByExpression(expr, invertSetOfMetaRecords)
 		if len(metaRecordIds) == 0 {
 			continue
 		}
@@ -76,7 +90,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
 		}
 
-		if expr.ResultIsSmallerWhenInverted() {
+		if invertSetOfMetaRecords {
 			res.filters[i].testByMetaTags = metaRecordFilterInverted(metaRecordFilters, res.filters[i].defaultDecision)
 		} else {
 			res.filters[i].testByMetaTags = metaRecordFilterNormal(metaRecordFilters, res.filters[i].defaultDecision)
