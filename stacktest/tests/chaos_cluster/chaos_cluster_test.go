@@ -182,7 +182,7 @@ func TestIsolateOneInstance(t *testing.T) {
 	if mt4Results.Valid[0]+mt4Results.Valid[1] != numReqMt4 {
 		t.Fatalf("expected mt4 to return either correct or erroring responses (total %d). got %s", numReqMt4, spew.Sdump(mt4Results))
 	}
-	if mt4Results.Valid[1] < numReqMt4*30/100 {
+	if mt4Results.Valid[0] < numReqMt4*30/100 {
 		// the instance is completely down for 30s of the 60s experiment run, but we allow some slack
 		t.Fatalf("expected at least 30%% of all mt4 results to succeed. did %d queries. got %s", numReqMt4, spew.Sdump(mt4Results))
 	}
