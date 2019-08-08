@@ -49,6 +49,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 
 	fmt.Println("launching docker-chaos stack...")
 	cmd = exec.CommandContext(ctx, "docker-compose", "up", "--force-recreate", "-V")
