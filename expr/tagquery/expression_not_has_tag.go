@@ -35,7 +35,7 @@ func (e *expressionNotHasTag) RequiresNonEmptyValue() bool {
 }
 
 func (e *expressionNotHasTag) Matches(value string) bool {
-	return value == e.key
+	return value != e.key
 }
 
 func (e *expressionNotHasTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefinitionFilter {
