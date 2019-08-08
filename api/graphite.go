@@ -1228,7 +1228,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 			builder := strings.Builder{}
 			for i := range tags {
 				tags[i].StringIntoBuilder(&builder)
-				var err error
+
 				expressions[i], err = tagquery.ParseExpression(builder.String())
 				if err != nil {
 					response.Write(ctx, response.WrapErrorForTagDB(err))

@@ -215,7 +215,7 @@ FIND_OPERATOR:
 	valuePos := pos
 	for ; pos < len(expr); pos++ {
 		// disallow ; in value
-		if expr[pos] == 59 {
+		if expr[pos] == ';' {
 			return nil, InvalidExpressionError(expr)
 		}
 	}
