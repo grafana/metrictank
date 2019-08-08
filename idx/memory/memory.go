@@ -64,6 +64,8 @@ var (
 	writeQueueEnabled            = false
 	writeQueueDelay              = 30 * time.Second
 	writeMaxBatchSize            = 5000
+	matchCacheSize               = 1000
+	metaTagSupport               = false
 )
 
 func ConfigSetup() {
@@ -82,8 +84,8 @@ func ConfigSetup() {
 	memoryIdx.DurationVar(&findCacheBackoffTime, "find-cache-backoff-time", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
-	memoryIdx.IntVar(&tagquery.MatchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.BoolVar(&tagquery.MetaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
+	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 }
 
@@ -108,6 +110,9 @@ func ConfigProcess() {
 	if findCacheInvalidateMaxSize >= findCacheInvalidateQueueSize {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
+
+	tagquery.MetaTagSupport = metaTagSupport
+	tagquery.MatchCacheSize = matchCacheSize
 }
 
 // interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx

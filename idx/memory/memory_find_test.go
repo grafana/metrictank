@@ -157,6 +157,7 @@ func TestMain(m *testing.M) {
 	defer func(t bool) { TagSupport = t }(TagSupport)
 	TagSupport = true
 	TagQueryWorkers = 5
+	matchCacheSize = 1000
 	tagquery.MatchCacheSize = 1000
 	// we dont need info logs in the test output
 	log.SetLevel(log.ErrorLevel)
