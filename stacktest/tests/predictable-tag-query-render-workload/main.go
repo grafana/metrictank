@@ -40,7 +40,7 @@ func constantBackgroundLoad() {
 
 	for {
 		resp := graphite.ExecuteRenderQuery(req)
-		if !graphite.ValidateTargets([]string{fakemetricName(100)})(resp) {
+		if !graphite.ValidateTargets([]string{fakemetricName(100)}).Fn(resp) {
 			log.Error("bad response: ", resp.StringWithoutData())
 			time.Sleep(time.Second)
 			continue
@@ -89,31 +89,31 @@ func intermittentConcurrentLoad() {
 
 		time.AfterFunc(randDur1, func() {
 			resp := graphite.ExecuteRenderQuery(req1)
-			if !graphite.ValidateTargets(expectedNames)(resp) {
+			if !graphite.ValidateTargets(expectedNames).Fn(resp) {
 				log.Error("intermittentConcurrentLoad case 1 bad response", resp.StringWithoutData())
 			}
 		})
 		time.AfterFunc(randDur2, func() {
 			resp := graphite.ExecuteRenderQuery(req2)
-			if !graphite.ValidateTargets(expectedNames[7:8])(resp) {
+			if !graphite.ValidateTargets(expectedNames[7:8]).Fn(resp) {
 				log.Error("intermittentConcurrentLoad case 2 bad response", resp.StringWithoutData())
 			}
 		})
 		time.AfterFunc(randDur3, func() {
 			resp := graphite.ExecuteRenderQuery(req3)
-			if !graphite.ValidateTargets(expectedNames[7:8])(resp) {
+			if !graphite.ValidateTargets(expectedNames[7:8]).Fn(resp) {
 				log.Error("intermittentConcurrentLoad case 3 bad response", resp.StringWithoutData())
 			}
 		})
 		time.AfterFunc(randDur4, func() {
 			resp := graphite.ExecuteRenderQuery(req4)
-			if !graphite.ValidateTargets(expectedNames[7:8])(resp) {
+			if !graphite.ValidateTargets(expectedNames[7:8]).Fn(resp) {
 				log.Error("intermittentConcurrentLoad case 4 bad response", resp.StringWithoutData())
 			}
 		})
 		time.AfterFunc(randDur5, func() {
 			resp := graphite.ExecuteRenderQuery(req5)
-			if !graphite.ValidateTargets(expectedNames[7:8])(resp) {
+			if !graphite.ValidateTargets(expectedNames[7:8]).Fn(resp) {
 				log.Error("intermittentConcurrentLoad case 5 bad response", resp.StringWithoutData())
 			}
 		})

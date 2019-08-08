@@ -105,16 +105,11 @@ func TestBaseIngestWorkload(t *testing.T) {
 	fm = fakemetrics.NewCarbon(metricsPerSecond)
 
 	req := graphite.RequestForLocalTestingGraphite8080("perSecond(metrictank.stats.docker-env.*.input.carbon.metricdata.received.counter32)", "-8s")
-	resp, ok := graphite.Retry(req, 18, func(resp graphite.Response) bool {
-		exp := []string{
-			"perSecond(metrictank.stats.docker-env.default.input.carbon.metricdata.received.counter32)",
-		}
-		a := graphite.ValidateTargets(exp)(resp)
-		b := graphite.ValidatorLenNulls(1, 8)(resp)
-		c := graphite.ValidatorAvgWindowed(8, graphite.Ge(metricsPerSecond))(resp)
-		log.Printf("condition target names %t - condition len & nulls %t - condition avg value %t", a, b, c)
-		return a && b && c
-	})
+	exp := []string{
+		"perSecond(metrictank.stats.docker-env.default.input.carbon.metricdata.received.counter32)",
+	}
+	validator := graphite.ValidatorAndExhaustive(graphite.ValidateTargets(exp), graphite.ValidatorLenNulls(1, 8), graphite.ValidatorAvgWindowed(8, graphite.Ge(metricsPerSecond)))
+	resp, ok := graphite.Retry(req, 18, validator)
 	if !ok {
 		grafana.PostAnnotation("TestBaseIngestWorkload:FAIL")
 		t.Fatalf("cluster did not reach a state where the MT instance processes at least %d points per second. last response was: %s", metricsPerSecond, spew.Sdump(resp))

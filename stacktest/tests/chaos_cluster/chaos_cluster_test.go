@@ -106,22 +106,20 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestClusterBaseIngestWorkload:begin")
 
 	// generate exactly numPartitions metrics, numbered 0..numPartitions where each metric goes to the partition of the same number
-	// each partition is consumed by 2 instances, and each instance consumes 4 partitions thus 4 metrics/s
+	// each partition is consumed by 2 instances, and each instance consumes 4 partitions thus 4 metrics/s on average.
 	fm = fakemetrics.NewKafka(numPartitions)
 
 	req := graphite.RequestForLocalTestingGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metricdata.received.counter32)", "-8s")
-	resp, ok := graphite.Retry(req, 18, func(resp graphite.Response) bool {
-		exp := []string{
-			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metricdata.received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metricdata.received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank2.input.kafka-mdm.metricdata.received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank3.input.kafka-mdm.metricdata.received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank4.input.kafka-mdm.metricdata.received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metricdata.received.counter32)",
-		}
-		// avg rate must be 4 (metrics ingested per second by each instance)
-		return graphite.ValidateTargets(exp)(resp) && graphite.ValidatorAvgWindowed(8, graphite.Eq(4))(resp)
-	})
+
+	exp := []string{
+		"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metricdata.received.counter32)",
+		"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metricdata.received.counter32)",
+		"perSecond(metrictank.stats.docker-cluster.metrictank2.input.kafka-mdm.metricdata.received.counter32)",
+		"perSecond(metrictank.stats.docker-cluster.metrictank3.input.kafka-mdm.metricdata.received.counter32)",
+		"perSecond(metrictank.stats.docker-cluster.metrictank4.input.kafka-mdm.metricdata.received.counter32)",
+		"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metricdata.received.counter32)",
+	}
+	resp, ok := graphite.Retry(req, 18, graphite.ValidatorAnd(graphite.ValidateTargets(exp), graphite.ValidatorAvgWindowed(8, graphite.Eq(4))))
 	if !ok {
 		grafana.PostAnnotation("TestClusterBaseIngestWorkload:FAIL")
 		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))

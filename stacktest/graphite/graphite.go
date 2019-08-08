@@ -68,7 +68,7 @@ func Retry(req *http.Request, times int, validate Validator) (Response, bool) {
 			time.Sleep(time.Second)
 		}
 		resp = ExecuteRenderQuery(req)
-		if validate(resp) {
+		if validate.Fn(resp) {
 			return resp, true
 		}
 	}
@@ -78,7 +78,8 @@ func Retry(req *http.Request, times int, validate Validator) (Response, bool) {
 // temporary check results
 type checkResultsTemp struct {
 	sync.Mutex
-	valid []int // each position corresponds to a validator
+	validators []Validator
+	valid      []int // each position corresponds to a validator
 	// categories of invalid responses
 	empty      int
 	timeout    int
@@ -88,7 +89,8 @@ type checkResultsTemp struct {
 
 // final outcome of check results
 type CheckResults struct {
-	Valid []int // each position corresponds to a validator
+	Validators []Validator
+	Valid      []int // each position corresponds to a validator
 	// categories of invalid responses
 	Empty      int
 	Timeout    int
@@ -98,15 +100,16 @@ type CheckResults struct {
 
 func newCheckResultsTemp(validators []Validator) *checkResultsTemp {
 	return &checkResultsTemp{
-		valid: make([]int, len(validators)),
+		validators: validators,
+		valid:      make([]int, len(validators)),
 	}
 }
 
-func checkWorker(req *http.Request, wg *sync.WaitGroup, cr *checkResultsTemp, validators []Validator) {
+func checkWorker(req *http.Request, wg *sync.WaitGroup, cr *checkResultsTemp) {
 	r := ExecuteRenderQuery(req)
 	defer wg.Done()
-	for i, v := range validators {
-		if v(r) {
+	for i, v := range cr.validators {
+		if v.Fn(r) {
 			cr.Lock()
 			cr.valid[i] += 1
 			cr.Unlock()
@@ -155,7 +158,7 @@ func CheckMT(endpoints []int, query, from string, dur time.Duration, reqs int, v
 		wg.Add(1)
 		base := fmt.Sprintf("http://localhost:%d", endpoints[issued%len(endpoints)])
 		req := RequestForLocalTesting(base, query, from)
-		go checkWorker(req, wg, ret, validators)
+		go checkWorker(req, wg, ret)
 		issued += 1
 		if issued == reqs {
 			break
@@ -167,6 +170,7 @@ func CheckMT(endpoints []int, query, from string, dur time.Duration, reqs int, v
 		panic(fmt.Sprintf("checkMT ran too long for some reason. expected %s. took actually %s. system overloaded?", dur, time.Since(pre)))
 	}
 	return CheckResults{
+		Validators: ret.validators,
 		Valid:      ret.valid,
 		Empty:      ret.empty,
 		Timeout:    ret.timeout,
