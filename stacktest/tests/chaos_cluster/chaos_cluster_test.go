@@ -105,17 +105,19 @@ func TestClusterStartup(t *testing.T) {
 func TestClusterBaseIngestWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestClusterBaseIngestWorkload:begin")
 
+	// generate exactly numPartitions metrics, numbered 0..numPartitions where each metric goes to the partition of the same number
+	// each partition is consumed by 2 instances, and each instance consumes 4 partitions thus 4 metrics/s
 	fm = fakemetrics.NewKafka(numPartitions)
 
-	req := graphite.RequestForLocalTestingGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-8s")
+	req := graphite.RequestForLocalTestingGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metricdata.received.counter32)", "-8s")
 	resp, ok := graphite.Retry(req, 18, func(resp graphite.Response) bool {
 		exp := []string{
-			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metrics_received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metrics_received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank2.input.kafka-mdm.metrics_received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank3.input.kafka-mdm.metrics_received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank4.input.kafka-mdm.metrics_received.counter32)",
-			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metrics_received.counter32)",
+			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metricdata.received.counter32)",
+			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metricdata.received.counter32)",
+			"perSecond(metrictank.stats.docker-cluster.metrictank2.input.kafka-mdm.metricdata.received.counter32)",
+			"perSecond(metrictank.stats.docker-cluster.metrictank3.input.kafka-mdm.metricdata.received.counter32)",
+			"perSecond(metrictank.stats.docker-cluster.metrictank4.input.kafka-mdm.metricdata.received.counter32)",
+			"perSecond(metrictank.stats.docker-cluster.metrictank5.input.kafka-mdm.metricdata.received.counter32)",
 		}
 		// avg rate must be 4 (metrics ingested per second by each instance)
 		return graphite.ValidateTargets(exp)(resp) && graphite.ValidatorAvgWindowed(8, graphite.Eq(4))(resp)
