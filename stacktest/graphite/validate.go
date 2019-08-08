@@ -34,6 +34,12 @@ type Validator struct {
 	Fn   func(resp Response) bool
 }
 
+// Equal returns whether v1 equals v2
+// workaround for go-cmp which treats Validators unequal even if they have the same function pointer. not sure why
+func (v1 Validator) Equal(v2 Validator) bool {
+	return v1.Name == v2.Name
+}
+
 // ValidateTargets returns a function that validates that the response contains exactly all named targets
 func ValidateTargets(targets []string) Validator {
 	return Validator{

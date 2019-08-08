@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/stacktest/docker"
 	"github.com/grafana/metrictank/stacktest/fakemetrics"
@@ -135,18 +135,19 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 
 func TestQueryWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestQueryWorkload:begin")
+	validators := []graphite.Validator{graphite.ValidateCorrect(12)}
 
-	results := graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 6000, graphite.ValidateCorrect(12))
-
+	got := graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 6000, validators...)
 	exp := graphite.CheckResults{
-		Valid:   []int{6000},
-		Empty:   0,
-		Timeout: 0,
-		Other:   0,
+		Validators: validators,
+		Valid:      []int{6000},
+		Empty:      0,
+		Timeout:    0,
+		Other:      0,
 	}
-	if !reflect.DeepEqual(exp, results) {
+	if diff := cmp.Diff(exp, got); diff != "" {
 		grafana.PostAnnotation("TestQueryWorkload:FAIL")
-		t.Fatalf("expected only correct results. got %s", spew.Sdump(results))
+		t.Fatalf("expected only correct results. (-want +got):\n%s", diff)
 	}
 }
 
@@ -159,7 +160,7 @@ func TestQueryWorkload(t *testing.T) {
 func TestIsolateOneInstance(t *testing.T) {
 	grafana.PostAnnotation("TestIsolateOneInstance:begin")
 	numReqMt4 := 1200
-
+	validatorsOther := []graphite.Validator{graphite.ValidateCorrect(12)}
 	mt4ResultsChan := make(chan graphite.CheckResults, 1)
 	otherResultsChan := make(chan graphite.CheckResults, 1)
 
@@ -167,7 +168,7 @@ func TestIsolateOneInstance(t *testing.T) {
 		mt4ResultsChan <- graphite.CheckMT([]int{6064}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, numReqMt4, graphite.ValidateCorrect(12), graphite.ValidateCode(503))
 	}()
 	go func() {
-		otherResultsChan <- graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, graphite.ValidateCorrect(12))
+		otherResultsChan <- graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, validatorsOther...)
 	}()
 
 	// now go ahead and isolate for 30s
@@ -188,14 +189,15 @@ func TestIsolateOneInstance(t *testing.T) {
 
 	// validate results of other cluster nodes
 	exp := graphite.CheckResults{
-		Valid:   []int{6000},
-		Empty:   0,
-		Timeout: 0,
-		Other:   0,
+		Validators: validatorsOther,
+		Valid:      []int{6000},
+		Empty:      0,
+		Timeout:    0,
+		Other:      0,
 	}
-	if !reflect.DeepEqual(exp, otherResults) {
+	if diff := cmp.Diff(exp, otherResults); diff != "" {
 		grafana.PostAnnotation("TestIsolateOneInstance:FAIL")
-		t.Fatalf("expected only correct results for all cluster nodes. got %s", spew.Sdump(otherResults))
+		t.Fatalf("expected only correct results for all cluster nodes. (-want +got):\n%s", diff)
 	}
 }
 
