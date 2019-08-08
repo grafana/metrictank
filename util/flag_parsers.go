@@ -1,40 +1,46 @@
 package util
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 )
 
-func ParseIngestFromFlag(ingestFromStr string) (uint32, int64, error) {
-	orgID := 0
-	timestamp := 0
-	if len(ingestFromStr) > 0 {
-		ingestFromParts := strings.Split(ingestFromStr, ":")
-		if len(ingestFromParts) != 2 {
-			return 0, 0, fmt.Errorf("Could not parse ingest-from. %s", ingestFromStr)
+func ParseIngestFromFlags(ingestFromStr string) (map[uint32]int64, error) {
+	if len(ingestFromStr) == 0 {
+		return nil, nil
+	}
+
+	ingestFrom := make(map[uint32]int64)
+
+	ingestFromStrPerOrgs := strings.Split(ingestFromStr, ",")
+	for _, ingestFromStrPerOrg := range ingestFromStrPerOrgs {
+
+		if len(ingestFromStr) == 0 {
+			continue
 		}
-		var err error
-		orgID, err = strconv.Atoi(ingestFromParts[0])
+		parts := strings.Split(ingestFromStrPerOrg, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("could not parse section %q from %q", ingestFromStrPerOrg, ingestFromStr)
+		}
+		orgID, err := strconv.Atoi(parts[0])
 		if err != nil {
-			return 0, 0, fmt.Errorf("Could not parse org id from ingest-from. %s", ingestFromStr)
+			return nil, fmt.Errorf("could not parse org id %q: %s", parts[0], err.Error())
 		}
 		if orgID < 0 || orgID > math.MaxUint32 {
-			return 0, 0, fmt.Errorf("Org id out of range. %d", orgID)
+			return nil, fmt.Errorf("org id out of range. %d", orgID)
 		}
-		timestamp, err = strconv.Atoi(ingestFromParts[1])
+		timestamp, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return 0, 0, fmt.Errorf("Could not parse timestamp from ingest-from. %s", ingestFromStr)
+			return nil, fmt.Errorf("could not parse timestamp %q: %s", parts[1], err.Error())
 		}
-	}
-	return uint32(orgID), int64(timestamp), nil
-}
+		if timestamp <= 0 {
+			return nil, errors.New("timestamp must be > 0")
+		}
 
-func MustParseIngestFromFlag(ingestFromStr string) (uint32, int64) {
-	orgID, timestamp, err := ParseIngestFromFlag(ingestFromStr)
-	if err != nil {
-		panic(err.Error())
+		ingestFrom[uint32(orgID)] = int64(timestamp)
 	}
-	return orgID, timestamp
+	return ingestFrom, nil
 }

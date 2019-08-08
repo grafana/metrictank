@@ -298,14 +298,12 @@ func main() {
 		Initialize our MemoryStore
 	***********************************/
 
-	ingestFrom := make(map[uint32]int64)
-	ingestFromStrPerOrg := strings.Split(*ingestFromStr, ",")
-	for _, ingestFromStrForOrg := range ingestFromStrPerOrg {
-		ingestFromOrgID, ingestFromTimestamp := util.MustParseIngestFromFlag(ingestFromStrForOrg)
-		if ingestFromTimestamp > 0 {
-			log.Infof("For org %d, will only ingest data for chunks that have a t0 equal or higher to %s", ingestFromOrgID, time.Unix(ingestFromTimestamp, 0))
-		}
-		ingestFrom[ingestFromOrgID] = ingestFromTimestamp
+	ingestFrom, err := util.ParseIngestFromFlags(*ingestFromStr)
+	if err != nil {
+		log.Fatalf("ingest-from: %s", err.Error())
+	}
+	for orgID, timestamp := range ingestFrom {
+		log.Infof("For org %d, will only ingest data for chunks that have a t0 equal or higher to %s", orgID, time.Unix(timestamp, 0))
 	}
 	if inputEnabled {
 		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, ingestFrom, chunkMaxStale, metricMaxStale, gcInterval)
