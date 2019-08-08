@@ -60,7 +60,7 @@ var (
 
 	// Data:
 	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
-	ingestFromStr     = flag.String("ingest-from", "", "only ingest data with timestamps belonging to the next chunk from the timestamp specified for an org id; syntax: [ORG_ID]:[TIMESTAMP],[ORG_ID]:[TIMESTAMP],...")
+	ingestFromStr     = flag.String("ingest-from", "", "only ingest data for chunks that have a t0 equal or higher to the given timestamp. Specified per org. syntax: orgID:timestamp[,...]")
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
@@ -303,7 +303,7 @@ func main() {
 	for _, ingestFromStrForOrg := range ingestFromStrPerOrg {
 		ingestFromOrgID, ingestFromTimestamp := util.MustParseIngestFromFlag(ingestFromStrForOrg)
 		if ingestFromTimestamp > 0 {
-			log.Infof("Will only ingest data points for org id %d belonging to chunks starting after %s", ingestFromOrgID, time.Unix(ingestFromTimestamp, 0))
+			log.Infof("For org %d, will only ingest data for chunks that have a t0 equal or higher to %s", ingestFromOrgID, time.Unix(ingestFromTimestamp, 0))
 		}
 		ingestFrom[ingestFromOrgID] = ingestFromTimestamp
 	}
