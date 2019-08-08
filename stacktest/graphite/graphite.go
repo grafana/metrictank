@@ -61,7 +61,7 @@ func ExecuteRenderQuery(req *http.Request) Response {
 	return r
 }
 
-func Retry(req *http.Request, times int, validate Validator) (bool, Response) {
+func Retry(req *http.Request, times int, validate Validator) (Response, bool) {
 	var resp Response
 	for i := 0; i < times; i++ {
 		if i > 0 {
@@ -69,10 +69,10 @@ func Retry(req *http.Request, times int, validate Validator) (bool, Response) {
 		}
 		resp = ExecuteRenderQuery(req)
 		if validate(resp) {
-			return true, resp
+			return resp, true
 		}
 	}
-	return false, resp
+	return resp, false
 }
 
 // temporary check results

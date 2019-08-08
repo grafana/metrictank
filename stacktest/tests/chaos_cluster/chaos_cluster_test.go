@@ -104,7 +104,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 	fm = fakemetrics.NewKafka(numPartitions)
 
 	req := graphite.RequestForLocalTestingGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metrics_received.counter32)", "-8s")
-	suc6, resp := graphite.Retry(req, 18, func(resp graphite.Response) bool {
+	resp, ok := graphite.Retry(req, 18, func(resp graphite.Response) bool {
 		exp := []string{
 			"perSecond(metrictank.stats.docker-cluster.metrictank0.input.kafka-mdm.metrics_received.counter32)",
 			"perSecond(metrictank.stats.docker-cluster.metrictank1.input.kafka-mdm.metrics_received.counter32)",
@@ -116,14 +116,14 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 		// avg rate must be 4 (metrics ingested per second by each instance)
 		return graphite.ValidateTargets(exp)(resp) && graphite.ValidatorAvgWindowed(8, graphite.Eq(4))(resp)
 	})
-	if !suc6 {
+	if !ok {
 		grafana.PostAnnotation("TestClusterBaseIngestWorkload:FAIL")
 		t.Fatalf("cluster did not reach a state where each MT instance receives 4 points per second. last response was: %s", spew.Sdump(resp))
 	}
 
 	req = graphite.RequestForLocalTestingMT("sum(some.id.of.a.metric.*)", "-16s")
-	suc6, resp = graphite.Retry(req, 20, graphite.ValidateCorrect(12))
-	if !suc6 {
+	resp, ok = graphite.Retry(req, 20, graphite.ValidateCorrect(12))
+	if !ok {
 		grafana.PostAnnotation("TestClusterBaseIngestWorkload:FAIL")
 		t.Fatalf("could not query correct result set. sum of 12 series, each valued 1, should result in 12.  last response was: %s", spew.Sdump(resp))
 	}
