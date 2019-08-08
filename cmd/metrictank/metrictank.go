@@ -60,7 +60,7 @@ var (
 
 	// Data:
 	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
-	ingestAfterStr    = flag.String("ingest-after", "", "only ingest data with timestamps belonging to the chunk starting after the timestamp specified for an org id; syntax: [ORG_ID]:[TIMESTAMP],[ORG_ID]:[TIMESTAMP],...")
+	ingestFromStr     = flag.String("ingest-from", "", "only ingest data with timestamps belonging to the chunk starting after the timestamp specified for an org id; syntax: [ORG_ID]:[TIMESTAMP],[ORG_ID]:[TIMESTAMP],...")
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
@@ -298,17 +298,17 @@ func main() {
 		Initialize our MemoryStore
 	***********************************/
 
-	ingestAfter := make(map[uint32]int64)
-	ingestAfterStrPerOrg := strings.Split(*ingestAfterStr, ",")
-	for _, ingestAfterStrForOrg := range ingestAfterStrPerOrg {
-		ingestAfterOrgID, ingestAfterTimestamp := util.MustParseIngestAfterFlag(ingestAfterStrForOrg)
-		if ingestAfterTimestamp > 0 {
-			log.Infof("Will only ingest data points for org id %d belonging to chunks starting after %s", ingestAfterOrgID, time.Unix(ingestAfterTimestamp, 0))
+	ingestFrom := make(map[uint32]int64)
+	ingestFromStrPerOrg := strings.Split(*ingestFromStr, ",")
+	for _, ingestFromStrForOrg := range ingestFromStrPerOrg {
+		ingestFromOrgID, ingestFromTimestamp := util.MustParseIngestFromFlag(ingestFromStrForOrg)
+		if ingestFromTimestamp > 0 {
+			log.Infof("Will only ingest data points for org id %d belonging to chunks starting after %s", ingestFromOrgID, time.Unix(ingestFromTimestamp, 0))
 		}
-		ingestAfter[ingestAfterOrgID] = ingestAfterTimestamp
+		ingestFrom[ingestFromOrgID] = ingestFromTimestamp
 	}
 	if inputEnabled {
-		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, ingestAfter, chunkMaxStale, metricMaxStale, gcInterval)
+		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, ingestFrom, chunkMaxStale, metricMaxStale, gcInterval)
 	}
 
 	/***********************************

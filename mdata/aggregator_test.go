@@ -91,15 +91,15 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block", agg.minMetric, expected)
 
-	// chunkspan is 120, ingestAfter = 140 means points before chunk starting at 240 are discarded
+	// chunkspan is 120, ingestFrom = 140 means points before chunk starting at 240 are discarded
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 140)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
 	expected = []schema.Point{}
-	compare("simple-min-ingest-after-all-before-next-chunk", agg.minMetric, expected)
+	compare("simple-min-ingest-from-all-before-next-chunk", agg.minMetric, expected)
 
-	// chunkspan is 120, ingestAfter = 115 means points before chunk starting at 120 are discarded
+	// chunkspan is 120, ingestFrom = 115 means points before chunk starting at 120 are discarded
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 115)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
@@ -107,15 +107,15 @@ func TestAggregator(t *testing.T) {
 	expected = []schema.Point{
 		{Val: 5, Ts: 120},
 	}
-	compare("simple-min-ingest-after-one-in-next-chunk", agg.minMetric, expected)
+	compare("simple-min-ingest-from-one-in-next-chunk", agg.minMetric, expected)
 
-	// chunkspan is 120, ingestAfter = 120 means points before chunk starting at 240 are discarded
+	// chunkspan is 120, ingestFrom = 120 means points before chunk starting at 240 are discarded
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 120)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
 	expected = []schema.Point{}
-	compare("simple-min-ingest-after-on-chunk-boundary", agg.minMetric, expected)
+	compare("simple-min-ingest-from-on-chunk-boundary", agg.minMetric, expected)
 
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(2), ret, aggs, false, 0)
 	agg.Add(100, 123.4)

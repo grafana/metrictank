@@ -18,7 +18,7 @@ type AggMetrics struct {
 	store          Store
 	cachePusher    cache.CachePusher
 	dropFirstChunk bool
-	ingestAfter    map[uint32]int64
+	ingestFrom     map[uint32]int64
 	chunkMaxStale  uint32
 	metricMaxStale uint32
 	gcInterval     time.Duration
@@ -27,12 +27,12 @@ type AggMetrics struct {
 	Metrics map[uint32]map[schema.Key]*AggMetric
 }
 
-func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bool, ingestAfter map[uint32]int64, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
+func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bool, ingestFrom map[uint32]int64, chunkMaxStale, metricMaxStale uint32, gcInterval time.Duration) *AggMetrics {
 	ms := AggMetrics{
 		store:          store,
 		cachePusher:    cachePusher,
 		dropFirstChunk: dropFirstChunk,
-		ingestAfter:    ingestAfter,
+		ingestFrom:     ingestFrom,
 		Metrics:        make(map[uint32]map[schema.Key]*AggMetric),
 		chunkMaxStale:  chunkMaxStale,
 		metricMaxStale: metricMaxStale,
@@ -164,8 +164,8 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 		ms.Unlock()
 		return m
 	}
-	ingestAfter := ms.ingestAfter[key.Org]
-	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, ms.dropFirstChunk, ingestAfter)
+	ingestFrom := ms.ingestFrom[key.Org]
+	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, ms.dropFirstChunk, ingestFrom)
 	ms.Metrics[key.Org][key.Key] = m
 	active := len(ms.Metrics[key.Org])
 	ms.Unlock()

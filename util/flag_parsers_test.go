@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func TestParseIngestAfterFlag(t *testing.T) {
+func TestParseIngestFromFlag(t *testing.T) {
 	tests := []struct {
 		name              string
-		ingestAfterStr    string
+		ingestFromStr     string
 		expectedOrgID     uint32
 		expectedTimestamp int64
 		shouldErr         bool
@@ -23,18 +23,18 @@ func TestParseIngestAfterFlag(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			orgID, timestamp, err := ParseIngestAfterFlag(test.ingestAfterStr)
+			orgID, timestamp, err := ParseIngestFromFlag(test.ingestFromStr)
 			if err == nil && test.shouldErr {
-				t.Errorf("ParseIngestAfterFlag() should have errored but did not")
+				t.Errorf("ParseIngestFromFlag() should have errored but did not")
 			}
 			if err != nil && !test.shouldErr {
-				t.Errorf("ParseIngestAfterFlag() errored but should not have = %v", err)
+				t.Errorf("ParseIngestFromFlag() errored but should not have = %v", err)
 			}
 			if orgID != test.expectedOrgID {
-				t.Errorf("ParseIngestAfterFlag() expected org id %d, got %d", test.expectedOrgID, orgID)
+				t.Errorf("ParseIngestFromFlag() expected org id %d, got %d", test.expectedOrgID, orgID)
 			}
 			if timestamp != test.expectedTimestamp {
-				t.Errorf("ParseIngestAfterFlag() expected timestamp %d, got %d", test.expectedOrgID, timestamp)
+				t.Errorf("ParseIngestFromFlag() expected timestamp %d, got %d", test.expectedOrgID, timestamp)
 			}
 		})
 	}

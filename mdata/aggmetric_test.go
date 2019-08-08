@@ -302,7 +302,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	}
 }
 
-func TestAggMetricIngestAfter(t *testing.T) {
+func TestAggMetricIngestFrom(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
