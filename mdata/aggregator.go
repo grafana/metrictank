@@ -95,6 +95,8 @@ func (agg *Aggregator) flush() {
 	agg.agg.Reset()
 }
 
+// Add adds the point to the in-progress aggregation, and flushes it if we reached the boundary
+// points going back in time are accepted, unless they go into a previous bucket, in which case they are ignored
 func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := AggBoundary(ts, agg.span)
 
@@ -111,8 +113,6 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 		}
 		agg.currentBoundary = boundary
 		agg.agg.Add(val)
-	} else {
-		panic("aggregator: boundary < agg.currentBoundary. ts > lastSeen should already have been asserted")
 	}
 }
 

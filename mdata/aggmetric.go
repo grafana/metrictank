@@ -434,6 +434,10 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-from. First chunk considered starts at %d", ts, val, a.ingestFromT0)
 		}
+		// even if a point is too old for our raw data, it may not be too old for aggregated data
+		// for example let's say a chunk starts at t0=3600 but we have 300-secondly aggregates
+		// that mean the aggregators need data from 3301 and onwards, because we aggregate 3301-3600 into a point with ts=3600
+		a.addAggregators(ts, val)
 		return
 	}
 
