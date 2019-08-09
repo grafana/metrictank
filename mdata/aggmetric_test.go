@@ -292,6 +292,8 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	m.Add(30, 30)
 	m.Add(31, 31)
 	m.Add(32, 32)
+	// the chunk that point belongs to is not returned by the search because the chunk has
+	// not been closed yet which will happen if a point belonging to the following chunk is added
 	m.Add(40, 40)
 	itgens, err := mockstore.Search(test.NewContext(), test.GetAMKey(42), 0, 0, 1000)
 	if err != nil {
@@ -320,6 +322,8 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	m.Add(30, 30)
 	m.Add(31, 31)
 	m.Add(32, 32)
+	// the chunk that point belongs to is not returned by the search because the chunk has
+	// not been closed yet which will happen if a point belonging to the following chunk is added
 	m.Add(40, 40)
 	itgens, err := mockstore.Search(test.NewContext(), test.GetAMKey(42), 0, 0, 1000)
 	if err != nil {

@@ -95,6 +95,8 @@ func TestAggregator(t *testing.T) {
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 140)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
+	// this point is not flushed to agg.minMetric because no point after it with a timestamp
+	// crossing the aggregation boundary is added (aggregation span here is 60)
 	agg.Add(130, 130)
 	expected = []schema.Point{}
 	compare("simple-min-ingest-from-all-before-next-chunk", agg.minMetric, expected)
@@ -103,6 +105,7 @@ func TestAggregator(t *testing.T) {
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 115)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
+	// this point is not flushed to agg.minMetric for the same reason as in the previous test
 	agg.Add(130, 130)
 	expected = []schema.Point{
 		{Val: 5, Ts: 120},
@@ -113,6 +116,7 @@ func TestAggregator(t *testing.T) {
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 120)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
+	// this point is not flushed to agg.minMetric for the same reason as in the previous test
 	agg.Add(130, 130)
 	expected = []schema.Point{
 		{Val: 5, Ts: 120},
