@@ -123,6 +123,43 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-ingest-from-on-chunk-boundary", agg.minMetric, expected)
 
+	// chunkspan is 120, ingestFrom = 170 means points before chunk starting at 240 are discarded
+	// but, each aggregation contains 60s of data, so the point at 240 covers raw data from 181..240
+
+	// raw data         :   1..120 121..180 181..240 241..300 301..360
+	// discarded data   :   xxxxxxxxxxxxxxxx
+	// aggregated points:      120      180      240      300      360
+	// chunks by t0     :      120               240      300      360
+	// discarded chunk  :   xxxxxxxxxxxxxxxxxxxxx
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 170)
+	agg.Add(1, 1.1)
+	agg.Add(119, 119)
+	agg.Add(120, 120)
+	agg.Add(121, 121)
+	agg.Add(179, 179)
+	agg.Add(180, 180)
+	agg.Add(181, 181)
+	agg.Add(220, 220)
+	agg.Add(230, 230)
+	agg.Add(231, 231)
+	agg.Add(233, 233)
+	agg.Add(239, 239)
+	agg.Add(240, 240)
+	agg.Add(245, 245)
+	agg.Add(249, 249)
+	agg.Add(250, 250)
+	agg.Add(299, 299)
+	agg.Add(300, 300)
+	// these points are not flushed to agg.sumMetric for the same reason as in the previous test
+	agg.Add(301, 0)
+	agg.Add(320, 0)
+
+	expected = []schema.Point{
+		{Val: 181 + 220 + 230 + 231 + 233 + 239 + 240, Ts: 240},
+		{Val: 245 + 249 + 250 + 299 + 300, Ts: 300},
+	}
+	compare("multi-sum-ingest-from-one-in-next-chunk", agg.sumMetric, expected)
+
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(2), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
