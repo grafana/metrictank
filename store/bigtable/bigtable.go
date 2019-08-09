@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
+	"github.com/jpillora/backoff"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
 	"github.com/raintank/schema"
@@ -236,6 +237,12 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 		btblPutBytes.Value(bytesPerFlush)
 		success := false
 		attempts := 0
+		boff := &backoff.Backoff{
+			Min:    100 * time.Millisecond,
+			Max:    2 * time.Minute,
+			Factor: 3,
+			Jitter: true,
+		}
 		for !success {
 			pre := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), s.cfg.WriteTimeout)
@@ -249,11 +256,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				if (attempts % 20) == 0 {
 					log.Warnf("btStore: Failed to write %d chunks to bigtable. they will be retried. %s", len(rowKeys), err)
 				}
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				time.Sleep(boff.Duration())
 				attempts++
 			} else if len(errs) > 0 {
 				// only some chunks in the batch failed to get written.
@@ -282,11 +285,7 @@ func (s *Store) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *st
 				muts = failedMutations
 				buf = retryBuf
 				chunkSaveFail.Add(len(failedRowKeys))
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+				time.Sleep(boff.Duration())
 				attempts++
 			} else {
 				success = true

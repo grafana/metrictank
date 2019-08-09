@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/stats"
+	"github.com/jpillora/backoff"
 	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -389,12 +390,25 @@ func (b *BigtableIdx) processWriteQueue() {
 		pre := time.Now()
 		complete := false
 		attempts := 0
+		boff := &backoff.Backoff{
+			Min:    100 * time.Millisecond,
+			Max:    2 * time.Minute,
+			Factor: 3,
+			Jitter: true,
+		}
 		for !complete {
+			attempts++
 			errs, err := b.tbl.ApplyBulk(context.Background(), rowKeys, mutations)
 			if err != nil {
 				statQueryInsertFail.Add(len(rowKeys))
-				log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they won't be retried: %s", len(rowKeys), err)
-				complete = true
+				if attempts >= 3 {
+					log.Errorf("bigtable-idx: Failed to write %d defs to bigtable. they won't be retried: %s", len(rowKeys), err)
+					complete = true
+				} else {
+					log.Warnf("bigtable-idx: failed to write %d rows after %d attempts.  They will be retried. %s", len(rowKeys), attempts, err)
+					time.Sleep(boff.Duration())
+					attempts++
+				}
 			} else if len(errs) > 0 {
 				var failedRowKeys []string
 				var failedMutations []*bigtable.Mutation
@@ -404,18 +418,12 @@ func (b *BigtableIdx) processWriteQueue() {
 						failedMutations = append(failedMutations, mutations[i])
 					}
 				}
-				log.Warnf("bigtable-idx: failed to write %d/%d rows.  They will be retried. %s", len(failedRowKeys), len(rowKeys), err)
+				log.Warnf("bigtable-idx: failed to write %d/%d rows after %d attempts.  They will be retried. %s", len(failedRowKeys), len(rowKeys), attempts, err)
 				statQueryInsertFail.Add(len(failedRowKeys))
 
 				rowKeys = failedRowKeys
 				mutations = failedMutations
-
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-				attempts++
+				time.Sleep(boff.Duration())
 			} else {
 				complete = true
 				statQueryInsertExecDuration.Value(time.Since(pre))
