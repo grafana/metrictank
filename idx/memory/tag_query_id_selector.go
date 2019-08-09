@@ -55,17 +55,12 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 	// need to start the deduplication routine.
 	if tagquery.MetaTagSupport {
 		go i.deduplicateRawResults()
-
-		go func() {
-			i.workerWg.Wait()
-			close(i.rawResCh)
-		}()
-	} else {
-		go func() {
-			i.workerWg.Wait()
-			close(i.rawResCh)
-		}()
 	}
+
+	go func() {
+		i.workerWg.Wait()
+		close(i.rawResCh)
+	}()
 
 	if i.expr.OperatesOnTag() {
 		i.byTag()
