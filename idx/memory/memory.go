@@ -49,7 +49,6 @@ var (
 	statMetricsActive = stats.NewGauge32("idx.metrics_active")
 
 	Enabled                      bool
-	matchCacheSize               int
 	maxPruneLockTime             = time.Millisecond * 100
 	maxPruneLockTimeStr          string
 	TagSupport                   bool
@@ -65,6 +64,8 @@ var (
 	writeQueueEnabled            = false
 	writeQueueDelay              = 30 * time.Second
 	writeMaxBatchSize            = 5000
+	matchCacheSize               = 1000
+	metaTagSupport               = false
 )
 
 func ConfigSetup() {
@@ -73,7 +74,6 @@ func ConfigSetup() {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
-	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
@@ -84,6 +84,8 @@ func ConfigSetup() {
 	memoryIdx.DurationVar(&findCacheBackoffTime, "find-cache-backoff-time", time.Minute, "amount of time to disable the findCache when the invalidate queue fills up.")
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
+	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 }
 
@@ -109,6 +111,8 @@ func ConfigProcess() {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
 
+	tagquery.MetaTagSupport = metaTagSupport
+	tagquery.MatchCacheSize = matchCacheSize
 }
 
 // interface implemented by both UnpartitionedMemoryIdx and PartitionedMemoryIdx
@@ -178,6 +182,11 @@ func (t *TagIndex) delTagId(name, value string, id schema.MKey) {
 // org id -> nameWithTags -> Set of references to schema.MetricDefinition
 // nameWithTags is the name plus all tags in the <name>;<tag>=<value>... format.
 type defByTagSet map[uint32]map[string]map[*schema.MetricDefinition]struct{}
+
+func (t TagIndex) idHasTag(id schema.MKey, tag, value string) bool {
+	_, ok := t[tag][value][id]
+	return ok
+}
 
 func (defs defByTagSet) add(def *schema.MetricDefinition) {
 	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
@@ -1089,9 +1098,10 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 			continue
 		}
 
-		if existing, ok := byPath[def.NameWithTags()]; !ok {
-			byPath[def.NameWithTags()] = &idx.Node{
-				Path:        def.NameWithTags(),
+		nameWithTags := def.NameWithTags()
+		if existing, ok := byPath[nameWithTags]; !ok {
+			byPath[nameWithTags] = &idx.Node{
+				Path:        nameWithTags,
 				Leaf:        true,
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
@@ -1101,10 +1111,12 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		}
 	}
 
-	results := make([]idx.Node, 0, len(byPath))
+	results := make([]idx.Node, len(byPath))
 
+	i := 0
 	for _, v := range byPath {
-		results = append(results, *v)
+		results[i] = *v
+		i++
 	}
 
 	return results

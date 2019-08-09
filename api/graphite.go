@@ -819,7 +819,7 @@ func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
 					return nil, err
 				}
 
-				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue
+				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue()
 
 				results = append(results, expression)
 				continue
@@ -1070,7 +1070,7 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 	default:
 	}
 
-	var resp models.GraphiteTagsResp
+	resp := make(models.GraphiteTagsResp, 0)
 	for _, tag := range tags {
 		resp = append(resp, models.GraphiteTagResp{Tag: tag})
 	}
@@ -1103,6 +1103,8 @@ func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string, f
 		}
 	}
 
+	// we want to make an empty list, because this results in the json response "[]" if it's empty
+	// if we initialize "tags" with "var tags []string" the json response (if empty) is "nil" instead of "[]"
 	tags := make([]string, 0, len(tagSet))
 	for t := range tagSet {
 		tags = append(tags, t)
@@ -1222,13 +1224,17 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 				return
 			}
 
-			expressions := make(tagquery.Expressions, 0, len(tags))
-			for _, tag := range tags {
-				expressions = append(expressions, tagquery.Expression{
-					Tag:                   tag,
-					Operator:              tagquery.EQUAL,
-					RequiresNonEmptyValue: true,
-				})
+			expressions := make(tagquery.Expressions, len(tags))
+			builder := strings.Builder{}
+			for i := range tags {
+				tags[i].StringIntoBuilder(&builder)
+
+				expressions[i], err = tagquery.ParseExpression(builder.String())
+				if err != nil {
+					response.Write(ctx, response.WrapErrorForTagDB(err))
+					return
+				}
+				builder.Reset()
 			}
 
 			query, err := tagquery.NewQuery(expressions, 0)
@@ -1346,7 +1352,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 		if !upsertRequest.Propagate {
 			response.Write(ctx, response.NewJson(200, models.MetaTagRecordUpsertResult{
 				MetaTags: localResult.MetaTags.Strings(),
-				Queries:  localResult.Queries.Strings(),
+				Queries:  localResult.Expressions.Strings(),
 				Created:  created,
 			}, ""))
 			return
@@ -1358,7 +1364,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 	res := models.MetaTagRecordUpsertResultByNode{
 		Local: models.MetaTagRecordUpsertResult{
 			MetaTags: localResult.MetaTags.Strings(),
-			Queries:  localResult.Queries.Strings(),
+			Queries:  localResult.Expressions.Strings(),
 			Created:  created,
 		},
 	}

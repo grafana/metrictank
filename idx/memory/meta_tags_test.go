@@ -2,7 +2,6 @@ package memory
 
 import (
 	"hash"
-	"reflect"
 	"testing"
 
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -32,47 +31,13 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 		t.Fatalf("metaTagRecords was expected to have 1 entry, but it had %d", len(metaTagRecords))
 	}
 
-	_, ok := metaTagRecords[metaTagRecords.hashMetaTagRecord(*record)]
+	_, ok := metaTagRecords[recordId(record.HashExpressions())]
 	if !ok {
 		t.Fatalf("We expected the record to be found at the index of its hash, but it wasn't")
 	}
 
-	if len(record.MetaTags) != 2 {
-		t.Fatalf("The newly created record was expected to have 2 tags, but it had %d", len(record.MetaTags))
-	}
-	if len(record.Queries) != 2 {
-		t.Fatalf("The newly created record was expected to have 2 queries, but it had %d", len(record.Queries))
-	}
-
-	var seenMetaTag1, seenMetaTag2 bool
-	for _, metaTag := range record.MetaTags {
-		if reflect.DeepEqual(metaTag, tagquery.Tag{Key: "metaTag1", Value: "abc"}) {
-			seenMetaTag1 = true
-		}
-		if reflect.DeepEqual(metaTag, tagquery.Tag{Key: "anotherTag", Value: "theValue"}) {
-			seenMetaTag2 = true
-		}
-	}
-
-	if !seenMetaTag1 || !seenMetaTag2 {
-		t.Fatalf("We expected both meta tags to be present in the record, but not both were: %t / %t", seenMetaTag1, seenMetaTag2)
-	}
-
-	var seenQuery1, seenQuery2 bool
-	for _, query := range record.Queries {
-		// ignore the compiled regex structs, as they can't reliably be compared
-		query.Regex = nil
-
-		if reflect.DeepEqual(query, tagquery.Expression{Tag: tagquery.Tag{Key: "metricTag", Value: "a"}, Operator: tagquery.NOT_EQUAL, RequiresNonEmptyValue: false, UsesRegex: false}) {
-			seenQuery1 = true
-		}
-		if reflect.DeepEqual(query, tagquery.Expression{Tag: tagquery.Tag{Key: "match", Value: "^(?:this)"}, Operator: tagquery.MATCH, RequiresNonEmptyValue: true, UsesRegex: true}) {
-			seenQuery2 = true
-		}
-	}
-
-	if !seenQuery1 || !seenQuery2 {
-		t.Fatalf("We expected both queries to be present in the record, but not both were: %t / %t", seenQuery1, seenQuery2)
+	if !recordToInsert.Equals(record) {
+		t.Fatalf("Inserted meta tag record has unexpectedly been modified")
 	}
 }
 
@@ -102,22 +67,18 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 		t.Fatalf("Expected 2 meta tag records, but there were %d", len(metaTagRecords))
 	}
 
-	// the order of the records may have changed due to sorting by id
-	var record1, record2 tagquery.MetaTagRecord
 	var found1, found2 bool
 	var recordIdToUpdate recordId
-	for id, record := range metaTagRecords {
-		switch record.Queries[0].Value {
-		case "^(?:a)":
-			record1 = metaTagRecords[id]
+	for i, record := range metaTagRecords {
+		if record.Equals(&recordToInsert1) {
 			found1 = true
-			recordIdToUpdate = id
-		case "^(?:c)":
-			record2 = metaTagRecords[id]
+			recordIdToUpdate = i
+		} else if record.Equals(&recordToInsert2) {
 			found2 = true
 		}
 	}
-	if !found1 || !found2 {
+
+	if !(found1 && found2) {
 		t.Fatalf("Expected both meta tag records to be found, but at least one wasn't: %t / %t", found1, found2)
 	}
 
@@ -134,106 +95,26 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	if oldId != id {
 		t.Fatalf("Expected the new id after updating to be %d (same as the old id), but it was %d", oldId, id)
 	}
-	if oldRecord == nil {
+	if oldRecord == nil || !oldRecord.Equals(&recordToInsert1) {
 		t.Fatalf("Expected the old record to not be nil, but it was")
 	}
-
 	if len(metaTagRecords) != 2 {
 		t.Fatalf("Expected that there to be 2 meta tag records, but there were %d", len(metaTagRecords))
 	}
 
 	// the order of the records may have changed again due to sorting by id
 	found1, found2 = false, false
-	for id, record := range metaTagRecords {
-		if len(record.Queries) != 2 {
-			t.Fatalf("Expected every record to have 2 queries, but one had not: %+v", record)
-		}
-		switch record.Queries[0].Value {
-		case "^(?:a)":
-			record1 = metaTagRecords[id]
+	for _, record := range metaTagRecords {
+		if record.Equals(&recordToUpdate) {
 			found1 = true
-		case "^(?:c)":
-			record2 = metaTagRecords[id]
+		}
+		if record.Equals(&recordToInsert2) {
 			found2 = true
 		}
 	}
 
-	if !found1 || !found2 {
+	if !(found1 && found2) {
 		t.Fatalf("Expected both meta tag records to be found, but not both were: %t / %t", found1, found2)
-	}
-
-	expectedRecord1 := tagquery.MetaTagRecord{
-		MetaTags: []tagquery.Tag{
-			{
-				Key:   "metaTag1",
-				Value: "value2",
-			},
-		},
-		Queries: tagquery.Expressions{
-			tagquery.Expression{
-				Tag: tagquery.Tag{
-					Key:   "tag1",
-					Value: "^(?:a)",
-				},
-				Operator:              tagquery.MATCH,
-				RequiresNonEmptyValue: true,
-				UsesRegex:             true,
-			},
-			tagquery.Expression{
-				Tag: tagquery.Tag{
-					Key:   "tag2",
-					Value: "^(?:b)",
-				},
-				Operator:              tagquery.MATCH,
-				RequiresNonEmptyValue: true,
-				UsesRegex:             true,
-			},
-		},
-	}
-
-	// ignore the compiled regex structs, as they can't reliably be compared
-	for i := range record1.Queries {
-		record1.Queries[i].Regex = nil
-	}
-	if !reflect.DeepEqual(record1, expectedRecord1) {
-		t.Fatalf("Record1 did not look as expected:\nExpected\n%+v\nGot:\n%+v", expectedRecord1, record1)
-	}
-
-	expectedRecord2 := tagquery.MetaTagRecord{
-		MetaTags: []tagquery.Tag{
-			{
-				Key:   "metaTag1",
-				Value: "value1",
-			},
-		},
-		Queries: tagquery.Expressions{
-			tagquery.Expression{
-				Tag: tagquery.Tag{
-					Key:   "tag1",
-					Value: "^(?:c)",
-				},
-				Operator:              tagquery.MATCH,
-				RequiresNonEmptyValue: true,
-				UsesRegex:             true,
-			},
-			tagquery.Expression{
-				Tag: tagquery.Tag{
-					Key:   "tag2",
-					Value: "^(?:d)",
-				},
-				Operator:              tagquery.MATCH,
-				RequiresNonEmptyValue: true,
-				UsesRegex:             true,
-			},
-		},
-	}
-
-	// ignore the compiled regex structs, as they can't reliably be compared
-	for i := range record2.Queries {
-		record2.Queries[i].Regex = nil
-	}
-	if !reflect.DeepEqual(record2, expectedRecord2) {
-		t.Fatalf("Record1 did not look as expected:\nExpected\n%+v\nGot:\n%+v", expectedRecord2, record2)
 	}
 }
 
@@ -274,10 +155,10 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	defer func() { collisionAvoidanceWindow = originalCollisionAvoidanceWindow }()
 	collisionAvoidanceWindow = 3
 
-	originalHash := queryHash
-	defer func() { queryHash = originalHash }()
+	originalHash := tagquery.QueryHash
+	defer func() { tagquery.QueryHash = originalHash }()
 
-	queryHash = func() hash.Hash32 {
+	tagquery.QueryHash = func() hash.Hash32 {
 		return &mockHash{
 			returnValues: []uint32{1}, // keep returning 1
 		}
@@ -316,7 +197,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords))
 	}
 
-	// updating the third record with the same hash and equal queries
+	// updating the third record with the same hash and equal queries, but different meta tags
 	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value4"}, []string{"metricTag3=value3"})
 	id, returnedRecord, oldId, oldRecord, err = metaTagRecords.upsert(record)
 	if err != nil {
@@ -327,7 +208,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// check if the returned new record looks as expected
-	if !reflect.DeepEqual(returnedRecord, &record) {
+	if !returnedRecord.Equals(&record) {
 		t.Fatalf("New record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, returnedRecord)
 	}
 	if oldId != 3 {
@@ -336,7 +217,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 
 	// check if the returned old record looks as expected
 	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
-	if !reflect.DeepEqual(oldRecord, &record) {
+	if !oldRecord.Equals(&record) {
 		t.Fatalf("Old record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, oldRecord)
 	}
 	if len(metaTagRecords) != 3 {
@@ -358,6 +239,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 	}
 
 	// then we delete one record again
+	// upserting a meta tag record with one that has no meta tags results in deletion
 	record.MetaTags = nil
 	id, returnedRecord, oldId, _, err := metaTagRecords.upsert(record)
 	if err != nil {
@@ -366,8 +248,8 @@ func TestDeletingMetaRecord(t *testing.T) {
 	if len(returnedRecord.MetaTags) != 0 {
 		t.Fatalf("Expected returned meta tag record to have 0 meta tags, but it had %d", len(returnedRecord.MetaTags))
 	}
-	if !reflect.DeepEqual(returnedRecord.Queries, record.Queries) {
-		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", record.Queries, returnedRecord.Queries)
+	if !returnedRecord.Equals(&record) {
+		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", record.Expressions, returnedRecord.Expressions)
 	}
 	if oldId != idOfRecord2 {
 		t.Fatalf("Expected the oldId to be the id of record2 (%d), but it was %d", idOfRecord2, oldId)

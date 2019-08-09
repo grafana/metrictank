@@ -7,7 +7,7 @@ import (
 
 func TestQueryByTagFilterByTagPrefixWithEmptyString(t *testing.T) {
 	_, err := NewQueryFromStrings([]string{"__tag^="}, 0)
-	if err != errInvalidQuery {
+	if err == nil {
 		t.Fatalf("Expected an error, but didn't get it")
 	}
 }
@@ -38,55 +38,60 @@ func TestNewQueryFromStrings(t *testing.T) {
 			},
 			want: Query{
 				From: 321,
-				Expressions: map[ExpressionOperator]Expressions{
-					EQUAL: {
-						{
-							Tag:                   Tag{Key: "a", Value: "b"},
-							Operator:              EQUAL,
-							RequiresNonEmptyValue: true,
-						}, {
-							Tag:                   Tag{Key: "x", Value: "z"},
-							Operator:              EQUAL,
-							RequiresNonEmptyValue: true,
+				Expressions: Expressions{
+					&expressionMatchTag{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "__tag",
+								value: "^(?:k)",
+							},
+							valueRe: nil,
 						},
 					},
-					NOT_EQUAL: {
-						{
-							Tag:      Tag{Key: "c", Value: "d"},
-							Operator: NOT_EQUAL,
+					&expressionEqual{
+						expressionCommon{
+							key:   "a",
+							value: "b",
 						},
 					},
-					MATCH: {
-						{
-							Tag:                   Tag{Key: "e", Value: "^(?:f)"},
-							Operator:              MATCH,
-							RequiresNonEmptyValue: true,
-							UsesRegex:             true,
+					&expressionNotEqual{
+						expressionCommon{
+							key:   "c",
+							value: "d",
 						},
 					},
-					NOT_MATCH: {
-						{
-							Tag:       Tag{Key: "g", Value: "^(?:h)"},
-							Operator:  NOT_MATCH,
-							UsesRegex: true,
+					&expressionMatch{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "e",
+								value: "^(?:f)",
+							},
+							valueRe: nil,
 						},
 					},
-					PREFIX: {
-						{
-							Tag:                   Tag{Key: "i", Value: "j"},
-							Operator:              PREFIX,
-							RequiresNonEmptyValue: true,
+					&expressionNotMatch{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "g",
+								value: "^(?:h)",
+							},
+							valueRe: nil,
+						},
+					},
+					&expressionPrefix{
+						expressionCommon{
+							key:   "i",
+							value: "j",
+						},
+					},
+					&expressionEqual{
+						expressionCommon{
+							key:   "x",
+							value: "z",
 						},
 					},
 				},
-				TagMatch: Expression{
-					Tag:                   Tag{Key: "__tag", Value: "^(?:k)"},
-					Operator:              MATCH_TAG,
-					RequiresNonEmptyValue: true,
-					UsesRegex:             true,
-				},
-				TagClause: MATCH_TAG,
-				StartWith: EQUAL,
+				tagClause: 0,
 			},
 		}, {
 			name: "test tag prefix with empty value",
@@ -107,6 +112,38 @@ func TestNewQueryFromStrings(t *testing.T) {
 			},
 			wantErr: true,
 		}, {
+			name: "missing an expression that requires non empty value because pattern matches empty value",
+			args: args{
+				expressionStrs: []string{"key=", "abc=~.*"},
+			},
+			wantErr: true,
+		}, {
+			name: "no error with + instead of * because pattern does not match empty value",
+			args: args{
+				expressionStrs: []string{"abc=~.+"},
+			},
+			want: Query{
+				From: 0,
+				Expressions: Expressions{
+					&expressionMatch{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "abc",
+								value: "^(?:.+)",
+							},
+							valueRe: nil,
+						},
+					},
+				},
+				tagClause: -1,
+			},
+		}, {
+			name: "missing an expression that requires non empty value because prefix matches empty value",
+			args: args{
+				expressionStrs: []string{"key=", "__tag^="},
+			},
+			wantErr: true,
+		}, {
 			name: "two different tag queries",
 			args: args{
 				expressionStrs: []string{"__tag^=abc", "__tag=~cba"},
@@ -118,17 +155,18 @@ func TestNewQueryFromStrings(t *testing.T) {
 				expressionStrs: []string{"abc=~cba"},
 			},
 			want: Query{
-				Expressions: map[ExpressionOperator]Expressions{
-					MATCH: {
-						{
-							Tag:                   Tag{Key: "abc", Value: "^(?:cba)"},
-							Operator:              MATCH,
-							RequiresNonEmptyValue: true,
-							UsesRegex:             true,
+				Expressions: Expressions{
+					&expressionMatch{
+						expressionCommonRe{
+							expressionCommon: expressionCommon{
+								key:   "abc",
+								value: "^(?:cba)",
+							},
+							valueRe: nil,
 						},
 					},
 				},
-				StartWith: MATCH,
+				tagClause: -1,
 			},
 		}, {
 			name: "deduplicate duplicate expressions",
@@ -136,20 +174,21 @@ func TestNewQueryFromStrings(t *testing.T) {
 				expressionStrs: []string{"a=a", "b=b", "a=a"},
 			},
 			want: Query{
-				Expressions: map[ExpressionOperator]Expressions{
-					EQUAL: {
-						{
-							Tag:                   Tag{Key: "a", Value: "a"},
-							Operator:              EQUAL,
-							RequiresNonEmptyValue: true,
-						}, {
-							Tag:                   Tag{Key: "b", Value: "b"},
-							Operator:              EQUAL,
-							RequiresNonEmptyValue: true,
+				Expressions: Expressions{
+					&expressionEqual{
+						expressionCommon{
+							key:   "a",
+							value: "a",
+						},
+					},
+					&expressionEqual{
+						expressionCommon{
+							key:   "b",
+							value: "b",
 						},
 					},
 				},
-				StartWith: EQUAL,
+				tagClause: -1,
 			},
 		},
 	}
@@ -167,10 +206,14 @@ func TestNewQueryFromStrings(t *testing.T) {
 			}
 
 			// don't compare the compiled regex objects
-			got.TagMatch.Regex = nil
-			for operator := range got.Expressions {
-				for i := range got.Expressions[operator] {
-					got.Expressions[operator][i].Regex = nil
+			for i := range got.Expressions {
+				switch got.Expressions[i].(type) {
+				case *expressionMatch:
+					got.Expressions[i].(*expressionMatch).valueRe = nil
+				case *expressionNotMatch:
+					got.Expressions[i].(*expressionNotMatch).valueRe = nil
+				case *expressionMatchTag:
+					got.Expressions[i].(*expressionMatchTag).valueRe = nil
 				}
 			}
 

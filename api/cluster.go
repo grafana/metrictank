@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -264,12 +265,16 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 		}
 
 		expressions := make(tagquery.Expressions, len(tags))
+		builder := strings.Builder{}
 		for i := range tags {
-			expressions[i] = tagquery.Expression{
-				Tag:                   tags[i],
-				Operator:              tagquery.EQUAL,
-				RequiresNonEmptyValue: true,
+			tags[i].StringIntoBuilder(&builder)
+
+			expressions[i], err = tagquery.ParseExpression(builder.String())
+			if err != nil {
+				response.Write(ctx, response.WrapErrorForTagDB(err))
+				return
 			}
+			builder.Reset()
 		}
 
 		query, err := tagquery.NewQuery(expressions, 0)
@@ -598,7 +603,7 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 
 	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{
 		MetaTags: result.MetaTags.Strings(),
-		Queries:  result.Queries.Strings(),
+		Queries:  result.Expressions.Strings(),
 		Created:  created,
 	}))
 }

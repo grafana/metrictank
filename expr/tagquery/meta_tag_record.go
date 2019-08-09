@@ -2,14 +2,15 @@ package tagquery
 
 import (
 	"fmt"
+	"strings"
 )
 
 type MetaTagRecord struct {
-	MetaTags Tags
-	Queries  Expressions
+	MetaTags    Tags
+	Expressions Expressions
 }
 
-func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, error) {
+func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord, error) {
 	res := MetaTagRecord{}
 	var err error
 
@@ -18,28 +19,62 @@ func ParseMetaTagRecord(metaTags []string, queries []string) (MetaTagRecord, err
 		return res, err
 	}
 
-	res.Queries, err = ParseExpressions(queries)
+	res.Expressions, err = ParseExpressions(expressions)
 	if err != nil {
 		return res, err
 	}
 
-	if len(res.Queries) == 0 {
+	if len(res.Expressions) == 0 {
 		return res, fmt.Errorf("Meta Tag Record must have at least one query")
 	}
 
 	return res, nil
 }
 
-// MatchesQueries compares another tag record's queries to this
-// one's queries. Returns true if they are equal, otherwise false.
-// It is assumed that all the queries are already sorted
-func (m *MetaTagRecord) MatchesQueries(other MetaTagRecord) bool {
-	if len(m.Queries) != len(other.Queries) {
+// Equals takes another MetaTagRecord and compares all its properties to its
+// own properties. It is assumed that the expressions of both meta tag records
+// are already sorted.
+func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
+	if len(m.MetaTags) != len(other.MetaTags) {
 		return false
 	}
 
-	for i, query := range m.Queries {
-		if !query.IsEqualTo(other.Queries[i]) {
+	for i := range m.MetaTags {
+		if m.MetaTags[i] != other.MetaTags[i] {
+			return false
+		}
+	}
+
+	return m.EqualExpressions(other)
+}
+
+// HashExpressions returns a hash of all expressions in this meta tag record
+// It is assumed that the expressions are already sorted
+func (m *MetaTagRecord) HashExpressions() uint32 {
+	builder := strings.Builder{}
+	for _, query := range m.Expressions {
+		query.StringIntoBuilder(&builder)
+
+		// trailing ";" doesn't matter, this is only hash input
+		builder.WriteString(";")
+	}
+
+	h := QueryHash()
+	h.Write([]byte(builder.String()))
+	return h.Sum32()
+}
+
+// EqualExpressions compares another meta tag record's expressions to
+// this one's expressions
+// Returns true if they are equal, otherwise false
+// It is assumed that all the expressions are already sorted
+func (m *MetaTagRecord) EqualExpressions(other *MetaTagRecord) bool {
+	if len(m.Expressions) != len(other.Expressions) {
+		return false
+	}
+
+	for i, expression := range m.Expressions {
+		if !expression.Equals(other.Expressions[i]) {
 			return false
 		}
 	}

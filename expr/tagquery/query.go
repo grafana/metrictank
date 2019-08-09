@@ -2,26 +2,37 @@ package tagquery
 
 import (
 	"errors"
+	"hash"
+	"hash/fnv"
+
+	"github.com/raintank/schema"
 )
 
 var (
 	errInvalidQuery = errors.New("invalid query")
+	MatchCacheSize  int
+	MetaTagSupport  bool
+
+	// the function we use to get the hash for hashing the meta records
+	// it can be replaced for mocking in tests
+	QueryHash func() hash.Hash32
 )
+
+func init() {
+	QueryHash = fnv.New32a
+}
 
 type Query struct {
 	// clause that operates on LastUpdate field
 	From int64
 
-	// clauses that operate on values. from expressions like tag<operator>value
-	Expressions map[ExpressionOperator]Expressions
+	// slice of expressions sorted by the estimated cost of their operators
+	Expressions Expressions
 
-	// clause that operate on tags (keys)
-	// we only need to support 1 condition for now: a prefix or match
-	TagClause ExpressionOperator // to know the clause type. either PREFIX_TAG or MATCH_TAG (or 0 if unset)
-	TagMatch  Expression         // only used for /metrics/tags with regex in filter param
-	TagPrefix string             // only used for auto complete of tags to match exact prefix
-
-	StartWith ExpressionOperator // choses the first clause to generate the initial result set (one of EQUAL PREFIX MATCH MATCH_TAG PREFIX_TAG)
+	// the index of clause that operate on tags (keys)
+	// we only support 0 or 1 tag expression per query
+	// tag expressions are __tag^= and __tag=~
+	tagClause int
 }
 
 func NewQueryFromStrings(expressionStrs []string, from int64) (Query, error) {
@@ -34,75 +45,56 @@ func NewQueryFromStrings(expressionStrs []string, from int64) (Query, error) {
 }
 
 func NewQuery(expressions Expressions, from int64) (Query, error) {
-	q := Query{From: from}
+	q := Query{From: from, tagClause: -1}
 
 	if len(expressions) == 0 {
 		return q, errInvalidQuery
 	}
 
 	expressions.Sort()
-	q.Expressions = make(map[ExpressionOperator]Expressions)
-	for i, e := range expressions {
+	foundExpressionRequiringNonEmptyValue := false
+	for i := 0; i < len(expressions); i++ {
 		// skip duplicate expression
-		if i > 0 && e.IsEqualTo(expressions[i-1]) {
+		if i > 0 && expressions[i].Equals(expressions[i-1]) {
+			expressions = append(expressions[:i], expressions[i+1:]...)
+			i--
 			continue
 		}
 
-		// special case of empty value
-		if len(e.Value) == 0 {
-			if e.Operator == EQUAL || e.Operator == MATCH {
-				q.Expressions[NOT_MATCH] = append(q.Expressions[NOT_MATCH], e)
-			} else {
-				q.Expressions[MATCH] = append(q.Expressions[MATCH], e)
-			}
-		} else {
-			switch e.Operator {
-			case EQUAL:
-				q.Expressions[EQUAL] = append(q.Expressions[EQUAL], e)
-			case NOT_EQUAL:
-				q.Expressions[NOT_EQUAL] = append(q.Expressions[NOT_EQUAL], e)
-			case MATCH:
-				q.Expressions[MATCH] = append(q.Expressions[MATCH], e)
-			case NOT_MATCH:
-				q.Expressions[NOT_MATCH] = append(q.Expressions[NOT_MATCH], e)
-			case PREFIX:
-				q.Expressions[PREFIX] = append(q.Expressions[PREFIX], e)
-			case MATCH_TAG:
-				// we only allow one expression operating on tags
-				if q.TagClause != 0 {
-					return q, errInvalidQuery
-				}
+		foundExpressionRequiringNonEmptyValue = foundExpressionRequiringNonEmptyValue || expressions[i].RequiresNonEmptyValue()
 
-				q.TagMatch = e
-				q.TagClause = MATCH_TAG
-			case PREFIX_TAG:
-				// we only allow one expression operating on tags
-				if q.TagClause != 0 {
-					return q, errInvalidQuery
-				}
-
-				q.TagPrefix = e.Value
-				q.TagClause = PREFIX_TAG
+		op := expressions[i].GetOperator()
+		switch op {
+		case MATCH_TAG:
+			fallthrough
+		case PREFIX_TAG:
+			// we only allow one expression operating on the tag per query
+			if q.tagClause >= 0 {
+				return q, errInvalidQuery
 			}
+
+			q.tagClause = i
 		}
 	}
 
-	// the cheapest operator to minimize the result set should have precedence
-	if len(q.Expressions[EQUAL]) > 0 {
-		q.StartWith = EQUAL
-	} else if len(q.Expressions[PREFIX]) > 0 {
-		q.StartWith = PREFIX
-	} else if len(q.Expressions[MATCH]) > 0 {
-		q.StartWith = MATCH
-	} else if q.TagClause == PREFIX_TAG {
-		// starting with a tag based expression can be very expensive because they
-		// have the potential to result in a huge initial result set
-		q.StartWith = PREFIX_TAG
-	} else if q.TagClause == MATCH_TAG {
-		q.StartWith = MATCH_TAG
-	} else {
+	if !foundExpressionRequiringNonEmptyValue {
 		return q, errInvalidQuery
 	}
 
+	q.Expressions = expressions
+
 	return q, nil
+}
+
+type IdTagLookup func(id schema.MKey, tag, value string) bool
+
+// GetTagClause returns the expression which operates on tags, if one is present.
+// This assumes that Query has been instantiated via NewQuery(), which either sets
+// .tagClause to a valid value or returns an error.
+// There can only be one tagClause per Query.
+func (q *Query) GetTagClause() Expression {
+	if q.tagClause < 0 {
+		return nil
+	}
+	return q.Expressions[q.tagClause]
 }
