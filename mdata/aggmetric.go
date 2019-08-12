@@ -39,6 +39,7 @@ type AggMetric struct {
 	chunks          []*chunk.Chunk
 	aggregators     []*Aggregator
 	dropFirstChunk  bool
+	ingestFromT0    uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
 	lastSaveFinish  uint32 // last chunk T0 successfully written to Cassandra.
@@ -50,7 +51,7 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, dropFirstChunk bool) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, dropFirstChunk bool, ingestFrom int64) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions[0]
@@ -68,12 +69,16 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
 	}
+	if ingestFrom > 0 {
+		// we only want to ingest data that will go into chunks with a t0 >= 'ingestFrom'.
+		m.ingestFromT0 = AggBoundary(uint32(ingestFrom), ret.ChunkSpan)
+	}
 	if reorderWindow != 0 {
 		m.rob = NewReorderBuffer(reorderWindow, interval)
 	}
 
 	for _, ret := range retentions[1:] {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk))
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk, ingestFrom))
 	}
 
 	return &m
@@ -424,6 +429,18 @@ func (a *AggMetric) persist(pos int) {
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
 func (a *AggMetric) Add(ts uint32, val float64) {
+	if ts < a.ingestFromT0 {
+		// TODO: add metric to keep track of the # of points discarded
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("AM: discarding metric <%d,%f>: does not belong to a chunk starting after ingest-from. First chunk considered starts at %d", ts, val, a.ingestFromT0)
+		}
+		// even if a point is too old for our raw data, it may not be too old for aggregated data
+		// for example let's say a chunk starts at t0=3600 but we have 300-secondly aggregates
+		// that mean the aggregators need data from 3301 and onwards, because we aggregate 3301-3600 into a point with ts=3600
+		a.addAggregators(ts, val)
+		return
+	}
+
 	a.Lock()
 	defer a.Unlock()
 

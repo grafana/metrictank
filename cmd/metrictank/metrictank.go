@@ -37,6 +37,7 @@ import (
 	statsConfig "github.com/grafana/metrictank/stats/config"
 	bigtableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
+	"github.com/grafana/metrictank/util"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )
@@ -59,6 +60,7 @@ var (
 
 	// Data:
 	dropFirstChunk    = flag.Bool("drop-first-chunk", false, "forego persisting of first received (and typically incomplete) chunk")
+	ingestFromStr     = flag.String("ingest-from", "", "only ingest data for chunks that have a t0 equal or higher to the given timestamp. Specified per org. syntax: orgID:timestamp[,...]")
 	chunkMaxStaleStr  = flag.String("chunk-max-stale", "1h", "max age for a chunk before to be considered stale and to be persisted to Cassandra.")
 	metricMaxStaleStr = flag.String("metric-max-stale", "3h", "max age for a metric before to be considered stale and to be purged from memory.")
 	gcIntervalStr     = flag.String("gc-interval", "1h", "Interval to run garbage collection job.")
@@ -296,8 +298,15 @@ func main() {
 		Initialize our MemoryStore
 	***********************************/
 
+	ingestFrom, err := util.ParseIngestFromFlags(*ingestFromStr)
+	if err != nil {
+		log.Fatalf("ingest-from: %s", err.Error())
+	}
+	for orgID, timestamp := range ingestFrom {
+		log.Infof("For org %d, will only ingest data for chunks that have a t0 equal or higher to %s", orgID, time.Unix(timestamp, 0))
+	}
 	if inputEnabled {
-		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, chunkMaxStale, metricMaxStale, gcInterval)
+		metrics = mdata.NewAggMetrics(store, ccache, *dropFirstChunk, ingestFrom, chunkMaxStale, metricMaxStale, gcInterval)
 	}
 
 	/***********************************
