@@ -318,7 +318,8 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 }
 
 // runSubQuery takes a sub-query and executes it.
-// it reads the returned results and pushes them into the id chan
+// it passes the rawResCh into the sub query, so the query results get
+// directly pushed into it
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
 

@@ -109,7 +109,6 @@ func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression, inv
 }
 
 func (m metaTagIndex) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
-	// TODO implement negated results
 	var res []recordId
 
 	for key := range m {
