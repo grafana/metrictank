@@ -339,7 +339,7 @@ func TestAggMetricIngestFrom(t *testing.T) {
 }
 
 func itersToPoints(iters []tsz.Iter) []schema.Point {
-	points := make([]schema.Point, 0)
+	var points []schema.Point
 	for _, it := range iters {
 		for it.Next() {
 			ts, val := it.Values()
