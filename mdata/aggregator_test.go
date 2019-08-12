@@ -91,6 +91,17 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block", agg.minMetric, expected)
 
+	// points with a timestamp belonging to the previous aggregation are ignored
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 0)
+	agg.Add(100, 123.4)
+	agg.Add(110, 5)
+	agg.Add(130, 130)
+	agg.Add(90, 24)
+	expected = []schema.Point{
+		{Val: 5, Ts: 120},
+	}
+	compare("simple-min-ignore-back-in-time", agg.minMetric, expected)
+
 	// chunkspan is 120, ingestFrom = 140 means points before chunk starting at 240 are discarded
 	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 140)
 	agg.Add(100, 123.4)
