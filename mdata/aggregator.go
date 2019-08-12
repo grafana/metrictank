@@ -100,11 +100,8 @@ func (agg *Aggregator) flush() {
 func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := AggBoundary(ts, agg.span)
 
-	if boundary == agg.currentBoundary {
-		agg.agg.Add(val)
-		if ts == boundary {
-			agg.flush()
-		}
+	if boundary < agg.currentBoundary {
+		return
 	} else if boundary > agg.currentBoundary {
 		// store current totals as a new point in their series
 		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
@@ -112,7 +109,10 @@ func (agg *Aggregator) Add(ts uint32, val float64) {
 			agg.flush()
 		}
 		agg.currentBoundary = boundary
-		agg.agg.Add(val)
+	}
+	agg.agg.Add(val)
+	if ts == boundary {
+		agg.flush()
 	}
 }
 
