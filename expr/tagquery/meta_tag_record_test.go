@@ -58,3 +58,12 @@ func TestErrorOnParsingMetaTagRecordWithoutQueryy(t *testing.T) {
 		t.Fatalf("Expected an error, but did not get one")
 	}
 }
+
+func TestErrorOnParsingMetaTagRecordWithValidExpressionsButInvalidQuery(t *testing.T) {
+	// the given expression is valid, but as a query this set of expressions is not valid
+	// because every query must have at least one expression requiring a non-empty value
+	_, err := ParseMetaTagRecord([]string{"meta=tag"}, []string{"a!=b"})
+	if err == nil {
+		t.Fatalf("Expected an error, but did not get one")
+	}
+}

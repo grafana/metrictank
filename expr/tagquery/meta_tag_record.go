@@ -26,6 +26,15 @@ func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord,
 		return res, err
 	}
 
+	// we don't actually need to instantiate a query at this point, but we want to verify
+	// that it is possible to instantiate a query from the given meta record expressions.
+	// if we can't instantiate a query from the given expressions, then the meta record
+	// upsert request should be considered invalid and should get rejected.
+	_, err = NewQuery(res.Expressions, 0)
+	if err != nil {
+		return res, fmt.Errorf("Failed to instantiate query from given expressions: %s", err)
+	}
+
 	if len(res.Expressions) == 0 {
 		return res, fmt.Errorf("Meta Tag Record must have at least one query")
 	}
