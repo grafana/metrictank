@@ -314,9 +314,9 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	mockstore.Reset()
 	chunkSpan := uint32(10)
 	numChunks := uint32(5)
+	ingestFrom := int64(25)
 	ret := []conf.Retention{conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0)}
-
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, 25)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, ingestFrom)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -406,6 +406,53 @@ func TestGetAggregated(t *testing.T) {
 		{Val: 20, Ts: 20},
 		{Val: 21 + 22, Ts: 25},
 		{Val: 30, Ts: 30},
+		{Val: 31 + 32, Ts: 35},
+	}
+	assertPointsEqual(t, got, expected)
+}
+
+func TestGetAggregatedIngestFrom(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(true)
+	mockstore.Reset()
+	chunkSpan := uint32(10)
+	numChunks := uint32(5)
+	aggSpan := uint32(5)
+	ingestFrom := int64(23)
+	ret := []conf.Retention{
+		conf.NewRetentionMT(1, 1, chunkSpan, numChunks, 0),
+		conf.NewRetentionMT(int(aggSpan), 1, chunkSpan, numChunks, 0),
+	}
+	agg := conf.Aggregation{
+		Name:              "Default",
+		Pattern:           regexp.MustCompile(".*"),
+		XFilesFactor:      0.5,
+		AggregationMethod: []conf.Method{conf.Sum},
+	}
+
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, ingestFrom)
+	m.Add(10, 10)
+	m.Add(11, 11)
+	m.Add(12, 12)
+	m.Add(20, 20)
+	m.Add(21, 21)
+	m.Add(22, 22)
+	m.Add(25, 25)
+	m.Add(26, 26)
+	m.Add(30, 30)
+	m.Add(31, 31)
+	m.Add(32, 32)
+	m.Add(40, 40)
+
+	result, err := m.GetAggregated(consolidation.Sum, aggSpan, 0, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := itersToPoints(result.Iters)
+
+	expected := []schema.Point{
+		{Val: 26 + 30, Ts: 30},
 		{Val: 31 + 32, Ts: 35},
 	}
 	assertPointsEqual(t, got, expected)
