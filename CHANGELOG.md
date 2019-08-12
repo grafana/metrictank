@@ -1,6 +1,9 @@
 # master
 
 ## breaking changes
+
+* as of v0.12.0-404-gc7715cb2 we clean up poorly formatted graphite metrics better. To the extent that they have previously worked, queries may need some adjusting
+  #1435
 * version v0.12.0-96-g998933c3 introduces config options for the cassandra/scylladb index table names.
   The default settings and schemas match the previous behavior, but people who have customized the schema-idx template files
   should know that we now no longer only expand the keyspace (and assume a hardcoded table name).
@@ -16,15 +19,37 @@
   - `tracing-enabled -> jaeger.enabled`
   - `tracing-addr -> jaeger.agent-addr`
   - `tracing-add-tags -> jaeger.add-tags` (now also key=value instead of key:value)
+* as of v0.12.0-43-g47bd3cb7 mt-whisper-importer-writer defaults to the new importer path, "/metrics/import" instead of "/chunks" and
+  uses a "http-endpoint" flag instead of "listen-address" and "listen-port".
+
+## importer
+
+* bigtable importer #1291
+* Make the importer utilities rely on TSDB-GW for authentication and org-association #1335
 
 ## other
 
-* bigtable importer #1291
-* fix kafka backlog processing to not get stuck/timeout if no messages #1315, #1328
+* fix kafka backlog processing to not get stuck/timeout if no messages #1315, #1328, #1350, #1352, #1360
 * memleak fix: Prevent blocked go routines to hang forever #1333, #1337
 * update jaeger client v2.15.0 -> v2.16.0, jaeger-lib v1.2.1 -> v2.0.0 #1339
+* Update Shopify/sarama from v1.19.0 to v1.23.0
+* add orgid as jaeger tag, to ease searching by orgid #1366
 * Fix active series stats decrement #1336
 * render response metadata: stats #1334
+* fix prometheus input plugin resetting its config at startup #1346
+* make index/archive tables configurable #1348
+* add writeQueue buffer to memoryIdx #1365
+* remove tilde from name values when indexing tags #1371
+* Jaeger cleanup: much fewer spans, but with more stats - and more stats for meta section #1380, #1410
+* increase connection pool usage #1412
+* New flag 'ingest-from' #1382
+* flush aggregates more eagerly when we can #1425
+* Peer query speculative fixes and improvements #1430
+* support sharding by tags #1427, #1436, #1444
+* meta tags: 
+  - Implement series lookup and filtering by meta tag #1423 
+  - Meta tag enrichment #1433
+  - Auto complete with meta tags #1438
 
 ## new query api functions
 
