@@ -1,11 +1,10 @@
 package chaos_cluster
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 	"testing"
 	"time"
 
@@ -37,13 +36,12 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping chaos cluster test in short mode")
+		log.Println("skipping chaos cluster test in short mode")
 		return
 	}
-	ctx, cancelFunc := context.WithCancel(context.Background())
 
-	fmt.Println("stopping docker-chaos stack should it be running...")
-	cmd := exec.CommandContext(ctx, "docker-compose", "down")
+	log.Println("stopping docker-chaos stack should it be running...")
+	cmd := exec.Command("docker-compose", "down")
 	cmd.Dir = test.Path("docker/docker-chaos")
 	err := cmd.Start()
 	if err != nil {
@@ -54,8 +52,15 @@ func TestMain(m *testing.M) {
 		log.Fatal(err.Error())
 	}
 
-	fmt.Println("launching docker-chaos stack...")
-	cmd = exec.CommandContext(ctx, "docker-compose", "up", "--force-recreate", "-V")
+	version := exec.Command("docker-compose", "version")
+	output, err := version.CombinedOutput()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	log.Println(string(output))
+
+	log.Println("launching docker-chaos stack...")
+	cmd = exec.Command("docker-compose", "up", "--force-recreate", "-V")
 	cmd.Dir = test.Path("docker/docker-chaos")
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
@@ -63,7 +68,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
@@ -72,11 +76,20 @@ func TestMain(m *testing.M) {
 	retcode := m.Run()
 	fm.Close()
 
-	fmt.Println("stopping docker-compose stack...")
-	cancelFunc()
-	if err := cmd.Wait(); err != nil {
+	log.Println("stopping docker-compose stack...")
+	cmd.Process.Signal(syscall.SIGINT)
+	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
+	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
+	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
+	tracker.Wait()
+	err = cmd.Wait()
+
+	// 130 means ctrl-C (interrupt) which is what we want
+	if err != nil && err.Error() != "exit status 130" {
 		log.Printf("ERROR: could not cleanly shutdown running docker-compose command: %s", err)
 		retcode = 1
+	} else {
+		log.Println("docker-compose stack is shut down")
 	}
 
 	os.Exit(retcode)
@@ -94,8 +107,8 @@ func TestClusterStartup(t *testing.T) {
 	}
 	select {
 	case <-tracker.Match(matchers):
-		fmt.Println("stack now running.")
-		fmt.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
+		log.Println("stack now running.")
+		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
 	case <-time.After(time.Second * 40):
 		grafana.PostAnnotation("TestClusterStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
@@ -201,12 +214,12 @@ func TestIsolateOneInstance(t *testing.T) {
 	}
 }
 
-func TestHang(t *testing.T) {
-	grafana.PostAnnotation("TestHang:begin")
-	t.Log("whatever happens, keep hanging for now, so that we can query grafana dashboards still")
-	var ch chan struct{}
-	<-ch
-}
+//func TestHang(t *testing.T) {
+//	grafana.PostAnnotation("TestHang:begin")
+//	t.Log("whatever happens, keep hanging for now, so that we can query grafana dashboards still")
+//	var ch chan struct{}
+//	<-ch
+//}
 
 // maybe useful in the future, test also clean exit and rejoin like so:
 //stop("metrictank4")

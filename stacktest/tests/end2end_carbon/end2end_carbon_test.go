@@ -2,7 +2,6 @@ package end2end_carbon
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -35,10 +34,22 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping end2end carbon test (cassandra) in short mode")
+		log.Println("skipping end2end carbon test (cassandra) in short mode")
 		return
 	}
-	log.Println("launching docker-dev stack...")
+
+	log.Println("stopping docker-dev stack should it be running...")
+	cmd := exec.Command("docker-compose", "down")
+	cmd.Dir = test.Path("docker/docker-dev")
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	version := exec.Command("docker-compose", "version")
 	output, err := version.CombinedOutput()
 	if err != nil {
@@ -46,17 +57,17 @@ func TestMain(m *testing.M) {
 	}
 	log.Println(string(output))
 
+	log.Println("launching docker-dev stack...")
 	// TODO: should probably use -V flag here.
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
-	cmd := exec.Command("docker-compose", "up", "--force-recreate")
+	cmd = exec.Command("docker-compose", "up", "--force-recreate")
 	cmd.Dir = test.Path("docker/docker-dev")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
@@ -88,6 +99,7 @@ func TestStartup(t *testing.T) {
 	matchers := []track.Matcher{
 		{Str: "metrictank.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank.*carbon-in: listening on.*2003"},
+		{Str: "grafana.*HTTP Server Listen.*3000"},
 	}
 	select {
 	case <-tracker.Match(matchers):
