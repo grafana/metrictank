@@ -165,7 +165,7 @@ func (i *idSelector) byTagValueFromMetaTagIndex() {
 	// if expression matches value exactly we can directly look up the ids by it as key.
 	// this is faster than having to call expr.Matches on each value
 	if i.expr.MatchesExactly() {
-		for _, metaRecordId := range i.ctx.mti[i.expr.GetKey()][i.expr.GetValue()] {
+		for _, metaRecordId := range i.ctx.metaTagIndex[i.expr.GetKey()][i.expr.GetValue()] {
 			select {
 			case <-i.stopCh:
 				return
@@ -176,7 +176,7 @@ func (i *idSelector) byTagValueFromMetaTagIndex() {
 		return
 	}
 
-	for value, records := range i.ctx.mti[i.expr.GetKey()] {
+	for value, records := range i.ctx.metaTagIndex[i.expr.GetKey()] {
 		select {
 		case <-i.stopCh:
 			return
@@ -257,7 +257,7 @@ func (i *idSelector) byTagFromMetaTagIndex() {
 	defer i.workerWg.Done()
 
 	if i.expr.MatchesExactly() {
-		for _, records := range i.ctx.mti[i.expr.GetKey()] {
+		for _, records := range i.ctx.metaTagIndex[i.expr.GetKey()] {
 			for _, metaRecordId := range records {
 				i.evaluateMetaRecord(metaRecordId)
 			}
@@ -266,12 +266,12 @@ func (i *idSelector) byTagFromMetaTagIndex() {
 		return
 	}
 
-	for tag := range i.ctx.mti {
+	for tag := range i.ctx.metaTagIndex {
 		if !i.expr.Matches(tag) {
 			continue
 		}
 
-		for _, records := range i.ctx.mti[tag] {
+		for _, records := range i.ctx.metaTagIndex[tag] {
 			for _, metaRecordId := range records {
 				i.evaluateMetaRecord(metaRecordId)
 			}
@@ -282,7 +282,7 @@ func (i *idSelector) byTagFromMetaTagIndex() {
 // evaluateMetaRecord takes a meta record id, it then looks up the corresponding
 // meta record, builds a sub query from its expressions and executes the sub query
 func (i *idSelector) evaluateMetaRecord(id recordId) {
-	record, ok := i.ctx.metaRecords[id]
+	record, ok := i.ctx.metaTagRecords[id]
 	if !ok {
 		corruptIndex.Inc()
 		return
@@ -323,5 +323,5 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
 
-	query.RunBlocking(i.ctx.index, i.ctx.byId, i.ctx.mti, i.ctx.metaRecords, i.rawResCh)
+	query.RunBlocking(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
 }

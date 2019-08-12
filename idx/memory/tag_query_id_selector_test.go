@@ -46,10 +46,10 @@ func selectAndCompareResults(t *testing.T, expression tagquery.Expression, metaR
 	}
 
 	ctx := &TagQueryContext{
-		index:       index.tags[1],
-		byId:        index.defById,
-		mti:         index.metaTags[1],
-		metaRecords: index.metaTagRecords[1],
+		index:          index.tags[1],
+		byId:           index.defById,
+		metaTagIndex:   index.metaTagIndex[1],
+		metaTagRecords: index.metaTagRecords[1],
 	}
 
 	resCh, _ := newIdSelector(expression, ctx).getIds()

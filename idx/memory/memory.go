@@ -266,7 +266,7 @@ type UnpartitionedMemoryIdx struct {
 	// used by tag index
 	defByTagSet    defByTagSet
 	tags           map[uint32]TagIndex       // by orgId
-	metaTags       map[uint32]metaTagIndex   // by orgId
+	metaTagIndex   map[uint32]metaTagIndex   // by orgId
 	metaTagRecords map[uint32]metaTagRecords // by orgId
 
 	findCache *FindCache
@@ -280,7 +280,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet:    make(defByTagSet),
 		tree:           make(map[uint32]*Tree),
 		tags:           make(map[uint32]TagIndex),
-		metaTags:       make(map[uint32]metaTagIndex),
+		metaTagIndex:   make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
 	}
 	return m
@@ -475,9 +475,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 		m.metaTagRecords[orgId] = mtr
 	}
 
-	if mti, ok = m.metaTags[orgId]; !ok {
+	if mti, ok = m.metaTagIndex[orgId]; !ok {
 		mti = make(metaTagIndex)
-		m.metaTags[orgId] = mti
+		m.metaTagIndex[orgId] = mti
 	}
 
 	id, record, oldId, oldRecord, err := mtr.upsert(upsertRecord)
@@ -513,14 +513,14 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 	m.RLock()
 	defer m.RUnlock()
 
-	metaTagRecords, ok := m.metaTagRecords[orgId]
+	mtr, ok := m.metaTagRecords[orgId]
 	if !ok {
 		return res
 	}
 
-	res = make([]tagquery.MetaTagRecord, len(metaTagRecords))
+	res = make([]tagquery.MetaTagRecord, len(mtr))
 	i := 0
-	for _, record := range metaTagRecords {
+	for _, record := range mtr {
 		res[i] = record
 		i++
 	}
@@ -894,7 +894,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	// probably allocating more than necessary, still better than growing
 	res := make([]string, 0, len(tags))
 
-	resMap := queryCtx.RunGetTags(tags, m.defById, m.metaTags[orgId], m.metaTagRecords[orgId])
+	resMap := queryCtx.RunGetTags(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId])
 	for tag := range resMap {
 		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
 			res = append(res, tag)
@@ -962,7 +962,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	}
 
 	resCh := make(chan schema.MKey, 100)
-	queryCtx.RunNonBlocking(tags, m.defById, m.metaTags[orgId], m.metaTagRecords[orgId], resCh)
+	queryCtx.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
 
 	valueMap := make(map[string]struct{})
 	tagPrefix := tag + "=" + prefix
@@ -1134,7 +1134,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 		return resCh
 	}
 
-	query.RunNonBlocking(tags, m.defById, m.metaTags[orgId], m.metaTagRecords[orgId], resCh)
+	query.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
 
 	return resCh
 }

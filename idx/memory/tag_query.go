@@ -25,12 +25,12 @@ type TagQueryContext struct {
 	selector *idSelector
 	filter   *idFilter
 
-	index       TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId        map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-	mti         metaTagIndex                 // the meta tag index
-	metaRecords metaTagRecords               // meta tag records keyed by their recordID
-	startWith   int                          // the expression index to start with
-	subQuery    bool                         // true if this is a subquery created from the expressions of a meta tag record
+	index          TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId           map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	metaTagIndex   metaTagIndex                 // the meta tag index
+	metaTagRecords metaTagRecords               // meta tag records keyed by their recordID
+	startWith      int                          // the expression index to start with
+	subQuery       bool                         // true if this is a subquery created from the expressions of a meta tag record
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -147,11 +147,11 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 // index:	    the tag index to operate on
 // byId:        a map keyed by schema.MKey referring to *idx.Archive
 // mti:         the meta tag index
-// metaRecords: the meta tag records
+// mtr:         the meta tag records
 // resCh:       a chan of schema.MKey into which the result set will be pushed
 //              this channel gets closed when the query execution is complete
-func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords, resCh chan schema.MKey) {
-	q.run(index, byId, mti, metaRecords, resCh)
+func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+	q.run(index, byId, mti, mtr, resCh)
 
 	go func() {
 		q.wg.Wait()
@@ -162,18 +162,18 @@ func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*i
 // RunBlocking is very similar to RunNonBlocking, but there are two notable differences:
 // 1) It only returns once the query execution is complete
 // 2) It does not close the resCh which has been passed to it on completion
-func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords, resCh chan schema.MKey) {
-	q.run(index, byId, mti, metaRecords, resCh)
+func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+	q.run(index, byId, mti, mtr, resCh)
 
 	q.wg.Wait()
 }
 
 // run implements the common parts of RunNonBlocking and RunBlocking
-func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords, resCh chan schema.MKey) {
+func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
 	q.index = index
 	q.byId = byId
-	q.mti = mti
-	q.metaRecords = metaRecords
+	q.metaTagIndex = mti
+	q.metaTagRecords = mtr
 	q.prepareExpressions()
 
 	// no initial expression has been chosen, returning empty result
@@ -321,11 +321,11 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, metaRecords metaTagRecords) map[string]struct{} {
+func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords) map[string]struct{} {
 	q.index = index
 	q.byId = byId
-	q.mti = mti
-	q.metaRecords = metaRecords
+	q.metaTagIndex = mti
+	q.metaTagRecords = mtr
 	q.prepareExpressions()
 
 	maxTagCount := int32(math.MaxInt32)

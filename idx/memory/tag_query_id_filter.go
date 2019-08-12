@@ -73,14 +73,14 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 
 		// if no meta records match this expression, then we don't need to generate
 		// a meta record filter for it
-		metaRecordIds := ctx.mti.getMetaRecordIdsByExpression(expr, invertSetOfMetaRecords)
+		metaRecordIds := ctx.metaTagIndex.getMetaRecordIdsByExpression(expr, invertSetOfMetaRecords)
 		if len(metaRecordIds) == 0 {
 			continue
 		}
 
 		var metaRecordFilters []tagquery.MetricDefinitionFilter
 		for _, id := range metaRecordIds {
-			record, ok := ctx.metaRecords[id]
+			record, ok := ctx.metaTagRecords[id]
 			if !ok {
 				corruptIndex.Inc()
 				log.Errorf("TagQueryContext: Tried to lookup a meta tag record id that does not exist, index is corrupted")

@@ -24,10 +24,10 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 	}
 
 	ctx := &TagQueryContext{
-		index:       index.tags[1],
-		byId:        index.defById,
-		mti:         index.metaTags[1],
-		metaRecords: index.metaTagRecords[1],
+		index:          index.tags[1],
+		byId:           index.defById,
+		metaTagIndex:   index.metaTagIndex[1],
+		metaTagRecords: index.metaTagRecords[1],
 	}
 
 	filter := newIdFilter(expressions, ctx)
