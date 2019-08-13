@@ -100,19 +100,26 @@ func (agg *Aggregator) flush() {
 func (agg *Aggregator) Add(ts uint32, val float64) {
 	boundary := AggBoundary(ts, agg.span)
 
-	if boundary == agg.currentBoundary {
-		agg.agg.Add(val)
-		if ts == boundary {
-			agg.flush()
-		}
+	if boundary < agg.currentBoundary {
+		// ignore the point it was for a previous bucket. we can't process it
+		return
 	} else if boundary > agg.currentBoundary {
-		// store current totals as a new point in their series
+		// point is for a more recent bucket
+		// store current aggregates as a new point in their series and start the new bucket
 		// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
 		if agg.agg.Cnt != 0 {
 			agg.flush()
 		}
 		agg.currentBoundary = boundary
-		agg.agg.Add(val)
+	}
+	agg.agg.Add(val)
+
+	// if the ts of the point is a boundary, it means no more point can possibly come in for the same aggregation.
+	// e.g. if aggspan is 10s and we're adding a point with timestamp 12:34:10, then any subsequent point will go
+	// in the bucket for 12:34:20 or later.
+	// so it is time to flush the result
+	if ts == boundary {
+		agg.flush()
 	}
 }
 

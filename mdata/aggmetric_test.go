@@ -407,6 +407,7 @@ func TestGetAggregated(t *testing.T) {
 		{Val: 21 + 22, Ts: 25},
 		{Val: 30, Ts: 30},
 		{Val: 31 + 32, Ts: 35},
+		{Val: 40, Ts: 40},
 	}
 	assertPointsEqual(t, got, expected)
 }
@@ -454,6 +455,7 @@ func TestGetAggregatedIngestFrom(t *testing.T) {
 	expected := []schema.Point{
 		{Val: 26 + 30, Ts: 30},
 		{Val: 31 + 32, Ts: 35},
+		{Val: 40, Ts: 40},
 	}
 	assertPointsEqual(t, got, expected)
 }
