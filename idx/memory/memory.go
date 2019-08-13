@@ -1095,7 +1095,13 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		return nil
 	}
 
-	mtr, useEnrichment := m.metaTagRecords[orgId]
+	var enricher *enricher
+	if metaTagSupport {
+		mtr, ok := m.metaTagRecords[orgId]
+		if ok {
+			enricher = mtr.getEnricher(tagIndex.idHasTag)
+		}
+	}
 
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	resCh := m.idsByTagQuery(orgId, queryCtx)
@@ -1117,8 +1123,8 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
 			}
-			if useEnrichment {
-				byPath[nameWithTags].Defs[0].MetaTags = mtr.enrich(tagIndex.idHasTag, def.Id, def.Name, def.Tags)
+			if enricher != nil {
+				byPath[nameWithTags].Defs[0].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
 			}
 		} else {
 			existing.Defs = append(existing.Defs, CloneArchive(def))

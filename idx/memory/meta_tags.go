@@ -3,7 +3,7 @@ package memory
 import (
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -62,13 +62,36 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
 }
 
-func (m metaTagRecords) enrich(lookup tagquery.IdTagLookup, id schema.MKey, name string, tags []string) tagquery.Tags {
-	var res tagquery.Tags
+func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
+	res := enricher{
+		filters: make([]tagquery.MetricDefinitionFilter, len(m)),
+		tags:    make([]tagquery.Tags, len(m)),
+	}
+
+	i := 0
 	for _, record := range m {
-		if record.GetMetricDefinitionFilter(lookup)(id, name, tags) == tagquery.Pass {
-			res = append(res, record.MetaTags...)
+		res.filters[i] = record.GetMetricDefinitionFilter(lookup)
+		res.tags[i] = record.MetaTags
+		i++
+	}
+
+	return &res
+}
+
+type enricher struct {
+	filters []tagquery.MetricDefinitionFilter
+	tags    []tagquery.Tags
+}
+
+func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
+	var res tagquery.Tags
+
+	for i := range e.filters {
+		if e.filters[i](id, name, tags) == tagquery.Pass {
+			res = append(res, e.tags[i]...)
 		}
 	}
+
 	return res
 }
 
