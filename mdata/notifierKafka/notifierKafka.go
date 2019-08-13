@@ -296,9 +296,9 @@ func (c *NotifierKafka) flush() {
 		}
 		messagesSize.Value(buf.Len())
 		kafkaMsg := &sarama.ProducerMessage{
+			Partition: partition,
 			Topic:     topic,
 			Value:     sarama.ByteEncoder(buf.Bytes()),
-			Partition: partition,
 		}
 		payload = append(payload, kafkaMsg)
 	}

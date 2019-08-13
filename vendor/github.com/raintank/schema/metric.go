@@ -3,9 +3,9 @@ package schema
 import (
 	"bytes"
 	"crypto/md5"
-	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -16,18 +16,13 @@ var ErrInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var ErrInvalidEmptyName = errors.New("name cannot be empty")
 var ErrInvalidMtype = errors.New("invalid mtype")
 var ErrInvalidTagFormat = errors.New("invalid tag format")
+var ErrUnknownPartitionMethod = errors.New("unknown partition method")
 
 type PartitionedMetric interface {
 	Validate() error
 	SetId()
-	// return a []byte key comprised of the metric's OrgId
-	// accepts an input []byte to allow callers to re-use
-	// buffers to reduce memory allocations
-	KeyByOrgId([]byte) []byte
-	// return a []byte key comprised of the metric's Name
-	// accepts an input []byte to allow callers to re-use
-	// buffers to reduce memory allocations
-	KeyBySeries([]byte) []byte
+	// PartitionID returns the partition id that should be used for this metric.
+	PartitionID(method PartitionByMethod, partitions int32) (int32, error)
 }
 
 //go:generate msgp
@@ -62,25 +57,6 @@ func (m *MetricData) Validate() error {
 		return ErrInvalidTagFormat
 	}
 	return nil
-}
-
-func (m *MetricData) KeyByOrgId(b []byte) []byte {
-	if cap(b)-len(b) < 4 {
-		// not enough unused space in the slice so we need to grow it.
-		newBuf := make([]byte, len(b), len(b)+4)
-		copy(newBuf, b)
-		b = newBuf
-	}
-	// PutUint32 writes directly to the slice rather then appending.
-	// so we need to set the length to 4 more bytes then it currently is.
-	b = b[:len(b)+4]
-	binary.LittleEndian.PutUint32(b[len(b)-4:], uint32(m.OrgId))
-	return b
-}
-
-func (m *MetricData) KeyBySeries(b []byte) []byte {
-	b = append(b, []byte(m.Name)...)
-	return b
 }
 
 // returns a id (hash key) in the format OrgId.md5Sum
@@ -125,7 +101,7 @@ type MetricDefinition struct {
 
 	// this is a special attribute that does not need to be set, it is only used
 	// to keep the state of NameWithTags()
-	nameWithTags string `json:"-"`
+	nameWithTags string
 }
 
 // NameWithTags deduplicates the name and tags strings by storing their content
@@ -138,27 +114,26 @@ func (m *MetricDefinition) NameWithTags() string {
 		return m.nameWithTags
 	}
 
-	sort.Strings(m.Tags)
+	nameWithTagsBuffer := &bytes.Buffer{}
+	_ = writeSortedTagString(nameWithTagsBuffer, m.Name, m.Tags)
+	m.nameWithTags = nameWithTagsBuffer.String()
 
-	nameWithTagsBuffer := bytes.NewBufferString(m.Name)
-	tagPositions := make([]int, 0, len(m.Tags)*2)
+	var i int
+	cursor := len(m.Name)
+	m.Name = m.nameWithTags[:cursor]
 	for _, t := range m.Tags {
-		if len(t) >= 5 && t[:5] == "name=" {
+		if len(t) > 5 && t[:5] == "name=" {
 			continue
 		}
-
-		nameWithTagsBuffer.WriteString(";")
-		tagPositions = append(tagPositions, nameWithTagsBuffer.Len())
-		nameWithTagsBuffer.WriteString(t)
-		tagPositions = append(tagPositions, nameWithTagsBuffer.Len())
+		m.Tags[i] = m.nameWithTags[cursor+1 : cursor+1+len(t)]
+		cursor += len(t) + 1
+		i++
 	}
 
-	m.nameWithTags = nameWithTagsBuffer.String()
-	m.Tags = make([]string, len(tagPositions)/2)
-	for i := 0; i < len(m.Tags); i++ {
-		m.Tags[i] = m.nameWithTags[tagPositions[i*2]:tagPositions[i*2+1]]
+	// if a "name" tag existed, then we have to shorten the slice
+	if i < len(m.Tags) {
+		m.Tags = m.Tags[:i]
 	}
-	m.Name = m.nameWithTags[:len(m.Name)]
 
 	return m.nameWithTags
 }
@@ -196,7 +171,7 @@ func (m *MetricDefinition) SetId() {
 	fmt.Fprintf(buffer, "%d", m.Interval)
 
 	for _, t := range m.Tags {
-		if len(t) >= 5 && t[:5] == "name=" {
+		if len(t) > 5 && t[:5] == "name=" {
 			continue
 		}
 
@@ -227,25 +202,6 @@ func (m *MetricDefinition) Validate() error {
 		return ErrInvalidTagFormat
 	}
 	return nil
-}
-
-func (m *MetricDefinition) KeyByOrgId(b []byte) []byte {
-	if cap(b)-len(b) < 4 {
-		// not enough unused space in the slice so we need to grow it.
-		newBuf := make([]byte, len(b), len(b)+4)
-		copy(newBuf, b)
-		b = newBuf
-	}
-	// PutUint32 writes directly to the slice rather then appending.
-	// so we need to set the length to 4 more bytes then it currently is.
-	b = b[:len(b)+4]
-	binary.LittleEndian.PutUint32(b[len(b)-4:], uint32(m.OrgId))
-	return b
-}
-
-func (m *MetricDefinition) KeyBySeries(b []byte) []byte {
-	b = append(b, []byte(m.Name)...)
-	return b
 }
 
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
@@ -286,6 +242,65 @@ func SanitizeNameAsTagValue(name string) string {
 
 	// the whole name consists of no other chars than '~'
 	return ""
+}
+
+// EatDots removes multiple consecutive, leading, and trailing dots
+// from name. If the provided name is only dots, it will return an
+// empty string
+// The vast majority of names will not need to be modified,
+// so we optimize for that case. This function only requires
+// allocations if the name does need to be modified.
+func EatDots(name string) string {
+	if len(name) == 0 {
+		return ""
+	}
+
+	dotsToRemove := 0
+	if name[0] == '.' {
+		dotsToRemove++
+	}
+	for i := 1; i < len(name); i++ {
+		if name[i] == '.' {
+			if name[i-1] == '.' {
+				dotsToRemove++
+			}
+			if i == len(name)-1 {
+				dotsToRemove++
+			}
+		}
+	}
+
+	// the majority of cases will return here
+	if dotsToRemove == 0 {
+		return name
+	}
+
+	if dotsToRemove >= len(name) {
+		return ""
+	}
+
+	newName := make([]byte, len(name)-dotsToRemove)
+	j := 0
+	sawDot := false
+	for i := 0; i < len(name); i++ {
+		if name[i] == '.' {
+			if j > 0 {
+				sawDot = true
+			}
+			continue
+		}
+
+		if sawDot {
+			newName[j] = '.'
+			sawDot = false
+			j++
+		}
+
+		newName[j] = name[i]
+		j++
+	}
+
+	return string(newName)
 }
 
 // ValidateTags returns whether all tags are in a valid format.
@@ -344,4 +359,31 @@ func ValidateTagValue(value string) bool {
 	}
 
 	return !strings.ContainsRune(value, ';')
+}
+
+func writeSortedTagString(w io.Writer, name string, tags []string) error {
+	sort.Strings(tags)
+
+	_, err := io.WriteString(w, name)
+	if err != nil {
+		return err
+	}
+
+	for _, t := range tags {
+		if len(t) > 5 && t[:5] == "name=" {
+			continue
+		}
+
+		_, err = io.WriteString(w, ";")
+		if err != nil {
+			return err
+		}
+
+		_, err = io.WriteString(w, t)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

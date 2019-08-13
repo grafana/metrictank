@@ -102,12 +102,12 @@
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 
 [[projects]]
-  digest = "1:ac52ddd069a36a6545ba4869aa169de501b2d9711437688a632cf9f8d8f5053c"
+  digest = "1:0c31fa2fb2c809d61d640e28cc400087fe205df6ec9623dd1eb91a7de8d4f5d6"
   name = "github.com/cespare/xxhash"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "5c37fe3735342a2e0d01c87a907579987c8936cc"
-  version = "v1.0.0"
+  revision = "3b82fb7d186719faeedd0c2864f868c74fbf79a1"
+  version = "v2.0.0"
 
 [[projects]]
   digest = "1:a2c1d0e43bd3baaa071d1b9ed72c27d78169b2b269f71c105ac4ba34b1be4a39"
@@ -116,6 +116,14 @@
   pruneopts = "NUT"
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:3db74f0cf75d9759d2bdfb6cb55f7d7d372c01f847c5e1ab2fe03773dc2bf024"
+  name = "github.com/dgryski/go-jump"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "e1f439676b570800a863c37b78d1f868f51a85fc"
 
 [[projects]]
   branch = "master"
@@ -713,14 +721,14 @@
   revision = "05a94bb32ad1f23f4b01edb2edd06862d4a484d2"
 
 [[projects]]
-  digest = "1:79cd8a8ab808d2806d7201bb39f5d0c7de4aadf067c1ca9793ea40f9654412b5"
+  digest = "1:dec53b91f232decdae33a4500125ac5bc21964e3d10390c8ef52ef8bdc5abced"
   name = "github.com/raintank/schema"
   packages = [
     ".",
     "msg",
   ]
   pruneopts = "NUT"
-  revision = "172e29ac645828b87130d8ae8b41e0a3727ad40d"
+  revision = "81ecd4b90851930216f37f1ce898cc4f7469d441"
 
 [[projects]]
   branch = "master"

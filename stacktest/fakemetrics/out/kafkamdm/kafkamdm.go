@@ -18,14 +18,15 @@ import (
 
 type KafkaMdm struct {
 	out.OutStats
-	topic      string
-	brokers    []string
-	config     *sarama.Config
-	client     sarama.SyncProducer
-	hash       hash.Hash32
-	part       *p.Kafka
-	lmPart     LastNumPartitioner
-	partScheme string
+	topic         string
+	brokers       []string
+	config        *sarama.Config
+	client        sarama.SyncProducer
+	hash          hash.Hash32
+	part          *p.Kafka
+	lmPart        LastNumPartitioner
+	partScheme    string
+	numPartitions int32
 }
 
 // map the last number in the metricname to the partition
@@ -33,7 +34,7 @@ type KafkaMdm struct {
 type LastNumPartitioner struct{}
 
 func (p *LastNumPartitioner) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
-	name := m.KeyBySeries(nil)
+	name := []byte(m.(*schema.MetricData).Name)
 	index := bytes.LastIndexByte(name, '.')
 	if index < 0 || index == len(name)-1 {
 		return 0, fmt.Errorf("invalid metricname for LastNumPartitioner: '%s'", name)
@@ -46,11 +47,11 @@ func (p *LastNumPartitioner) Partition(m schema.PartitionedMetric, numPartitions
 }
 
 // key is by metric name, but won't be used for partition setting
-func (p *LastNumPartitioner) GetPartitionKey(m schema.PartitionedMetric, b []byte) ([]byte, error) {
-	return m.KeyBySeries(b), nil
+func (p *LastNumPartitioner) GetPartition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
+	return m.PartitionID(schema.PartitionBySeries, numPartitions)
 }
 
-func New(topic string, brokers []string, codec string, stats met.Backend, partitionScheme string) (*KafkaMdm, error) {
+func New(topic string, brokers []string, codec string, stats met.Backend, partitionScheme string, numPartitions int32) (*KafkaMdm, error) {
 	// We are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
@@ -72,6 +73,10 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		return nil, err
 	}
 
+	if numPartitions < 1 {
+		return nil, fmt.Errorf("must use at least 1 partition")
+	}
+
 	client, err := sarama.NewSyncProducer(brokers, config)
 	if err != nil {
 		return nil, err
@@ -83,6 +88,8 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		part, err = p.NewKafka("byOrg")
 	case "bySeries":
 		part, err = p.NewKafka("bySeries")
+	case "bySeriesWithTags":
+		part, err = p.NewKafka("bySeriesWithTags")
 	case "lastNum":
 		lmPart = LastNumPartitioner{}
 		// sets partition based on message partition field
@@ -95,15 +102,16 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	}
 
 	return &KafkaMdm{
-		OutStats:   out.NewStats(stats, "kafka-mdm"),
-		topic:      topic,
-		brokers:    brokers,
-		config:     config,
-		client:     client,
-		hash:       fnv.New32a(),
-		part:       part,
-		lmPart:     lmPart,
-		partScheme: partitionScheme,
+		OutStats:      out.NewStats(stats, "kafka-mdm"),
+		topic:         topic,
+		brokers:       brokers,
+		config:        config,
+		client:        client,
+		hash:          fnv.New32a(),
+		part:          part,
+		lmPart:        lmPart,
+		partScheme:    partitionScheme,
+		numPartitions: numPartitions,
 	}, nil
 }
 
@@ -132,26 +140,26 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 		k.MessageBytes.Value(int64(len(data)))
 
 		if k.partScheme == "lastNum" {
-			part, err := k.lmPart.Partition(metric, 0)
+			partition, err := k.lmPart.Partition(metric, 0)
 			if err != nil {
 				return fmt.Errorf("Failed to get partition for metric. %s", err)
 			}
 
 			payload[i] = &sarama.ProducerMessage{
-				Partition: part,
+				Partition: partition,
 				Topic:     k.topic,
 				Value:     sarama.ByteEncoder(data),
 			}
 		} else {
-			key, err := k.part.GetPartitionKey(metric, nil)
+			partition, err := k.part.GetPartition(metric, k.numPartitions)
 			if err != nil {
 				return fmt.Errorf("Failed to get partition for metric. %s", err)
 			}
 
 			payload[i] = &sarama.ProducerMessage{
-				Key:   sarama.ByteEncoder(key),
-				Topic: k.topic,
-				Value: sarama.ByteEncoder(data),
+				Partition: partition,
+				Topic:     k.topic,
+				Value:     sarama.ByteEncoder(data),
 			}
 		}
 
