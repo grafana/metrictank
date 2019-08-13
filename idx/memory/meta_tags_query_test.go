@@ -154,3 +154,137 @@ func TestSimpleMetaTagQueryWithManyTypesOfExpression(t *testing.T) {
 		mkeys[9]: struct{}{},
 	})
 }
+
+func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
+	_metaTagSupport := tagquery.MetaTagSupport
+	tagquery.MetaTagSupport = true
+	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+
+	metaTagRecord, err := tagquery.ParseMetaTagRecord(
+		[]string{"metatag1=value1"},
+		[]string{"tag1=~iterator[1-2]"},
+	)
+	if err != nil {
+		t.Fatalf("Error when parsing meta tag record: %s", err)
+	}
+
+	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord})
+
+	expressions, err := tagquery.ParseExpressions([]string{"tag1=~.+"})
+	if err != nil {
+		t.Fatalf("Error when parsing expressions: %s", err)
+	}
+
+	query, err := tagquery.NewQuery(expressions, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when instantiating query from expressions %q: %s", expressions, err)
+	}
+
+	res := idx.FindByTag(1, query)
+
+	for _, node := range res {
+		for _, def := range node.Defs {
+			shouldHaveMetaTag := false
+
+			// determine whether this serie should have the meta tag metatag1=value1
+			for _, tag := range def.Tags {
+				if tag == "tag1=iterator1" || tag == "tag1=iterator2" {
+					shouldHaveMetaTag = true
+				}
+			}
+
+			foundMetaTag := false
+			for _, tag := range def.MetaTags {
+				if tag == metaTagRecord.MetaTags[0] {
+					foundMetaTag = true
+				}
+			}
+
+			if shouldHaveMetaTag != foundMetaTag {
+				if shouldHaveMetaTag {
+					t.Fatalf("Expected meta tag, but it wasn't present in: %+v", def)
+				} else {
+					t.Fatalf("Unexpected meta tag in: %+v", def)
+				}
+			}
+		}
+	}
+}
+
+func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
+	_metaTagSupport := tagquery.MetaTagSupport
+	tagquery.MetaTagSupport = true
+	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+
+	metaTagRecord1, err := tagquery.ParseMetaTagRecord(
+		[]string{"metatag1=value1"},
+		[]string{"name=~.+", "tag1!=iterator1", "tag1!=iterator2"},
+	)
+	if err != nil {
+		t.Fatalf("Error when parsing meta tag record: %s", err)
+	}
+	metaTagRecord2, err := tagquery.ParseMetaTagRecord(
+		[]string{"metatag1=value2"},
+		[]string{"name=~.+", "tag1!=iterator3", "tag1!=iterator4"},
+	)
+	if err != nil {
+		t.Fatalf("Error when parsing meta tag record: %s", err)
+	}
+
+	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord1, metaTagRecord2})
+
+	expressions, err := tagquery.ParseExpressions([]string{"tag1=~.+"})
+	if err != nil {
+		t.Fatalf("Error when parsing expressions: %s", err)
+	}
+
+	query, err := tagquery.NewQuery(expressions, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when instantiating query from expressions %q: %s", expressions, err)
+	}
+
+	res := idx.FindByTag(1, query)
+
+	for _, node := range res {
+		for _, def := range node.Defs {
+			shouldHaveMetaTag1 := true
+			shouldHaveMetaTag2 := true
+
+			// determine whether this serie should have metatag1=value1 and/or metatag1=value2
+			for _, tag := range def.Tags {
+				if tag == "tag1=iterator1" || tag == "tag1=iterator2" {
+					shouldHaveMetaTag1 = false
+				}
+				if tag == "tag1=iterator3" || tag == "tag1=iterator4" {
+					shouldHaveMetaTag2 = false
+				}
+			}
+
+			foundMetaTag1 := false
+			foundMetaTag2 := false
+			for _, tag := range def.MetaTags {
+				if tag == metaTagRecord1.MetaTags[0] {
+					foundMetaTag1 = true
+				}
+				if tag == metaTagRecord2.MetaTags[0] {
+					foundMetaTag2 = true
+				}
+			}
+
+			if shouldHaveMetaTag1 != foundMetaTag1 {
+				if shouldHaveMetaTag1 {
+					t.Fatalf("Expected meta tag metatag1=value1, but it wasn't present in: %+v", def)
+				} else {
+					t.Fatalf("Unexpected meta tag metatag1=value1 in: %+v", def)
+				}
+			}
+			if shouldHaveMetaTag2 != foundMetaTag2 {
+				if shouldHaveMetaTag2 {
+					t.Fatalf("Expected meta tag metatag1=value2, but it wasn't present in: %+v", def)
+				} else {
+					t.Fatalf("Unexpected meta tag metatag1=value2 in: %+v", def)
+				}
+			}
+		}
+	}
+}
