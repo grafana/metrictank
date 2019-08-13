@@ -265,9 +265,9 @@ type UnpartitionedMemoryIdx struct {
 
 	// used by tag index
 	defByTagSet    defByTagSet
-	tags           map[uint32]TagIndex       // by orgId
-	metaTagIndex   map[uint32]metaTagIndex   // by orgId
-	metaTagRecords map[uint32]metaTagRecords // by orgId
+	tags           map[uint32]TagIndex        // by orgId
+	metaTagIndex   map[uint32]metaTagIndex    // by orgId
+	metaTagRecords map[uint32]*metaTagRecords // by orgId
 
 	findCache *FindCache
 
@@ -281,7 +281,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tree:           make(map[uint32]*Tree),
 		tags:           make(map[uint32]TagIndex),
 		metaTagIndex:   make(map[uint32]metaTagIndex),
-		metaTagRecords: make(map[uint32]metaTagRecords),
+		metaTagRecords: make(map[uint32]*metaTagRecords),
 	}
 	return m
 }
@@ -463,7 +463,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 		return res, false, errors.NewBadRequest("Tag support is disabled")
 	}
 
-	var mtr metaTagRecords
+	var mtr *metaTagRecords
 	var mti metaTagIndex
 	var ok bool
 
@@ -471,7 +471,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	defer m.Unlock()
 
 	if mtr, ok = m.metaTagRecords[orgId]; !ok {
-		mtr = make(metaTagRecords)
+		mtr = newMetaTagRecords()
 		m.metaTagRecords[orgId] = mtr
 	}
 
@@ -518,9 +518,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 		return res
 	}
 
-	res = make([]tagquery.MetaTagRecord, len(mtr))
+	res = make([]tagquery.MetaTagRecord, len(mtr.records))
 	i := 0
-	for _, record := range mtr {
+	for _, record := range mtr.records {
 		res[i] = record
 		i++
 	}

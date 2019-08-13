@@ -28,7 +28,7 @@ type TagQueryContext struct {
 	index          TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
 	byId           map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
 	metaTagIndex   metaTagIndex                 // the meta tag index
-	metaTagRecords metaTagRecords               // meta tag records keyed by their recordID
+	metaTagRecords *metaTagRecords              // meta tag records keyed by their recordID
 	startWith      int                          // the expression index to start with
 	subQuery       bool                         // true if this is a subquery created from the expressions of a meta tag record
 }
@@ -150,7 +150,7 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 // mtr:         the meta tag records
 // resCh:       a chan of schema.MKey into which the result set will be pushed
 //              this channel gets closed when the query execution is complete
-func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr *metaTagRecords, resCh chan schema.MKey) {
 	q.run(index, byId, mti, mtr, resCh)
 
 	go func() {
@@ -162,14 +162,14 @@ func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*i
 // RunBlocking is very similar to RunNonBlocking, but there are two notable differences:
 // 1) It only returns once the query execution is complete
 // 2) It does not close the resCh which has been passed to it on completion
-func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr *metaTagRecords, resCh chan schema.MKey) {
 	q.run(index, byId, mti, mtr, resCh)
 
 	q.wg.Wait()
 }
 
 // run implements the common parts of RunNonBlocking and RunBlocking
-func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr *metaTagRecords, resCh chan schema.MKey) {
 	q.index = index
 	q.byId = byId
 	q.metaTagIndex = mti
@@ -321,7 +321,7 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords) map[string]struct{} {
+func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr *metaTagRecords) map[string]struct{} {
 	q.index = index
 	q.byId = byId
 	q.metaTagIndex = mti

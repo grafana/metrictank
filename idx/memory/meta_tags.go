@@ -1,6 +1,9 @@
 package memory
 
 import (
+	"sync/atomic"
+	"unsafe"
+
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
@@ -13,7 +16,16 @@ var collisionAvoidanceWindow = uint32(1024)
 type recordId uint32
 
 // list of meta records keyed by a unique identifier used as ID
-type metaTagRecords map[recordId]tagquery.MetaTagRecord
+type metaTagRecords struct {
+	records  map[recordId]tagquery.MetaTagRecord
+	enricher unsafe.Pointer
+}
+
+func newMetaTagRecords() *metaTagRecords {
+	return &metaTagRecords{
+		records: make(map[recordId]tagquery.MetaTagRecord),
+	}
+}
 
 // upsert inserts or updates a meta tag record according to the given specifications
 // it uses the set of tag query expressions as the identity of the record, if a record with the
@@ -26,6 +38,9 @@ type metaTagRecords map[recordId]tagquery.MetaTagRecord
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
 func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
+	// after altering meta records we need to reinstantiate the enricher the next time we want to use it
+	defer atomic.StorePointer(&m.enricher, nil)
+
 	id := recordId(record.HashExpressions())
 	var oldRecord *tagquery.MetaTagRecord
 	var oldId recordId
@@ -33,11 +48,11 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	// loop over existing records, starting from id, trying to find one that has
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		if existingRecord, ok := m[id+recordId(i)]; ok {
+		if existingRecord, ok := m.records[id+recordId(i)]; ok {
 			if record.EqualExpressions(&existingRecord) {
 				oldRecord = &existingRecord
 				oldId = id + recordId(i)
-				delete(m, oldId)
+				delete(m.records, oldId)
 				break
 			}
 		}
@@ -50,8 +65,8 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	// now find the best position to insert the new/updated record, starting from id
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		// if we find a free slot, then insert the new record there
-		if _, ok := m[id]; !ok {
-			m[id] = record
+		if _, ok := m.records[id]; !ok {
+			m.records[id] = record
 
 			return id, &record, oldId, oldRecord, nil
 		}
@@ -63,19 +78,26 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 }
 
 func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
-	res := enricher{
-		filters: make([]tagquery.MetricDefinitionFilter, len(m)),
-		tags:    make([]tagquery.Tags, len(m)),
+	res := (*enricher)(atomic.LoadPointer(&m.enricher))
+	if res != nil {
+		return res
+	}
+
+	res = &enricher{
+		filters: make([]tagquery.MetricDefinitionFilter, len(m.records)),
+		tags:    make([]tagquery.Tags, len(m.records)),
 	}
 
 	i := 0
-	for _, record := range m {
+	for _, record := range m.records {
 		res.filters[i] = record.GetMetricDefinitionFilter(lookup)
 		res.tags[i] = record.MetaTags
 		i++
 	}
 
-	return &res
+	atomic.StorePointer(&m.enricher, (unsafe.Pointer)(res))
+
+	return res
 }
 
 type enricher struct {

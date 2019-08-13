@@ -8,7 +8,7 @@ import (
 )
 
 func TestInsertSimpleMetaTagRecord(t *testing.T) {
-	metaTagRecords := make(metaTagRecords)
+	metaTagRecords := newMetaTagRecords()
 	recordToInsert, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=abc", "anotherTag=theValue"}, []string{"metricTag!=a", "match=~this"})
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
@@ -27,11 +27,11 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 	if oldRecord != nil {
 		t.Fatalf("OldRecord was expected to be nil, but it was %+v", oldRecord)
 	}
-	if len(metaTagRecords) != 1 {
-		t.Fatalf("metaTagRecords was expected to have 1 entry, but it had %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 1 {
+		t.Fatalf("metaTagRecords was expected to have 1 entry, but it had %d", len(metaTagRecords.records))
 	}
 
-	_, ok := metaTagRecords[recordId(record.HashExpressions())]
+	_, ok := metaTagRecords.records[recordId(record.HashExpressions())]
 	if !ok {
 		t.Fatalf("We expected the record to be found at the index of its hash, but it wasn't")
 	}
@@ -59,17 +59,17 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
 
-	metaTagRecords := make(metaTagRecords)
+	metaTagRecords := newMetaTagRecords()
 	metaTagRecords.upsert(recordToInsert1)
 	metaTagRecords.upsert(recordToInsert2)
 
-	if len(metaTagRecords) != 2 {
-		t.Fatalf("Expected 2 meta tag records, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 2 {
+		t.Fatalf("Expected 2 meta tag records, but there were %d", len(metaTagRecords.records))
 	}
 
 	var found1, found2 bool
 	var recordIdToUpdate recordId
-	for i, record := range metaTagRecords {
+	for i, record := range metaTagRecords.records {
 		if record.Equals(&recordToInsert1) {
 			found1 = true
 			recordIdToUpdate = i
@@ -98,13 +98,13 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	if oldRecord == nil || !oldRecord.Equals(&recordToInsert1) {
 		t.Fatalf("Expected the old record to not be nil, but it was")
 	}
-	if len(metaTagRecords) != 2 {
-		t.Fatalf("Expected that there to be 2 meta tag records, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 2 {
+		t.Fatalf("Expected that there to be 2 meta tag records, but there were %d", len(metaTagRecords.records))
 	}
 
 	// the order of the records may have changed again due to sorting by id
 	found1, found2 = false, false
-	for _, record := range metaTagRecords {
+	for _, record := range metaTagRecords.records {
 		if record.Equals(&recordToUpdate) {
 			found1 = true
 		}
@@ -164,15 +164,15 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 		}
 	}
 
-	metaTagRecords := make(metaTagRecords)
+	metaTagRecords := newMetaTagRecords()
 	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
 	metaTagRecords.upsert(record)
 	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
 	metaTagRecords.upsert(record)
 	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
 	metaTagRecords.upsert(record)
-	if len(metaTagRecords) != 3 {
-		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 3 {
+		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords.records))
 	}
 
 	// adding a 4th record with the same hash but different queries
@@ -193,8 +193,8 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	if oldRecord != nil {
 		t.Fatalf("Expected oldRecord to be nil, but it wasn't")
 	}
-	if len(metaTagRecords) != 3 {
-		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 3 {
+		t.Fatalf("Expected 3 metatag records to be present, but there were %d", len(metaTagRecords.records))
 	}
 
 	// updating the third record with the same hash and equal queries, but different meta tags
@@ -220,22 +220,22 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	if !oldRecord.Equals(&record) {
 		t.Fatalf("Old record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, oldRecord)
 	}
-	if len(metaTagRecords) != 3 {
-		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 3 {
+		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords.records))
 	}
 }
 
 func TestDeletingMetaRecord(t *testing.T) {
 	// Adding 2 meta records
-	metaTagRecords := make(metaTagRecords)
+	metaTagRecords := newMetaTagRecords()
 	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
 	metaTagRecords.upsert(record)
 
 	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
 	idOfRecord2, _, _, _, _ := metaTagRecords.upsert(record)
 
-	if len(metaTagRecords) != 2 {
-		t.Fatalf("Expected that 2 meta tag records exist, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 2 {
+		t.Fatalf("Expected that 2 meta tag records exist, but there were %d", len(metaTagRecords.records))
 	}
 
 	// then we delete one record again
@@ -254,10 +254,10 @@ func TestDeletingMetaRecord(t *testing.T) {
 	if oldId != idOfRecord2 {
 		t.Fatalf("Expected the oldId to be the id of record2 (%d), but it was %d", idOfRecord2, oldId)
 	}
-	if len(metaTagRecords) != 1 {
-		t.Fatalf("Expected that there is 1 meta tag record, but there were %d", len(metaTagRecords))
+	if len(metaTagRecords.records) != 1 {
+		t.Fatalf("Expected that there is 1 meta tag record, but there were %d", len(metaTagRecords.records))
 	}
-	_, ok := metaTagRecords[id]
+	_, ok := metaTagRecords.records[id]
 	if ok {
 		t.Fatalf("Expected returned record id to not be present, but it was")
 	}
