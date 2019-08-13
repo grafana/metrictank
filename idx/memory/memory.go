@@ -1089,6 +1089,14 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	m.RLock()
 	defer m.RUnlock()
 
+	tagIndex, ok := m.tags[orgId]
+	if !ok {
+		// if there is no tag index, we don't need to run the tag query
+		return nil
+	}
+
+	mtr, useEnrichment := m.metaTagRecords[orgId]
+
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	resCh := m.idsByTagQuery(orgId, queryCtx)
 
@@ -1109,10 +1117,12 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
 			}
+			if useEnrichment {
+				byPath[nameWithTags].Defs[0].MetaTags = mtr.enrich(tagIndex.idHasTag, def.Id, def.Name, def.Tags)
+			}
 		} else {
 			existing.Defs = append(existing.Defs, CloneArchive(def))
 		}
-		byPath[nameWithTags].Defs[len(byPath[nameWithTags].Defs)-1].MetaTags = tagquery.Tags{tagquery.Tag{Key: "meta1", Value: "tag1"}}
 	}
 
 	results := make([]idx.Node, len(byPath))

@@ -3,6 +3,7 @@ package memory
 import (
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/raintank/schema"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -59,6 +60,16 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	}
 
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
+}
+
+func (m metaTagRecords) enrich(lookup tagquery.IdTagLookup, id schema.MKey, name string, tags []string) tagquery.Tags {
+	var res tagquery.Tags
+	for _, record := range m {
+		if record.GetMetricDefinitionFilter(lookup)(id, name, tags) == tagquery.Pass {
+			res = append(res, record.MetaTags...)
+		}
+	}
+	return res
 }
 
 // index structure keyed by tag -> value -> list of meta record IDs
