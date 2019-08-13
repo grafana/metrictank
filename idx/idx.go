@@ -23,10 +23,11 @@ type Node struct {
 
 type Archive struct {
 	schema.MetricDefinition
-	SchemaId uint16 // index in mdata.schemas (not persisted)
-	AggId    uint16 // index in mdata.aggregations (not persisted)
-	IrId     uint16 // index in mdata.indexrules (not persisted)
-	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
+	SchemaId uint16        // index in mdata.schemas (not persisted)
+	AggId    uint16        // index in mdata.aggregations (not persisted)
+	IrId     uint16        // index in mdata.indexrules (not persisted)
+	LastSave uint32        // last time the metricDefinition was saved to a backend store (cassandra)
+	MetaTags tagquery.Tags // meta tags that should be added to the ones in the MetricDefinition
 }
 
 // used primarily by tests, for convenience

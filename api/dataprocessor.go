@@ -255,6 +255,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 		}
 		out = append(out, resp.series...)
 	}
+
 	log.Debugf("DP getTargetsRemote: total of %d series found on peers", len(out))
 	return out, nil
 }
@@ -317,6 +318,7 @@ LOOP:
 		}
 		out = append(out, resp.series...)
 	}
+
 	ss.Trace(span)
 	log.Debugf("DP getTargetsLocal: %d series found locally", len(out))
 	return out, nil
