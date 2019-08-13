@@ -1,6 +1,7 @@
 package tagquery
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -67,6 +68,12 @@ func (t Tags) Strings() []string {
 		builder.Reset()
 	}
 	return res
+}
+
+// MarshalJSON satisfies the json.Marshaler interface
+// it is used by the api endpoint /metaTags to list the meta tag records
+func (t Tags) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.Strings())
 }
 
 type Tag struct {

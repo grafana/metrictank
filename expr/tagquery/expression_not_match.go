@@ -41,6 +41,10 @@ func (e *expressionNotMatch) RequiresNonEmptyValue() bool {
 	return e.matchesEmpty
 }
 
+func (e *expressionNotMatch) ResultIsSmallerWhenInverted() bool {
+	return true
+}
+
 func (e *expressionNotMatch) Matches(value string) bool {
 	return !e.valueRe.MatchString(value)
 }

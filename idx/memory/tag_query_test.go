@@ -77,7 +77,7 @@ func queryAndCompareTagResults(t *testing.T, q TagQueryContext, expectedData map
 	t.Helper()
 	tagIdx, byId := getTestIndex()
 
-	res := q.RunGetTags(tagIdx, byId)
+	res := q.RunGetTags(tagIdx, byId, nil, nil)
 	if !reflect.DeepEqual(expectedData, res) {
 		t.Fatalf("Expected: %+v\nGot: %+v", expectedData, res)
 	}
@@ -87,12 +87,15 @@ func queryAndCompareResults(t *testing.T, q TagQueryContext, expectedData IdSet)
 	t.Helper()
 	tagIdx, byId := getTestIndex()
 
-	res := q.Run(tagIdx, byId)
+	resCh := make(chan schema.MKey, 100)
+	q.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	res := make(IdSet)
+	for id := range resCh {
+		res[id] = struct{}{}
+	}
 
 	if !reflect.DeepEqual(expectedData, res) {
-		q.Run(tagIdx, byId)
 		t.Fatalf("Returned data does not match expected data:\nExpected: %s\nGot: %s", expectedData, res)
-
 	}
 }
 
@@ -331,28 +334,49 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 
 	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1"}, 4)
 	qCtx := NewTagQueryContext(q)
-	res := qCtx.Run(tagIdx, byId)
+	resCh := make(chan schema.MKey, 100)
+	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	res := make(IdSet)
+	for id := range resCh {
+		res[id] = struct{}{}
+	}
+
 	if len(res) != 1 {
 		t.Fatalf("Expected %d results, but got %d", 1, len(res))
 	}
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 3)
 	qCtx = NewTagQueryContext(q)
-	res = qCtx.Run(tagIdx, byId)
+	resCh = make(chan schema.MKey, 100)
+	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	res = make(IdSet)
+	for id := range resCh {
+		res[id] = struct{}{}
+	}
 	if len(res) != 2 {
 		t.Fatalf("Expected %d results, but got %d", 2, len(res))
 	}
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 2)
 	qCtx = NewTagQueryContext(q)
-	res = qCtx.Run(tagIdx, byId)
+	resCh = make(chan schema.MKey, 100)
+	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	res = make(IdSet)
+	for id := range resCh {
+		res[id] = struct{}{}
+	}
 	if len(res) != 3 {
 		t.Fatalf("Expected %d results, but got %d", 3, len(res))
 	}
 
 	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 1)
 	qCtx = NewTagQueryContext(q)
-	res = qCtx.Run(tagIdx, byId)
+	resCh = make(chan schema.MKey, 100)
+	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	res = make(IdSet)
+	for id := range resCh {
+		res[id] = struct{}{}
+	}
 	if len(res) != 4 {
 		t.Fatalf("Expected %d results, but got %d", 4, len(res))
 	}
@@ -590,7 +614,12 @@ func testGetByTag(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}
-		res := ix.idsByTagQuery(1, NewTagQueryContext(q))
+		resCh := ix.idsByTagQuery(1, NewTagQueryContext(q))
+		res := make(IdSet)
+		for id := range resCh {
+			res[id] = struct{}{}
+		}
+
 		if len(tc.expectation) != len(res) {
 			t.Fatalf("Result does not match expectation for expressions %+v\nExpected:\n%+v\nGot:\n%+v\n", tc.expressions, tc.expectation, res)
 		}

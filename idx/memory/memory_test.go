@@ -185,8 +185,24 @@ func withAndWithoutPartitonedIndex(f func(*testing.T)) func(*testing.T) {
 	}
 }
 
+// withAndWithoutMetaTagSupport calls a test with the MetaTagSupport
+// setting turned on and off. This is to verify that something works as
+// expected with both settings.
+func withAndWithoutMetaTagSupport(f func(*testing.T)) func(*testing.T) {
+	return func(t *testing.T) {
+		t.Helper()
+		_metaTagSupport := tagquery.MetaTagSupport
+		defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+
+		tagquery.MetaTagSupport = false
+		t.Run("withoutMetaTagSupport", f)
+		tagquery.MetaTagSupport = true
+		t.Run("withMetaTagSupport", f)
+	}
+}
+
 func TestGetAddKey(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testGetAddKey))(t)
+	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(withAndWithoutTagSupport(testGetAddKey)))(t)
 }
 
 func testGetAddKey(t *testing.T) {
@@ -1075,17 +1091,17 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Expected MetaTagRecordList to return no records for org 2, but it has:\n%+v\n", metaTagRecords)
 	}
 
-	if len(ix.metaTags[1]["a"]["b"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag a=b, but there were %d", len(ix.metaTags[1]["a"]["b"]))
+	if len(ix.metaTagIndex[1]["a"]["b"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag a=b, but there were %d", len(ix.metaTagIndex[1]["a"]["b"]))
 	}
-	if len(ix.metaTags[1]["c"]["d"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag c=d, but there were %d", len(ix.metaTags[1]["c"]["d"]))
+	if len(ix.metaTagIndex[1]["c"]["d"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag c=d, but there were %d", len(ix.metaTagIndex[1]["c"]["d"]))
 	}
-	if len(ix.metaTags[1]["e"]["f"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag e=f, but there were %d", len(ix.metaTags[1]["e"]["f"]))
+	if len(ix.metaTagIndex[1]["e"]["f"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag e=f, but there were %d", len(ix.metaTagIndex[1]["e"]["f"]))
 	}
-	if len(ix.metaTags[1]["g"]["h"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag g=h, but there were %d", len(ix.metaTags[1]["g"]["h"]))
+	if len(ix.metaTagIndex[1]["g"]["h"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag g=h, but there were %d", len(ix.metaTagIndex[1]["g"]["h"]))
 	}
 
 	// record3 has the same queries as record2, so it should completely replace it
@@ -1105,23 +1121,23 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Expected MetaTagRecordList to return 2 records for org 1, but it has:\n%+v\n", metaTagRecords)
 	}
 
-	if len(ix.metaTags[1]["a"]["b"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag a=b, but there were %d", len(ix.metaTags[1]["a"]["b"]))
+	if len(ix.metaTagIndex[1]["a"]["b"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag a=b, but there were %d", len(ix.metaTagIndex[1]["a"]["b"]))
 	}
-	if len(ix.metaTags[1]["c"]["d"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag c=d, but there were %d", len(ix.metaTags[1]["c"]["d"]))
+	if len(ix.metaTagIndex[1]["c"]["d"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag c=d, but there were %d", len(ix.metaTagIndex[1]["c"]["d"]))
 	}
-	if len(ix.metaTags[1]["e"]["f"]) != 0 {
-		t.Fatalf("Expected that there is 0 record associated with tag e=f, but there were %d", len(ix.metaTags[1]["e"]["f"]))
+	if len(ix.metaTagIndex[1]["e"]["f"]) != 0 {
+		t.Fatalf("Expected that there is 0 record associated with tag e=f, but there were %d", len(ix.metaTagIndex[1]["e"]["f"]))
 	}
-	if len(ix.metaTags[1]["g"]["h"]) != 0 {
-		t.Fatalf("Expected that there is 0 record associated with tag g=h, but there were %d", len(ix.metaTags[1]["g"]["h"]))
+	if len(ix.metaTagIndex[1]["g"]["h"]) != 0 {
+		t.Fatalf("Expected that there is 0 record associated with tag g=h, but there were %d", len(ix.metaTagIndex[1]["g"]["h"]))
 	}
-	if len(ix.metaTags[1]["i"]["j"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag i=j, but there were %d", len(ix.metaTags[1]["i"]["j"]))
+	if len(ix.metaTagIndex[1]["i"]["j"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag i=j, but there were %d", len(ix.metaTagIndex[1]["i"]["j"]))
 	}
-	if len(ix.metaTags[1]["k"]["l"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag k=l, but there were %d", len(ix.metaTags[1]["k"]["l"]))
+	if len(ix.metaTagIndex[1]["k"]["l"]) != 1 {
+		t.Fatalf("Expected that there is 1 record associated with tag k=l, but there were %d", len(ix.metaTagIndex[1]["k"]["l"]))
 	}
 }
 
@@ -1251,6 +1267,19 @@ func benchWithAndWithoutPartitonedIndex(f func(*testing.B)) func(*testing.B) {
 		b.Run("partitioned", f)
 		Partitioned = false
 		b.Run("unPartitioned", f)
+	}
+}
+
+func benchWithAndWithoutMetaTagSupport(f func(*testing.B)) func(*testing.B) {
+	return func(b *testing.B) {
+		b.Helper()
+		_metaTagSupport := tagquery.MetaTagSupport
+		defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+
+		tagquery.MetaTagSupport = true
+		b.Run("withMetaTagSupport", f)
+		tagquery.MetaTagSupport = false
+		b.Run("withoutMetaTagSupport", f)
 	}
 }
 

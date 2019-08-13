@@ -122,7 +122,7 @@ type MemoryIndex interface {
 	LoadPartition(int32, []schema.MetricDefinition) int
 	UpdateArchiveLastSave(schema.MKey, int32, uint32)
 	add(*idx.Archive)
-	idsByTagQuery(uint32, TagQueryContext) IdSet
+	idsByTagQuery(uint32, TagQueryContext) chan schema.MKey
 	PurgeFindCache()
 	ForceInvalidationFindCache()
 }
@@ -266,7 +266,7 @@ type UnpartitionedMemoryIdx struct {
 	// used by tag index
 	defByTagSet    defByTagSet
 	tags           map[uint32]TagIndex       // by orgId
-	metaTags       map[uint32]metaTagIndex   // by orgId
+	metaTagIndex   map[uint32]metaTagIndex   // by orgId
 	metaTagRecords map[uint32]metaTagRecords // by orgId
 
 	findCache *FindCache
@@ -280,7 +280,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet:    make(defByTagSet),
 		tree:           make(map[uint32]*Tree),
 		tags:           make(map[uint32]TagIndex),
-		metaTags:       make(map[uint32]metaTagIndex),
+		metaTagIndex:   make(map[uint32]metaTagIndex),
 		metaTagRecords: make(map[uint32]metaTagRecords),
 	}
 	return m
@@ -475,9 +475,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 		m.metaTagRecords[orgId] = mtr
 	}
 
-	if mti, ok = m.metaTags[orgId]; !ok {
+	if mti, ok = m.metaTagIndex[orgId]; !ok {
 		mti = make(metaTagIndex)
-		m.metaTags[orgId] = mti
+		m.metaTagIndex[orgId] = mti
 	}
 
 	id, record, oldId, oldRecord, err := mtr.upsert(upsertRecord)
@@ -513,14 +513,14 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 	m.RLock()
 	defer m.RUnlock()
 
-	metaTagRecords, ok := m.metaTagRecords[orgId]
+	mtr, ok := m.metaTagRecords[orgId]
 	if !ok {
 		return res
 	}
 
-	res = make([]tagquery.MetaTagRecord, len(metaTagRecords))
+	res = make([]tagquery.MetaTagRecord, len(mtr))
 	i := 0
-	for _, record := range metaTagRecords {
+	for _, record := range mtr {
 		res[i] = record
 		i++
 	}
@@ -894,7 +894,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	// probably allocating more than necessary, still better than growing
 	res := make([]string, 0, len(tags))
 
-	resMap := queryCtx.RunGetTags(tags, m.defById)
+	resMap := queryCtx.RunGetTags(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId])
 	for tag := range resMap {
 		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
 			res = append(res, tag)
@@ -961,10 +961,12 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return nil
 	}
 
-	ids := queryCtx.Run(tags, m.defById)
+	resCh := make(chan schema.MKey, 100)
+	queryCtx.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
+
 	valueMap := make(map[string]struct{})
 	tagPrefix := tag + "=" + prefix
-	for id := range ids {
+	for id := range resCh {
 		var ok bool
 		var def *idx.Archive
 		if def, ok = m.defById[id]; !ok {
@@ -1088,9 +1090,10 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	defer m.RUnlock()
 
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
-	ids := m.idsByTagQuery(orgId, queryCtx)
+	resCh := m.idsByTagQuery(orgId, queryCtx)
+
 	byPath := make(map[string]*idx.Node)
-	for id := range ids {
+	for id := range resCh {
 		def, ok := m.defById[id]
 		if !ok {
 			corruptIndex.Inc()
@@ -1122,13 +1125,18 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	return results
 }
 
-func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) IdSet {
+func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) chan schema.MKey {
+	resCh := make(chan schema.MKey, 100)
+
 	tags, ok := m.tags[orgId]
 	if !ok {
-		return nil
+		close(resCh)
+		return resCh
 	}
 
-	return query.Run(tags, m.defById)
+	query.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
+
+	return resCh
 }
 
 func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
@@ -1337,7 +1345,12 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 	queryCtx := NewTagQueryContext(query)
 
 	m.RLock()
-	ids := m.idsByTagQuery(orgId, queryCtx)
+	resCh := m.idsByTagQuery(orgId, queryCtx)
+	ids := make(IdSet)
+	for id := range resCh {
+		ids[id] = struct{}{}
+	}
+
 	m.RUnlock()
 
 	m.Lock()

@@ -21,13 +21,16 @@ import (
 type TagQueryContext struct {
 	wg sync.WaitGroup
 
-	query            tagquery.Query
-	filters          []tagquery.MetricDefinitionFilter
-	defaultDecisions []tagquery.FilterDecision
+	query    tagquery.Query
+	selector *idSelector
+	filter   *idFilter
 
-	index     TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId      map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-	startWith int                          // the expression index to start with
+	index          TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId           map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	metaTagIndex   metaTagIndex                 // the meta tag index
+	metaTagRecords metaTagRecords               // meta tag records keyed by their recordID
+	startWith      int                          // the expression index to start with
+	subQuery       bool                         // true if this is a subquery created from the expressions of a meta tag record
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -41,12 +44,13 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 	return ctx
 }
 
-func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
-	type expressionCost struct {
-		operatorCost  uint32
-		cardinality   uint32
-		expressionIdx int
-	}
+type expressionCost struct {
+	operatorCost  uint32
+	cardinality   uint32
+	expressionIdx int
+}
+
+func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 	costs := make([]expressionCost, len(q.query.Expressions))
 
 	for i, expr := range q.query.Expressions {
@@ -55,18 +59,18 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 		if expr.OperatesOnTag() {
 			if expr.MatchesExactly() {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx[expr.GetKey()]))
+				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
 			} else {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx))
+				costs[i].cardinality = uint32(len(q.index))
 			}
 		} else {
 			if expr.MatchesExactly() {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx[expr.GetKey()][expr.GetValue()]))
+				costs[i].cardinality = uint32(len(q.index[expr.GetKey()][expr.GetValue()]))
 			} else {
 				costs[i].operatorCost = expr.GetOperatorCost()
-				costs[i].cardinality = uint32(len(idx[expr.GetKey()]))
+				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
 			}
 		}
 	}
@@ -78,157 +82,34 @@ func (q *TagQueryContext) prepareExpressions(idx TagIndex) {
 		return costs[i].operatorCost < costs[j].operatorCost
 	})
 
-	// the number of filters / default decisions is equal to the number of expressions - 1
-	// because one of the expressions will be chosen to be the one that we start with.
-	// we don't need to filter function, nor the default decision, of the expression which
+	return costs
+}
+
+func (q *TagQueryContext) prepareExpressions() {
+	costs := q.evaluateExpressionCosts()
+
+	// the number of filters is equal to the number of expressions - 1 because one of the
+	// expressions will be chosen to be the one that we start with.
+	// we don't need the filter function, nor the default decision, of the expression which
 	// we start with.
 	// all the remaining expressions will be used as filter expressions, for which we need
 	// to obtain their filter functions and their default decisions.
-	q.filters = make([]tagquery.MetricDefinitionFilter, len(q.query.Expressions)-1)
-	q.defaultDecisions = make([]tagquery.FilterDecision, len(q.query.Expressions)-1)
+	filterExpressions := make([]tagquery.Expression, 0, len(q.query.Expressions)-1)
 
 	// Every tag query has at least one expression which requires a non-empty value according to:
 	// https://graphite.readthedocs.io/en/latest/tags.html#querying
 	// This rule is enforced by tagquery.NewQuery, here we trust that the queries which get passed
 	// into the index have already been validated
-	i := 0
 	for _, cost := range costs {
 		if q.startWith < 0 && q.query.Expressions[cost.expressionIdx].RequiresNonEmptyValue() {
 			q.startWith = cost.expressionIdx
 		} else {
-			q.filters[i] = q.query.Expressions[cost.expressionIdx].GetMetricDefinitionFilter(idx.idHasTag)
-			q.defaultDecisions[i] = q.query.Expressions[cost.expressionIdx].GetDefaultDecision()
-			i++
-		}
-	}
-}
-
-// getInitialIds asynchronously collects all ID's of the initial result set.  It returns:
-// a channel through which the IDs of the initial result set will be sent
-// a stop channel, which when closed, will cause it to abort the background worker.
-func (q *TagQueryContext) getInitialIds() (chan schema.MKey, chan struct{}) {
-	idCh := make(chan schema.MKey, 1000)
-	stopCh := make(chan struct{})
-
-	if q.query.Expressions[q.startWith].OperatesOnTag() {
-		q.getInitialByTag(idCh, stopCh)
-	} else {
-		q.getInitialByTagValue(idCh, stopCh)
-	}
-
-	return idCh, stopCh
-}
-
-// getInitialByTagValue generates an initial ID set which is later filtered down
-// it only handles those expressions which involve matching a tag value:
-// f.e. key=value but not key!=
-func (q *TagQueryContext) getInitialByTagValue(idCh chan schema.MKey, stopCh chan struct{}) {
-	expr := q.query.Expressions[q.startWith]
-
-	q.wg.Add(1)
-	go func() {
-		defer close(idCh)
-		defer q.wg.Done()
-
-		key := expr.GetKey()
-
-		if expr.MatchesExactly() {
-			value := expr.GetValue()
-
-			for id := range q.index[key][value] {
-				select {
-				case <-stopCh:
-					break
-				case idCh <- id:
-				}
-			}
-		} else {
-		OUTER:
-			for value, ids := range q.index[key] {
-				if !expr.Matches(value) {
-					continue
-				}
-
-				for id := range ids {
-					select {
-					case <-stopCh:
-						break OUTER
-					case idCh <- id:
-					}
-				}
-			}
-		}
-	}()
-}
-
-// getInitialByTag generates an initial ID set which is later filtered down
-// it only handles those expressions which do not involve matching a tag value:
-// f.e. key!= but not key=value
-func (q *TagQueryContext) getInitialByTag(idCh chan schema.MKey, stopCh chan struct{}) {
-	expr := q.query.Expressions[q.startWith]
-
-	q.wg.Add(1)
-	go func() {
-		defer close(idCh)
-		defer q.wg.Done()
-
-		if expr.MatchesExactly() {
-			for _, ids := range q.index[expr.GetKey()] {
-				for id := range ids {
-					select {
-					case <-stopCh:
-						break
-					case idCh <- id:
-					}
-				}
-			}
-		} else {
-		OUTER:
-			for tag := range q.index {
-				if !expr.Matches(tag) {
-					continue
-				}
-
-				for _, ids := range q.index[tag] {
-					for id := range ids {
-						select {
-						case <-stopCh:
-							break OUTER
-						case idCh <- id:
-						}
-					}
-				}
-			}
-		}
-	}()
-}
-
-// testByAllExpressions takes and id and a MetricDefinition and runs it through
-// all required tests in order to decide whether this metric should be part
-// of the final result set or not
-// in map/reduce terms this is the reduce function
-func (q *TagQueryContext) testByAllExpressions(id schema.MKey, def *idx.Archive, omitTagFilters bool) bool {
-	if !q.testByFrom(def) {
-		return false
-	}
-
-	for i := range q.filters {
-		decision := q.filters[i](id, schema.SanitizeNameAsTagValue(def.Name), def.Tags)
-
-		if decision == tagquery.None {
-			decision = q.defaultDecisions[i]
-		}
-
-		if decision == tagquery.Pass {
-			continue
-		}
-
-		if decision == tagquery.Fail {
-			return false
+			filterExpressions = append(filterExpressions, q.query.Expressions[cost.expressionIdx])
 		}
 	}
 
-	return true
+	q.selector = newIdSelector(q.query.Expressions[q.startWith], q)
+	q.filter = newIdFilter(filterExpressions, q)
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -253,8 +134,7 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 			continue
 		}
 
-		// we always omit tag filters because Run() does not support filtering by tags
-		if q.testByAllExpressions(id, def, false) {
+		if q.testByFrom(def) && q.filter.matches(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags) {
 			resCh <- id
 		}
 	}
@@ -262,14 +142,46 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	q.wg.Done()
 }
 
-// Run executes the tag query on the given index and returns a list of ids
-func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive) IdSet {
+// RunNonBlocking executes the tag query on the given index and returns a list of ids
+// It takes the following arguments:
+// index:	    the tag index to operate on
+// byId:        a map keyed by schema.MKey referring to *idx.Archive
+// mti:         the meta tag index
+// mtr:         the meta tag records
+// resCh:       a chan of schema.MKey into which the result set will be pushed
+//              this channel gets closed when the query execution is complete
+func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+	q.run(index, byId, mti, mtr, resCh)
+
+	go func() {
+		q.wg.Wait()
+		close(resCh)
+	}()
+}
+
+// RunBlocking is very similar to RunNonBlocking, but there are two notable differences:
+// 1) It only returns once the query execution is complete
+// 2) It does not close the resCh which has been passed to it on completion
+func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
+	q.run(index, byId, mti, mtr, resCh)
+
+	q.wg.Wait()
+}
+
+// run implements the common parts of RunNonBlocking and RunBlocking
+func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords, resCh chan schema.MKey) {
 	q.index = index
 	q.byId = byId
-	q.prepareExpressions(index)
+	q.metaTagIndex = mti
+	q.metaTagRecords = mtr
+	q.prepareExpressions()
 
-	idCh, _ := q.getInitialIds()
-	resCh := make(chan schema.MKey)
+	// no initial expression has been chosen, returning empty result
+	if q.startWith < 0 || q.startWith >= len(q.query.Expressions) {
+		return
+	}
+
+	idCh, _ := q.selector.getIds()
 
 	// start the tag query workers. they'll consume the ids on the idCh and
 	// evaluate for each of them whether it satisfies all the conditions
@@ -279,19 +191,6 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive)
 	for i := 0; i < TagQueryWorkers; i++ {
 		go q.filterIdsFromChan(idCh, resCh)
 	}
-
-	go func() {
-		q.wg.Wait()
-		close(resCh)
-	}()
-
-	result := make(IdSet)
-
-	for id := range resCh {
-		result[id] = struct{}{}
-	}
-
-	return result
 }
 
 // getMaxTagCount calculates the maximum number of results (cardinality) a
@@ -374,7 +273,7 @@ IDS:
 		// the metric through all tag expression tests in order to decide
 		// whether those tags should be part of the final result set
 		if len(metricTags) > 0 {
-			if q.testByAllExpressions(id, def, omitTagFilters) {
+			if q.testByFrom(def) && q.filter.matches(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags) {
 				for key := range metricTags {
 					select {
 					case tagCh <- key:
@@ -422,10 +321,12 @@ func (q *TagQueryContext) tagFilterMatchesName() bool {
 
 // RunGetTags executes the tag query and returns all the tags of the
 // resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive) map[string]struct{} {
+func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr metaTagRecords) map[string]struct{} {
 	q.index = index
 	q.byId = byId
-	q.prepareExpressions(index)
+	q.metaTagIndex = mti
+	q.metaTagRecords = mtr
+	q.prepareExpressions()
 
 	maxTagCount := int32(math.MaxInt32)
 
@@ -437,7 +338,7 @@ func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.A
 	q.wg.Add(1)
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
-	idCh, stopCh := q.getInitialIds()
+	idCh, stopCh := q.selector.getIds()
 	tagCh := make(chan string)
 
 	// we know there can only be 1 tag filter, so if we detect that the given

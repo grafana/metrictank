@@ -1150,7 +1150,7 @@ func permutations(lst []string) [][]string {
 // benchtime to be meaningful. f.e. on my laptop i'm using -benchtime=1m, which
 // is enough for it to go through all the 6! permutations
 func BenchmarkTagQueryFilterAndIntersect(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterAndIntersect)(b)
+	benchWithAndWithoutMetaTagSupport(benchWithAndWithoutPartitonedIndex(benchmarkTagQueryFilterAndIntersect))(b)
 }
 
 func benchmarkTagQueryFilterAndIntersect(b *testing.B) {

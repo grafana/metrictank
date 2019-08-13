@@ -3,11 +3,13 @@ package tagquery
 import (
 	"fmt"
 	"strings"
+
+	"github.com/raintank/schema"
 )
 
 type MetaTagRecord struct {
-	MetaTags    Tags
-	Expressions Expressions
+	MetaTags    Tags        `json:"metaTags"`
+	Expressions Expressions `json:"expressions"`
 }
 
 func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord, error) {
@@ -22,6 +24,15 @@ func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord,
 	res.Expressions, err = ParseExpressions(expressions)
 	if err != nil {
 		return res, err
+	}
+
+	// we don't actually need to instantiate a query at this point, but we want to verify
+	// that it is possible to instantiate a query from the given meta record expressions.
+	// if we can't instantiate a query from the given expressions, then the meta record
+	// upsert request should be considered invalid and should get rejected.
+	_, err = NewQuery(res.Expressions, 0)
+	if err != nil {
+		return res, fmt.Errorf("Failed to instantiate query from given expressions: %s", err)
 	}
 
 	if len(res.Expressions) == 0 {
@@ -86,4 +97,33 @@ func (m *MetaTagRecord) EqualExpressions(other *MetaTagRecord) bool {
 // meta tags, otherwise it returns false
 func (m *MetaTagRecord) HasMetaTags() bool {
 	return len(m.MetaTags) > 0
+}
+
+func (m *MetaTagRecord) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {
+	filters := make([]MetricDefinitionFilter, len(m.Expressions))
+	defaultDecisions := make([]FilterDecision, len(m.Expressions))
+	for i, expr := range m.Expressions {
+		filters[i] = expr.GetMetricDefinitionFilter(lookup)
+		defaultDecisions[i] = expr.GetDefaultDecision()
+	}
+
+	return func(id schema.MKey, name string, tags []string) FilterDecision {
+		for i := range filters {
+			decision := filters[i](id, name, tags)
+
+			if decision == None {
+				return defaultDecisions[i]
+			}
+
+			if decision == Pass {
+				continue
+			}
+
+			if decision == Fail {
+				return Fail
+			}
+		}
+
+		return Pass
+	}
 }

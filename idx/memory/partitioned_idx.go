@@ -496,27 +496,26 @@ func (p *PartitionedMemoryIdx) add(archive *idx.Archive) {
 	p.Partition[archive.Partition].add(archive)
 }
 
-func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) IdSet {
+func (p *PartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) chan schema.MKey {
 	g, _ := errgroup.WithContext(context.Background())
-	result := make([]IdSet, len(p.Partition))
-	var i int
+	resCh := make(chan schema.MKey, 100)
 	for _, m := range p.Partition {
-		pos, m := i, m
+		m := m
 		g.Go(func() error {
-			result[pos] = m.idsByTagQuery(orgId, query)
+			partitionCh := m.idsByTagQuery(orgId, query)
+			for id := range partitionCh {
+				resCh <- id
+			}
 			return nil
 		})
-		i++
 	}
-	g.Wait()
 
-	response := make(IdSet)
-	for _, ids := range result {
-		for mk := range ids {
-			response[mk] = struct{}{}
-		}
-	}
-	return response
+	go func() {
+		g.Wait()
+		close(resCh)
+	}()
+
+	return resCh
 }
 
 func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {

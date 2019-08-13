@@ -1,6 +1,7 @@
 package tagquery
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -50,6 +51,12 @@ func (e Expressions) Sort() {
 		}
 		return e[i].GetKey() < e[j].GetKey()
 	})
+}
+
+// MarshalJSON satisfies the json.Marshaler interface
+// it is used by the api endpoint /metaTags to list the meta tag records
+func (e Expressions) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.Strings())
 }
 
 // Expression represents one expression inside a query of one or many expressions.
@@ -133,6 +140,14 @@ type Expression interface {
 	// RequiresNonEmptyValue returns whether this expression requires a non-empty value.
 	// Every valid query must have at least one expression requiring a non-empty value.
 	RequiresNonEmptyValue() bool
+
+	// ResultIsSmallerWhenInverted returns a bool indicating whether the result set after evaluating
+	// this expression will likely be bigger than half of the tested index entries or smaller.
+	// This is never guaranteed to actually be correct, it is only an assumption based on which we
+	// can optimize performance.
+	// F.e. operators = / =~ / __tag=   would return false
+	//      operators != / !=~          would return true
+	ResultIsSmallerWhenInverted() bool
 
 	// Matches takes a string which should either be a tag key or value depending on the return
 	// value of OperatesOnTag(), then it returns whether the given string satisfies this expression

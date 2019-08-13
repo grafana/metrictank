@@ -30,6 +30,10 @@ func (e *expressionNotEqual) RequiresNonEmptyValue() bool {
 	return false
 }
 
+func (e *expressionNotEqual) ResultIsSmallerWhenInverted() bool {
+	return true
+}
+
 func (e *expressionNotEqual) Matches(value string) bool {
 	return value != e.value
 }
