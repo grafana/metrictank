@@ -88,7 +88,7 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 	}
 
 	// if provided size is valid, it's not possible for lru.New to return an error
-	cache, _ := lru.New(10000)
+	cache, _ := lru.New(enrichmentCacheSize)
 	res = &enricher{
 		filters: make([]tagquery.MetricDefinitionFilter, len(m.records)),
 		tags:    make([]tagquery.Tags, len(m.records)),

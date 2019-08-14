@@ -65,6 +65,7 @@ var (
 	writeQueueDelay              = 30 * time.Second
 	writeMaxBatchSize            = 5000
 	matchCacheSize               = 1000
+	enrichmentCacheSize          = 10000
 	metaTagSupport               = false
 )
 
@@ -85,6 +86,7 @@ func ConfigSetup() {
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
 	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 }
