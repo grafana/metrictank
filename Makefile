@@ -1,10 +1,19 @@
-.PHONY: test bin docker debug
+.PHONY: test bin docker debug stacktest
 default:
 	$(MAKE) all
 test:
 	CGO_ENABLED=1 go test -race -short ./...
 test-all:
 	CGO_ENABLED=1 go test -race ./...
+
+stacktest:
+	# count=1 forces uncached runs
+	# not using stacktest/... here because Go would run them all in parallel,
+	# or at least the TestMain's, and the stacks would conflict with each other
+	go test -count=1 -v ./stacktest/tests/chaos_cluster
+	go test -count=1 -v ./stacktest/tests/end2end_carbon
+	go test -count=1 -v ./stacktest/tests/end2end_carbon_bigtable
+
 check:
 	$(MAKE) test
 bin:

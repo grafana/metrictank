@@ -2,7 +2,6 @@ package end2end_carbon
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -11,11 +10,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/stacktest/docker"
 	"github.com/grafana/metrictank/stacktest/fakemetrics"
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
+	"github.com/grafana/metrictank/test"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,10 +34,22 @@ func init() {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
-		fmt.Println("skipping end2end carbon test (cassandra) in short mode")
+		log.Println("skipping end2end carbon test (cassandra) in short mode")
 		return
 	}
-	log.Println("launching docker-dev stack...")
+
+	log.Println("stopping docker-dev stack should it be running...")
+	cmd := exec.Command("docker-compose", "down")
+	cmd.Dir = test.Path("docker/docker-dev")
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	version := exec.Command("docker-compose", "version")
 	output, err := version.CombinedOutput()
 	if err != nil {
@@ -46,17 +57,17 @@ func TestMain(m *testing.M) {
 	}
 	log.Println(string(output))
 
+	log.Println("launching docker-dev stack...")
 	// TODO: should probably use -V flag here.
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
-	cmd := exec.Command("docker-compose", "up", "--force-recreate")
-	cmd.Dir = docker.Path("docker/docker-dev")
+	cmd = exec.Command("docker-compose", "up", "--force-recreate")
+	cmd.Dir = test.Path("docker/docker-dev")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
@@ -88,6 +99,7 @@ func TestStartup(t *testing.T) {
 	matchers := []track.Matcher{
 		{Str: "metrictank.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank.*carbon-in: listening on.*2003"},
+		{Str: "grafana.*HTTP Server Listen.*3000"},
 	}
 	select {
 	case <-tracker.Match(matchers):
@@ -104,17 +116,13 @@ func TestBaseIngestWorkload(t *testing.T) {
 
 	fm = fakemetrics.NewCarbon(metricsPerSecond)
 
-	suc6, resp := graphite.RetryGraphite8080("perSecond(metrictank.stats.docker-env.*.input.carbon.metricdata.received.counter32)", "-8s", 18, func(resp graphite.Response) bool {
-		exp := []string{
-			"perSecond(metrictank.stats.docker-env.default.input.carbon.metricdata.received.counter32)",
-		}
-		a := graphite.ValidateTargets(exp)(resp)
-		b := graphite.ValidatorLenNulls(1, 8)(resp)
-		c := graphite.ValidatorAvgWindowed(8, graphite.Ge(metricsPerSecond))(resp)
-		log.Printf("condition target names %t - condition len & nulls %t - condition avg value %t", a, b, c)
-		return a && b && c
-	})
-	if !suc6 {
+	req := graphite.RequestForLocalTestingGraphite8080("perSecond(metrictank.stats.docker-env.*.input.carbon.metricdata.received.counter32)", "-8s")
+	exp := []string{
+		"perSecond(metrictank.stats.docker-env.default.input.carbon.metricdata.received.counter32)",
+	}
+	validator := graphite.ValidatorAndExhaustive(graphite.ValidateTargets(exp), graphite.ValidatorLenNulls(1, 8), graphite.ValidatorAvgWindowed(8, graphite.Ge(metricsPerSecond)))
+	resp, ok := graphite.Retry(req, 18, validator)
+	if !ok {
 		grafana.PostAnnotation("TestBaseIngestWorkload:FAIL")
 		t.Fatalf("cluster did not reach a state where the MT instance processes at least %d points per second. last response was: %s", metricsPerSecond, spew.Sdump(resp))
 	}
