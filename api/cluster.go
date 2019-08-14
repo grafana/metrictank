@@ -508,12 +508,12 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 			log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
 			buf, err := peer.Post(reqCtx, name, path, data)
 			if err != nil {
-				cancel()
+				// log an error, but we will still try other peers for this shardGroup
 				log.Errorf("HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
 			}
 
 			select {
-			case <-ctx.Done():
+			case <-reqCtx.Done():
 				return
 			case responses <- response{shardGroup, PeerResponse{peer, buf}, err}:
 				return
@@ -521,9 +521,12 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 		}
 
 		for group, peers := range peerGroups {
-			peer := peers[0]
-			originalPeers[peer.GetName()] = struct{}{}
-			go askPeer(group, peer)
+			nextPeer := peers[0]
+			// shift nextPeer from the group
+			peerGroups[group] = peers[1:]
+
+			originalPeers[nextPeer.GetName()] = struct{}{}
+			go askPeer(group, nextPeer)
 		}
 
 		var ticker *time.Ticker
@@ -536,7 +539,7 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 
 		for len(receivedResponses) < len(peerGroups) {
 			select {
-			case <-ctx.Done():
+			case <-reqCtx.Done():
 				//request canceled
 				return
 			case resp := <-responses:
@@ -546,6 +549,19 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 				}
 
 				if resp.err != nil {
+					// check if there is another peer for this shardGroup. If so try it.
+					if len(peerGroups[resp.shardGroup]) > 0 {
+						speculativeRequests.Inc()
+						nextPeer := peerGroups[resp.shardGroup][0]
+						// shift nextPeer from the group
+						peerGroups[resp.shardGroup] = peerGroups[resp.shardGroup][1:]
+
+						go askPeer(resp.shardGroup, nextPeer)
+						continue
+					}
+					// No more peers to try. Cancel the reqCtx, which will cancel all in-flight
+					// requests.
+					cancel()
 					errorChan <- resp.err
 					return
 				}
@@ -565,11 +581,19 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 						if _, ok := receivedResponses[shardGroup]; ok {
 							continue
 						}
-						eligiblePeers := peers[1:]
-						for _, peer := range eligiblePeers {
-							speculativeRequests.Inc()
-							go askPeer(shardGroup, peer)
+
+						if len(peers) == 0 {
+							// no more peers to try
+							continue
 						}
+
+						nextPeer := peers[0]
+						// shift nextPeer from the group
+						peerGroups[shardGroup] = peers[1:]
+
+						// send the request to the next peer for the group.
+						speculativeRequests.Inc()
+						go askPeer(shardGroup, nextPeer)
 					}
 				}
 			}
