@@ -5,7 +5,6 @@ import (
 
 	"github.com/raintank/schema"
 
-	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -27,7 +26,7 @@ type Req struct {
 	// we need to make this differentiation to tie back to the original request (and we can't just fill in the concrete consolidation in the request,
 	// because one request may result in multiple series with different consolidators)
 	ConsReq  consolidation.Consolidator `json:"consolidator_req"`
-	Node     cluster.Node               `json:"-"`
+	Shard    int32                      `json:"shard"`
 	SchemaId uint16                     `json:"schemaId"`
 	AggId    uint16                     `json:"aggId"`
 
@@ -39,7 +38,7 @@ type Req struct {
 	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive
 }
 
-func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
+func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, shard int32, schemaId, aggId uint16) Req {
 	return Req{
 		key,
 		target,
@@ -50,7 +49,7 @@ func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterv
 		rawInterval,
 		cons,
 		consReq,
-		node,
+		shard,
 		schemaId,
 		aggId,
 		-1, // this is supposed to be updated still!
@@ -132,7 +131,7 @@ func (a Req) Equals(b Req) bool {
 	if a.ConsReq != b.ConsReq {
 		return false
 	}
-	if a.Node.GetName() != b.Node.GetName() {
+	if a.Shard != b.Shard {
 		return false
 	}
 	if a.SchemaId != b.SchemaId {

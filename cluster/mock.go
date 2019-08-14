@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 )
@@ -25,6 +26,15 @@ func (n *MockNode) IsReady() bool {
 
 func (n *MockNode) GetPartitions() []int32 {
 	return n.partitions
+}
+
+// GetShard returns the Shard group of this node. This assumes that each node in the cluster
+// has the same number of partitions.
+func (n *MockNode) GetShard() (int32, error) {
+	if len(n.partitions) == 0 {
+		return 0, fmt.Errorf("node has no partitions")
+	}
+	return n.partitions[0] / int32(len(n.partitions)), nil
 }
 
 func (n *MockNode) HasData() bool {

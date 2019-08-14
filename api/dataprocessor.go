@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
@@ -150,15 +151,12 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 }
 
 func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
-	// split reqs into local and remote.
-	localReqs := make([]models.Req, 0)
-	remoteReqs := make(map[string][]models.Req)
+	if len(reqs) == 0 {
+		return nil, nil
+	}
+	remoteReqs := make(map[int32][]models.Req)
 	for _, req := range reqs {
-		if req.Node.IsLocal() {
-			localReqs = append(localReqs, req)
-		} else {
-			remoteReqs[req.Node.GetName()] = append(remoteReqs[req.Node.GetName()], req)
-		}
+		remoteReqs[req.Shard] = append(remoteReqs[req.Shard], req)
 	}
 
 	var wg sync.WaitGroup
@@ -166,19 +164,6 @@ func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs [
 	responses := make(chan getTargetsResp, 1)
 	getCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	if len(localReqs) > 0 {
-		wg.Add(1)
-		go func() {
-			// the only errors returned are from us catching panics, so we should treat them
-			// all as internalServerErrors
-			series, err := s.getTargetsLocal(getCtx, ss, localReqs)
-			if err != nil {
-				cancel()
-			}
-			responses <- getTargetsResp{series, err}
-			wg.Done()
-		}()
-	}
 	if len(remoteReqs) > 0 {
 		wg.Add(1)
 		go func() {
@@ -211,35 +196,46 @@ func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs [
 
 // getTargetsRemote issues the requests on other nodes
 // it's nothing more than a thin network wrapper around getTargetsLocal of a peer.
-func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[string][]models.Req) ([]models.Series, error) {
+func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[int32][]models.Req) ([]models.Series, error) {
+	peerGroups, err := cluster.MembersForSpeculativeQuery()
+	if err != nil {
+		log.Errorf("HTTP getTargetsRemote unable to get peers, %s", err.Error())
+		return nil, err
+	}
 	responses := make(chan getTargetsResp, len(remoteReqs))
 	rCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	wg := sync.WaitGroup{}
 	wg.Add(len(remoteReqs))
-	for _, nodeReqs := range remoteReqs {
-		log.Debugf("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.GetName())
-		go func(reqs []models.Req) {
+	for shardGroup, nodeReqs := range remoteReqs {
+		log.Debugf("DP getTargetsRemote: handling %d reqs for shard %d", len(nodeReqs), shardGroup)
+		go func(shardGroup int32, reqs []models.Req) {
 			defer wg.Done()
-			node := reqs[0].Node
-			buf, err := node.Post(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
-			if err != nil {
-				cancel()
-				responses <- getTargetsResp{nil, err}
+			var err error
+			var buf []byte
+			for len(peerGroups[shardGroup]) > 0 {
+				node := peerGroups[shardGroup][0]
+				peerGroups[shardGroup] = peerGroups[shardGroup][1:]
+				buf, err = node.Post(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
+				if err != nil {
+					log.Errorf("DP getTargetsRemote: %s/getdata failed: %q", node.GetName(), err.Error())
+					continue
+				}
+				var resp models.GetDataRespV1
+				_, err = resp.UnmarshalMsg(buf)
+				if err != nil {
+					log.Errorf("DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err.Error())
+					continue
+				}
+				log.Debugf("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
+				ss.Add(&resp.Stats)
+				responses <- getTargetsResp{resp.Series, nil}
 				return
 			}
-			var resp models.GetDataRespV1
-			_, err = resp.UnmarshalMsg(buf)
-			if err != nil {
-				cancel()
-				log.Errorf("DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err.Error())
-				responses <- getTargetsResp{nil, err}
-				return
-			}
-			log.Debugf("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
-			ss.Add(&resp.Stats)
-			responses <- getTargetsResp{resp.Series, nil}
-		}(nodeReqs)
+			// failed to get data from any peer.
+			cancel()
+			responses <- getTargetsResp{nil, err}
+		}(shardGroup, nodeReqs)
 	}
 
 	// wait for all getTargetsRemote goroutines to end, then close our responses channel
@@ -248,7 +244,12 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 		close(responses)
 	}()
 
-	out := make([]models.Series, 0)
+	// get the expected number of series, so we can allocate our output slice
+	expectedSeries := 0
+	for _, reqs := range remoteReqs {
+		expectedSeries += len(reqs)
+	}
+	out := make([]models.Series, 0, expectedSeries)
 	for resp := range responses {
 		if resp.err != nil {
 			return nil, resp.err

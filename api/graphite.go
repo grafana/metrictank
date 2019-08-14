@@ -95,7 +95,7 @@ var rollupPreference = map[consolidation.Consolidator][]consolidation.Consolidat
 type Series struct {
 	Pattern string // pattern used for index lookup. typically user input like foo.{b,a}r.*
 	Series  []idx.Node
-	Node    cluster.Node
+	Shard   int32
 }
 
 func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
@@ -118,7 +118,7 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 
 	series := make([]Series, 0)
 	resp := models.IndexFindResp{}
-	for _, r := range resps {
+	for shard, r := range resps {
 		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
@@ -127,10 +127,10 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 		for pattern, nodes := range resp.Nodes {
 			series = append(series, Series{
 				Pattern: pattern,
-				Node:    r.peer,
+				Shard:   shard,
 				Series:  nodes,
 			})
-			log.Debugf("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, r.peer.GetName())
+			log.Debugf("HTTP findSeries %d matches for %s found on shard %d", len(nodes), pattern, shard)
 		}
 	}
 
@@ -719,7 +719,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 					}
 
 					newReq := models.NewReq(
-						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
+						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Shard, archive.SchemaId, archive.AggId)
 					reqs = append(reqs, newReq)
 				}
 			}
@@ -755,7 +755,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	span.SetTag("points_return", meta.RenderStats.PointsReturn)
 
 	for _, req := range reqs {
-		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
+		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from shard%d", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Shard)
 	}
 
 	a := time.Now()
@@ -1044,7 +1044,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		for _, series := range resp.Metrics {
 			allSeries = append(allSeries, Series{
 				Pattern: series.Path,
-				Node:    r.peer,
+				Shard:   r.shard,
 				Series:  []idx.Node{series},
 			})
 		}

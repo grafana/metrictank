@@ -180,6 +180,13 @@ func (n HTTPNode) GetPartitions() []int32 {
 	return n.Partitions
 }
 
+func (n HTTPNode) GetShard() (int32, error) {
+	if len(n.Partitions) == 0 {
+		return 0, fmt.Errorf("node has no partitions")
+	}
+	return n.Partitions[0] / int32(len(n.Partitions)), nil
+}
+
 func (n HTTPNode) HasData() bool {
 	return len(n.Partitions) > 0
 }
