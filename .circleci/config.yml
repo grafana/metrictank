@@ -56,6 +56,16 @@ jobs:
       - run: go test -v ./stacktest/tests/end2end_carbon
       - run: go test -v ./stacktest/tests/end2end_carbon_bigtable
 
+  qa-chaos:
+    working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
+    machine: true
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: docker load -i build_docker/metrictank.tar
+      - run: go test -v ./stacktest/tests/chaos_cluster
+
   deploy:
     docker:
       - image: circleci/ruby:2.3
@@ -92,9 +102,13 @@ workflows:
       - qa-post-build:
           requires:
             - build
+      - qa-chaos:
+          requires:
+            - build
       - deploy:
           requires:
             - build
             - test
             - qa
             - qa-post-build
+            - qa-chaos
