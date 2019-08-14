@@ -23,9 +23,7 @@ type KafkaMdm struct {
 	config        *sarama.Config
 	client        sarama.SyncProducer
 	hash          hash.Hash32
-	part          *p.Kafka
-	lmPart        LastNumPartitioner
-	partScheme    string
+	part          p.Partitioner
 	numPartitions int32
 }
 
@@ -44,11 +42,6 @@ func (p *LastNumPartitioner) Partition(m schema.PartitionedMetric, numPartitions
 		return 0, fmt.Errorf("invalid metricname for LastNumPartitioner: '%s'", name)
 	}
 	return int32(part), nil
-}
-
-// key is by metric name, but won't be used for partition setting
-func (p *LastNumPartitioner) GetPartition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {
-	return m.PartitionID(schema.PartitionBySeries, numPartitions)
 }
 
 func New(topic string, brokers []string, codec string, stats met.Backend, partitionScheme string, numPartitions int32) (*KafkaMdm, error) {
@@ -81,8 +74,7 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	if err != nil {
 		return nil, err
 	}
-	var part *p.Kafka
-	var lmPart LastNumPartitioner
+	var part p.Partitioner
 	switch partitionScheme {
 	case "byOrg":
 		part, err = p.NewKafka("byOrg")
@@ -91,11 +83,9 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	case "bySeriesWithTags":
 		part, err = p.NewKafka("bySeriesWithTags")
 	case "lastNum":
-		lmPart = LastNumPartitioner{}
-		// sets partition based on message partition field
-		config.Producer.Partitioner = sarama.NewManualPartitioner
+		part = &LastNumPartitioner{}
 	default:
-		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|lastNum'. got %s", partitionScheme)
+		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
 	}
 	if err != nil {
 		return nil, err
@@ -109,8 +99,6 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		client:        client,
 		hash:          fnv.New32a(),
 		part:          part,
-		lmPart:        lmPart,
-		partScheme:    partitionScheme,
 		numPartitions: numPartitions,
 	}, nil
 }
@@ -139,28 +127,15 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 
 		k.MessageBytes.Value(int64(len(data)))
 
-		if k.partScheme == "lastNum" {
-			partition, err := k.lmPart.Partition(metric, 0)
-			if err != nil {
-				return fmt.Errorf("Failed to get partition for metric. %s", err)
-			}
+		partition, err := k.part.Partition(metric, k.numPartitions)
+		if err != nil {
+			return fmt.Errorf("Failed to get partition for metric. %s", err)
+		}
 
-			payload[i] = &sarama.ProducerMessage{
-				Partition: partition,
-				Topic:     k.topic,
-				Value:     sarama.ByteEncoder(data),
-			}
-		} else {
-			partition, err := k.part.GetPartition(metric, k.numPartitions)
-			if err != nil {
-				return fmt.Errorf("Failed to get partition for metric. %s", err)
-			}
-
-			payload[i] = &sarama.ProducerMessage{
-				Partition: partition,
-				Topic:     k.topic,
-				Value:     sarama.ByteEncoder(data),
-			}
+		payload[i] = &sarama.ProducerMessage{
+			Partition: partition,
+			Topic:     k.topic,
+			Value:     sarama.ByteEncoder(data),
 		}
 
 	}
