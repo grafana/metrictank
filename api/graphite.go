@@ -722,10 +722,10 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 					newReq := models.NewReq(
 						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
 					reqs = append(reqs, newReq)
+				}
 
-					if tagquery.MetaTagSupport && len(archive.MetaTags) > 0 {
-						metaTagEnrichmentData[archive.NameWithTags()] = archive.MetaTags
-					}
+				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
+					metaTagEnrichmentData[metric.Defs[0].NameWithTags()] = metric.MetaTags
 				}
 			}
 		}

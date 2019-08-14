@@ -157,9 +157,9 @@ func TestSimpleMetaTagQueryWithManyTypesOfExpression(t *testing.T) {
 }
 
 func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
 
 	metaTagRecord, err := tagquery.ParseMetaTagRecord(
 		[]string{"metatag1=value1"},
@@ -195,7 +195,7 @@ func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
 			}
 
 			foundMetaTag := false
-			for _, tag := range def.MetaTags {
+			for _, tag := range node.MetaTags {
 				if tag == metaTagRecord.MetaTags[0] {
 					foundMetaTag = true
 				}
@@ -203,9 +203,9 @@ func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
 
 			if shouldHaveMetaTag != foundMetaTag {
 				if shouldHaveMetaTag {
-					t.Fatalf("Expected meta tag, but it wasn't present in: %+v", def)
+					t.Fatalf("Expected meta tag, but it wasn't present in: %+v", node)
 				} else {
-					t.Fatalf("Unexpected meta tag in: %+v", def)
+					t.Fatalf("Unexpected meta tag in: %+v", node)
 				}
 			}
 		}
@@ -213,9 +213,9 @@ func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
 }
 
 func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
 
 	metaTagRecord1, err := tagquery.ParseMetaTagRecord(
 		[]string{"metatag1=value1"},
@@ -263,7 +263,7 @@ func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
 
 			foundMetaTag1 := false
 			foundMetaTag2 := false
-			for _, tag := range def.MetaTags {
+			for _, tag := range node.MetaTags {
 				if tag == metaTagRecord1.MetaTags[0] {
 					foundMetaTag1 = true
 				}

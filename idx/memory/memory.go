@@ -1126,7 +1126,7 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 				Defs:        []idx.Archive{CloneArchive(def)},
 			}
 			if enricher != nil {
-				byPath[nameWithTags].Defs[0].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
+				byPath[nameWithTags].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
 			}
 		} else {
 			existing.Defs = append(existing.Defs, CloneArchive(def))

@@ -54,12 +54,6 @@ func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "LastSave")
 				return
 			}
-		case "MetaTags":
-			err = z.MetaTags.DecodeMsg(dc)
-			if err != nil {
-				err = msgp.WrapError(err, "MetaTags")
-				return
-			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -73,9 +67,9 @@ func (z *Archive) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 6
+	// map header, size 5
 	// write "MetricDefinition"
-	err = en.Append(0x86, 0xb0, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e)
+	err = en.Append(0x85, 0xb0, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e)
 	if err != nil {
 		return
 	}
@@ -124,25 +118,15 @@ func (z *Archive) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "LastSave")
 		return
 	}
-	// write "MetaTags"
-	err = en.Append(0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
-	if err != nil {
-		return
-	}
-	err = z.MetaTags.EncodeMsg(en)
-	if err != nil {
-		err = msgp.WrapError(err, "MetaTags")
-		return
-	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 6
+	// map header, size 5
 	// string "MetricDefinition"
-	o = append(o, 0x86, 0xb0, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e)
+	o = append(o, 0x85, 0xb0, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x44, 0x65, 0x66, 0x69, 0x6e, 0x69, 0x74, 0x69, 0x6f, 0x6e)
 	o, err = z.MetricDefinition.MarshalMsg(o)
 	if err != nil {
 		err = msgp.WrapError(err, "MetricDefinition")
@@ -160,13 +144,6 @@ func (z *Archive) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "LastSave"
 	o = append(o, 0xa8, 0x4c, 0x61, 0x73, 0x74, 0x53, 0x61, 0x76, 0x65)
 	o = msgp.AppendUint32(o, z.LastSave)
-	// string "MetaTags"
-	o = append(o, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
-	o, err = z.MetaTags.MarshalMsg(o)
-	if err != nil {
-		err = msgp.WrapError(err, "MetaTags")
-		return
-	}
 	return
 }
 
@@ -218,12 +195,6 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "LastSave")
 				return
 			}
-		case "MetaTags":
-			bts, err = z.MetaTags.UnmarshalMsg(bts)
-			if err != nil {
-				err = msgp.WrapError(err, "MetaTags")
-				return
-			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -238,7 +209,7 @@ func (z *Archive) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Archive) Msgsize() (s int) {
-	s = 1 + 17 + z.MetricDefinition.Msgsize() + 9 + msgp.Uint16Size + 6 + msgp.Uint16Size + 5 + msgp.Uint16Size + 9 + msgp.Uint32Size + 9 + z.MetaTags.Msgsize()
+	s = 1 + 17 + z.MetricDefinition.Msgsize() + 9 + msgp.Uint16Size + 6 + msgp.Uint16Size + 5 + msgp.Uint16Size + 9 + msgp.Uint32Size
 	return
 }
 
@@ -297,6 +268,12 @@ func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "HasChildren")
 				return
 			}
+		case "MetaTags":
+			err = z.MetaTags.DecodeMsg(dc)
+			if err != nil {
+				err = msgp.WrapError(err, "MetaTags")
+				return
+			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -310,9 +287,9 @@ func (z *Node) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 4
+	// map header, size 5
 	// write "Path"
-	err = en.Append(0x84, 0xa4, 0x50, 0x61, 0x74, 0x68)
+	err = en.Append(0x85, 0xa4, 0x50, 0x61, 0x74, 0x68)
 	if err != nil {
 		return
 	}
@@ -358,15 +335,25 @@ func (z *Node) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "HasChildren")
 		return
 	}
+	// write "MetaTags"
+	err = en.Append(0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
+	if err != nil {
+		return
+	}
+	err = z.MetaTags.EncodeMsg(en)
+	if err != nil {
+		err = msgp.WrapError(err, "MetaTags")
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *Node) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 4
+	// map header, size 5
 	// string "Path"
-	o = append(o, 0x84, 0xa4, 0x50, 0x61, 0x74, 0x68)
+	o = append(o, 0x85, 0xa4, 0x50, 0x61, 0x74, 0x68)
 	o = msgp.AppendString(o, z.Path)
 	// string "Leaf"
 	o = append(o, 0xa4, 0x4c, 0x65, 0x61, 0x66)
@@ -384,6 +371,13 @@ func (z *Node) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "HasChildren"
 	o = append(o, 0xab, 0x48, 0x61, 0x73, 0x43, 0x68, 0x69, 0x6c, 0x64, 0x72, 0x65, 0x6e)
 	o = msgp.AppendBool(o, z.HasChildren)
+	// string "MetaTags"
+	o = append(o, 0xa8, 0x4d, 0x65, 0x74, 0x61, 0x54, 0x61, 0x67, 0x73)
+	o, err = z.MetaTags.MarshalMsg(o)
+	if err != nil {
+		err = msgp.WrapError(err, "MetaTags")
+		return
+	}
 	return
 }
 
@@ -442,6 +436,12 @@ func (z *Node) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "HasChildren")
 				return
 			}
+		case "MetaTags":
+			bts, err = z.MetaTags.UnmarshalMsg(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "MetaTags")
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -460,6 +460,6 @@ func (z *Node) Msgsize() (s int) {
 	for za0001 := range z.Defs {
 		s += z.Defs[za0001].Msgsize()
 	}
-	s += 12 + msgp.BoolSize
+	s += 12 + msgp.BoolSize + 9 + z.MetaTags.Msgsize()
 	return
 }
