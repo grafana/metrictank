@@ -282,45 +282,28 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 	if err != nil {
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
+	req = req.WithContext(ctx)
 	carrier := opentracing.HTTPHeadersCarrier(req.Header)
 	err = Tracer.Inject(span.Context(), opentracing.HTTPHeaders, carrier)
 	if err != nil {
 		log.Errorf("CLU failed to inject span into headers: %s", err.Error())
 	}
 	req.Header.Add("Content-Type", "application/json")
+	rsp, err := client.Do(req)
 
-	c := make(chan struct {
-		r   *http.Response
-		err error
-	}, 1)
-
-	go func() {
-		rsp, err := client.Do(req)
-		c <- struct {
-			r   *http.Response
-			err error
-		}{rsp, err}
-	}()
-
-	// wait for either our results from the http request or if out context has been canceled
-	// then abort the http request.
 	select {
 	case <-ctx.Done():
-		log.Debugf("CLU HTTPNode: context canceled. terminating request to peer %s", n.Name)
-		transport.CancelRequest(req)
-		<-c // Wait for client.Do but ignore result
-	case resp := <-c:
-		err := resp.err
-		rsp := resp.r
-		if err != nil {
-			tags.Error.Set(span, true)
-			log.Errorf("CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
-			return nil, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
-		}
-		return handleResp(rsp)
+		log.Debugf("CLU HTTPNode: context canceled on request to peer %s", n.Name)
+		return nil, nil
+	default:
 	}
 
-	return nil, nil
+	if err != nil {
+		tags.Error.Set(span, true)
+		log.Errorf("CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
+		return nil, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
+	}
+	return handleResp(rsp)
 }
 
 func (n HTTPNode) GetName() string {
