@@ -3,8 +3,6 @@ package kafkamdm
 import (
 	"bytes"
 	"fmt"
-	"hash"
-	"hash/fnv"
 	"strconv"
 	"time"
 
@@ -22,7 +20,6 @@ type KafkaMdm struct {
 	brokers       []string
 	config        *sarama.Config
 	client        sarama.SyncProducer
-	hash          hash.Hash32
 	part          p.Partitioner
 	numPartitions int32
 }
@@ -75,20 +72,13 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		return nil, err
 	}
 	var part p.Partitioner
-	switch partitionScheme {
-	case "byOrg":
-		part, err = p.NewKafka("byOrg")
-	case "bySeries":
-		part, err = p.NewKafka("bySeries")
-	case "bySeriesWithTags":
-		part, err = p.NewKafka("bySeriesWithTags")
-	case "lastNum":
+	if partitionScheme == "lastNum" {
 		part = &LastNumPartitioner{}
-	default:
-		err = fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
-	}
-	if err != nil {
-		return nil, err
+	} else {
+		part, err = p.NewKafka(partitionScheme)
+		if err != nil {
+			return nil, fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
+		}
 	}
 
 	return &KafkaMdm{
@@ -97,7 +87,6 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		brokers:       brokers,
 		config:        config,
 		client:        client,
-		hash:          fnv.New32a(),
 		part:          part,
 		numPartitions: numPartitions,
 	}, nil
