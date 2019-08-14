@@ -1,12 +1,16 @@
 package memory
 
 import (
+	"hash"
+	"hash/fnv"
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -83,9 +87,17 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 		return res
 	}
 
+	// if provided size is valid, it's not possible for lru.New to return an error
+	cache, _ := lru.New(10000)
 	res = &enricher{
 		filters: make([]tagquery.MetricDefinitionFilter, len(m.records)),
 		tags:    make([]tagquery.Tags, len(m.records)),
+		cache:   cache,
+		hashPool: sync.Pool{
+			New: func() interface{} {
+				return fnv.New64a()
+			},
+		},
 	}
 
 	i := 0
@@ -101,18 +113,38 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 }
 
 type enricher struct {
-	filters []tagquery.MetricDefinitionFilter
-	tags    []tagquery.Tags
+	filters  []tagquery.MetricDefinitionFilter
+	tags     []tagquery.Tags
+	cache    *lru.Cache
+	hashPool sync.Pool
 }
 
 func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
-	var res tagquery.Tags
+	h := e.hashPool.Get().(hash.Hash64)
+	h.Reset()
+	h.Write([]byte(name))
+	for i := range tags {
+		h.Write([]byte(";"))
+		h.Write([]byte(tags[i]))
+	}
+	sum := h.Sum64()
+	e.hashPool.Put(h)
 
+	cachedRes, ok := e.cache.Get(sum)
+	if ok {
+		return cachedRes.(tagquery.Tags)
+	}
+
+	var res tagquery.Tags
+	var matches []int
 	for i := range e.filters {
 		if e.filters[i](id, name, tags) == tagquery.Pass {
 			res = append(res, e.tags[i]...)
+			matches = append(matches, i)
 		}
 	}
+
+	e.cache.Add(sum, res)
 
 	return res
 }
