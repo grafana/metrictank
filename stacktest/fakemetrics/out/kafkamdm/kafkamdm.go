@@ -41,7 +41,7 @@ func (p *LastNumPartitioner) Partition(m schema.PartitionedMetric, numPartitions
 	return int32(part), nil
 }
 
-func New(topic string, brokers []string, codec string, stats met.Backend, partitionScheme string, numPartitions int32) (*KafkaMdm, error) {
+func New(topic string, brokers []string, codec string, stats met.Backend, partitionScheme string) (*KafkaMdm, error) {
 	// We are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
@@ -63,14 +63,24 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		return nil, err
 	}
 
-	if numPartitions < 1 {
-		return nil, fmt.Errorf("must use at least 1 partition")
-	}
-
-	client, err := sarama.NewSyncProducer(brokers, config)
+	client, err := sarama.NewClient(brokers, config)
 	if err != nil {
 		return nil, err
 	}
+
+	partitions, err := client.Partitions(topic)
+	if err != nil {
+		return nil, err
+	}
+	if len(partitions) < 1 {
+		return nil, fmt.Errorf("failed to get number of partitions for topic: %s", topic)
+	}
+
+	producer, err := sarama.NewSyncProducerFromClient(client)
+	if err != nil {
+		return nil, err
+	}
+
 	var part p.Partitioner
 	if partitionScheme == "lastNum" {
 		part = &LastNumPartitioner{}
@@ -86,9 +96,9 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		topic:         topic,
 		brokers:       brokers,
 		config:        config,
-		client:        client,
+		client:        producer,
 		part:          part,
-		numPartitions: numPartitions,
+		numPartitions: int32(len(partitions)),
 	}, nil
 }
 
