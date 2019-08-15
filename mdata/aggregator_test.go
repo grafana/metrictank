@@ -7,8 +7,8 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
-	"github.com/raintank/schema"
 )
 
 type testcase struct {

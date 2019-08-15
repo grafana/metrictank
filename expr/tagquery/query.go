@@ -5,7 +5,7 @@ import (
 	"hash"
 	"hash/fnv"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 var (

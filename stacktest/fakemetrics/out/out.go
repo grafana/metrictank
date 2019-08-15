@@ -3,8 +3,8 @@ package out
 import (
 	"fmt"
 
+	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/met"
-	"github.com/raintank/schema"
 )
 
 // Out submits metricdata to a destination

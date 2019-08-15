@@ -10,8 +10,8 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

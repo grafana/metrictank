@@ -120,7 +120,7 @@ type Decoder struct {
 	buf bytes.Buffer
 
 	// reusable buffer for readLine
-	line  []byte
+	line []byte
 }
 
 // NewDecoder constructs a new Decoder which will decode the pickle stream in r.
@@ -469,7 +469,6 @@ func (d *Decoder) loadNone() error {
 	return nil
 }
 
-
 // Ref represents Python's persistent reference.
 //
 // Such references are used when one pickle somehow references another pickle
@@ -701,7 +700,7 @@ func (d *Decoder) loadDict() error {
 
 	m := make(map[interface{}]interface{}, 0)
 	items := d.stack[k+1:]
-	if len(items) % 2 != 0 {
+	if len(items)%2 != 0 {
 		return fmt.Errorf("pickle: loadDict: odd # of elements")
 	}
 	for i := 0; i < len(items); i += 2 {
@@ -921,7 +920,7 @@ func (d *Decoder) loadSetItems() error {
 	l := d.stack[k-1]
 	switch m := l.(type) {
 	case map[interface{}]interface{}:
-		if (len(d.stack) - (k + 1)) % 2 != 0 {
+		if (len(d.stack)-(k+1))%2 != 0 {
 			return fmt.Errorf("pickle: loadSetItems: odd # of elements")
 		}
 		for i := k + 1; i < len(d.stack); i += 2 {

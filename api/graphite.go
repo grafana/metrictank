@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 	macaron "gopkg.in/macaron.v1"
 
 	"github.com/grafana/metrictank/api/middleware"

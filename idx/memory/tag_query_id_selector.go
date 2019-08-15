@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // idSelector looks up ids from the metric & meta tag index according to

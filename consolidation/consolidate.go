@@ -3,7 +3,7 @@ package consolidation
 import (
 	"context"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // ConsolidateContext wraps a Consolidate() call with a context.Context condition

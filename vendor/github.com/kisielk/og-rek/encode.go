@@ -103,10 +103,10 @@ func (e *Encoder) encodeTuple(t Tuple) error {
 		_, err := e.w.Write([]byte{opEmptyTuple})
 		return err
 
-	// TODO this are protocol 2 opcodes - check e.protocol before using them
-	//case 1:
-	//case 2:
-	//case 3:
+		// TODO this are protocol 2 opcodes - check e.protocol before using them
+		//case 1:
+		//case 2:
+		//case 3:
 	}
 
 	_, err := e.w.Write([]byte{opMark})

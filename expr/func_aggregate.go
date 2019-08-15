@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type FuncAggregate struct {

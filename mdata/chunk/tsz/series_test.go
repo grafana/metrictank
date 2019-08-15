@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
-	"github.com/raintank/schema"
 )
 
 type testCase struct {

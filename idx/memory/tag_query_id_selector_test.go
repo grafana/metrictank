@@ -7,7 +7,7 @@ import (
 
 	"github.com/grafana/metrictank/idx"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/expr/tagquery"
 )

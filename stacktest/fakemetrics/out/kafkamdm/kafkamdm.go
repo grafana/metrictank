@@ -8,9 +8,9 @@ import (
 
 	"github.com/Shopify/sarama"
 	p "github.com/grafana/metrictank/cluster/partitioner"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/raintank/met"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

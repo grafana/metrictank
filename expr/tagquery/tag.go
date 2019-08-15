@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type Tags []Tag

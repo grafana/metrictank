@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type MockCache struct {

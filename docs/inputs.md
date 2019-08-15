@@ -1,7 +1,7 @@
 # Inputs
 
 All input options - except for the carbon input - use the [metrics 2.0](http://metrics20.org/) format.
-See the [schema repository](https://github.com/raintank/schema) for more details.
+See the [schema repository](https://github.com/grafana/metrictank/schema) for more details.
 
 
 ## How to send data to MT
@@ -32,19 +32,19 @@ The Kafka input supports 2 formats:
 * MetricData
 * MetricPoint
 
-Both formats have a corresponding implementation in the [schema repository](https://github.com/raintank/schema), making it trivial
+Both formats have a corresponding implementation in the [schema repository](https://github.com/grafana/metrictank/schema), making it trivial
 to implement your own producers (and consumers) if you use Golang.
 
 ### MetricData
 
 This format contains the data points as well as all metric identity data and metadata, in messagepack encoded messages (not JSON).
 This format is rather verbose and inefficient to encode/decode.
-See the [MetricData](https://godoc.org/github.com/raintank/schema#MetricData) documentation for format and implementation details.
+See the [MetricData](https://godoc.org/github.com/grafana/metrictank/schema#MetricData) documentation for format and implementation details.
 
 ### MetricPoint
 
 This format is a hand-written binary format that is much more compact and fast to encode/decode compared to MetricData.
-See the [MetricPoint](https://godoc.org/github.com/raintank/schema#MetricPoint) documentation for format and implementation details.
+See the [MetricPoint](https://godoc.org/github.com/grafana/metrictank/schema#MetricPoint) documentation for format and implementation details.
 It is a minimal format that only contains the series identifier, value and timestamp.
 As such, it is paramount that MetricPoint messages for each series have been preceded by a MetricData message for that series, so
 that metrictank has had the chance to add the metric information into its index.

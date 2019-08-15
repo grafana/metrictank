@@ -187,7 +187,7 @@ func New(addr string, options ...Option) (*Client, error) {
 	if c.flushPeriod > 0 {
 		go func() {
 			ticker := time.NewTicker(c.flushPeriod)
-			for _ = range ticker.C {
+			for range ticker.C {
 				c.mu.Lock()
 				if c.closed {
 					ticker.Stop()

@@ -10,7 +10,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )

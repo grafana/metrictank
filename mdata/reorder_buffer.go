@@ -2,7 +2,7 @@ package mdata
 
 import (
 	"github.com/grafana/metrictank/mdata/errors"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // ReorderBuffer keeps a window of data during which it is ok to send data out of order.

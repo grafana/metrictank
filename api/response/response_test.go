@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/grafana/metrictank/api/models"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type series struct {

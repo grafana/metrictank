@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -8,8 +8,8 @@ import (
 
 	"github.com/grafana/metrictank/api"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/store/cassandra"
-	"github.com/raintank/schema"
 )
 
 // printPoints prints points in the store corresponding to the given requirements

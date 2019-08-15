@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
 	mdataerrors "github.com/grafana/metrictank/mdata/errors"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

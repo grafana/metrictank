@@ -6,12 +6,12 @@ import (
 
 	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/carbon"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out/kafkamdm"
 	"github.com/raintank/met"
 	"github.com/raintank/met/helper"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

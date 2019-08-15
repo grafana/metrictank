@@ -121,7 +121,7 @@ func (c *Client) format(name, value string, tags []string, rate float64) string 
 }
 
 func (c *Client) watch() {
-	for _ = range time.Tick(c.flushTime) {
+	for range time.Tick(c.flushTime) {
 		if c.stop {
 			return
 		}

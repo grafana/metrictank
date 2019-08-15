@@ -3,7 +3,7 @@ package expr
 import (
 	"math"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 var a = []schema.Point{

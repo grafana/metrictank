@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
-	"github.com/raintank/schema"
 )
 
 func TestFilterSeriesEqual(t *testing.T) {

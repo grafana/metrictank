@@ -3,8 +3,8 @@ package consolidation
 import (
 	"testing"
 
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
-	"github.com/raintank/schema"
 )
 
 type testCase struct {

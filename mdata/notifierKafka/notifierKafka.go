@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/mdata"

@@ -721,16 +721,6 @@
   revision = "05a94bb32ad1f23f4b01edb2edd06862d4a484d2"
 
 [[projects]]
-  digest = "1:dec53b91f232decdae33a4500125ac5bc21964e3d10390c8ef52ef8bdc5abced"
-  name = "github.com/raintank/schema"
-  packages = [
-    ".",
-    "msg",
-  ]
-  pruneopts = "NUT"
-  revision = "81ecd4b90851930216f37f1ce898cc4f7469d441"
-
-[[projects]]
   branch = "master"
   digest = "1:7c522337040d4ec9a136cd9d64fe4677ee1d3eae4a7f8831c2108f9bec43fa48"
   name = "github.com/rcrowley/go-metrics"
@@ -1155,7 +1145,9 @@
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/Shopify/sarama",
     "github.com/alyu/configparser",
+    "github.com/cespare/xxhash",
     "github.com/davecgh/go-spew/spew",
+    "github.com/dgryski/go-jump",
     "github.com/dgryski/go-linlog",
     "github.com/docker/docker/api/types",
     "github.com/docker/docker/client",
@@ -1190,8 +1182,6 @@
     "github.com/raintank/gziper",
     "github.com/raintank/met",
     "github.com/raintank/met/helper",
-    "github.com/raintank/schema",
-    "github.com/raintank/schema/msg",
     "github.com/rs/cors",
     "github.com/sergi/go-diff/diffmatchpatch",
     "github.com/sirupsen/logrus",

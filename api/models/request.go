@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/consolidation"

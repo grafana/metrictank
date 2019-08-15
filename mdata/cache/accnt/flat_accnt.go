@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 const (

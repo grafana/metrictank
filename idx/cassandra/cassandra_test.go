@@ -15,8 +15,8 @@ import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
-	"github.com/raintank/schema"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

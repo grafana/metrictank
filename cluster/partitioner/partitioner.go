@@ -3,7 +3,7 @@ package partitioner
 import (
 	"fmt"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type Partitioner interface {

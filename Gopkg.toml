@@ -110,10 +110,6 @@ unused-packages = true
   branch = "master"
 
 [[constraint]]
-  name = "github.com/raintank/schema"
-  revision = "81ecd4b90851930216f37f1ce898cc4f7469d441"
-
-[[constraint]]
   name = "github.com/rs/cors"
   version = "1.0.0"
 

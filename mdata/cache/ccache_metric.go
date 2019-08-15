@@ -7,8 +7,8 @@ import (
 
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/schema"
 	opentracing "github.com/opentracing/opentracing-go"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

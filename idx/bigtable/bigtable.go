@@ -10,9 +10,9 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
 	"github.com/jpillora/backoff"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

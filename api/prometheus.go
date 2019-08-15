@@ -13,11 +13,11 @@ import (
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/schema"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/promql"
 	"github.com/prometheus/prometheus/storage"
-	"github.com/raintank/schema"
 )
 
 type orgID string

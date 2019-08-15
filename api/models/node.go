@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/schema"
 	opentracing "github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
-	"github.com/raintank/schema"
 )
 
 type NodeStatus struct {

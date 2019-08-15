@@ -11,8 +11,8 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/schema"
 	backendStore "github.com/grafana/metrictank/store"
-	"github.com/raintank/schema"
 )
 
 func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T) {

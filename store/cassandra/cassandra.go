@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"

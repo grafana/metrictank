@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/schema"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/schema"
 	"github.com/tinylib/msgp/msgp"
 )
 

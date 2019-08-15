@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/mdata"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 //go:generate msgp
