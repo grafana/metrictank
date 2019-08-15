@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 func getTestIndexWithMetaTags(t *testing.T, metaTags []tagquery.MetaTagRecord) (*UnpartitionedMemoryIdx, []schema.MKey) {

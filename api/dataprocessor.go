@@ -14,12 +14,12 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk/tsz"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/tracing"
 	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	traceLog "github.com/opentracing/opentracing-go/log"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/grafana/metrictank/schema"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/schema"
 )
 
 func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes, from, until uint32) {

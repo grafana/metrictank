@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/mdata/errors"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded uint32, expectedErrors []error, expectReordered uint32) []schema.Point {

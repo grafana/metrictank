@@ -14,8 +14,8 @@ import (
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/dur"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 var OrgIdPublic = uint32(0)

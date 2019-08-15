@@ -3,7 +3,7 @@ package memory
 import (
 	"testing"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/expr/tagquery"
 )

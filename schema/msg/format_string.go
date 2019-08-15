@@ -4,6 +4,16 @@ package msg
 
 import "strconv"
 
+func _() {
+	// An "invalid array index" compiler error signifies that the constant values have changed.
+	// Re-run the stringer command to generate them again.
+	var x [1]struct{}
+	_ = x[FormatMetricDataArrayJson-0]
+	_ = x[FormatMetricDataArrayMsgp-1]
+	_ = x[FormatMetricPoint-2]
+	_ = x[FormatMetricPointWithoutOrg-3]
+}
+
 const _Format_name = "FormatMetricDataArrayJsonFormatMetricDataArrayMsgpFormatMetricPointFormatMetricPointWithoutOrg"
 
 var _Format_index = [...]uint8{0, 25, 50, 67, 94}

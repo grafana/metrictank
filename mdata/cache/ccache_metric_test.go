@@ -11,8 +11,8 @@ import (
 
 	"github.com/grafana/metrictank/mdata/cache/accnt"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
-	"github.com/raintank/schema"
 )
 
 func generateChunks(b testing.TB, startAt, count, step uint32) []chunk.IterGen {

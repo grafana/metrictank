@@ -12,9 +12,9 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
+	"github.com/grafana/metrictank/schema"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

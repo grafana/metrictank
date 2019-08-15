@@ -5,8 +5,8 @@ import (
 	"sort"
 
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/schema"
 	"github.com/kisielk/whisper-go/whisper"
-	"github.com/raintank/schema"
 )
 
 type converter struct {

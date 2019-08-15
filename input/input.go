@@ -11,9 +11,9 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/schema/msg"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -9,7 +9,7 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/grafana/metrictank/idx"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // FormatRowKey formats an MKey and partition into a rowKey

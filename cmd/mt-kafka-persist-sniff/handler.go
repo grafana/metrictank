@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/mdata"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

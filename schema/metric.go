@@ -60,7 +60,7 @@ func (m *MetricData) Validate() error {
 }
 
 // returns a id (hash key) in the format OrgId.md5Sum
-// the md5sum is a hash of the the concatination of the
+// the md5sum is a hash of the the concatenation of the
 // metric + each tag key:value pair (in metrics2.0 sense, so also fields), sorted alphabetically.
 func (m *MetricData) SetId() {
 	sort.Strings(m.Tags)

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/mdata/errors"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type prodChunk struct {

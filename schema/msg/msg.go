@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 var errTooSmall = errors.New("too small")

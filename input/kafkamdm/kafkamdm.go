@@ -14,9 +14,9 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
 	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/schema/msg"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/schema"
-	"github.com/raintank/schema/msg"
 	log "github.com/sirupsen/logrus"
 )
 

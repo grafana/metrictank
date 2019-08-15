@@ -2,7 +2,7 @@ package accnt
 
 import (
 	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // Accnt represents an instance of cache accounting.

@@ -11,12 +11,12 @@ import (
 	"cloud.google.com/go/bigtable"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
 	"github.com/jpillora/backoff"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 )
 

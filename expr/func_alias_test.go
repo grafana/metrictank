@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 func TestAliasSingle(t *testing.T) {

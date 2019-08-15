@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
 	"github.com/raintank/met"
-	"github.com/raintank/schema"
 )
 
 var errClosed = errors.New("output is closed")

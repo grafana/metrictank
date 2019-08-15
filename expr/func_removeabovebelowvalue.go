@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/api/models"
 )

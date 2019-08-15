@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 type Cache interface {

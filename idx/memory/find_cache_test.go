@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

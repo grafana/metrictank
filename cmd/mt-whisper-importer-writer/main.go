@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/dur"
-	"github.com/raintank/schema"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/cluster"

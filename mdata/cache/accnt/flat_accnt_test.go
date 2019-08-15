@@ -5,7 +5,7 @@ import (
 
 	"github.com/grafana/metrictank/test"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 func resetCounters() {

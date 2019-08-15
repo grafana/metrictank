@@ -5,7 +5,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/api/models"
 )

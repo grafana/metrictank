@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/grafana/metrictank/expr"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 // default size is probably bigger than what most responses need, but it saves [re]allocations
