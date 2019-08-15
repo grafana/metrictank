@@ -47,6 +47,7 @@ func (m *MetricData) Validate() error {
 	if m.Interval == 0 {
 		return ErrInvalidIntervalzero
 	}
+	m.Name = EatDots(m.Name)
 	if m.Name == "" {
 		return ErrInvalidEmptyName
 	}
@@ -192,6 +193,7 @@ func (m *MetricDefinition) Validate() error {
 	if m.Interval == 0 {
 		return ErrInvalidIntervalzero
 	}
+	m.Name = EatDots(m.Name)
 	if m.Name == "" {
 		return ErrInvalidEmptyName
 	}
