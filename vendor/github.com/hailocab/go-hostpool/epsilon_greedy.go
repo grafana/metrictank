@@ -53,8 +53,8 @@ func NewEpsilonGreedy(hosts []string, decayDuration time.Duration, calc EpsilonV
 		epsilon:                float32(initialEpsilon),
 		decayDuration:          decayDuration,
 		EpsilonValueCalculator: calc,
-		timer:                  &realTimer{},
-		quit:                   make(chan bool),
+		timer: &realTimer{},
+		quit:  make(chan bool),
 	}
 
 	// allocate structures

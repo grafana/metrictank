@@ -281,7 +281,6 @@ type CreateOptions struct {
 func DefaultCreateOptions() CreateOptions {
 	return CreateOptions{DefaultXFilesFactor, DefaultAggregationMethod, false}
 }
-
 // headerSize calculates the size of a header with n archives
 func headerSize(n int) uint32 {
 	return metadataSize + (archiveInfoSize * uint32(n))

@@ -128,7 +128,7 @@ func New(options Options) *Cors {
 				break
 			} else if i := strings.IndexByte(origin, '*'); i >= 0 {
 				// Split the origin in two: start and end string without the *
-				w := wildcard{origin[0:i], origin[i+1:]}
+				w := wildcard{origin[0:i], origin[i+1 : len(origin)]}
 				c.allowedWOrigins = append(c.allowedWOrigins, w)
 			} else {
 				c.allowedOrigins = append(c.allowedOrigins, origin)

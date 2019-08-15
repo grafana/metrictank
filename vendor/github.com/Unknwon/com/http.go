@@ -169,7 +169,7 @@ func FetchFiles(client *http.Client, files []RawFile, header http.Header) error 
 			ch <- nil
 		}(i)
 	}
-	for range files {
+	for _ = range files {
 		if err := <-ch; err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ func FetchFilesCurl(files []RawFile, curlOptions ...string) error {
 			ch <- nil
 		}(i)
 	}
-	for range files {
+	for _ = range files {
 		if err := <-ch; err != nil {
 			return err
 		}

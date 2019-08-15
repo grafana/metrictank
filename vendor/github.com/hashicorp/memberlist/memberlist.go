@@ -324,7 +324,7 @@ func (m *Memberlist) resolveAddr(hostStr string) ([]ipPort, error) {
 	// will make sure the host part is in good shape for parsing, even for
 	// IPv6 addresses.
 	if ip := net.ParseIP(host); ip != nil {
-		return []ipPort{{ip, port}}, nil
+		return []ipPort{ipPort{ip, port}}, nil
 	}
 
 	// First try TCP so we have the best chance for the largest list of
@@ -370,7 +370,7 @@ func (m *Memberlist) setAlive() error {
 		return fmt.Errorf("Failed to parse interface addresses: %v", err)
 	}
 	ifAddrs := []sockaddr.IfAddr{
-		{
+		sockaddr.IfAddr{
 			SockAddr: ipAddr,
 		},
 	}
