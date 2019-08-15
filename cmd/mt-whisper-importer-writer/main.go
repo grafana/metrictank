@@ -33,7 +33,7 @@ var (
 	exitOnError     = flag.Bool("exit-on-error", false, "Exit with a message when there's an error")
 	httpEndpoint    = flag.String("http-endpoint", "0.0.0.0:8080", "The http endpoint to listen on")
 	ttlsStr         = flag.String("ttls", "35d", "list of ttl strings used by MT separated by ','")
-	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries)")
+	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags)")
 	uriPath         = flag.String("uri-path", "/metrics/import", "the URI on which we expect chunks to get posted")
 	numPartitions   = flag.Int("num-partitions", 1, "Number of Partitions")
 	logLevel        = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
@@ -89,6 +89,10 @@ func main() {
 	}
 	log.SetLevel(lvl)
 	log.Infof("logging level set to '%s'", *logLevel)
+
+	if *numPartitions < 1 {
+		log.Fatalf("number of partitions must be set to at least 1")
+	}
 
 	// the specified port is not relevant as we don't use clustering with this tool
 	cluster.Init("mt-whisper-importer-writer", version, time.Now(), "http", int(80))
