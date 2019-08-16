@@ -3,10 +3,13 @@ package schema
 import (
 	"encoding/binary"
 	"hash/fnv"
+	"sort"
 
 	"github.com/cespare/xxhash"
 	jump "github.com/dgryski/go-jump"
 )
+
+const prime32 = uint32(16777619)
 
 type PartitionByMethod uint8
 
@@ -55,11 +58,26 @@ func (m *MetricData) PartitionID(method PartitionByMethod, partitions int32) (in
 		}
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
-		h := fnv.New32a()
-		if err := writeSortedTagString(h, m.Name, m.Tags); err != nil {
-			return 0, err
+		// this was running too slow so we copied
+		// the code from fnv here
+		sort.Strings(m.Tags)
+		hash := uint32(2166136261)
+		for i := 0; i < len(m.Name); i++ {
+			hash ^= uint32(m.Name[i])
+			hash *= prime32
 		}
-		partition = int32(h.Sum32()) % partitions
+		for _, t := range m.Tags {
+			if len(t) > 5 && t[:5] == "name=" {
+				continue
+			}
+			hash ^= uint32(';')
+			hash *= prime32
+			for i := 0; i < len(t); i++ {
+				hash ^= uint32(t[i])
+				hash *= prime32
+			}
+		}
+		partition = int32(hash) % partitions
 		if partition < 0 {
 			partition = -partition
 		}
@@ -96,15 +114,33 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 		h.WriteString(m.NameWithTags())
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
-		h := fnv.New32a()
+		// this was running too slow so we copied
+		// the code from fnv here
+		sort.Strings(m.Tags)
+		hash := uint32(2166136261)
 		if len(m.nameWithTags) > 0 {
-			h.Write([]byte(m.nameWithTags))
+			for i := 0; i < len(m.nameWithTags); i++ {
+				hash ^= uint32(m.nameWithTags[i])
+				hash *= prime32
+			}
 		} else {
-			if err := writeSortedTagString(h, m.Name, m.Tags); err != nil {
-				return 0, err
+			for i := 0; i < len(m.Name); i++ {
+				hash ^= uint32(m.Name[i])
+				hash *= prime32
+			}
+			for _, t := range m.Tags {
+				if len(t) > 5 && t[:5] == "name=" {
+					continue
+				}
+				hash ^= uint32(';')
+				hash *= prime32
+				for i := 0; i < len(t); i++ {
+					hash ^= uint32(t[i])
+					hash *= prime32
+				}
 			}
 		}
-		partition = int32(h.Sum32()) % partitions
+		partition = int32(hash) % partitions
 		if partition < 0 {
 			partition = -partition
 		}
