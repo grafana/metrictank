@@ -108,6 +108,15 @@ type MetricIndex interface {
 	// LastUpdate of at least one metric with that tag is >= of the given from value.
 	Tags(orgId uint32, filter *regexp.Regexp) []string
 
+	// TagDetails returns a list of all values associated with a given tag key in the
+	// given org. The occurrences of each value is counted and the count is referred to by
+	// the metric names in the returned map.
+	// If the third parameter is not nil it will be used to filter the values before
+	// accounting for them.
+	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
+	// time is >= the from timestamp will be included.
+	TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64
+
 	// FindTags generates a list of possible tags that could complete a
 	// given prefix. It only supports simple queries by prefix and from,
 	// without any further conditions. But its faster than the alternative
@@ -134,15 +143,6 @@ type MetricIndex interface {
 	// result set. If the tag query is not necessary, it is recommended to use
 	// FindTagValues() because it is faster
 	FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string
-
-	// TagDetails returns a list of all values associated with a given tag key in the
-	// given org. The occurrences of each value is counted and the count is referred to by
-	// the metric names in the returned map.
-	// If the third parameter is not nil it will be used to filter the values before
-	// accounting for them.
-	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
-	// time is >= the from timestamp will be included.
-	TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64
 
 	// DeleteTagged deletes the series returned by the given query from the tag index
 	// and also the DefById index.

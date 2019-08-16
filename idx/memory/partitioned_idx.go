@@ -323,6 +323,36 @@ func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []strin
 	return mergePartitionStringResults(result)
 }
 
+// TagDetails returns a list of all values associated with a given tag key in the
+// given org. The occurrences of each value is counted and the count is referred to by
+// the metric names in the returned map.
+// If the third parameter is not "" it will be used as a regular expression to filter
+// the values before accounting for them.
+func (p *PartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64 {
+	g, _ := errgroup.WithContext(context.Background())
+	result := make([]map[string]uint64, len(p.Partition))
+	var i int
+	for _, m := range p.Partition {
+		pos, m := i, m
+		g.Go(func() error {
+			result[pos] = m.TagDetails(orgId, key, filter)
+			return nil
+		})
+		i++
+	}
+	g.Wait()
+
+	// merge our results into the unique set of tags
+	merged := map[string]uint64{}
+	for _, tagCounts := range result {
+		for tag, count := range tagCounts {
+			merged[tag] = merged[tag] + count
+		}
+	}
+
+	return merged
+}
+
 // FindTags returns tags matching the specified conditions
 // prefix:      prefix match
 // limit:       the maximum number of results to return
@@ -419,36 +449,6 @@ func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix 
 		return response[:limit]
 	}
 	return response
-}
-
-// TagDetails returns a list of all values associated with a given tag key in the
-// given org. The occurrences of each value is counted and the count is referred to by
-// the metric names in the returned map.
-// If the third parameter is not "" it will be used as a regular expression to filter
-// the values before accounting for them.
-func (p *PartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64 {
-	g, _ := errgroup.WithContext(context.Background())
-	result := make([]map[string]uint64, len(p.Partition))
-	var i int
-	for _, m := range p.Partition {
-		pos, m := i, m
-		g.Go(func() error {
-			result[pos] = m.TagDetails(orgId, key, filter)
-			return nil
-		})
-		i++
-	}
-	g.Wait()
-
-	// merge our results into the unique set of tags
-	merged := map[string]uint64{}
-	for _, tagCounts := range result {
-		for tag, count := range tagCounts {
-			merged[tag] = merged[tag] + count
-		}
-	}
-
-	return merged
 }
 
 // DeleteTagged deletes the specified series from the tag index and also the

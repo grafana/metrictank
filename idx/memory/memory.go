@@ -779,6 +779,102 @@ func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archiv
 	return archives
 }
 
+func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []idx.Node {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	queryCtx := NewTagQueryContext(query)
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tagIndex, ok := m.tags[orgId]
+	if !ok {
+		// if there is no tag index, we don't need to run the tag query
+		return nil
+	}
+
+	var enricher *enricher
+	if metaTagSupport {
+		mtr, ok := m.metaTagRecords[orgId]
+		if ok {
+			enricher = mtr.getEnricher(tagIndex.idHasTag)
+		}
+	}
+
+	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
+	resCh := m.idsByTagQuery(orgId, queryCtx)
+
+	byPath := make(map[string]*idx.Node)
+	for id := range resCh {
+		def, ok := m.defById[id]
+		if !ok {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
+			continue
+		}
+
+		nameWithTags := def.NameWithTags()
+		if existing, ok := byPath[nameWithTags]; !ok {
+			byPath[nameWithTags] = &idx.Node{
+				Path:        nameWithTags,
+				Leaf:        true,
+				HasChildren: false,
+				Defs:        []idx.Archive{CloneArchive(def)},
+			}
+			if enricher != nil {
+				byPath[nameWithTags].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
+			}
+		} else {
+			existing.Defs = append(existing.Defs, CloneArchive(def))
+		}
+	}
+
+	results := make([]idx.Node, len(byPath))
+
+	i := 0
+	for _, v := range byPath {
+		results[i] = *v
+		i++
+	}
+
+	return results
+}
+
+// Tags returns a list of all tag keys associated with the metrics of a given
+// organization. The return values are filtered by the regex in the second parameter.
+func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []string {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return nil
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	tags, ok := m.tags[orgId]
+	if !ok {
+		return nil
+	}
+
+	var res []string
+
+	res = make([]string, 0, len(tags))
+
+	for tag := range tags {
+		// filter by pattern if one was given
+		if filter != nil && !filter.MatchString(tag) {
+			continue
+		}
+
+		res = append(res, tag)
+	}
+
+	return res
+}
+
 func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64 {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
@@ -987,102 +1083,6 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return res[:limit]
 	}
 	return res
-}
-
-// Tags returns a list of all tag keys associated with the metrics of a given
-// organization. The return values are filtered by the regex in the second parameter.
-func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []string {
-	if !TagSupport {
-		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil
-	}
-
-	m.RLock()
-	defer m.RUnlock()
-
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil
-	}
-
-	var res []string
-
-	res = make([]string, 0, len(tags))
-
-	for tag := range tags {
-		// filter by pattern if one was given
-		if filter != nil && !filter.MatchString(tag) {
-			continue
-		}
-
-		res = append(res, tag)
-	}
-
-	return res
-}
-
-func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []idx.Node {
-	if !TagSupport {
-		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil
-	}
-
-	queryCtx := NewTagQueryContext(query)
-
-	m.RLock()
-	defer m.RUnlock()
-
-	tagIndex, ok := m.tags[orgId]
-	if !ok {
-		// if there is no tag index, we don't need to run the tag query
-		return nil
-	}
-
-	var enricher *enricher
-	if metaTagSupport {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
-			enricher = mtr.getEnricher(tagIndex.idHasTag)
-		}
-	}
-
-	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
-	resCh := m.idsByTagQuery(orgId, queryCtx)
-
-	byPath := make(map[string]*idx.Node)
-	for id := range resCh {
-		def, ok := m.defById[id]
-		if !ok {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
-			continue
-		}
-
-		nameWithTags := def.NameWithTags()
-		if existing, ok := byPath[nameWithTags]; !ok {
-			byPath[nameWithTags] = &idx.Node{
-				Path:        nameWithTags,
-				Leaf:        true,
-				HasChildren: false,
-				Defs:        []idx.Archive{CloneArchive(def)},
-			}
-			if enricher != nil {
-				byPath[nameWithTags].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
-			}
-		} else {
-			existing.Defs = append(existing.Defs, CloneArchive(def))
-		}
-	}
-
-	results := make([]idx.Node, len(byPath))
-
-	i := 0
-	for _, v := range byPath {
-		results[i] = *v
-		i++
-	}
-
-	return results
 }
 
 func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) chan schema.MKey {
