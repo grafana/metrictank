@@ -872,6 +872,27 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		res = append(res, tag)
 	}
 
+	if !metaTagSupport {
+		sort.Strings(res)
+		return res
+	}
+
+	mti, ok := m.metaTagIndex[orgId]
+	if !ok {
+		sort.Strings(res)
+		return res
+	}
+
+	for tag := range mti {
+		// filter by pattern if one was given
+		if filter != nil && !filter.MatchString(tag) {
+			continue
+		}
+
+		res = append(res, tag)
+	}
+
+	sort.Strings(res)
 	return res
 }
 
@@ -889,18 +910,52 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		return nil
 	}
 
-	values, ok := tags[key]
-	if !ok {
-		return nil
-	}
-
 	res := make(map[string]uint64)
-	for value, ids := range values {
+	for value, ids := range tags[key] {
 		if filter != nil && !filter.MatchString(value) {
 			continue
 		}
 
-		res[value] = uint64(len(ids))
+		res[value] += uint64(len(ids))
+	}
+
+	if !metaTagSupport {
+		return res
+	}
+
+	mti, ok := m.metaTagIndex[orgId]
+	if !ok {
+		return res
+	}
+
+	mtr, ok := m.metaTagRecords[orgId]
+	if !ok {
+		return res
+	}
+
+	for value, recordIds := range mti[key] {
+		if filter != nil && !filter.MatchString(value) {
+			continue
+		}
+
+		for _, recordId := range recordIds {
+			record, ok := mtr.records[recordId]
+			if !ok {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: corrupt. record id %d is in meta tag index, but not in meta tag records", recordId)
+				continue
+			}
+			query, err := tagquery.NewQuery(record.Expressions, 0)
+			if err != nil {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: corrupt. record expressions cannot instantiate query: %+v results in %s", record.Expressions, err)
+				continue
+			}
+			resCh := m.idsByTagQuery(orgId, NewTagQueryContext(query))
+			for range resCh {
+				res[value]++
+			}
+		}
 	}
 
 	return res
@@ -936,12 +991,24 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		}
 	}
 
-	sort.Strings(res)
-
-	if len(res) > int(limit) {
-		return res[:limit]
+	if !metaTagSupport {
+		return m.finalizeAutoCompleteResult(res, limit, false)
 	}
-	return res
+
+	mti, ok := m.metaTagIndex[orgId]
+	if !ok {
+		return m.finalizeAutoCompleteResult(res, limit, false)
+	}
+
+	for tag := range mti {
+		// a tag gets appended to the result set if either the given prefix is
+		// empty or the tag has the given prefix
+		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
+			res = append(res, tag)
+		}
+	}
+
+	return m.finalizeAutoCompleteResult(res, limit, true)
 }
 
 // FindTagsWithQuery returns tags matching the specified conditions
@@ -965,22 +1032,62 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		return nil
 	}
 
-	// probably allocating more than necessary, still better than growing
-	res := make([]string, 0, len(tags))
+	resMap := make(map[string]struct{})
 
-	resMap := queryCtx.RunGetTags(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId])
-	for tag := range resMap {
-		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
-			res = append(res, tag)
+	var enricher *enricher
+	if metaTagSupport {
+		mtr, ok := m.metaTagRecords[orgId]
+		if ok {
+			enricher = mtr.getEnricher(tags.idHasTag)
 		}
 	}
 
-	sort.Strings(res)
+	resCh := m.idsByTagQuery(orgId, queryCtx)
+	for id := range resCh {
+		def, ok := m.defById[id]
+		if !ok {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
+			continue
+		}
 
-	if len(res) > int(limit) {
-		return res[:limit]
+		for _, tag := range def.Tags {
+			equal := strings.Index(tag, "=")
+			if equal < 0 {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", id, tag)
+				continue
+			}
+
+			key := tag[:equal]
+			if len(prefix) == 0 || strings.HasPrefix(key, prefix) {
+				resMap[key] = struct{}{}
+			}
+		}
+
+		if enricher != nil {
+			metaTags := enricher.enrich(def.Id, def.Name, def.Tags)
+			for _, tag := range metaTags {
+				if len(prefix) == 0 || strings.HasPrefix(tag.Key, prefix) {
+					resMap[tag.Key] = struct{}{}
+				}
+			}
+		}
 	}
-	return res
+
+	// handle special case of the name tag
+	if len(prefix) == 0 || strings.HasPrefix("name", prefix) {
+		resMap["name"] = struct{}{}
+	}
+
+	res := make([]string, len(resMap))
+	i := 0
+	for k := range resMap {
+		res[i] = k
+		i++
+	}
+
+	return m.finalizeAutoCompleteResult(res, limit, false)
 }
 
 // FindTagValues returns tag values matching the specified conditions
@@ -1010,12 +1117,24 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		}
 	}
 
-	sort.Strings(res)
-
-	if len(res) > int(limit) {
-		return res[:limit]
+	if !metaTagSupport {
+		return m.finalizeAutoCompleteResult(res, limit, false)
 	}
-	return res
+
+	metaTagValues := m.metaTagIndex[orgId][tag]
+	if len(metaTagValues) == 0 {
+		return m.finalizeAutoCompleteResult(res, limit, false)
+	}
+
+	for value := range metaTagValues {
+		// a tag value gets appended to the result set if either the given prefix is
+		// empty or the tag value has the given prefix
+		if len(prefix) == 0 || strings.HasPrefix(value, prefix) {
+			res = append(res, value)
+		}
+	}
+
+	return m.finalizeAutoCompleteResult(res, limit, true)
 }
 
 func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string {
@@ -1034,25 +1153,31 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return nil
 	}
 
-	resCh := make(chan schema.MKey, 100)
-	queryCtx.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
+	resMap := make(map[string]struct{})
 
-	valueMap := make(map[string]struct{})
+	var enricher *enricher
+	if metaTagSupport {
+		mtr, ok := m.metaTagRecords[orgId]
+		if ok {
+			enricher = mtr.getEnricher(tags.idHasTag)
+		}
+	}
+
+	resCh := m.idsByTagQuery(orgId, queryCtx)
 	tagPrefix := tag + "=" + prefix
 	for id := range resCh {
-		var ok bool
-		var def *idx.Archive
-		if def, ok = m.defById[id]; !ok {
-			// should never happen because every ID in the tag index
-			// must be present in the byId lookup table
+		def, ok := m.defById[id]
+		if !ok {
 			corruptIndex.Inc()
-			log.Errorf("memory-idx: ID %q is in tag index but not in the byId lookup table", id)
+			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
 			continue
 		}
 
 		// special case if the tag to complete values for is "name"
 		if tag == "name" {
-			valueMap[def.NameSanitizedAsTagValue()] = struct{}{}
+			if strings.HasPrefix(def.NameSanitizedAsTagValue(), prefix) {
+				resMap[def.NameSanitizedAsTagValue()] = struct{}{}
+			}
 		} else {
 			for _, tag := range def.Tags {
 				if !strings.HasPrefix(tag, tagPrefix) {
@@ -1067,22 +1192,28 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 					continue
 				}
 
-				valueMap[tagValue[1]] = struct{}{}
+				resMap[tagValue[1]] = struct{}{}
+			}
+
+			if enricher != nil {
+				metaTags := enricher.enrich(def.Id, def.Name, def.Tags)
+				for _, metaTag := range metaTags {
+					if metaTag.Key == tag && strings.HasPrefix(metaTag.Value, prefix) {
+						resMap[metaTag.Value] = struct{}{}
+					}
+				}
 			}
 		}
 	}
 
-	res := make([]string, 0, len(valueMap))
-	for v := range valueMap {
-		res = append(res, v)
+	res := make([]string, len(resMap))
+	i := 0
+	for v := range resMap {
+		res[i] = v
+		i++
 	}
 
-	sort.Strings(res)
-
-	if len(res) > int(limit) {
-		return res[:limit]
-	}
-	return res
+	return m.finalizeAutoCompleteResult(res, limit, false)
 }
 
 func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) chan schema.MKey {
@@ -1097,6 +1228,28 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 	query.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
 
 	return resCh
+}
+
+func (m *UnpartitionedMemoryIdx) finalizeAutoCompleteResult(res []string, limit uint, deduplicate bool) []string {
+	sort.Strings(res)
+
+	if deduplicate {
+		j := 0
+		for i := 1; i < len(res); i++ {
+			if res[j] == res[i] {
+				continue
+			}
+			j++
+			res[j] = res[i]
+		}
+		res = res[:j+1]
+	}
+
+	if len(res) > int(limit) {
+		return res[:limit]
+	}
+
+	return res
 }
 
 func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
