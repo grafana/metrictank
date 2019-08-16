@@ -1021,34 +1021,6 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 	return res
 }
 
-func (m *UnpartitionedMemoryIdx) tagHasOneMetricFrom(values TagValues, from int64) bool {
-	for _, ids := range values {
-		if m.idSetHasOneMetricFrom(ids, from) {
-			return true
-		}
-	}
-	return false
-}
-
-func (m *UnpartitionedMemoryIdx) idSetHasOneMetricFrom(ids IdSet, from int64) bool {
-	for id := range ids {
-		def, ok := m.defById[id]
-		if !ok {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
-			continue
-		}
-
-		// as soon as we found one metric definition with LastUpdate >= from
-		// we can return true
-		if atomic.LoadInt64(&def.LastUpdate) >= from {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []idx.Node {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
