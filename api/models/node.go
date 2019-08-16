@@ -60,13 +60,11 @@ type IndexTagDetails struct {
 	OrgId  uint32 `json:"orgId" binding:"Required"`
 	Filter string `json:"filter"`
 	Tag    string `json:"tag" binding:"Required"`
-	From   int64  `json:"from"`
 }
 
 func (t IndexTagDetails) Trace(span opentracing.Span) {
 	span.SetTag("orgId", t.OrgId)
 	span.LogFields(
-		traceLog.Int64("from", t.From),
 		traceLog.String("filter", t.Filter),
 		traceLog.String("tag", t.Tag),
 	)
@@ -78,13 +76,11 @@ func (i IndexTagDetails) TraceDebug(span opentracing.Span) {
 type IndexTags struct {
 	OrgId  uint32 `json:"orgId" binding:"Required"`
 	Filter string `json:"filter"`
-	From   int64  `json:"from"`
 }
 
 func (t IndexTags) Trace(span opentracing.Span) {
 	span.SetTag("orgId", t.OrgId)
 	span.LogFields(
-		traceLog.Int64("from", t.From),
 		traceLog.String("filter", t.Filter),
 	)
 }
@@ -96,14 +92,12 @@ type IndexAutoCompleteTags struct {
 	OrgId  uint32   `json:"orgId" binding:"Required"`
 	Prefix string   `json:"Prefix"`
 	Expr   []string `json:"expressions"`
-	From   int64    `json:"from"`
 	Limit  uint     `json:"limit"`
 }
 
 func (t IndexAutoCompleteTags) Trace(span opentracing.Span) {
 	span.SetTag("orgId", t.OrgId)
 	span.LogFields(
-		traceLog.Int64("from", t.From),
 		traceLog.String("prefix", t.Prefix),
 		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
 		traceLog.Int("limit", int(t.Limit)),
@@ -118,14 +112,12 @@ type IndexAutoCompleteTagValues struct {
 	Tag    string   `json:"tag"`
 	Prefix string   `json:"prefix"`
 	Expr   []string `json:"expressions"`
-	From   int64    `json:"from"`
 	Limit  uint     `json:"limit"`
 }
 
 func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
 	span.SetTag("orgId", t.OrgId)
 	span.LogFields(
-		traceLog.Int64("from", t.From),
 		traceLog.String("prefix", t.Prefix),
 		traceLog.String("tag", t.Tag),
 		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),

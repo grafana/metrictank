@@ -946,7 +946,7 @@ func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.Grap
 		return
 	}
 	reqCtx := ctx.Req.Context()
-	tagValues, err := s.clusterTagDetails(reqCtx, ctx.OrgId, tag, request.Filter, request.From)
+	tagValues, err := s.clusterTagDetails(reqCtx, ctx.OrgId, tag, request.Filter)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -975,10 +975,10 @@ func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.Grap
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filter string, from int64) (map[string]uint64, error) {
+func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filter string) (map[string]uint64, error) {
 	result := make(map[string]uint64)
 
-	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter, From: from}
+	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter}
 	resps, err := s.peerQuerySpeculative(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
@@ -1070,7 +1070,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
 	reqCtx := ctx.Req.Context()
-	tags, err := s.clusterTags(reqCtx, ctx.OrgId, request.Filter, request.From)
+	tags, err := s.clusterTags(reqCtx, ctx.OrgId, request.Filter)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -1091,8 +1091,8 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string, from int64) ([]string, error) {
-	data := models.IndexTags{OrgId: orgId, Filter: filter, From: from}
+func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string) ([]string, error) {
+	data := models.IndexTags{OrgId: orgId, Filter: filter}
 	resps, err := s.peerQuerySpeculative(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
@@ -1132,7 +1132,7 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 		request.Limit = tagdbDefaultLimit
 	}
 
-	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.Prefix, request.Expr, request.From, request.Limit)
+	tags, err := s.clusterAutoCompleteTags(ctx.Req.Context(), ctx.OrgId, request.Prefix, request.Expr, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
@@ -1141,10 +1141,10 @@ func (s *Server) graphiteAutoCompleteTags(ctx *middleware.Context, request model
 	response.Write(ctx, response.NewJson(200, tags, ""))
 }
 
-func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId uint32, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId uint32, prefix string, expressions []string, limit uint) ([]string, error) {
 	tagSet := make(map[string]struct{})
 
-	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
+	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, Limit: limit}
 	responses, err := s.peerQuerySpeculative(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
@@ -1179,7 +1179,7 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 		request.Limit = tagdbDefaultLimit
 	}
 
-	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.Prefix, request.Expr, request.From, request.Limit)
+	resp, err := s.clusterAutoCompleteTagValues(ctx.Req.Context(), ctx.OrgId, request.Tag, request.Prefix, request.Expr, request.Limit)
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
@@ -1188,10 +1188,10 @@ func (s *Server) graphiteAutoCompleteTagValues(ctx *middleware.Context, request 
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
-func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32, tag, prefix string, expressions []string, from int64, limit uint) ([]string, error) {
+func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32, tag, prefix string, expressions []string, limit uint) ([]string, error) {
 	valSet := make(map[string]struct{})
 
-	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, From: from, Limit: limit}
+	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, Limit: limit}
 	responses, err := s.peerQuerySpeculative(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err

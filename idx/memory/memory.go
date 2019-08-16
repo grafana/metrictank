@@ -779,7 +779,7 @@ func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archiv
 	return archives
 }
 
-func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp, from int64) map[string]uint64 {
+func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64 {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -804,29 +804,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 			continue
 		}
 
-		count := uint64(0)
-		if from > 0 {
-			for id := range ids {
-				def, ok := m.defById[id]
-				if !ok {
-					corruptIndex.Inc()
-					log.Errorf("memory-idx: corrupt. ID %q is in tag index but not in the byId lookup table", id)
-					continue
-				}
-
-				if atomic.LoadInt64(&def.LastUpdate) < from {
-					continue
-				}
-
-				count++
-			}
-		} else {
-			count += uint64(len(ids))
-		}
-
-		if count > 0 {
-			res[value] = count
-		}
+		res[value] = uint64(len(ids))
 	}
 
 	return res
@@ -834,11 +812,10 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 
 // FindTags returns tags matching the specified conditions
 // prefix:      prefix match
-// from:        tags must have at least one metric with LastUpdate >= from
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int64, limit uint) []string {
+func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uint) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -855,11 +832,10 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int6
 	// probably allocating more than necessary, still better than growing
 	res := make([]string, 0, len(tags))
 
-	for tag, values := range tags {
-		// a tag gets appended to the result set if:
-		// either the given prefix is empty or the tag has the given prefix, and
-		// either from is set to 0 or the tag has at least one metric with .LastUpdate higher or equal to from
-		if (len(prefix) == 0 || strings.HasPrefix(tag, prefix)) && (from == 0 || m.tagHasOneMetricFrom(values, from)) {
+	for tag := range tags {
+		// a tag gets appended to the result set if either the given prefix is
+		// empty or the tag has the given prefix
+		if len(prefix) == 0 || strings.HasPrefix(tag, prefix) {
 			res = append(res, tag)
 		}
 	}
@@ -914,11 +890,10 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 // FindTagValues returns tag values matching the specified conditions
 // tag:         tag key match
 // prefix:      value prefix match
-// from:        tags must have at least one metric with LastUpdate >= from
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, from int64, limit uint) []string {
+func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, limit uint) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -933,8 +908,8 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 	}
 
 	res := make([]string, 0, len(values))
-	for value, ids := range values {
-		if (len(prefix) == 0 || strings.HasPrefix(value, prefix)) && (from == 0 || m.idSetHasOneMetricFrom(ids, from)) {
+	for value := range values {
+		if len(prefix) == 0 || strings.HasPrefix(value, prefix) {
 			res = append(res, value)
 		}
 	}
@@ -1016,9 +991,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 // Tags returns a list of all tag keys associated with the metrics of a given
 // organization. The return values are filtered by the regex in the second parameter.
-// If the third parameter is >0 then only metrics will be accounted of which the
-// LastUpdate time is >= the given value.
-func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp, from int64) []string {
+func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []string {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil
@@ -1036,17 +1009,13 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp, from 
 
 	res = make([]string, 0, len(tags))
 
-	for tag, values := range tags {
+	for tag := range tags {
 		// filter by pattern if one was given
 		if filter != nil && !filter.MatchString(tag) {
 			continue
 		}
 
-		// if from is > 0 we need to find at least one metric definition where
-		// LastUpdate >= from before we add the tag to the result set
-		if (from > 0 && m.tagHasOneMetricFrom(values, from)) || from == 0 {
-			res = append(res, tag)
-		}
+		res = append(res, tag)
 	}
 
 	return res
