@@ -104,8 +104,6 @@ type MetricIndex interface {
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.
-	// If the third parameter is >0 then only tags will be returned of which the
-	// LastUpdate of at least one metric with that tag is >= of the given from value.
 	Tags(orgId uint32, filter *regexp.Regexp) []string
 
 	// TagDetails returns a list of all values associated with a given tag key in the
@@ -113,8 +111,6 @@ type MetricIndex interface {
 	// the metric names in the returned map.
 	// If the third parameter is not nil it will be used to filter the values before
 	// accounting for them.
-	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
-	// time is >= the from timestamp will be included.
 	TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64
 
 	// FindTags generates a list of possible tags that could complete a
