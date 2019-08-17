@@ -1230,7 +1230,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 func (m *UnpartitionedMemoryIdx) finalizeAutoCompleteResult(res []string, limit uint, deduplicate bool) []string {
 	sort.Strings(res)
 
-	if deduplicate {
+	if deduplicate && len(res) >= 2 {
 		j := 0
 		for i := 1; i < len(res); i++ {
 			if res[j] == res[i] {
