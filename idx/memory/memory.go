@@ -1106,9 +1106,6 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 	defer m.RUnlock()
 
 	values := m.tags[orgId][tag]
-	if len(values) == 0 {
-		return nil
-	}
 
 	res := make([]string, 0, len(values))
 	for value := range values {
