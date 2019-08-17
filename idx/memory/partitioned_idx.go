@@ -527,10 +527,10 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagqu
 	var record tagquery.MetaTagRecord
 	var created bool
 	for _, m := range p.Partition {
-		m := m
+		m, partNum := m, i
 		g.Go(func() error {
 			var err error
-			if i == 0 {
+			if partNum == 0 {
 				record, created, err = m.MetaTagRecordUpsert(orgId, rawRecord)
 			} else {
 				_, _, err = m.MetaTagRecordUpsert(orgId, rawRecord)
