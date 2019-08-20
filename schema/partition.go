@@ -97,9 +97,6 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
 		var h sum32aStringWriter = offset32
-		if err := writeSortedTagString(&h, m.Name, m.Tags); err != nil {
-			return 0, err
-		}
 		if len(m.nameWithTags) > 0 {
 			h.WriteString(m.nameWithTags)
 		} else {
