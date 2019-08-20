@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-	"hash/fnv"
 	"math/rand"
 	"strings"
 	"testing"
@@ -253,73 +252,6 @@ func testPartitionWithSeriesWithTagsFnv(t *testing.T, byDef bool) {
 	}
 	if int32(len(partitions)) < partitionCount {
 		t.Fatalf("with %d series only %d/%d partitions seen", metricCount, len(partitions), partitionCount)
-	}
-}
-
-func TestPartitionWithSeriesWithTagsFnvNewAndOldData(t *testing.T) {
-	partitionCount := int32(32)
-	metricCount := 5000
-	series := getMetricDataWithCustomTags(1, 2, metricCount, 10, "metric.org1", 0.2)
-
-	for _, md := range series {
-		p, err := md.PartitionID(PartitionBySeriesWithTagsFnv, partitionCount)
-		if err != nil {
-			t.Fatalf("failed to get partition on %s with orgId=%d", md.Id, md.OrgId)
-		}
-		if p < 0 {
-			t.Fatalf("partition expected to be a positive number, p=%d", p)
-		}
-
-		// check using old partitioning method
-		h := fnv.New32a()
-		err = writeSortedTagString(h, md.Name, md.Tags)
-		if err != nil {
-			t.Fatalf("failed to write sorted tag string")
-		}
-		partition := int32(h.Sum32()) % partitionCount
-		if partition < 0 {
-			partition = -partition
-		}
-
-		if p != partition {
-			t.Fatalf("new and old partitoning methods give different values, old=%d, new=%d", partition, p)
-		}
-	}
-}
-
-func TestPartitionWithSeriesWithTagsFnvNewAndOldDefs(t *testing.T) {
-	partitionCount := int32(32)
-	metricCount := 5000
-	series := getMetricDataWithCustomTags(1, 2, metricCount, 10, "metric.org1", 0.2)
-	defs := make([]*MetricDefinition, len(series))
-
-	for i := 0; i < len(series); i++ {
-		defs[i] = MetricDefinitionFromMetricData(series[i])
-	}
-
-	for _, md := range defs {
-		p, err := md.PartitionID(PartitionBySeriesWithTagsFnv, partitionCount)
-		if err != nil {
-			t.Fatalf("failed to get partition on %s with orgId=%d", md.Id, md.OrgId)
-		}
-		if p < 0 {
-			t.Fatalf("partition expected to be a positive number, p=%d", p)
-		}
-
-		// check using old partitioning method
-		h := fnv.New32a()
-		err = writeSortedTagString(h, md.Name, md.Tags)
-		if err != nil {
-			t.Fatalf("failed to write sorted tag string")
-		}
-		partition := int32(h.Sum32()) % partitionCount
-		if partition < 0 {
-			partition = -partition
-		}
-
-		if p != partition {
-			t.Fatalf("new and old partitoning methods give different values, old=%d, new=%d", partition, p)
-		}
 	}
 }
 
