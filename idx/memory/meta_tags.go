@@ -87,6 +87,14 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 		return res
 	}
 
+	// if no enricher is present yet, then we instantiate one and store its reference
+	// to reuse it later.
+	// there is an unlikely race condition where we receive multiple calls to FindByTag
+	// from multiple requests at the same time, which would result in multiple enrichers
+	// getting instantiated. in such a case the last one would overwrite the previous
+	// ones and there shouldn't be any issues. this case is very unlikely, so it doesn't
+	// seem to be worth it to add a lock for that.
+
 	// if provided size is valid, it's not possible for lru.New to return an error
 	cache, _ := lru.New(enrichmentCacheSize)
 	res = &enricher{
@@ -107,6 +115,7 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 		i++
 	}
 
+	// to atomically store a pointer, unfortunately we need to use unsafe.Pointer
 	atomic.StorePointer(&m.enricher, (unsafe.Pointer)(res))
 
 	return res
