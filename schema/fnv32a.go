@@ -30,8 +30,8 @@ func (s *sum32aStringWriter) Size() int { return 4 }
 func (s *sum32aStringWriter) Write(data []byte) (int, error) {
 	hash := *s
 	for _, c := range data {
-		hash *= prime32
 		hash ^= sum32aStringWriter(c)
+		hash *= prime32
 	}
 	*s = hash
 	return len(data), nil
