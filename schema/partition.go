@@ -42,8 +42,8 @@ func (m *MetricData) PartitionID(method PartitionByMethod, partitions int32) (in
 			partition = -partition
 		}
 	case PartitionBySeries:
-		h := fnv.New32a()
-		h.Write([]byte(m.Name))
+		var h sum32aStringWriter = offset32
+		h.WriteString(m.Name)
 		partition = int32(h.Sum32()) % partitions
 		if partition < 0 {
 			partition = -partition
@@ -85,8 +85,8 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 			partition = -partition
 		}
 	case PartitionBySeries:
-		h := fnv.New32a()
-		h.Write([]byte(m.Name))
+		var h sum32aStringWriter = offset32
+		h.WriteString(m.Name)
 		partition = int32(h.Sum32()) % partitions
 		if partition < 0 {
 			partition = -partition
