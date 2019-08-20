@@ -6,6 +6,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	jump "github.com/dgryski/go-jump"
+	"github.com/grafana/metrictank/util"
 )
 
 type PartitionByMethod uint8
@@ -42,7 +43,7 @@ func (m *MetricData) PartitionID(method PartitionByMethod, partitions int32) (in
 			partition = -partition
 		}
 	case PartitionBySeries:
-		var h sum32aStringWriter = offset32
+		h := util.NewFnv32aStringWriter()
 		h.WriteString(m.Name)
 		partition = int32(h.Sum32()) % partitions
 		if partition < 0 {
@@ -55,8 +56,8 @@ func (m *MetricData) PartitionID(method PartitionByMethod, partitions int32) (in
 		}
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
-		h := fnvNew32aStringWriter()
-		if err := writeSortedTagString(h, m.Name, m.Tags); err != nil {
+		h := util.NewFnv32aStringWriter()
+		if err := writeSortedTagString(&h, m.Name, m.Tags); err != nil {
 			return 0, err
 		}
 		partition = int32(h.Sum32()) % partitions
@@ -85,7 +86,7 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 			partition = -partition
 		}
 	case PartitionBySeries:
-		var h sum32aStringWriter = offset32
+		h := util.NewFnv32aStringWriter()
 		h.WriteString(m.Name)
 		partition = int32(h.Sum32()) % partitions
 		if partition < 0 {
@@ -96,7 +97,7 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 		h.WriteString(m.NameWithTags())
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
-		var h sum32aStringWriter = offset32
+		h := util.NewFnv32aStringWriter()
 		if len(m.nameWithTags) > 0 {
 			h.WriteString(m.nameWithTags)
 		} else {
