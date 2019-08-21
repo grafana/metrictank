@@ -7,6 +7,8 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 )
 
+//go:generate msgp
+
 type MetaTagRecordUpsert struct {
 	MetaTags    []string `json:"metaTags" binding:"Required"`
 	Expressions []string `json:"expressions" binding:"Required"`
@@ -30,7 +32,6 @@ type MetaTagRecordUpsertResultByNode struct {
 	PeerErrors  map[string]string                    `json:"peerErrors"`
 }
 
-//go:generate msgp
 type MetaTagRecordUpsertResult struct {
 	MetaTags []string `json:"metaTags"`
 	Queries  []string `json:"queries"`
@@ -52,4 +53,51 @@ func (m IndexMetaTagRecordUpsert) Trace(span opentracing.Span) {
 }
 
 func (m IndexMetaTagRecordUpsert) TraceDebug(span opentracing.Span) {
+}
+
+type MetaTagRecordSwap struct {
+	Records   []MetaTagRecord `json:"records"`
+	Propagate bool            `json:"propagate"`
+}
+
+type MetaTagRecord struct {
+	MetaTags    []string `json:"metaTags" binding:"Required"`
+	Expressions []string `json:"expressions" binding:"Required"`
+}
+
+func (m MetaTagRecordSwap) Trace(span opentracing.Span) {
+	span.LogFields(
+		traceLog.String("recordCount", string(len(m.Records))),
+		traceLog.Bool("propagate", m.Propagate),
+	)
+}
+
+func (m MetaTagRecordSwap) TraceDebug(span opentracing.Span) {
+}
+
+type MetaTagRecordSwapResultByNode struct {
+	Local       MetaTagRecordSwapResult            `json:"local"`
+	PeerResults map[string]MetaTagRecordSwapResult `json:"peerResults"`
+	PeerErrors  map[string]string                  `json:"peerErrors"`
+}
+
+type MetaTagRecordSwapResult struct {
+	Deleted uint32 `json:"deleted"`
+	Added   uint32 `json:"added"`
+}
+
+type IndexMetaTagRecordSwap struct {
+	OrgId     uint32          `json:"orgId" binding:"Required"`
+	Records   []MetaTagRecord `json:"records"`
+	Propagate bool            `json:"propagate"`
+}
+
+func (m IndexMetaTagRecordSwap) Trace(span opentracing.Span) {
+	span.SetTag("orgId", m.OrgId)
+	span.LogFields(
+		traceLog.String("recordCount", string(len(m.Records))),
+	)
+}
+
+func (m IndexMetaTagRecordSwap) TraceDebug(span opentracing.Span) {
 }

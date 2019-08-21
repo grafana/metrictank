@@ -3,6 +3,7 @@ package memory
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"regexp"
 	"sort"
@@ -507,6 +508,10 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	}
 
 	return res, true, nil
+}
+
+func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
+	return rand.Uint32(), rand.Uint32(), nil
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {

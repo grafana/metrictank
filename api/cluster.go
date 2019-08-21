@@ -631,3 +631,28 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 		Created:  created,
 	}))
 }
+
+func (s *Server) indexMetaTagRecordSwap(ctx *middleware.Context, req models.IndexMetaTagRecordSwap) {
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordSwapResult{}))
+		return
+	}
+
+	metaTagRecords := make([]tagquery.MetaTagRecord, len(req.Records))
+	for i, rawRecord := range req.Records {
+		var err error
+		metaTagRecords[i], err = tagquery.ParseMetaTagRecord(rawRecord.MetaTags, rawRecord.Expressions)
+		if err != nil {
+			response.Write(ctx, response.WrapError(fmt.Errorf("Error when parsing record %d: %s", i, err)))
+			return
+		}
+	}
+
+	added, deleted, err := s.MetricIndex.MetaTagRecordSwap(req.OrgId, metaTagRecords)
+	if err != nil {
+		response.Write(ctx, response.WrapError(fmt.Errorf("Error when swapping meta tag records: %s", err)))
+		return
+	}
+
+	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordSwapResult{Added: added, Deleted: deleted}))
+}

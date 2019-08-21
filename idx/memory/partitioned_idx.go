@@ -549,6 +549,10 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagqu
 	return record, created, nil
 }
 
+func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
+	return 0, 0, nil
+}
+
 func mergePartitionStringResults(partitionResults [][]string) []string {
 	// merge our results into the unique set of strings
 	merged := map[string]struct{}{}
