@@ -1,11 +1,10 @@
 package memory
 
 import (
-	"hash"
-	"hash/fnv"
-	"sync"
 	"sync/atomic"
 	"unsafe"
+
+	"github.com/grafana/metrictank/util"
 
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -101,11 +100,6 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 		filters: make([]tagquery.MetricDefinitionFilter, len(m.records)),
 		tags:    make([]tagquery.Tags, len(m.records)),
 		cache:   cache,
-		hashPool: sync.Pool{
-			New: func() interface{} {
-				return fnv.New64a()
-			},
-		},
 	}
 
 	i := 0
@@ -122,22 +116,19 @@ func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 }
 
 type enricher struct {
-	filters  []tagquery.MetricDefinitionFilter
-	tags     []tagquery.Tags
-	cache    *lru.Cache
-	hashPool sync.Pool
+	filters []tagquery.MetricDefinitionFilter
+	tags    []tagquery.Tags
+	cache   *lru.Cache
 }
 
 func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
-	h := e.hashPool.Get().(hash.Hash64)
-	h.Reset()
-	h.Write([]byte(name))
+	h := util.NewFnv64aStringWriter()
+	h.WriteString(name)
 	for i := range tags {
-		h.Write([]byte(";"))
-		h.Write([]byte(tags[i]))
+		h.WriteString(";")
+		h.WriteString(tags[i])
 	}
 	sum := h.Sum64()
-	e.hashPool.Put(h)
 
 	cachedRes, ok := e.cache.Get(sum)
 	if ok {
