@@ -282,7 +282,7 @@ func (i *idSelector) byTagFromMetaTagIndex() {
 // evaluateMetaRecord takes a meta record id, it then looks up the corresponding
 // meta record, builds a sub query from its expressions and executes the sub query
 func (i *idSelector) evaluateMetaRecord(id recordId) {
-	record, ok := i.ctx.metaTagRecords[id]
+	record, ok := i.ctx.metaTagRecords.records[id]
 	if !ok {
 		corruptIndex.Inc()
 		return

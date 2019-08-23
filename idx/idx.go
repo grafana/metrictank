@@ -19,6 +19,11 @@ type Node struct {
 	Leaf        bool
 	Defs        []Archive
 	HasChildren bool
+
+	// meta tags that should be added to the ones in the MetricDefinitions in the .Defs property.
+	// it is important that all MetricDefinitions in .Defs have the same .Name and .Tags values,
+	// otherwise each of them would have to get their own set of MetaTags
+	MetaTags tagquery.Tags
 }
 
 type Archive struct {

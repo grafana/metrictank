@@ -65,6 +65,7 @@ var (
 	writeQueueDelay              = 30 * time.Second
 	writeMaxBatchSize            = 5000
 	matchCacheSize               = 1000
+	enrichmentCacheSize          = 10000
 	metaTagSupport               = false
 )
 
@@ -85,6 +86,7 @@ func ConfigSetup() {
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
+	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
 	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 }
@@ -265,9 +267,9 @@ type UnpartitionedMemoryIdx struct {
 
 	// used by tag index
 	defByTagSet    defByTagSet
-	tags           map[uint32]TagIndex       // by orgId
-	metaTagIndex   map[uint32]metaTagIndex   // by orgId
-	metaTagRecords map[uint32]metaTagRecords // by orgId
+	tags           map[uint32]TagIndex        // by orgId
+	metaTagIndex   map[uint32]metaTagIndex    // by orgId
+	metaTagRecords map[uint32]*metaTagRecords // by orgId
 
 	findCache *FindCache
 
@@ -281,7 +283,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tree:           make(map[uint32]*Tree),
 		tags:           make(map[uint32]TagIndex),
 		metaTagIndex:   make(map[uint32]metaTagIndex),
-		metaTagRecords: make(map[uint32]metaTagRecords),
+		metaTagRecords: make(map[uint32]*metaTagRecords),
 	}
 	return m
 }
@@ -463,7 +465,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 		return res, false, errors.NewBadRequest("Tag support is disabled")
 	}
 
-	var mtr metaTagRecords
+	var mtr *metaTagRecords
 	var mti metaTagIndex
 	var ok bool
 
@@ -471,7 +473,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	defer m.Unlock()
 
 	if mtr, ok = m.metaTagRecords[orgId]; !ok {
-		mtr = make(metaTagRecords)
+		mtr = newMetaTagRecords()
 		m.metaTagRecords[orgId] = mtr
 	}
 
@@ -518,9 +520,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 		return res
 	}
 
-	res = make([]tagquery.MetaTagRecord, len(mtr))
+	res = make([]tagquery.MetaTagRecord, len(mtr.records))
 	i := 0
-	for _, record := range mtr {
+	for _, record := range mtr.records {
 		res[i] = record
 		i++
 	}
@@ -1089,6 +1091,20 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	m.RLock()
 	defer m.RUnlock()
 
+	tagIndex, ok := m.tags[orgId]
+	if !ok {
+		// if there is no tag index, we don't need to run the tag query
+		return nil
+	}
+
+	var enricher *enricher
+	if metaTagSupport {
+		mtr, ok := m.metaTagRecords[orgId]
+		if ok {
+			enricher = mtr.getEnricher(tagIndex.idHasTag)
+		}
+	}
+
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	resCh := m.idsByTagQuery(orgId, queryCtx)
 
@@ -1108,6 +1124,9 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 				Leaf:        true,
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
+			}
+			if enricher != nil {
+				byPath[nameWithTags].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
 			}
 		} else {
 			existing.Defs = append(existing.Defs, CloneArchive(def))

@@ -1,8 +1,15 @@
 package memory
 
 import (
+	"sync/atomic"
+	"unsafe"
+
+	"github.com/grafana/metrictank/util"
+
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/schema"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 // the collision avoidance window defines how many times we try to find a higher
@@ -12,7 +19,16 @@ var collisionAvoidanceWindow = uint32(1024)
 type recordId uint32
 
 // list of meta records keyed by a unique identifier used as ID
-type metaTagRecords map[recordId]tagquery.MetaTagRecord
+type metaTagRecords struct {
+	records  map[recordId]tagquery.MetaTagRecord
+	enricher unsafe.Pointer
+}
+
+func newMetaTagRecords() *metaTagRecords {
+	return &metaTagRecords{
+		records: make(map[recordId]tagquery.MetaTagRecord),
+	}
+}
 
 // upsert inserts or updates a meta tag record according to the given specifications
 // it uses the set of tag query expressions as the identity of the record, if a record with the
@@ -25,6 +41,9 @@ type metaTagRecords map[recordId]tagquery.MetaTagRecord
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
 func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
+	// after altering meta records we need to reinstantiate the enricher the next time we want to use it
+	defer atomic.StorePointer(&m.enricher, nil)
+
 	id := recordId(record.HashExpressions())
 	var oldRecord *tagquery.MetaTagRecord
 	var oldId recordId
@@ -32,11 +51,11 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	// loop over existing records, starting from id, trying to find one that has
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		if existingRecord, ok := m[id+recordId(i)]; ok {
+		if existingRecord, ok := m.records[id+recordId(i)]; ok {
 			if record.EqualExpressions(&existingRecord) {
 				oldRecord = &existingRecord
 				oldId = id + recordId(i)
-				delete(m, oldId)
+				delete(m.records, oldId)
 				break
 			}
 		}
@@ -49,8 +68,8 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	// now find the best position to insert the new/updated record, starting from id
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		// if we find a free slot, then insert the new record there
-		if _, ok := m[id]; !ok {
-			m[id] = record
+		if _, ok := m.records[id]; !ok {
+			m.records[id] = record
 
 			return id, &record, oldId, oldRecord, nil
 		}
@@ -59,6 +78,75 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	}
 
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
+}
+
+func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
+	res := (*enricher)(atomic.LoadPointer(&m.enricher))
+	if res != nil {
+		return res
+	}
+
+	// if no enricher is present yet, then we instantiate one and store its reference
+	// to reuse it later.
+	// there is an unlikely race condition where we receive multiple calls to FindByTag
+	// from multiple requests at the same time, which would result in multiple enrichers
+	// getting instantiated. in such a case the last one would overwrite the previous
+	// ones and there shouldn't be any issues. this case is very unlikely, so it doesn't
+	// seem to be worth it to add a lock for that.
+
+	// if provided size is valid, it's not possible for lru.New to return an error
+	cache, _ := lru.New(enrichmentCacheSize)
+	res = &enricher{
+		filters: make([]tagquery.MetricDefinitionFilter, len(m.records)),
+		tags:    make([]tagquery.Tags, len(m.records)),
+		cache:   cache,
+	}
+
+	i := 0
+	for _, record := range m.records {
+		res.filters[i] = record.GetMetricDefinitionFilter(lookup)
+		res.tags[i] = record.MetaTags
+		i++
+	}
+
+	// to atomically store a pointer, unfortunately we need to use unsafe.Pointer
+	atomic.StorePointer(&m.enricher, (unsafe.Pointer)(res))
+
+	return res
+}
+
+type enricher struct {
+	filters []tagquery.MetricDefinitionFilter
+	tags    []tagquery.Tags
+	cache   *lru.Cache
+}
+
+func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
+	h := util.NewFnv64aStringWriter()
+	h.WriteString(name)
+	for i := range tags {
+		h.WriteString(";")
+		h.WriteString(tags[i])
+	}
+	sum := h.Sum64()
+
+	cachedRes, ok := e.cache.Get(sum)
+	if ok {
+		return cachedRes.(tagquery.Tags)
+	}
+
+	var res tagquery.Tags
+	var matches []int
+	for i := range e.filters {
+		if e.filters[i](id, name, tags) == tagquery.Pass {
+			res = append(res, e.tags[i]...)
+			matches = append(matches, i)
+		}
+	}
+
+	e.cache.Add(sum, res)
+
+	return res
 }
 
 // index structure keyed by tag -> value -> list of meta record IDs

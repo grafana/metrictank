@@ -662,6 +662,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
 	var reqs []models.Req
+	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
 	// note that different patterns to query can have different from / to, so they require different index lookups
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
@@ -722,6 +723,10 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
 					reqs = append(reqs, newReq)
 				}
+
+				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
+					metaTagEnrichmentData[metric.Defs[0].NameWithTags()] = metric.MetaTags
+				}
 			}
 		}
 	}
@@ -770,6 +775,14 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	out = mergeSeries(out)
 
+	if len(metaTagEnrichmentData) > 0 {
+		for i := range out {
+			if metaTags, ok := metaTagEnrichmentData[out[i].Target]; ok {
+				out[i].EnrichWithTags(metaTags)
+			}
+		}
+	}
+
 	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work
 	// if we need to cancel the request due to a fetch error
 
@@ -787,6 +800,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	preRun := time.Now()
 	out, err = plan.Run(data)
+
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
 	return out, meta, err

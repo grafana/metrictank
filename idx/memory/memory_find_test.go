@@ -831,7 +831,7 @@ func BenchmarkTagsWithFromAndFilter(b *testing.B) {
 func benchmarkTagsWithFromAndFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
-	filters := []string{"d", "di", "c"}
+	filters := []string{"d", "di", "^c"}
 	expected := [][]string{
 		{"dc", "device", "direction", "disk"},
 		{"direction", "disk"},
@@ -879,6 +879,9 @@ func ixFind(b *testing.B, org uint32, q int) {
 }
 
 func BenchmarkFind(b *testing.B) {
+	_tagSupport := TagSupport
+	defer func() { TagSupport = _tagSupport }()
+	TagSupport = false
 	benchWithAndWithoutPartitonedIndex(benchmarkFind)(b)
 }
 

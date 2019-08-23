@@ -3,10 +3,12 @@ package models
 import (
 	"bytes"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
 	pickle "github.com/kisielk/og-rek"
 )
@@ -66,6 +68,45 @@ func (s *Series) SetTags() {
 
 	// Do this last to overwrite any "name" tag that might have been specified in the series tags.
 	s.Tags["name"] = name
+}
+
+func (s *Series) EnrichWithTags(tags tagquery.Tags) {
+	// every serie has at least one tag, the name tag
+	// if there are no tags defined, this means the tags must not have been set yet
+	if len(s.Tags) == 0 {
+		s.SetTags()
+	}
+
+	for _, tag := range tags {
+		if _, ok := s.Tags[tag.Key]; !ok {
+			s.Tags[tag.Key] = tag.Value
+		}
+	}
+
+	s.buildTargetFromTags()
+}
+
+func (s *Series) buildTargetFromTags() {
+	buf := bytes.NewBufferString(s.Tags["name"])
+
+	keys := make([]string, 0, len(s.Tags)-1)
+	for key := range s.Tags {
+		if key == "name" {
+			continue
+		}
+		keys = append(keys, key)
+	}
+
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		buf.WriteRune(';')
+		buf.WriteString(key)
+		buf.WriteRune('=')
+		buf.WriteString(s.Tags[key])
+	}
+
+	s.Target = buf.String()
 }
 
 func (s Series) Copy(emptyDatapoints []schema.Point) Series {

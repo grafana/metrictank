@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
+//go:generate msgp
 type Tags []Tag
 
 func ParseTags(tags []string) (Tags, error) {
