@@ -3,7 +3,6 @@ package memory
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"regexp"
 	"sort"
@@ -511,7 +510,38 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
-	return rand.Uint32(), rand.Uint32(), nil
+	if !TagSupport {
+		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
+		return 0, 0, errors.NewBadRequest("Tag support is disabled")
+	}
+
+	newMtr := newMetaTagRecords()
+	newMti := make(metaTagIndex)
+
+	var addedRecords, deletedRecords uint32
+	for _, record := range records {
+		recordId, _, _, _, err := newMtr.upsert(record)
+		if err != nil {
+			return 0, 0, err
+		}
+
+		for _, keyValue := range record.MetaTags {
+			newMti.insertRecord(keyValue, recordId)
+		}
+
+		addedRecords++
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	oldMti := m.metaTagIndex[orgId]
+	deletedRecords = uint32(len(oldMti))
+
+	m.metaTagRecords[orgId] = newMtr
+	m.metaTagIndex[orgId] = newMti
+
+	return addedRecords, deletedRecords, nil
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
