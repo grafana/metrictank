@@ -1342,6 +1342,10 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 }
 
 func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewJson(200, []tagquery.MetaTagRecord{}, ""))
+		return
+	}
 	metaTagRecords := s.MetricIndex.MetaTagRecordList(ctx.OrgId)
 	response.Write(ctx, response.NewJson(200, metaTagRecords, ""))
 }
