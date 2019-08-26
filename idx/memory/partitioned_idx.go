@@ -553,8 +553,8 @@ func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquer
 	g, _ := errgroup.WithContext(context.Background())
 
 	results := make([]struct {
-		Added   uint32
-		Deleted uint32
+		added   uint32
+		deleted uint32
 	}, len(p.Partition))
 
 	var i int
@@ -562,7 +562,7 @@ func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquer
 		m, partNum := m, i
 		g.Go(func() error {
 			var err error
-			results[partNum].Added, results[partNum].Deleted, err = m.MetaTagRecordSwap(orgId, records)
+			results[partNum].added, results[partNum].deleted, err = m.MetaTagRecordSwap(orgId, records)
 			return err
 		})
 		i++
@@ -571,8 +571,8 @@ func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquer
 	err := g.Wait()
 	var added, deleted uint32
 	for _, result := range results {
-		added += result.Added
-		deleted += result.Deleted
+		added += result.added
+		deleted += result.deleted
 	}
 
 	if err != nil {
