@@ -992,12 +992,12 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 	}
 
 	if !metaTagSupport {
-		return m.finalizeAutoCompleteResult(res, limit, false)
+		return m.finalizeResult(res, limit, false)
 	}
 
 	mti, ok := m.metaTagIndex[orgId]
 	if !ok {
-		return m.finalizeAutoCompleteResult(res, limit, false)
+		return m.finalizeResult(res, limit, false)
 	}
 
 	for tag := range mti {
@@ -1008,7 +1008,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		}
 	}
 
-	return m.finalizeAutoCompleteResult(res, limit, true)
+	return m.finalizeResult(res, limit, true)
 }
 
 // FindTagsWithQuery returns tags matching the specified conditions
@@ -1087,7 +1087,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		i++
 	}
 
-	return m.finalizeAutoCompleteResult(res, limit, false)
+	return m.finalizeResult(res, limit, false)
 }
 
 // FindTagValues returns tag values matching the specified conditions
@@ -1115,12 +1115,12 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 	}
 
 	if !metaTagSupport {
-		return m.finalizeAutoCompleteResult(res, limit, false)
+		return m.finalizeResult(res, limit, false)
 	}
 
 	metaTagValues := m.metaTagIndex[orgId][tag]
 	if len(metaTagValues) == 0 {
-		return m.finalizeAutoCompleteResult(res, limit, false)
+		return m.finalizeResult(res, limit, false)
 	}
 
 	for value := range metaTagValues {
@@ -1131,7 +1131,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		}
 	}
 
-	return m.finalizeAutoCompleteResult(res, limit, true)
+	return m.finalizeResult(res, limit, true)
 }
 
 func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string {
@@ -1210,7 +1210,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		i++
 	}
 
-	return m.finalizeAutoCompleteResult(res, limit, false)
+	return m.finalizeResult(res, limit, false)
 }
 
 func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryContext) chan schema.MKey {
@@ -1227,7 +1227,13 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 	return resCh
 }
 
-func (m *UnpartitionedMemoryIdx) finalizeAutoCompleteResult(res []string, limit uint, deduplicate bool) []string {
+// finalizeResult prepares a result to return it to the caller
+// it takes a slice of results which needs to be finalized and prepared to be returned
+// a limit that defines how many results we want to return, if the final results set is more than limit
+// then it limits the result to the given size. the result set gets sorted before the limitation is
+// applied, to ensure consistent result sets
+// a deduplicate flag, if the deduplicate flag is true then it deduplicates the results before returning
+func (m *UnpartitionedMemoryIdx) finalizeResult(res []string, limit uint, deduplicate bool) []string {
 	sort.Strings(res)
 
 	if deduplicate && len(res) >= 2 {
