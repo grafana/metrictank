@@ -292,10 +292,10 @@ func InitLargeIndex() {
 	//orgId 2 has 168,000 mertics
 }
 
-func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expected map[string]uint64) {
+func queryAndCompareTagValues(t *testing.T, key, filter string, expected map[string]uint64) {
 	t.Helper()
 
-	values := ix.TagDetails(1, key, regexp.MustCompile(filter), from)
+	values := ix.TagDetails(1, key, regexp.MustCompile(filter))
 	if len(values) != len(expected) {
 		t.Fatalf("Expected %d values, but got %d", len(expected), len(values))
 	}
@@ -317,11 +317,11 @@ func queryAndCompareTagValues(t *testing.T, key, filter string, from int64, expe
 
 }
 
-func TestTagDetailsWithoutFilters(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagDetailsWithoutFilters)(t)
+func TestTagDetailsWithoutFilter(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagDetailsWithoutFilter)(t)
 }
 
-func testTagDetailsWithoutFilters(t *testing.T) {
+func testTagDetailsWithoutFilter(t *testing.T) {
 	InitSmallIndex()
 	defer ix.Stop()
 
@@ -331,22 +331,7 @@ func testTagDetailsWithoutFilters(t *testing.T) {
 	expected["dc2"] = 33600
 	expected["dc3"] = 33600
 	expected["dc4"] = 33600
-	queryAndCompareTagValues(t, "dc", "", 0, expected)
-}
-
-func TestTagDetailsWithFrom(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagDetailsWithFrom)(t)
-}
-
-func testTagDetailsWithFrom(t *testing.T) {
-	InitSmallIndex()
-	defer ix.Stop()
-
-	expected := make(map[string]uint64)
-	expected["dc3"] = 2500
-	expected["dc4"] = 25600
-
-	queryAndCompareTagValues(t, "dc", "", 100000, expected)
+	queryAndCompareTagValues(t, "dc", "", expected)
 }
 
 func TestTagDetailsWithFilter(t *testing.T) {
@@ -361,32 +346,76 @@ func testTagDetailsWithFilter(t *testing.T) {
 	expected["dc3"] = 33600
 	expected["dc4"] = 33600
 
-	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", 0, expected)
+	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", expected)
 }
 
-func TestTagDetailsWithFilterAndFrom(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagDetailsWithFilterAndFrom)(t)
+func TestTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testTagDetailsWithMetaTagSupportWithoutFilter)(t)
 }
 
-func testTagDetailsWithFilterAndFrom(t *testing.T) {
+func testTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
 	InitSmallIndex()
 	defer ix.Stop()
 
-	expected := make(map[string]uint64)
-	expected["dc4"] = 25600
+	metaRecordExpression, err := tagquery.ParseExpression("dc=~dc[0-9]+")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
 
-	queryAndCompareTagValues(t, "dc", ".+[4-9]{1}$", 100000, expected)
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "all"}},
+		Expressions: tagquery.Expressions{metaRecordExpression},
+	})
+
+	expected := make(map[string]uint64)
+	expected["all"] = 168000
+	expected["dc0"] = 33600
+	expected["dc1"] = 33600
+	expected["dc2"] = 33600
+	expected["dc3"] = 33600
+	expected["dc4"] = 33600
+	queryAndCompareTagValues(t, "dc", "", expected)
 }
 
-func queryAndCompareTagKeys(t testing.TB, filter string, from int64, expected []string) {
+func TestTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testTagDetailsWithMetaTagSupportWithFilter)(t)
+}
+
+func testTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
+	InitSmallIndex()
+	defer ix.Stop()
+
+	metaRecordExpression, err := tagquery.ParseExpression("dc=dc0")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "dc5"}},
+		Expressions: tagquery.Expressions{metaRecordExpression},
+	})
+
+	expected := make(map[string]uint64)
+	expected["dc3"] = 33600
+	expected["dc4"] = 33600
+	expected["dc5"] = 33600
+	queryAndCompareTagValues(t, "dc", ".+[3-9]{1}$", expected)
+}
+
+func queryAndCompareTagKeys(t testing.TB, filter string, expected []string) {
 	t.Helper()
-	values := ix.Tags(1, regexp.MustCompile(filter), from)
+	values := ix.Tags(1, regexp.MustCompile(filter))
 	if len(values) != len(expected) {
 		t.Fatalf("Expected %d values, but got %d", len(expected), len(values))
 	}
 
 	sort.Strings(expected)
-	sort.Strings(values)
 
 	// reflect.DeepEqual treats nil & []string{} as not equal
 	if len(values) == 0 {
@@ -410,20 +439,7 @@ func testTagKeysWithoutFilters(t *testing.T) {
 	defer ix.Stop()
 
 	expected := []string{"dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
-	queryAndCompareTagKeys(t, "", 0, expected)
-}
-
-func TestTagKeysWithFrom(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagKeysWithFrom)(t)
-}
-
-func testTagKeysWithFrom(t *testing.T) {
-	InitSmallIndex()
-	defer ix.Stop()
-
-	// disk metrics should all have been added before ts 1000000
-	expected := []string{"dc", "host", "device", "cpu", "metric", "name"}
-	queryAndCompareTagKeys(t, "", 100000, expected)
+	queryAndCompareTagKeys(t, "", expected)
 }
 
 func TestTagKeysWithFilter(t *testing.T) {
@@ -435,24 +451,67 @@ func testTagKeysWithFilter(t *testing.T) {
 	defer ix.Stop()
 
 	expected := []string{"dc", "device", "disk", "direction"}
-	queryAndCompareTagKeys(t, "d", 0, expected)
+	queryAndCompareTagKeys(t, "d", expected)
 
 	expected = []string{"direction", "disk"}
-	queryAndCompareTagKeys(t, "di", 0, expected)
+	queryAndCompareTagKeys(t, "di", expected)
 }
 
-func TestTagKeysWithFromAndFilter(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagKeysWithFromAndFilter)(t)
+func TestTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testTagKeysWithMetaTagSupportWithFilter)(t)
 }
 
-func testTagKeysWithFromAndFilter(t *testing.T) {
+func testTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
 	InitSmallIndex()
 	defer ix.Stop()
 
-	expected := []string{"dc", "device"}
-	queryAndCompareTagKeys(t, "d", 100000, expected)
+	metaRecordExpression, err := tagquery.ParseExpression("direction=read")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
 
-	queryAndCompareTagKeys(t, "di", 1000000, nil)
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "directionMeta", Value: "read"}},
+		Expressions: tagquery.Expressions{metaRecordExpression},
+	})
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "directionMeta2", Value: "read"}},
+		Expressions: tagquery.Expressions{metaRecordExpression},
+	})
+
+	expected := []string{"dc", "device", "disk", "direction", "directionMeta", "directionMeta2"}
+	queryAndCompareTagKeys(t, "d", expected)
+
+	expected = []string{"direction", "disk", "directionMeta", "directionMeta2"}
+	queryAndCompareTagKeys(t, "di", expected)
+}
+
+func TestTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testTagKeysWithMetaTagSupportWithoutFilters)(t)
+}
+
+func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
+	InitSmallIndex()
+	defer ix.Stop()
+
+	metaRecordExpression, err := tagquery.ParseExpression("name!=")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
+		Expressions: tagquery.Expressions{metaRecordExpression},
+	})
+
+	expected := []string{"all", "dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
+	queryAndCompareTagKeys(t, "", expected)
 }
 
 func TestTagSorting(t *testing.T) {
@@ -528,10 +587,10 @@ func TestAutoCompleteTags(t *testing.T) {
 
 func testAutoCompleteTags(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	type testCase struct {
 		prefix string
-		from   int64
 		limit  uint
 		expRes []string
 	}
@@ -539,36 +598,100 @@ func testAutoCompleteTags(t *testing.T) {
 	testCases := []testCase{
 		{
 			prefix: "ho",
-			from:   100,
 			limit:  100,
 			expRes: []string{"host"},
 		}, {
 			prefix: "host",
-			from:   100,
 			limit:  100,
 			expRes: []string{"host"},
 		}, {
 			prefix: "n",
-			from:   100,
 			limit:  100,
 			expRes: []string{"name"},
 		}, {
 			prefix: "",
-			from:   100,
 			limit:  100,
 			expRes: []string{"cpu", "dc", "device", "direction", "disk", "host", "metric", "name"},
 		},
 	}
 
 	for i, tc := range testCases {
-		autoCompleteTagsAndCompare(t, i, tc.prefix, tc.from, tc.limit, tc.expRes)
+		autoCompleteTagsAndCompare(t, i, tc.prefix, tc.limit, tc.expRes)
 	}
 }
 
-func autoCompleteTagsAndCompare(t testing.TB, tcIdx int, prefix string, from int64, limit uint, expRes []string) {
+func TestAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithMetaTagSupport)(t)
+}
+
+func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
+	InitSmallIndex()
+	defer ix.Stop()
+
+	metaRecordExpression1, err := tagquery.ParseExpression("host=~.+")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "host2", Value: "all"}},
+		Expressions: tagquery.Expressions{metaRecordExpression1},
+	})
+
+	metaRecordExpression2, err := tagquery.ParseExpression("name=~.+")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
+		Expressions: tagquery.Expressions{metaRecordExpression2},
+	})
+
+	type testCase struct {
+		prefix string
+		limit  uint
+		expRes []string
+	}
+
+	testCases := []testCase{
+		{
+			prefix: "ho",
+			limit:  100,
+			expRes: []string{"host", "host2"},
+		}, {
+			prefix: "host2",
+			limit:  100,
+			expRes: []string{"host2"},
+		}, {
+			prefix: "n",
+			limit:  100,
+			expRes: []string{"name"},
+		}, {
+			prefix: "",
+			limit:  100,
+			expRes: []string{"all", "cpu", "dc", "device", "direction", "disk", "host", "host2", "metric", "name"},
+		}, {
+			prefix: "",
+			limit:  2,
+			expRes: []string{"all", "cpu"},
+		}, {
+			prefix: "a",
+			limit:  100,
+			expRes: []string{"all"},
+		},
+	}
+
+	for i, tc := range testCases {
+		autoCompleteTagsAndCompare(t, i, tc.prefix, tc.limit, tc.expRes)
+	}
+}
+
+func autoCompleteTagsAndCompare(t testing.TB, tcIdx int, prefix string, limit uint, expRes []string) {
 	t.Helper()
 
-	res := ix.FindTags(1, prefix, from, limit)
+	res := ix.FindTags(1, prefix, limit)
 
 	if len(res) != len(expRes) {
 		t.Fatalf("TC %d: Wrong result, Expected:\n%s\nGot:\n%s\n", tcIdx, expRes, res)
@@ -592,7 +715,6 @@ func testAutoCompleteTagsWithQuery(t *testing.T) {
 	type testCase struct {
 		prefix string
 		expr   []string
-		from   int64
 		limit  uint
 		expRes []string
 	}
@@ -601,39 +723,87 @@ func testAutoCompleteTagsWithQuery(t *testing.T) {
 		{
 			prefix: "di",
 			expr:   []string{"direction=write", "host=host90"},
-			from:   100,
 			limit:  100,
 			expRes: []string{"direction", "disk"},
 		}, {
 			prefix: "di",
 			expr:   []string{"direction=write", "host=host90", "device=cpu"},
-			from:   100,
 			limit:  100,
 			expRes: []string{},
 		}, {
 			prefix: "",
 			expr:   []string{"direction=write", "host=host90"},
-			from:   100,
 			limit:  100,
 			expRes: []string{"dc", "device", "direction", "disk", "host", "metric", "name"},
 		}, {
 			prefix: "",
 			expr:   []string{"direction=write", "host=host90"},
-			from:   100,
 			limit:  3,
 			expRes: []string{"dc", "device", "direction"},
 		},
 	}
 
 	for i, tc := range testCases {
-		autoCompleteTagsWithQueryAndCompare(t, i, tc.prefix, tc.expr, tc.from, tc.limit, tc.expRes)
+		autoCompleteTagsWithQueryAndCompare(t, i, tc.prefix, tc.expr, tc.limit, tc.expRes)
 	}
 }
 
-func autoCompleteTagsWithQueryAndCompare(t testing.TB, tcIdx int, prefix string, expr []string, from int64, limit uint, expRes []string) {
+func TestAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithQueryWithMetaTagSupport)(t)
+}
+
+func testAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
+	InitSmallIndex()
+	defer ix.Stop()
+
+	metaRecordExpression, err := tagquery.ParseExpression("host=~.+")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "another", Value: "tag"}, tagquery.Tag{Key: "meta", Value: "tag"}},
+		Expressions: tagquery.Expressions{metaRecordExpression},
+	})
+
+	type testCase struct {
+		prefix string
+		expr   []string
+		limit  uint
+		expRes []string
+	}
+
+	testCases := []testCase{
+		{
+			prefix: "me",
+			expr:   []string{"direction=write"},
+			limit:  100,
+			expRes: []string{"meta", "metric"},
+		}, {
+			prefix: "",
+			expr:   []string{"direction=write", "host=host90"},
+			limit:  100,
+			expRes: []string{"another", "dc", "device", "direction", "disk", "host", "meta", "metric", "name"},
+		}, {
+			prefix: "",
+			expr:   []string{"direction=write", "host=host90"},
+			limit:  8,
+			expRes: []string{"another", "dc", "device", "direction", "disk", "host", "meta", "metric"},
+		},
+	}
+
+	for i, tc := range testCases {
+		autoCompleteTagsWithQueryAndCompare(t, i, tc.prefix, tc.expr, tc.limit, tc.expRes)
+	}
+}
+
+func autoCompleteTagsWithQueryAndCompare(t testing.TB, tcIdx int, prefix string, expr []string, limit uint, expRes []string) {
 	t.Helper()
 
-	query, err := tagquery.NewQueryFromStrings(expr, from)
+	query, err := tagquery.NewQueryFromStrings(expr, 0)
 	if err != nil {
 		t.Fatalf("Error when instantiating query: %s", err)
 	}
@@ -656,11 +826,11 @@ func TestAutoCompleteTagValues(t *testing.T) {
 
 func testAutoCompleteTagValues(t *testing.T) {
 	InitSmallIndex()
+	defer ix.Stop()
 
 	type testCase struct {
 		tag    string
 		prefix string
-		from   int64
 		limit  uint
 		expRes []string
 	}
@@ -669,21 +839,105 @@ func testAutoCompleteTagValues(t *testing.T) {
 		{
 			tag:    "device",
 			prefix: "",
-			from:   100,
 			limit:  100,
 			expRes: []string{"cpu", "disk"},
+		}, {
+			tag:    "metric",
+			prefix: "disk_o",
+			limit:  100,
+			expRes: []string{"disk_octets", "disk_ops"},
+		},
+		{
+			tag:    "metric",
+			prefix: "disk_o",
+			limit:  1,
+			expRes: []string{"disk_octets"},
 		},
 	}
 
 	for _, tc := range testCases {
-		autoCompleteTagValuesAndCompare(t, tc.tag, tc.prefix, tc.from, tc.limit, tc.expRes)
+		autoCompleteTagValuesAndCompare(t, tc.tag, tc.prefix, tc.limit, tc.expRes)
 	}
 }
 
-func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, from int64, limit uint, expRes []string) {
+func TestAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithMetaTagSupport)(t)
+}
+
+func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
+	InitSmallIndex()
+	defer ix.Stop()
+
+	metaRecordExpression1, err := tagquery.ParseExpression("metric=~.+")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "metric", Value: "all"}},
+		Expressions: tagquery.Expressions{metaRecordExpression1},
+	})
+
+	metaRecordExpression2, err := tagquery.ParseExpression("metric=~disk_.+")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "metric", Value: "disk_all"}},
+		Expressions: tagquery.Expressions{metaRecordExpression2},
+	})
+
+	metaRecordExpression3, err := tagquery.ParseExpression("name!=")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "meta1", Value: "all_metrics"}},
+		Expressions: tagquery.Expressions{metaRecordExpression3},
+	})
+
+	type testCase struct {
+		tag    string
+		prefix string
+		limit  uint
+		expRes []string
+	}
+
+	testCases := []testCase{
+		{
+			tag:    "metric",
+			prefix: "",
+			limit:  100,
+			expRes: []string{"all", "disk_all", "disk_merged", "disk_octets", "disk_ops", "disk_time", "idle", "interrupt", "nice", "softirq", "steal", "system", "user", "wait"},
+		}, {
+			tag:    "metric",
+			prefix: "disk_",
+			limit:  100,
+			expRes: []string{"disk_all", "disk_merged", "disk_octets", "disk_ops", "disk_time"},
+		}, {
+			tag:    "metric",
+			prefix: "disk_",
+			limit:  3,
+			expRes: []string{"disk_all", "disk_merged", "disk_octets"},
+		}, {
+			tag:    "meta1",
+			prefix: "",
+			limit:  100,
+			expRes: []string{"all_metrics"},
+		},
+	}
+
+	for _, tc := range testCases {
+		autoCompleteTagValuesAndCompare(t, tc.tag, tc.prefix, tc.limit, tc.expRes)
+	}
+}
+
+func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, limit uint, expRes []string) {
 	t.Helper()
 
-	res := ix.FindTagValues(1, tag, prefix, from, limit)
+	res := ix.FindTagValues(1, tag, prefix, limit)
 
 	if len(res) != len(expRes) {
 		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
@@ -710,7 +964,6 @@ func testAutoCompleteTagValuesWithQuery(t *testing.T) {
 		tag    string
 		prefix string
 		expr   []string
-		from   int64
 		limit  uint
 		expRes []string
 	}
@@ -720,49 +973,126 @@ func testAutoCompleteTagValuesWithQuery(t *testing.T) {
 			tag:    "host",
 			prefix: "host9",
 			expr:   []string{"direction=write"},
-			from:   100,
 			limit:  100,
 			expRes: []string{"host9", "host90", "host91", "host92", "host93", "host94", "host95", "host96", "host97", "host98", "host99"},
 		}, {
 			tag:    "host",
 			prefix: "host9",
 			expr:   []string{"direction=write"},
-			from:   100,
 			limit:  5,
 			expRes: []string{"host9", "host90", "host91", "host92", "host93"},
 		}, {
 			tag:    "direction",
 			prefix: "w",
 			expr:   []string{"device=disk"},
-			from:   100,
 			limit:  100,
 			expRes: []string{"write"},
 		}, {
 			tag:    "direction",
 			prefix: "w",
 			expr:   []string{"device=cpu"},
-			from:   100,
 			limit:  100,
 			expRes: []string{},
 		}, {
 			tag:    "device",
 			prefix: "",
 			expr:   []string{"disk=~disk[4-5]{1}"},
-			from:   100,
 			limit:  100,
 			expRes: []string{"disk"},
 		},
 	}
 
 	for _, tc := range testCases {
-		autoCompleteTagValuesWithQueryAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.from, tc.limit, tc.expRes)
+		autoCompleteTagValuesWithQueryAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.limit, tc.expRes)
 	}
 }
 
-func autoCompleteTagValuesWithQueryAndCompare(t testing.TB, tag, prefix string, expr []string, from int64, limit uint, expRes []string) {
+func TestAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = true
+	defer func() { metaTagSupport = _metaTagSupport }()
+	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithQueryWithMetaTagSupport)(t)
+}
+
+func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
+	InitSmallIndex()
+	defer ix.Stop()
+
+	metaRecordExpression1, err := tagquery.ParseExpression("name=~.*\\.cpu\\..*")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "direction", Value: "none"}},
+		Expressions: tagquery.Expressions{metaRecordExpression1},
+	})
+
+	metaRecordExpression2, err := tagquery.ParseExpression("name!=")
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
+		Expressions: tagquery.Expressions{metaRecordExpression2},
+	})
+
+	type testCase struct {
+		tag    string
+		prefix string
+		expr   []string
+		limit  uint
+		expRes []string
+	}
+
+	testCases := []testCase{
+		{
+			tag:    "direction",
+			prefix: "",
+			expr:   []string{"device=disk"},
+			limit:  100,
+			expRes: []string{"read", "write"},
+		}, {
+			tag:    "direction",
+			prefix: "",
+			expr:   []string{"host=~.+"},
+			limit:  100,
+			expRes: []string{"none", "read", "write"},
+		}, {
+			tag:    "direction",
+			prefix: "wr",
+			expr:   []string{"host=~.+"},
+			limit:  100,
+			expRes: []string{"write"},
+		}, {
+			tag:    "direction",
+			prefix: "no",
+			expr:   []string{"host=~.+"},
+			limit:  100,
+			expRes: []string{"none"},
+		}, {
+			tag:    "direction",
+			prefix: "",
+			expr:   []string{"host=~.+"},
+			limit:  2,
+			expRes: []string{"none", "read"},
+		}, {
+			tag:    "all",
+			prefix: "",
+			expr:   []string{"__tag=name"},
+			limit:  100,
+			expRes: []string{"metrics"},
+		},
+	}
+
+	for _, tc := range testCases {
+		autoCompleteTagValuesWithQueryAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.limit, tc.expRes)
+	}
+}
+
+func autoCompleteTagValuesWithQueryAndCompare(t testing.TB, tag, prefix string, expr []string, limit uint, expRes []string) {
 	t.Helper()
 
-	query, err := tagquery.NewQueryFromStrings(expr, from)
+	query, err := tagquery.NewQueryFromStrings(expr, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query: %s", err)
 	}
@@ -781,11 +1111,11 @@ func autoCompleteTagValuesWithQueryAndCompare(t testing.TB, tag, prefix string, 
 	}
 }
 
-func BenchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagDetailsWithoutFromNorFilter)(b)
+func BenchmarkTagDetailsWithoutFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagDetailsWithoutFilter)(b)
 }
 
-func benchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
+func benchmarkTagDetailsWithoutFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
 
@@ -794,18 +1124,18 @@ func benchmarkTagDetailsWithoutFromNorFilter(b *testing.B) {
 
 	expectedCount := uint64(100000)
 	for n := 0; n < b.N; n++ {
-		val := ix.TagDetails(1, "metric", regexp.MustCompile(""), int64(0))
+		val := ix.TagDetails(1, "metric", regexp.MustCompile(""))
 		if val["disk_ops"] != expectedCount {
 			b.Fatalf("Expected count %d, but got %d: %+v", expectedCount, val["disk_ops"], val)
 		}
 	}
 }
 
-func BenchmarkTagDetailsWithFromAndFilter(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagDetailsWithFromAndFilter)(b)
+func BenchmarkTagDetailsWithFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagDetailsWithFilter)(b)
 }
 
-func benchmarkTagDetailsWithFromAndFilter(b *testing.B) {
+func benchmarkTagDetailsWithFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
 
@@ -817,18 +1147,18 @@ func benchmarkTagDetailsWithFromAndFilter(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		q := n % len(filters)
-		val := ix.TagDetails(1, "metric", regexp.MustCompile(filters[q]), int64(10000+(q*100)))
+		val := ix.TagDetails(1, "metric", regexp.MustCompile(filters[q]))
 		if val["interrupt"] != expectedCounts[q] {
 			b.Fatalf("Expected count %d, but got %d: %+v", expectedCounts[q], val["interrupt"], val)
 		}
 	}
 }
 
-func BenchmarkTagsWithFromAndFilter(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagsWithFromAndFilter)(b)
+func BenchmarkTagsWithFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagsWithFilter)(b)
 }
 
-func benchmarkTagsWithFromAndFilter(b *testing.B) {
+func benchmarkTagsWithFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
 	filters := []string{"d", "di", "^c"}
@@ -842,16 +1172,15 @@ func benchmarkTagsWithFromAndFilter(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		q := n % len(filters)
-		from := int64(q % 1000)
-		queryAndCompareTagKeys(b, filters[q], from, expected[q])
+		queryAndCompareTagKeys(b, filters[q], expected[q])
 	}
 }
 
-func BenchmarkTagsWithoutFromNorFilter(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkTagsWithoutFromNorFilter)(b)
+func BenchmarkTagsWithoutFilter(b *testing.B) {
+	benchWithAndWithoutPartitonedIndex(benchmarkTagsWithoutFilter)(b)
 }
 
-func benchmarkTagsWithoutFromNorFilter(b *testing.B) {
+func benchmarkTagsWithoutFilter(b *testing.B) {
 	InitLargeIndex()
 	defer ix.Stop()
 	expected := []string{"dc", "device", "direction", "disk", "cpu", "metric", "name", "host"}
@@ -859,7 +1188,7 @@ func benchmarkTagsWithoutFromNorFilter(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		queryAndCompareTagKeys(b, "", 0, expected)
+		queryAndCompareTagKeys(b, "", expected)
 	}
 }
 
@@ -1223,13 +1552,11 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 
 	type testCase struct {
 		prefix string
-		from   int64
 		expRes []string
 	}
 
 	tc := testCase{
 		prefix: "di",
-		from:   100,
 		expRes: []string{"direction", "disk"},
 	}
 
@@ -1237,7 +1564,7 @@ func benchmarkTagQueryKeysByPrefixSimple(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsAndCompare(b, n, tc.prefix, tc.from, 2, tc.expRes)
+		autoCompleteTagsAndCompare(b, n, tc.prefix, 2, tc.expRes)
 	}
 }
 
@@ -1252,14 +1579,12 @@ func benchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 	type testCase struct {
 		prefix string
 		expr   []string
-		from   int64
 		expRes []string
 	}
 
 	tc := testCase{
 		prefix: "di",
 		expr:   []string{"metric=~.*_time$", "direction!=~re", "host=~host9[0-9]0"},
-		from:   12345,
 		expRes: []string{"direction", "disk"},
 	}
 
@@ -1267,6 +1592,6 @@ func benchmarkTagQueryKeysByPrefixExpressions(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, tc.from, 2, tc.expRes)
+		autoCompleteTagsWithQueryAndCompare(b, n, tc.prefix, tc.expr, 2, tc.expRes)
 	}
 }

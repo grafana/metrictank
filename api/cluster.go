@@ -149,7 +149,7 @@ func (s *Server) indexTagDetails(ctx *middleware.Context, req models.IndexTagDet
 		return
 	}
 
-	values := s.MetricIndex.TagDetails(req.OrgId, req.Tag, re, req.From)
+	values := s.MetricIndex.TagDetails(req.OrgId, req.Tag, re)
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagDetailsResp{Values: values}))
 }
 
@@ -167,7 +167,7 @@ func (s *Server) indexTags(ctx *middleware.Context, req models.IndexTags) {
 		return
 	}
 
-	tags := s.MetricIndex.Tags(req.OrgId, re, req.From)
+	tags := s.MetricIndex.Tags(req.OrgId, re)
 	response.Write(ctx, response.NewMsgp(200, &models.IndexTagsResp{Tags: tags}))
 }
 
@@ -196,7 +196,7 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 
 	// if there are no expressions given, we can shortcut the evaluation by not using a query
 	if len(req.Expr) == 0 {
-		tags := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.From, req.Limit)
+		tags := s.MetricIndex.FindTags(req.OrgId, req.Prefix, req.Limit)
 		response.Write(ctx, response.NewMsgp(200, models.StringList(tags)))
 		return
 	}
@@ -206,7 +206,7 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 		expressions = append(expressions, "__tag^="+req.Prefix)
 	}
 
-	query, err := tagquery.NewQueryFromStrings(expressions, req.From)
+	query, err := tagquery.NewQueryFromStrings(expressions, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -227,7 +227,7 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 
 	// if there are no expressions given, we can shortcut the evaluation by not using a query
 	if len(req.Expr) == 0 {
-		values := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.From, req.Limit)
+		values := s.MetricIndex.FindTagValues(req.OrgId, req.Tag, req.Prefix, req.Limit)
 		response.Write(ctx, response.NewMsgp(200, models.StringList(values)))
 		return
 	}
@@ -237,7 +237,7 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 		expressions = append(expressions, req.Tag+"^="+req.Prefix)
 	}
 
-	query, err := tagquery.NewQueryFromStrings(expressions, req.From)
+	query, err := tagquery.NewQueryFromStrings(expressions, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

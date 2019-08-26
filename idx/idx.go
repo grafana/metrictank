@@ -104,15 +104,20 @@ type MetricIndex interface {
 
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.
-	// If the third parameter is >0 then only tags will be returned of which the
-	// LastUpdate of at least one metric with that tag is >= of the given from value.
-	Tags(orgId uint32, filter *regexp.Regexp, from int64) []string
+	Tags(orgId uint32, filter *regexp.Regexp) []string
+
+	// TagDetails returns a list of all values associated with a given tag key in the
+	// given org. The occurrences of each value is counted and the count is referred to by
+	// the metric names in the returned map.
+	// If the third parameter is not nil it will be used to filter the values before
+	// accounting for them.
+	TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64
 
 	// FindTags generates a list of possible tags that could complete a
 	// given prefix. It only supports simple queries by prefix and from,
 	// without any further conditions. But its faster than the alternative
 	// FindTagsWithQuery()
-	FindTags(orgId uint32, prefix string, from int64, limit uint) []string
+	FindTags(orgId uint32, prefix string, limit uint) []string
 
 	// FindTagsWithQuery generates a list of possible tags that could complete
 	// a given prefix. It runs a full query on the index, so it allows the
@@ -123,29 +128,17 @@ type MetricIndex interface {
 
 	// FindTagValues generates a list of possible values that could complete
 	// a given value prefix. It requires a tag to be specified and only values
-	// of the given tag will be returned. It also allows the caller to further
-	// narrow down the results by specifying a from value, if from >=0 then
-	// only values will be returned of which at least one metric has received
-	// a datapoint since or at "from". The "limit" limits the result set to a
+	// of the given tag will be returned. The "limit" limits the result set to a
 	// specified length, since the results are sorted before being sliced it
 	// can be relied on that always the first "limit" entries of the result
 	// set will be returned.
-	FindTagValues(orgId uint32, tag, prefix string, from int64, limit uint) []string
+	FindTagValues(orgId uint32, tag, prefix string, limit uint) []string
 
 	// FindTagValuesWithQuery does the same thing as FindTagValues, but additionally it
 	// allows the caller to pass a tag query which is used to further narrow down the
 	// result set. If the tag query is not necessary, it is recommended to use
 	// FindTagValues() because it is faster
 	FindTagValuesWithQuery(orgId uint32, tag, prefix string, query tagquery.Query, limit uint) []string
-
-	// TagDetails returns a list of all values associated with a given tag key in the
-	// given org. The occurrences of each value is counted and the count is referred to by
-	// the metric names in the returned map.
-	// If the third parameter is not nil it will be used to filter the values before
-	// accounting for them.
-	// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
-	// time is >= the from timestamp will be included.
-	TagDetails(orgId uint32, key string, filter *regexp.Regexp, from int64) map[string]uint64
 
 	// DeleteTagged deletes the series returned by the given query from the tag index
 	// and also the DefById index.

@@ -1187,7 +1187,7 @@ func testMetricNameStartingWithTilde(t *testing.T) {
 		t.Fatalf("Expected metric name to be %q, but it was %q", metricName, findResult[0].Path)
 	}
 
-	tagDetails := ix.TagDetails(1, "name", nil, 0)
+	tagDetails := ix.TagDetails(1, "name", nil)
 	if len(tagDetails) != 1 {
 		t.Fatalf("Expected 1 result, but got %d", len(tagDetails))
 	}

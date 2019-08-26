@@ -173,7 +173,6 @@ func (p *PartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archi
 // Find searches the index for matching nodes.
 // * orgId describes the org to search in (public data in orgIdPublic is automatically included)
 // * pattern is handled like graphite does. see https://graphite.readthedocs.io/en/latest/render_api.html#paths-and-wildcards
-// * from is a unix timestamp. series not updated since then are excluded.
 func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
 	g, _ := errgroup.WithContext(context.Background())
 	resultChan := make(chan []idx.Node)
@@ -307,16 +306,14 @@ func (p *PartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []i
 
 // Tags returns a list of all tag keys associated with the metrics of a given
 // organization. The return values are filtered by the regex in the second parameter.
-// If the third parameter is >0 then only metrics will be accounted of which the
-// LastUpdate time is >= the given value.
-func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp, from int64) []string {
+func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []string {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]string, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
 		g.Go(func() error {
-			result[pos] = m.Tags(orgId, filter, from)
+			result[pos] = m.Tags(orgId, filter)
 			return nil
 		})
 		i++
@@ -326,20 +323,49 @@ func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp, from in
 	return mergePartitionStringResults(result)
 }
 
+// TagDetails returns a list of all values associated with a given tag key in the
+// given org. The occurrences of each value is counted and the count is referred to by
+// the metric names in the returned map.
+// If the third parameter is not "" it will be used as a regular expression to filter
+// the values before accounting for them.
+func (p *PartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp) map[string]uint64 {
+	g, _ := errgroup.WithContext(context.Background())
+	result := make([]map[string]uint64, len(p.Partition))
+	var i int
+	for _, m := range p.Partition {
+		pos, m := i, m
+		g.Go(func() error {
+			result[pos] = m.TagDetails(orgId, key, filter)
+			return nil
+		})
+		i++
+	}
+	g.Wait()
+
+	// merge our results into the unique set of tags
+	merged := map[string]uint64{}
+	for _, tagCounts := range result {
+		for tag, count := range tagCounts {
+			merged[tag] = merged[tag] + count
+		}
+	}
+
+	return merged
+}
+
 // FindTags returns tags matching the specified conditions
 // prefix:      prefix match
-// from:        tags must have at least one metric with LastUpdate >= from
 // limit:       the maximum number of results to return
 //
 // the results will always be sorted alphabetically for consistency
-func (p *PartitionedMemoryIdx) FindTags(orgId uint32, prefix string, from int64, limit uint) []string {
+func (p *PartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uint) []string {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]string, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
 		g.Go(func() error {
-			result[pos] = m.FindTags(orgId, prefix, from, limit)
+			result[pos] = m.FindTags(orgId, prefix, limit)
 			return nil
 		})
 		i++
@@ -383,14 +409,14 @@ func (p *PartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, qu
 // complete a given value prefix. It requires a tag to be specified and only values
 // of the given tag will be returned. It also accepts additional conditions to
 // further narrow down the result set in the format of graphite's tag queries
-func (p *PartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, from int64, limit uint) []string {
+func (p *PartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string, limit uint) []string {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]string, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
 		g.Go(func() error {
-			result[pos] = m.FindTagValues(orgId, tag, prefix, from, limit)
+			result[pos] = m.FindTagValues(orgId, tag, prefix, limit)
 			return nil
 		})
 		i++
@@ -423,38 +449,6 @@ func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix 
 		return response[:limit]
 	}
 	return response
-}
-
-// TagDetails returns a list of all values associated with a given tag key in the
-// given org. The occurrences of each value is counted and the count is referred to by
-// the metric names in the returned map.
-// If the third parameter is not "" it will be used as a regular expression to filter
-// the values before accounting for them.
-// If the fourth parameter is > 0 then only those metrics of which the LastUpdate
-// time is >= the from timestamp will be included.
-func (p *PartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *regexp.Regexp, from int64) map[string]uint64 {
-	g, _ := errgroup.WithContext(context.Background())
-	result := make([]map[string]uint64, len(p.Partition))
-	var i int
-	for _, m := range p.Partition {
-		pos, m := i, m
-		g.Go(func() error {
-			result[pos] = m.TagDetails(orgId, key, filter, from)
-			return nil
-		})
-		i++
-	}
-	g.Wait()
-
-	// merge our results into the unique set of tags
-	merged := map[string]uint64{}
-	for _, tagCounts := range result {
-		for tag, count := range tagCounts {
-			merged[tag] = merged[tag] + count
-		}
-	}
-
-	return merged
 }
 
 // DeleteTagged deletes the specified series from the tag index and also the
@@ -533,10 +527,10 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagqu
 	var record tagquery.MetaTagRecord
 	var created bool
 	for _, m := range p.Partition {
-		m := m
+		m, partNum := m, i
 		g.Go(func() error {
 			var err error
-			if i == 0 {
+			if partNum == 0 {
 				record, created, err = m.MetaTagRecordUpsert(orgId, rawRecord)
 			} else {
 				_, _, err = m.MetaTagRecordUpsert(orgId, rawRecord)
