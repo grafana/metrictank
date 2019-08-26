@@ -69,9 +69,8 @@ func queryAndCompareResultsWithMetaTags(t *testing.T, idx *UnpartitionedMemoryId
 }
 
 func TestSimpleMetaTagQueryWithSingleEqualExpression(t *testing.T) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	metaTagRecord, err := tagquery.ParseMetaTagRecord([]string{"metatag1=value1"}, []string{"tag1=iterator3"})
 	if err != nil {
@@ -89,9 +88,8 @@ func TestSimpleMetaTagQueryWithSingleEqualExpression(t *testing.T) {
 }
 
 func TestSimpleMetaTagQueryWithMatchAndUnequalExpression(t *testing.T) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	metaTagRecord, err := tagquery.ParseMetaTagRecord([]string{"metatag1=value1"}, []string{"tag1=~iterator[3-4]", "tag1!=iterator3"})
 	if err != nil {
@@ -109,9 +107,8 @@ func TestSimpleMetaTagQueryWithMatchAndUnequalExpression(t *testing.T) {
 }
 
 func TestSimpleMetaTagQueryWithMatchAndNotMatchExpression(t *testing.T) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	metaTagRecord, err := tagquery.ParseMetaTagRecord([]string{"metatag1=value1"}, []string{"tag1=~iterator[3-9]", "tag1!=~iterator[4-8]"})
 	if err != nil {
@@ -129,9 +126,8 @@ func TestSimpleMetaTagQueryWithMatchAndNotMatchExpression(t *testing.T) {
 }
 
 func TestSimpleMetaTagQueryWithManyTypesOfExpression(t *testing.T) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	metaTagRecord, err := tagquery.ParseMetaTagRecord(
 		[]string{"metatag1=value1"},
@@ -157,9 +153,8 @@ func TestSimpleMetaTagQueryWithManyTypesOfExpression(t *testing.T) {
 }
 
 func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	metaTagRecord, err := tagquery.ParseMetaTagRecord(
 		[]string{"metatag1=value1"},
@@ -213,9 +208,8 @@ func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
 }
 
 func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	metaTagRecord1, err := tagquery.ParseMetaTagRecord(
 		[]string{"metatag1=value1"},
@@ -291,9 +285,8 @@ func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
 }
 
 func BenchmarkMetaTagEnricher(b *testing.B) {
-	_metaTagSupport := tagquery.MetaTagSupport
-	tagquery.MetaTagSupport = true
-	defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
 
 	var err error
 	metaTagRecords1 := make([]tagquery.MetaTagRecord, 1000)

@@ -350,9 +350,9 @@ func testTagDetailsWithFilter(t *testing.T) {
 }
 
 func TestTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testTagDetailsWithMetaTagSupportWithoutFilter)(t)
 }
 
@@ -381,9 +381,9 @@ func testTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
 }
 
 func TestTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testTagDetailsWithMetaTagSupportWithFilter)(t)
 }
 
@@ -458,9 +458,9 @@ func testTagKeysWithFilter(t *testing.T) {
 }
 
 func TestTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testTagKeysWithMetaTagSupportWithFilter)(t)
 }
 
@@ -490,9 +490,9 @@ func testTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
 }
 
 func TestTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testTagKeysWithMetaTagSupportWithoutFilters)(t)
 }
 
@@ -621,9 +621,9 @@ func testAutoCompleteTags(t *testing.T) {
 }
 
 func TestAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithMetaTagSupport)(t)
 }
 
@@ -749,9 +749,9 @@ func testAutoCompleteTagsWithQuery(t *testing.T) {
 }
 
 func TestAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithQueryWithMetaTagSupport)(t)
 }
 
@@ -861,9 +861,9 @@ func testAutoCompleteTagValues(t *testing.T) {
 }
 
 func TestAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithMetaTagSupport)(t)
 }
 
@@ -1008,9 +1008,9 @@ func testAutoCompleteTagValuesWithQuery(t *testing.T) {
 }
 
 func TestAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = true
-	defer func() { metaTagSupport = _metaTagSupport }()
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithQueryWithMetaTagSupport)(t)
 }
 

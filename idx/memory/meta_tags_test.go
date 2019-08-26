@@ -7,7 +7,40 @@ import (
 	"github.com/grafana/metrictank/expr/tagquery"
 )
 
+// enableMetaTagSupport enables meta tag support and also tag support
+// (because tag-support required to use meta tags)
+// it returns a function which resets both setttings to what they were
+// before enableMetaTagSupport was called
+func enableMetaTagSupport() func() {
+	_tagSupport := TagSupport
+	_metaTagSupport := metaTagSupport
+	TagSupport = true
+	metaTagSupport = true
+	tagquery.MetaTagSupport = true
+	return func() {
+		TagSupport = _tagSupport
+		metaTagSupport = _metaTagSupport
+		tagquery.MetaTagSupport = _metaTagSupport
+	}
+}
+
+// disableMetaTagSupport disables the meta-tag-support feature flag, it does not
+// modify the tag-support feature flag
+// it returns a function to reset the meta-tag-support to the previous setting
+func disableMetaTagSupport() func() {
+	_metaTagSupport := metaTagSupport
+	metaTagSupport = false
+	tagquery.MetaTagSupport = false
+	return func() {
+		metaTagSupport = _metaTagSupport
+		tagquery.MetaTagSupport = _metaTagSupport
+	}
+}
+
 func TestInsertSimpleMetaTagRecord(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	metaTagRecords := newMetaTagRecords()
 	recordToInsert, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=abc", "anotherTag=theValue"}, []string{"metricTag!=a", "match=~this"})
 	if err != nil {
@@ -42,6 +75,9 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 }
 
 func TestUpdateExistingMetaTagRecord(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	// define the values for two metric records with the same meta tags, but different queries
 	recordToInsert1, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~a", "tag2=~b"})
 	if err != nil {
@@ -151,6 +187,9 @@ func (m *mockHash) BlockSize() (n int) {
 // We set the hash collision window to 3, so up to 3 hash collisions are allowed per hash value
 // When more than 3 hash collisions are encountered for one hash value, new records are rejected
 func TestHashCollisionsOnInsert(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	originalCollisionAvoidanceWindow := collisionAvoidanceWindow
 	defer func() { collisionAvoidanceWindow = originalCollisionAvoidanceWindow }()
 	collisionAvoidanceWindow = 3
@@ -226,6 +265,9 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 }
 
 func TestDeletingMetaRecord(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	// Adding 2 meta records
 	metaTagRecords := newMetaTagRecords()
 	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})

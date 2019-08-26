@@ -191,13 +191,12 @@ func withAndWithoutPartitonedIndex(f func(*testing.T)) func(*testing.T) {
 func withAndWithoutMetaTagSupport(f func(*testing.T)) func(*testing.T) {
 	return func(t *testing.T) {
 		t.Helper()
-		_metaTagSupport := tagquery.MetaTagSupport
-		defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+		reset := enableMetaTagSupport()
+		defer reset()
 
-		tagquery.MetaTagSupport = false
-		t.Run("withoutMetaTagSupport", f)
-		tagquery.MetaTagSupport = true
 		t.Run("withMetaTagSupport", f)
+		disableMetaTagSupport()
+		t.Run("withoutMetaTagSupport", f)
 	}
 }
 
@@ -1029,8 +1028,10 @@ func testSingleNodeMetric(t *testing.T) {
 	}
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 }
-
 func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
 	ix := NewUnpartitionedMemoryIdx()
 
 	record1, err := tagquery.ParseMetaTagRecord([]string{"a=b", "c=d"}, []string{"name=~a.+", "__tag^=a"})
@@ -1273,12 +1274,11 @@ func benchWithAndWithoutPartitonedIndex(f func(*testing.B)) func(*testing.B) {
 func benchWithAndWithoutMetaTagSupport(f func(*testing.B)) func(*testing.B) {
 	return func(b *testing.B) {
 		b.Helper()
-		_metaTagSupport := tagquery.MetaTagSupport
-		defer func() { tagquery.MetaTagSupport = _metaTagSupport }()
+		reset := enableMetaTagSupport()
+		defer reset()
 
-		tagquery.MetaTagSupport = true
 		b.Run("withMetaTagSupport", f)
-		tagquery.MetaTagSupport = false
+		disableMetaTagSupport()
 		b.Run("withoutMetaTagSupport", f)
 	}
 }
