@@ -1450,7 +1450,7 @@ func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.M
 			return
 		}
 	} else if !swapRequest.Propagate {
-		response.Write(ctx, response.NewJson(200, nil, ""))
+		response.Write(ctx, response.NewJson(200, models.MetaTagRecordSwapResult{}, ""))
 		return
 	}
 
