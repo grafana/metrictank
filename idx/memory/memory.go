@@ -460,9 +460,9 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
 	res := tagquery.MetaTagRecord{}
 
-	if !TagSupport {
-		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
-		return res, false, errors.NewBadRequest("Tag support is disabled")
+	if !TagSupport || !metaTagSupport {
+		log.Warn("memory-idx: received tag/meta-tag query, but that feature is disabled")
+		return res, false, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
 	var mtr *metaTagRecords
@@ -510,9 +510,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
-	if !TagSupport {
-		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
-		return 0, 0, errors.NewBadRequest("Tag support is disabled")
+	if !TagSupport || !metaTagSupport {
+		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
+		return 0, 0, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
 	newMtr := newMetaTagRecords()
