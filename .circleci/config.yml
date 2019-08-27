@@ -64,6 +64,14 @@ jobs:
       - attach_workspace:
           at: .
       - run: docker load -i build_docker/metrictank.tar
+        # docker-compose can pull these in by itself, but that would time out the test
+      - run: docker pull cassandra:3.9
+      - run: docker pull raintank/graphite-mt
+      - run: docker pull grafana/grafana
+      - run: docker pull raintank/kafka
+      - run: docker pull raintank/statsdaemon
+      - run: docker pull graphiteapp/graphite-statsd
+      - run: docker pull jaegertracing/all-in-one
       - run: go test -v ./stacktest/tests/chaos_cluster
 
   deploy:
