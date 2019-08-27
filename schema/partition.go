@@ -2,6 +2,7 @@ package schema
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash/fnv"
 
 	"github.com/cespare/xxhash"
@@ -27,6 +28,20 @@ const (
 	// making it possible to adopt tags for existing PartitionBySeries deployments without a migration.
 	PartitionBySeriesWithTagsFnv
 )
+
+func PartitonMethodFromString(input string) (PartitionByMethod, error) {
+	switch input {
+	case "byOrg":
+		return PartitionByOrg, nil
+	case "bySeries":
+		return PartitionBySeries, nil
+	case "bySeriesWithTags":
+		return PartitionBySeriesWithTags, nil
+	case "bySeriesWithTagsFnv":
+		return PartitionBySeriesWithTagsFnv, nil
+	}
+	return 0, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv'. got %s", input)
+}
 
 func (m *MetricData) PartitionID(method PartitionByMethod, partitions int32) (int32, error) {
 	var partition int32
