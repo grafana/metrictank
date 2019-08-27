@@ -195,7 +195,7 @@ Flags:
   -num-partitions int
     	number of partitions in cluster (default 1)
   -partition-scheme string
-    	method used for partitioning metrics. (byOrg|bySeries|bySeriesWithTags) (default "byOrg")
+    	method used for partitioning metrics. (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv) (default "byOrg")
   -schema-file string
     	File containing the needed schemas in case database needs initializing (default "/etc/metrictank/schema-idx-cassandra.toml")
   -src-cass-addr string
@@ -734,7 +734,7 @@ Usage of ./mt-whisper-importer-writer:
   -num-partitions int
     	Number of Partitions (default 1)
   -partition-scheme string
-    	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags) (default "bySeries")
+    	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv) (default "bySeries")
   -ttls string
     	list of ttl strings used by MT separated by ',' (default "35d")
   -uri-path string

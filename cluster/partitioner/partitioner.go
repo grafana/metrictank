@@ -1,8 +1,6 @@
 package partitioner
 
 import (
-	"fmt"
-
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -15,18 +13,11 @@ type Kafka struct {
 }
 
 func NewKafka(partitionBy string) (*Kafka, error) {
-	var method schema.PartitionByMethod
-	switch partitionBy {
-	case "byOrg":
-		method = schema.PartitionByOrg
-	case "bySeries":
-		method = schema.PartitionBySeries
-	case "bySeriesWithTags":
-		method = schema.PartitionBySeriesWithTags
-	default:
-		return nil, fmt.Errorf("partitionBy must be one of 'byOrg|bySeries|bySeriesWithTags'. got %s", partitionBy)
+	method, err := schema.PartitonMethodFromString(partitionBy)
+	if err != nil {
+		return nil, err
 	}
-	return &Kafka{Method: method}, nil
+	return &Kafka{Method: method}, err
 }
 
 func (k *Kafka) Partition(m schema.PartitionedMetric, numPartitions int32) (int32, error) {

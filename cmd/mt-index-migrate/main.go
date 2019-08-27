@@ -24,7 +24,7 @@ var (
 	dstKeyspace     = flag.String("dst-keyspace", "raintank", "Cassandra keyspace in use on destination.")
 	srcTable        = flag.String("src-table", "metric_idx", "Cassandra table name in use on source.")
 	dstTable        = flag.String("dst-table", "metric_idx", "Cassandra table name in use on destination.")
-	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries|bySeriesWithTags)")
+	partitionScheme = flag.String("partition-scheme", "byOrg", "method used for partitioning metrics. (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv)")
 	numPartitions   = flag.Int("num-partitions", 1, "number of partitions in cluster")
 	schemaFile      = flag.String("schema-file", "/etc/metrictank/schema-idx-cassandra.toml", "File containing the needed schemas in case database needs initializing")
 
