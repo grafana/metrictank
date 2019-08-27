@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 func TestWriteReadPointMsg(t *testing.T) {
@@ -22,7 +22,8 @@ func TestWriteReadPointMsg(t *testing.T) {
 		t.Fatalf("%s", err.Error())
 	}
 
-	if !IsPointMsg(out) {
+	_, ok := IsPointMsg(out)
+	if !ok {
 		t.Fatal("IsPointMsg: exp true, got false")
 	}
 
@@ -53,7 +54,8 @@ func TestWriteReadPointMsgWithoutOrg(t *testing.T) {
 		t.Fatalf("%s", err.Error())
 	}
 
-	if !IsPointMsg(out) {
+	_, ok := IsPointMsg(out)
+	if !ok {
 		t.Fatal("IsPointMsg: exp true, got false")
 	}
 
