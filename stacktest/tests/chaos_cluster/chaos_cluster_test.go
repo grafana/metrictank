@@ -60,7 +60,10 @@ func TestMain(m *testing.M) {
 	log.Println(string(output))
 
 	log.Println("launching docker-chaos stack...")
-	cmd = exec.Command("docker-compose", "up", "--force-recreate", "-V")
+	// TODO: should probably use -V flag here.
+	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
+	// but circleCI machine image still stuck with 1.14.0
+	cmd = exec.Command("docker-compose", "up", "--force-recreate")
 	cmd.Dir = test.Path("docker/docker-chaos")
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
