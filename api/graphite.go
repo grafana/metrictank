@@ -808,7 +808,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 // getTagQueryExpressions takes a query string which includes multiple tag query expressions
 // example string: "'a=b', 'c=d', 'e!=~f.*'"
-// it then returns a slice of strings where each string is one of the queries, and an error
+// it then returns a slice of strings where each string is one of the expressions, and an error
 // which is non-nil if there was an error in the expression validation
 // all expressions get validated and an error is returned if one or more are invalid
 func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
