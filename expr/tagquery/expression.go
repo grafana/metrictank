@@ -59,6 +59,22 @@ func (e Expressions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(e.Strings())
 }
 
+func (e *Expressions) UnmarshalJSON(data []byte) error {
+	var expressionStrings []string
+	err := json.Unmarshal(data, &expressionStrings)
+	if err != nil {
+		return err
+	}
+
+	parsed, err := ParseExpressions(expressionStrings)
+	if err != nil {
+		return err
+	}
+
+	*e = parsed
+	return nil
+}
+
 // Expression represents one expression inside a query of one or many expressions.
 // It provides all the necessary methods that are required to do a tag lookup from an index keyed by
 // tags & values, such as the type memory.TagIndex or the type memory.metaTagIndex.

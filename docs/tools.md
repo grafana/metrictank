@@ -116,6 +116,8 @@ cass config flags:
     	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -meta-record-table string
+    	Cassandra table to store meta records. (default "meta_records")
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -password string
@@ -257,6 +259,8 @@ cass config flags:
     	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -meta-record-table string
+    	Cassandra table to store meta records. (default "meta_records")
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -password string

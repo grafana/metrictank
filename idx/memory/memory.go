@@ -66,7 +66,7 @@ var (
 	writeMaxBatchSize            = 5000
 	matchCacheSize               = 1000
 	enrichmentCacheSize          = 10000
-	metaTagSupport               = false
+	MetaTagSupport               = false
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -87,7 +87,7 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
-	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
+	memoryIdx.BoolVar(&MetaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 	return memoryIdx
 }
@@ -114,7 +114,7 @@ func ConfigProcess() {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
 
-	tagquery.MetaTagSupport = metaTagSupport
+	tagquery.MetaTagSupport = MetaTagSupport
 	tagquery.MatchCacheSize = matchCacheSize
 }
 
@@ -462,7 +462,7 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
 	res := tagquery.MetaTagRecord{}
 
-	if !TagSupport || !metaTagSupport {
+	if !TagSupport || !MetaTagSupport {
 		log.Warn("memory-idx: received tag/meta-tag query, but that feature is disabled")
 		return res, false, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
@@ -512,7 +512,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
-	if !TagSupport || !metaTagSupport {
+	if !TagSupport || !MetaTagSupport {
 		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
 		return 0, 0, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
@@ -836,7 +836,7 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	}
 
 	var enricher *enricher
-	if metaTagSupport {
+	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tagIndex.idHasTag)
@@ -911,7 +911,7 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		res = append(res, tag)
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		sort.Strings(res)
 		return res
 	}
@@ -958,7 +958,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		res[value] += uint64(len(ids))
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return res
 	}
 
@@ -1030,7 +1030,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		}
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return m.finalizeResult(res, limit, false)
 	}
 
@@ -1074,7 +1074,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	resMap := make(map[string]struct{})
 
 	var enricher *enricher
-	if metaTagSupport {
+	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tags.idHasTag)
@@ -1153,7 +1153,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		}
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return m.finalizeResult(res, limit, false)
 	}
 
@@ -1192,7 +1192,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	resMap := make(map[string]struct{})
 
 	var enricher *enricher
-	if metaTagSupport {
+	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tags.idHasTag)
