@@ -613,7 +613,7 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 		return
 	}
 
-	record, err := tagquery.ParseMetaTagRecord(req.MetaTags, req.Queries)
+	record, err := tagquery.ParseMetaTagRecord(req.MetaTags, req.Expressions)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -626,9 +626,9 @@ func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.In
 	}
 
 	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{
-		MetaTags: result.MetaTags.Strings(),
-		Queries:  result.Expressions.Strings(),
-		Created:  created,
+		MetaTags:    result.MetaTags.Strings(),
+		Expressions: result.Expressions.Strings(),
+		Created:     created,
 	}))
 }
 
