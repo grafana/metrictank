@@ -53,7 +53,7 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 	// i.rawResCh and deduplicates its ids before inserting them into i.resCh.
 	// if meta tag support is not enabled, then this is not necessary and we don't
 	// need to start the deduplication routine.
-	if metaTagSupport {
+	if MetaTagSupport {
 		go i.deduplicateRawResults()
 	}
 
@@ -70,7 +70,7 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 
 	// if meta tag support is enabled we return i.resCh because that channel has
 	// been deduplicated by i.deduplicateRawResults()
-	if metaTagSupport {
+	if MetaTagSupport {
 		return i.resCh, i.stopCh
 	}
 
@@ -108,7 +108,7 @@ func (i *idSelector) byTagValue() {
 	// otherwise we'd risk to create a loop of sub queries creating
 	// each other
 	// same when meta tag support is disabled in the config
-	if !metaTagSupport || i.ctx.subQuery {
+	if !MetaTagSupport || i.ctx.subQuery {
 		i.workerWg.Done()
 		return
 	}
@@ -203,7 +203,7 @@ func (i *idSelector) byTag() {
 	// otherwise we'd risk to create a loop of sub queries creating
 	// each other
 	// same when meta tag support is disabled in the config
-	if !metaTagSupport || i.ctx.subQuery {
+	if !MetaTagSupport || i.ctx.subQuery {
 		i.workerWg.Done()
 		return
 	}

@@ -2,6 +2,7 @@ package cassandra
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
@@ -133,7 +135,11 @@ func (c *CasIdx) InitBare() error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
-		c.EnsureArchiveTableExists(tmpSession)
+		c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_archive_table", c.Config.ArchiveTable)
+
+		if memory.MetaTagSupport {
+			c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_meta_record_table", c.Config.MetaRecordTable)
+		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		for attempt := 1; attempt > 0; attempt++ {
@@ -170,12 +176,14 @@ func (c *CasIdx) InitBare() error {
 	return nil
 }
 
-// EnsureArchiveTableExists checks if the index archive table exists or not. If it does not exist and
-// the create-keyspace flag is true, then it will create it, if it doesn't exist and the create-keyspace
-// flag is false, then it will return an error. If the table exists then it just returns nil.
-// The index archive table is not required for Metrictank to run, it's only required by the
-// mt-index-prune utility to archive old metrics from the index.
-func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
+// EnsureTableExists checks if the specified table exists or not. If it does not exist and the
+// create-keyspace flag is true, then it will create it, if it doesn't exist and the create-keyspace
+// flag is false, then it will return an error. If the table exists then it just returns nil
+// sessions:    cassandra session
+// schemaFile:  file containing table definition
+// entryName:   identifier of the schema within the file
+// tableName:   name of the table in cassandra
+func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName, tableName string) error {
 	var err error
 	if session == nil {
 		session, err = c.cluster.CreateSession()
@@ -184,11 +192,11 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 		}
 	}
 
-	schemaArchiveTable := util.ReadEntry(c.Config.SchemaFile, "schema_archive_table").(string)
+	tableSchema := util.ReadEntry(schemaFile, entryName).(string)
 
 	if c.Config.CreateKeyspace {
-		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.ArchiveTable)
-		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.Config.Keyspace, c.Config.ArchiveTable)).Exec()
+		log.Infof("cassandra-idx: ensuring that table %s exists.", tableName)
+		err = session.Query(fmt.Sprintf(tableSchema, c.Config.Keyspace, tableName)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
@@ -198,8 +206,8 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 		if err != nil {
 			return fmt.Errorf("failed to read cassandra tables: %s", err)
 		}
-		if _, ok := keyspaceMetadata.Tables[c.Config.ArchiveTable]; !ok {
-			return fmt.Errorf("table %s does not exist", c.Config.ArchiveTable)
+		if _, ok := keyspaceMetadata.Tables[tableName]; !ok {
+			return fmt.Errorf("table %s does not exist", tableName)
 		}
 	}
 	return nil
@@ -366,8 +374,60 @@ func (c *CasIdx) rebuildIndex() {
 			atomic.AddUint32(&num, uint32(c.MemoryIndex.LoadPartition(p, defs)))
 		}(partition)
 	}
+
+	if memory.MetaTagSupport {
+		wg.Add(1)
+		go func() {
+			gate <- struct{}{}
+
+			records := c.loadMetaRecords()
+			for orgId, values := range records {
+				c.applyMetaRecords(orgId, values)
+			}
+
+			wg.Done()
+			<-gate
+		}()
+	}
+
 	wg.Wait()
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
+}
+
+func (c *CasIdx) loadMetaRecords() map[uint32][]tagquery.MetaTagRecord {
+	q := fmt.Sprintf("SELECT orgid, expressions, metatags FROM %s", c.Config.MetaRecordTable)
+	var orgId uint32
+	var expressions, metatags string
+	iter := c.Session.Query(q).Iter()
+
+	res := make(map[uint32][]tagquery.MetaTagRecord)
+	for iter.Scan(&orgId, &expressions, &metatags) {
+		record := tagquery.MetaTagRecord{}
+		err := json.Unmarshal([]byte(expressions), &record.Expressions)
+		if err != nil {
+			log.Errorf("cassandra-idx: LoadMetaRecords() could not parse stored expressions (%s): %s", expressions, err)
+			continue
+		}
+
+		err = json.Unmarshal([]byte(metatags), &record.MetaTags)
+		if err != nil {
+			log.Errorf("cassandra-idx: LoadMetaRecords() could not parse stored metatags (%s): %s", metatags, err)
+			continue
+		}
+
+		res[orgId] = append(res[orgId], record)
+	}
+
+	return res
+}
+
+func (c *CasIdx) applyMetaRecords(orgId uint32, records []tagquery.MetaTagRecord) {
+	for _, record := range records {
+		_, _, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, record)
+		if err != nil {
+			log.Errorf("cassandra-idx: applyMetaRecords() failed to apply meta record: %s", err)
+		}
+	}
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
