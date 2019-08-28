@@ -237,11 +237,11 @@ POST /metaTags/upsert
 ```
 
 This route can be used to create, update and delete meta tag records. Each record is
-identified by its set of queries, if a record gets posted to this URL which has a set
-of queries that doesn't exist yet, a new meta record gets created. If this set of
-queries already exists, the existing meta record will be updated. If the new record
-has no meta tags associated with it, then an existing record with the same set of
-queries gets deleted.
+identified by its set of query expressions, if a record gets posted to this URL which
+has a set of expressions that doesn't exist yet, a new meta record gets created. If
+its set of query expressions already exists, the existing meta record will be updated.
+If the new record has no meta tags associated with it, then an existing record with the
+same set of expressions gets deleted.
 When an existing record gets updated the returned property `created` is `false`,
 otherwise it's `true`.
 
@@ -250,12 +250,12 @@ otherwise it's `true`.
 ```
 ~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
 []
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": ["mytag=value"], "queries": ["a=b", "c=d"]}' | jq
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": ["mytag=value"], "expressions": ["a=b", "c=d"]}' | jq
 {
   "metaTags": [
     "mytag=value"
   ],
-  "queries": [
+  "expressions": [
     "a=b",
     "c=d"
   ],
@@ -267,16 +267,16 @@ otherwise it's `true`.
     "MetaTags": [
       "mytag=value"
     ],
-    "Queries": [
+    "Expressions": [
       "a=b",
       "c=d"
     ]
   }
 ]
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": [], "queries": ["a=b", "c=d"]}' | jq
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": [], "expressions": ["a=b", "c=d"]}' | jq
 {
   "metaTags": [],
-  "queries": [
+  "expressions": [
     "a=b",
     "c=d"
   ],
@@ -284,6 +284,14 @@ otherwise it's `true`.
 }
 mst@mst-nb1:~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
 []
+```
+
+The optional boolean parameter "propagate" tells the receiving node that this
+upsert request needs to be propagated among all cluster nodes. Then the request
+would look like this:
+
+```
+~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": ["mytag=value"], "expressions": ["a=b", "c=d"], "propagate": true}' | jq
 ```
 
 ## Batch updating all Meta Tag Records
