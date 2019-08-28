@@ -99,6 +99,11 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 License
 =======
 
-Copyright 2016-2018 Dieter Plaetinck, Anthony Woods, Jeremy Bingham, Damian Gryski, raintank inc
+Copyright 2016-2019 Grafana Labs
 
 This software is distributed under the terms of the GNU Affero General Public License.
+
+Some specific packages have a different license:
+* schema : [apache2](schema/LICENSE)
+* expr: [2-clause BSD](expr/LICENSE)
+* mdata/chunk/tsz: [2-clause BSD](mdata/chunk/tsz/LICENSE)
