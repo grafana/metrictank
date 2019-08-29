@@ -430,6 +430,110 @@ func (c *CasIdx) applyMetaRecords(orgId uint32, records []tagquery.MetaTagRecord
 	}
 }
 
+func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
+	record, created, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, upsertRecord)
+	if err != nil {
+		return record, created, err
+	}
+
+	// TODO figure out how to determine which of the MT instances with updateCassIdx == true should flush a given record,
+	// currently they'll all flush it
+	if c.Config.updateCassIdx {
+		var err error
+
+		// if a record has no meta tags associated with it, then we delete it
+		if len(record.MetaTags) > 0 {
+			err = c.persistMetaRecord(orgId, record, created)
+		} else {
+			err = c.deleteMetaRecord(orgId, record)
+		}
+
+		if err != nil {
+			log.Errorf("Failed to update meta records in cassandra: %s", err)
+			return record, created, fmt.Errorf("Failed to update cassandra: %s", err)
+		}
+	}
+
+	return record, created, nil
+}
+
+func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, created bool) error {
+	var write func() error
+	expressions, err := record.Expressions.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("Failed to marshal expressions: %s", err)
+	}
+	metaTags, err := record.MetaTags.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("Failed to marshal meta tags: %s", err)
+	}
+
+	if created {
+		write = func() error {
+			now := time.Now().UnixNano() / 1000000
+			qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?)", c.Config.MetaRecordTable)
+			return c.Session.Query(
+				qry,
+				orgId,
+				expressions,
+				metaTags,
+				now,
+				now).Exec()
+
+		}
+	} else {
+		write = func() error {
+			now := time.Now().UnixNano() / 1000000
+			qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
+			return c.Session.Query(
+				qry,
+				orgId,
+				expressions,
+				metaTags,
+				now).Exec()
+		}
+	}
+
+	return c.flushMetaRecordUpdate(write)
+}
+
+func (c *CasIdx) deleteMetaRecord(orgId uint32, record tagquery.MetaTagRecord) error {
+	expressions, err := record.Expressions.MarshalJSON()
+	if err != nil {
+		return fmt.Errorf("Failed to marshal record expressions: %s", err)
+	}
+
+	delete := func() error {
+		qry := fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND expressions=?", c.Config.MetaRecordTable)
+		return c.Session.Query(
+			qry,
+			orgId,
+			expressions,
+		).Exec()
+	}
+
+	return c.flushMetaRecordUpdate(delete)
+}
+
+func (c *CasIdx) flushMetaRecordUpdate(flush func() error) error {
+	var err error
+	var attempts uint8
+	for {
+		err = flush()
+		if err == nil {
+			return nil
+		}
+
+		attempts++
+
+		if attempts >= 3 {
+			return err
+		}
+
+		time.Sleep(time.Duration(attempts*100) * time.Millisecond)
+	}
+}
+
 func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
 	iter := c.Session.Query(fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s", c.Config.Table)).Iter()
 	return c.load(defs, iter, now)
