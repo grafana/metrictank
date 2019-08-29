@@ -286,16 +286,16 @@ mst@mst-nb1:~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
 []
 ```
 
-## Batch updating all Meta Records
+## Batch updating all Meta Tag Records
 
 ```
 POST /metaTags/swap
 ```
 
-This route is an alternative to the above "upsert". It accepts a list of meta records and
-replaces all currently present records with the given ones. This is useful for users who
-first generate all their meta records and then want to simply replace all the records in 
-metrictank with the generated ones.
+This route is an alternative to the above "upsert". It accepts a list of meta tag records and
+replaces all existing records with the new ones. This is useful for users who
+first generate all of their meta tag records and then want to simply replace all the records in 
+Metrictank with the generated ones.
 
 ## Example
 
