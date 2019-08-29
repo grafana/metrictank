@@ -49,12 +49,6 @@ func (z *IndexMetaTagRecordSwap) DecodeMsg(dc *msgp.Reader) (err error) {
 					return
 				}
 			}
-		case "Propagate":
-			z.Propagate, err = dc.ReadBool()
-			if err != nil {
-				err = msgp.WrapError(err, "Propagate")
-				return
-			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -68,9 +62,9 @@ func (z *IndexMetaTagRecordSwap) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *IndexMetaTagRecordSwap) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 3
+	// map header, size 2
 	// write "OrgId"
-	err = en.Append(0x83, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
+	err = en.Append(0x82, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
 	if err != nil {
 		return
 	}
@@ -96,25 +90,15 @@ func (z *IndexMetaTagRecordSwap) EncodeMsg(en *msgp.Writer) (err error) {
 			return
 		}
 	}
-	// write "Propagate"
-	err = en.Append(0xa9, 0x50, 0x72, 0x6f, 0x70, 0x61, 0x67, 0x61, 0x74, 0x65)
-	if err != nil {
-		return
-	}
-	err = en.WriteBool(z.Propagate)
-	if err != nil {
-		err = msgp.WrapError(err, "Propagate")
-		return
-	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *IndexMetaTagRecordSwap) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 3
+	// map header, size 2
 	// string "OrgId"
-	o = append(o, 0x83, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
+	o = append(o, 0x82, 0xa5, 0x4f, 0x72, 0x67, 0x49, 0x64)
 	o = msgp.AppendUint32(o, z.OrgId)
 	// string "Records"
 	o = append(o, 0xa7, 0x52, 0x65, 0x63, 0x6f, 0x72, 0x64, 0x73)
@@ -126,9 +110,6 @@ func (z *IndexMetaTagRecordSwap) MarshalMsg(b []byte) (o []byte, err error) {
 			return
 		}
 	}
-	// string "Propagate"
-	o = append(o, 0xa9, 0x50, 0x72, 0x6f, 0x70, 0x61, 0x67, 0x61, 0x74, 0x65)
-	o = msgp.AppendBool(o, z.Propagate)
 	return
 }
 
@@ -175,12 +156,6 @@ func (z *IndexMetaTagRecordSwap) UnmarshalMsg(bts []byte) (o []byte, err error) 
 					return
 				}
 			}
-		case "Propagate":
-			z.Propagate, bts, err = msgp.ReadBoolBytes(bts)
-			if err != nil {
-				err = msgp.WrapError(err, "Propagate")
-				return
-			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -199,7 +174,6 @@ func (z *IndexMetaTagRecordSwap) Msgsize() (s int) {
 	for za0001 := range z.Records {
 		s += z.Records[za0001].Msgsize()
 	}
-	s += 10 + msgp.BoolSize
 	return
 }
 

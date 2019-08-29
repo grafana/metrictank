@@ -67,7 +67,7 @@ type MetaTagRecord struct {
 
 func (m MetaTagRecordSwap) Trace(span opentracing.Span) {
 	span.LogFields(
-		traceLog.String("recordCount", string(len(m.Records))),
+		traceLog.Uint32("recordCount", uint32(len(m.Records))),
 		traceLog.Bool("propagate", m.Propagate),
 	)
 }
@@ -87,15 +87,14 @@ type MetaTagRecordSwapResult struct {
 }
 
 type IndexMetaTagRecordSwap struct {
-	OrgId     uint32          `json:"orgId" binding:"Required"`
-	Records   []MetaTagRecord `json:"records"`
-	Propagate bool            `json:"propagate"`
+	OrgId   uint32          `json:"orgId" binding:"Required"`
+	Records []MetaTagRecord `json:"records"`
 }
 
 func (m IndexMetaTagRecordSwap) Trace(span opentracing.Span) {
 	span.SetTag("orgId", m.OrgId)
 	span.LogFields(
-		traceLog.String("recordCount", string(len(m.Records))),
+		traceLog.Uint32("recordCount", uint32(len(m.Records))),
 	)
 }
 
