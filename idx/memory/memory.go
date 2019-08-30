@@ -460,9 +460,9 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
 	res := tagquery.MetaTagRecord{}
 
-	if !TagSupport {
-		log.Warn("memory-idx: received meta-tag query, but tag support is disabled")
-		return res, false, errors.NewBadRequest("Tag support is disabled")
+	if !TagSupport || !metaTagSupport {
+		log.Warn("memory-idx: received tag/meta-tag query, but that feature is disabled")
+		return res, false, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
 	var mtr *metaTagRecords
@@ -507,6 +507,43 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	}
 
 	return res, true, nil
+}
+
+func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
+	if !TagSupport || !metaTagSupport {
+		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
+		return 0, 0, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
+	}
+
+	newMtr := newMetaTagRecords()
+	newMti := make(metaTagIndex)
+
+	var addedRecords, deletedRecords uint32
+	for _, record := range records {
+		recordId, _, _, _, err := newMtr.upsert(record)
+		if err != nil {
+			return 0, 0, err
+		}
+
+		for _, keyValue := range record.MetaTags {
+			newMti.insertRecord(keyValue, recordId)
+		}
+
+		addedRecords++
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	oldMtr, ok := m.metaTagRecords[orgId]
+	if ok {
+		deletedRecords = uint32(len(oldMtr.records))
+	}
+
+	m.metaTagRecords[orgId] = newMtr
+	m.metaTagIndex[orgId] = newMti
+
+	return addedRecords, deletedRecords, nil
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {

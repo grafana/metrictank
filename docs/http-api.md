@@ -286,6 +286,48 @@ mst@mst-nb1:~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
 []
 ```
 
+## Batch updating all Meta Tag Records
+
+```
+POST /metaTags/swap
+```
+
+This route is an alternative to the above "upsert". It accepts a list of meta tag records
+and replaces all existing records with the new ones. This is useful for users who first
+generate all of their meta tag records and then want to simply replace all the records in
+Metrictank with the generated ones.
+
+## Example
+
+```
+~$ curl -s -H 'X-Org-Id: 1' 'http://localhost:6070/metaTags/swap' -H 'Content-Type: application/json' -d '{"propagate": true, "records":[{"metaTags": ["meta=tag"], "expressions": ["name=~.*[2-7]$"]}]}' | jq
+{
+  "local": {
+    "deleted": 0,
+    "added": 0
+  },
+  "peerResults": {
+    "metrictank0": {
+      "deleted": 0,
+      "added": 1
+    },
+    "metrictank1": {
+      "deleted": 0,
+      "added": 1
+    },
+    "metrictank2": {
+      "deleted": 0,
+      "added": 1
+    },
+    "metrictank3": {
+      "deleted": 0,
+      "added": 1
+    }
+  },
+  "peerErrors": null
+}
+```
+
 ## Misc
 
 ### Tspec

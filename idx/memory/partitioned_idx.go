@@ -549,6 +549,39 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagqu
 	return record, created, nil
 }
 
+func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
+	g, _ := errgroup.WithContext(context.Background())
+
+	results := make([]struct {
+		added   uint32
+		deleted uint32
+	}, len(p.Partition))
+
+	var i int
+	for _, m := range p.Partition {
+		m, partNum := m, i
+		g.Go(func() error {
+			var err error
+			results[partNum].added, results[partNum].deleted, err = m.MetaTagRecordSwap(orgId, records)
+			return err
+		})
+		i++
+	}
+
+	err := g.Wait()
+	var added, deleted uint32
+	for _, result := range results {
+		added += result.added
+		deleted += result.deleted
+	}
+
+	if err != nil {
+		log.Errorf("memory-idx: failed to swap meta tag records in at least one partition: %s", err)
+	}
+
+	return added, deleted, err
+}
+
 func mergePartitionStringResults(partitionResults [][]string) []string {
 	// merge our results into the unique set of strings
 	merged := map[string]struct{}{}
