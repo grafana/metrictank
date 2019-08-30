@@ -535,8 +535,10 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 	m.Lock()
 	defer m.Unlock()
 
-	oldMti := m.metaTagIndex[orgId]
-	deletedRecords = uint32(len(oldMti))
+	oldMtr, ok := m.metaTagRecords[orgId]
+	if ok {
+		deletedRecords = uint32(len(oldMtr.records))
+	}
 
 	m.metaTagRecords[orgId] = newMtr
 	m.metaTagIndex[orgId] = newMti

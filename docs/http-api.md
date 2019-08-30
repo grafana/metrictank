@@ -292,9 +292,9 @@ mst@mst-nb1:~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
 POST /metaTags/swap
 ```
 
-This route is an alternative to the above "upsert". It accepts a list of meta tag records and
-replaces all existing records with the new ones. This is useful for users who
-first generate all of their meta tag records and then want to simply replace all the records in 
+This route is an alternative to the above "upsert". It accepts a list of meta tag records
+and replaces all existing records with the new ones. This is useful for users who first
+generate all of their meta tag records and then want to simply replace all the records in
 Metrictank with the generated ones.
 
 ## Example
