@@ -355,6 +355,26 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 		return nil
 	}
 
+	span := chunk.ExtractChunkSpan(data)
+	if span == 0 {
+		span = mdata.MaxChunkSpan()
+	}
+
+	// we calculate ttl like this:
+	// - the chunk's t0 plus its span is the ts of last possible datapoint in the chunk
+	// - the timestamp of the last datapoint + ttl is the timestamp until when we want to keep this chunk
+	// - then we subtract the current time stamp to get the difference relative to now
+	// - the result is the ttl in seconds relative to now
+	relativeTtl := int64(t0+span+ttl) - time.Now().Unix()
+
+	// if the ttl relative to now is <=0 then we can omit the insert
+	if relativeTtl <= 0 {
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("Omitting insert of chunk with ttl %d: %s, %d", relativeTtl, key, t0)
+		}
+		return nil
+	}
+
 	table, ok := c.TTLTables[ttl]
 	if !ok {
 		return errTableNotFound
@@ -363,7 +383,7 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	ret := c.Session.Query(table.QueryWrite, row_key, t0, data, ttl).WithContext(ctx).Exec()
+	ret := c.Session.Query(table.QueryWrite, row_key, t0, data, uint32(relativeTtl)).WithContext(ctx).Exec()
 	cancel()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret

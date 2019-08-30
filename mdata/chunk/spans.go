@@ -44,3 +44,22 @@ func init() {
 		RevChunkSpans[v] = SpanCode(k)
 	}
 }
+
+// SpanOfChunk takes a chunk and tries to determine its span.
+// It returns 0 if it failed to determine the span, this could fail
+// either because the given chunk is invalid or because it has an old format
+func ExtractChunkSpan(chunk []byte) uint32 {
+	if len(chunk) < 2 {
+		return 0
+	}
+
+	if Format(chunk[0]) != FormatStandardGoTszWithSpan && Format(chunk[0]) != FormatGoTszLongWithSpan {
+		return 0
+	}
+
+	if int(chunk[1]) >= len(ChunkSpans) {
+		return 0
+	}
+
+	return ChunkSpans[SpanCode(chunk[1])]
+}
