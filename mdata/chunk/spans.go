@@ -56,8 +56,7 @@ func SpanOfChunk(chunk []byte) (uint32, error) {
 		return 0, ErrUnknownChunkSpan
 	}
 
-	format := Format(chunk[0])
-	if format != FormatStandardGoTszWithSpan && format != FormatGoTszLongWithSpan {
+	if Format(chunk[0]) != FormatStandardGoTszWithSpan && Format(chunk[0]) != FormatGoTszLongWithSpan {
 		return 0, ErrUnknownChunkSpan
 	}
 
