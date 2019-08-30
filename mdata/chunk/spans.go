@@ -1,7 +1,5 @@
 package chunk
 
-import "fmt"
-
 type SpanCode uint8
 
 var ChunkSpans = [32]uint32{
@@ -40,7 +38,6 @@ var ChunkSpans = [32]uint32{
 }
 
 var RevChunkSpans = make(map[uint32]SpanCode, len(ChunkSpans))
-var ErrUnknownChunkSpan = fmt.Errorf("Cannot determine span of chunk")
 
 func init() {
 	for k, v := range ChunkSpans {
@@ -49,20 +46,20 @@ func init() {
 }
 
 // SpanOfChunk takes a chunk and tries to determine its span.
-// It returns an error if it failed to determine the span, this could fail
+// It returns 0 if it failed to determine the span, this could fail
 // either because the given chunk is invalid or because it has an old format
-func SpanOfChunk(chunk []byte) (uint32, error) {
+func SpanOfChunk(chunk []byte) uint32 {
 	if len(chunk) < 2 {
-		return 0, ErrUnknownChunkSpan
+		return 0
 	}
 
 	if Format(chunk[0]) != FormatStandardGoTszWithSpan && Format(chunk[0]) != FormatGoTszLongWithSpan {
-		return 0, ErrUnknownChunkSpan
+		return 0
 	}
 
 	if int(chunk[1]) >= len(ChunkSpans) {
-		return 0, ErrUnknownChunkSpan
+		return 0
 	}
 
-	return ChunkSpans[SpanCode(chunk[1])], nil
+	return ChunkSpans[SpanCode(chunk[1])]
 }
