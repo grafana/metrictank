@@ -48,7 +48,7 @@ func init() {
 // SpanOfChunk takes a chunk and tries to determine its span.
 // It returns 0 if it failed to determine the span, this could fail
 // either because the given chunk is invalid or because it has an old format
-func SpanOfChunk(chunk []byte) uint32 {
+func ExtractChunkSpan(chunk []byte) uint32 {
 	if len(chunk) < 2 {
 		return 0
 	}

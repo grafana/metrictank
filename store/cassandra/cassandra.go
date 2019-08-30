@@ -355,7 +355,7 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 		return nil
 	}
 
-	span := chunk.SpanOfChunk(data)
+	span := chunk.ExtractChunkSpan(data)
 	if span == 0 {
 		span = mdata.MaxChunkSpan()
 	}
