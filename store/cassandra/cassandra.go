@@ -355,12 +355,17 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 		return nil
 	}
 
+	span, err := chunk.SpanOfChunk(data)
+	if err != nil {
+		span = mdata.MaxChunkSpan()
+	}
+
 	// we calculate ttl like this:
-	// - the chunk's t0 plus maxChunkSpan is the ts of last possible datapoint in the chunk
+	// - the chunk's t0 plus its span is the ts of last possible datapoint in the chunk
 	// - the timestamp of the last datapoint + ttl is the timestamp until when we want to keep this chunk
 	// - then we subtract the current time stamp to get the difference relative to now
 	// - the result is the ttl in seconds relative to now
-	relativeTtl := int64(t0+mdata.MaxChunkSpan()+ttl) - time.Now().Unix()
+	relativeTtl := int64(t0+span+ttl) - time.Now().Unix()
 
 	// if the ttl relative to now is <=0 then we can omit the insert
 	if relativeTtl <= 0 {
