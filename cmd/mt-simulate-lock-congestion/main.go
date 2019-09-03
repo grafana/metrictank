@@ -57,8 +57,38 @@ func main() {
 		os.Exit(1)
 	}
 
-	memory.ConfigSetup()
+	memoryIdxFlags := memory.ConfigSetup()
+
+	flag.Usage = func() {
+		fmt.Println("mt-simulate-lock-congestion")
+		fmt.Println()
+		fmt.Println("Simulates index lock congestion")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println()
+		fmt.Printf("	mt-simulate-lock-congestion [flags] [memory-idx memory-idx flags]\n")
+		fmt.Println()
+		fmt.Println("Flags:")
+		flag.PrintDefaults()
+		fmt.Println("memory-idx flags:")
+		memoryIdxFlags.PrintDefaults()
+	}
+
+	var pos int
+	for pos = 0; pos < len(os.Args); pos++ {
+		if os.Args[pos] == "memory-idx" {
+			break
+		}
+	}
+
+	if pos > 1 {
+		flag.CommandLine.Parse(os.Args[1:pos])
+		memoryIdxFlags.Parse(os.Args[pos+1:])
+	}
+
+	// even if flags have already been parsed, this still allows to use env vars such as MT_MEMORY_IDX_PARTITIONED=true
 	config.ParseAll()
+
 	memory.ConfigProcess()
 
 	runtime.SetBlockProfileRate(*blockProfileRate)

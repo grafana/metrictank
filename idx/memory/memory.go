@@ -69,7 +69,7 @@ var (
 	metaTagSupport               = false
 )
 
-func ConfigSetup() {
+func ConfigSetup() *flag.FlagSet {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
@@ -89,6 +89,7 @@ func ConfigSetup() {
 	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
 	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
+	return memoryIdx
 }
 
 func ConfigProcess() {
