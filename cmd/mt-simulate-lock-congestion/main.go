@@ -5,7 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+
 	"math/rand"
 	"os"
 	"runtime"
@@ -19,7 +19,9 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/runner"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -37,6 +39,13 @@ var (
 	mutexProfileFraction = flag.Int("mutex-profile-rate", 0, "Fraction of mutex samples, 0 means disabled")
 	cpuProfile           = flag.Bool("cpu-profile", false, "Enable cpu profile")
 )
+
+func init() {
+	formatter := &logger.TextFormatter{}
+	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
+	log.SetFormatter(formatter)
+	log.SetLevel(log.InfoLevel)
+}
 
 func main() {
 	config, err := globalconf.NewWithOptions(&globalconf.Options{
@@ -99,6 +108,7 @@ func main() {
 		}
 	}()
 	time.Sleep(*runDuration)
+	log.Printf("stopping the benchmark")
 	cancel()
 	testRun.Wait()
 

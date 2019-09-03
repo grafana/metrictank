@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
-	"log"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
