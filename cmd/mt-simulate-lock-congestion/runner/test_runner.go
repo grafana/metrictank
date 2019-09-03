@@ -13,7 +13,6 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/stats"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
@@ -37,9 +36,9 @@ type TestRun struct {
 }
 
 var (
-	metricAdd    = stats.NewLatencyHistogram15s32("metric-add")
-	metricUpdate = stats.NewLatencyHistogram15s32("metric-update")
-	queryExec    = stats.NewLatencyHistogram15s32("query")
+	metricAdd    = NewStat("metric-add")
+	metricUpdate = NewStat("metric-update")
+	queryExec    = NewStat("query")
 )
 
 const orgID = 1
@@ -104,10 +103,11 @@ func (t *TestRun) Run() {
 
 // PrintStats writes all the statistics in human readable format into stdout
 func (t *TestRun) PrintStats() {
-	now := time.Now()
-	fmt.Printf("MetricAdd:\n%s\n", metricAdd.ReportGraphite([]byte("metric-add."), nil, now))
-	fmt.Printf("MetricUpdate:\n%s\n", metricUpdate.ReportGraphite([]byte("metric-update."), nil, now))
-	fmt.Printf("Query:\n%s\n", queryExec.ReportGraphite([]byte("query."), nil, now))
+	metricAdd.Report()
+	fmt.Println()
+	metricUpdate.Report()
+	fmt.Println()
+	queryExec.Report()
 }
 
 func getPartitionFromName(name string, partitionCount uint32) int32 {
@@ -168,9 +168,9 @@ func (t *TestRun) addRoutine(ctx context.Context, in chan *schema.MetricData, pa
 			pre := time.Now()
 			_, _, update := t.index.AddOrUpdate(key, md, partitionID)
 			if !update {
-				metricAdd.Value(time.Since(pre))
+				metricAdd.Add(time.Since(pre))
 			} else {
-				metricUpdate.Value(time.Since(pre))
+				metricUpdate.Add(time.Since(pre))
 			}
 		}
 		return nil
@@ -222,5 +222,5 @@ func (t *TestRun) runQuery(pattern string, wg *sync.WaitGroup, active chan struc
 		log.Printf("Warning: Query failed with error: %s", err)
 	}
 
-	queryExec.Value(time.Since(pre))
+	queryExec.Add(time.Since(pre))
 }
