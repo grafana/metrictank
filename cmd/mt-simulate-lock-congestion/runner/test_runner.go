@@ -29,7 +29,11 @@ type TestRun struct {
 	queriesPerSec    uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
 	concQueries      int    // how many queries we want to execute concurrently.
 	startTime        time.Time
-	done             chan struct{}
+
+	workers *errgroup.Group
+	ctx     context.Context
+
+	done chan struct{}
 }
 
 var (
@@ -66,30 +70,36 @@ func (t *TestRun) Wait() {
 	<-t.done
 }
 
-// Run executes the run
-func (t *TestRun) Run(ctx context.Context, start chan struct{}) {
-	log.Printf("TestRun started")
-	defer close(t.done)
-	workerThreads, workerCtx := errgroup.WithContext(ctx)
-	log.Printf("TestRun pre-population starting")
+// Init prepares to run
+func (t *TestRun) Init(ctx context.Context) {
+	t.workers, t.ctx = errgroup.WithContext(ctx)
+	log.Printf("TestRun.Init: index pre-population starting")
 	t.prepopulateIndex()
-	log.Printf("pre-populated the index with %d entries", t.initialIndexSize)
+	log.Printf("TestRun.Init: pre-populated the index with %d entries", t.initialIndexSize)
 	t.startTime = time.Now()
-	workerThreads.Go(t.queryRoutine(workerCtx))
-	close(start)
+	log.Printf("TestRun.Init: launching query routine")
+	t.workers.Go(t.queryRoutine(t.ctx))
+	log.Printf("TestRun.Init: done")
+}
+
+// Run executes the run
+func (t *TestRun) Run() {
+	log.Printf("TestRun.Run: starting index add routines")
 	mdChans := make([]chan *schema.MetricData, t.addThreads)
 	for i := uint32(0); i < t.addThreads; i++ {
 		ch := make(chan *schema.MetricData, 1000)
 		mdChans[i] = ch
 		partition := int32(i)
-		workerThreads.Go(t.addRoutine(workerCtx, ch, partition))
+		t.workers.Go(t.addRoutine(t.ctx, ch, partition))
 	}
-	workerThreads.Go(t.routeMetrics(workerCtx, mdChans))
+	log.Printf("TestRun.Run: starting index routing routine")
+	t.workers.Go(t.routeMetrics(t.ctx, mdChans))
+	log.Printf("TestRun.Run: starting benchmark")
 
-	log.Printf("Benchmark has started")
-	workerThreads.Wait()
-	log.Printf("Benchmark has complete")
+	t.workers.Wait()
+	log.Printf("TestRun.Run: benchmark complete")
 	t.PrintStats()
+	close(t.done)
 }
 
 // PrintStats writes all the statistics in human readable format into stdout
