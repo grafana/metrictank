@@ -19,7 +19,7 @@ import (
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/runner"
 	"github.com/grafana/metrictank/idx/memory"
-	"github.com/raintank/schema"
+	"github.com/grafana/metrictank/schema"
 )
 
 var (
@@ -28,9 +28,9 @@ var (
 	addsPerSec           = flag.Int("adds-per-sec", 5000, "Metric add operations per second")
 	newSeriesPercent     = flag.Int("new-series-percent", 2, "percentage of adds that should be new series")
 	addThreads           = flag.Int("add-threads", 8, "Number of threads to concurrently try adding metrics into the index")
-	addDelay             = flag.Int("add-delay", 0, "adds a delay of the given number of seconds until the adding of new metrics starts")
 	initialIndexSize     = flag.Int("initial-index-size", 1000000, "prepopulate the index with the defined number of metrics before starting the benchmark")
 	queriesPerSec        = flag.Int("queries-per-sec", 100, "Index queries per second")
+	concQueries          = flag.Int("concurrent-queries", 1000, "Max number of concurrent index queries. (note: this limit does not exist in metrictank)")
 	runDuration          = flag.Duration("run-duration", time.Minute, "How long we want the test to run")
 	profileNamePrefix    = flag.String("profile-name-prefix", "profile", "Prefix to prepend before profile file names")
 	blockProfileRate     = flag.Int("block-profile-rate", 0, "Sampling rate of block profile, 0 means disabled")
@@ -73,8 +73,15 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	queryGenerator, err := NewQueryGenerator(ctx, *queriesFile)
+	if err != nil {
+		log.Fatalf("Failed read queries: %s", err.Error())
+	}
 	metricGenerator, err := NewMetricsGenerator(ctx, *seriesFile, *initialIndexSize, *newSeriesPercent)
-	testRun := runner.NewTestRun(metricGenerator.Out, queryGenerator.Out, uint32(*addDelay), uint32(*addsPerSec), uint32(*addThreads), uint32(*initialIndexSize), uint32(*queriesPerSec))
+	if err != nil {
+		log.Fatalf("Failed read series: %s", err.Error())
+	}
+	testRun := runner.NewTestRun(metricGenerator.Out, queryGenerator.Out, uint32(*addDelay), uint32(*addsPerSec), uint32(*addThreads), uint32(*initialIndexSize), uint32(*queriesPerSec), *concQueries)
+	testRun := runner.NewTestRun(metricGenerator.Out, queryGenerator.Out, uint32(*addsPerSec), uint32(*addThreads), uint32(*initialIndexSize), uint32(*queriesPerSec), *concQueries)
 	startTrigger := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(time.Second * 2)
@@ -84,6 +91,7 @@ func main() {
 	}()
 	go testRun.Run(ctx, startTrigger)
 	<-startTrigger
+	// TODO: this looks like a duplicate (see above): confirm we can remove this without affecting results
 	go func() {
 		ticker := time.NewTicker(time.Second * 2)
 		for range ticker.C {
@@ -151,8 +159,8 @@ func NewFileScanner(filename string) (*FileScanner, error) {
 	return res, nil
 }
 
-// GetNextLine reads a query from queriesFile. If we reach
-// the end of the file, we loop around and start at the begining again.
+// GetNextLine reads the next line from the file.
+// When the end is reached, it wraps back to the beginning.
 func (f *FileScanner) GetNextLine() (string, error) {
 	ok := f.scanner.Scan()
 	if !ok {
@@ -235,6 +243,7 @@ func NewMetricsGenerator(ctx context.Context, filename string, initialIndexSize,
 }
 
 func (f *MetricsGenerator) run(ctx context.Context) {
+	// note: this may store series rendundantly (multiple times) because the scanner may wrap
 	seenSeries := make([]string, 0, f.initialIndexSize*2)
 	count := 0
 	for {

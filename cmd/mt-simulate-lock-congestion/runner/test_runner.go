@@ -12,8 +12,8 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/schema"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
@@ -25,10 +25,9 @@ type TestRun struct {
 	queriesChan      chan string
 	addsPerSec       uint32 // how many adds per second we want to execute. 0 means unlimited, as many as possible
 	addThreads       uint32 // number of concurrent add threads
-	addDelay         uint32 // once the benchmark starts the querying threads start, if addDelay is >0 then the adding into the index is delayed by the given number of seconds
 	initialIndexSize uint32 // prepopulate the index with the defined number of entries before starting the actual test run
 	queriesPerSec    uint32 // how many queries per second we want to execute. 0 means unlimited, as many as possible
-	totalQueryCount  uint32 // the total number of queries we will start
+	concQueries      int    // how many queries we want to execute concurrently.
 	startTime        time.Time
 	done             chan struct{}
 }
@@ -42,7 +41,7 @@ var (
 const orgID = 1
 
 // NewTestRun Instantiates a new test run
-func NewTestRun(metricsChan chan *schema.MetricData, queriesChan chan string, addDelay, addsPerSec, addThreads, initialIndexSize, queriesPerSec uint32) *TestRun {
+func NewTestRun(metricsChan chan *schema.MetricData, queriesChan chan string, addsPerSec, addThreads, initialIndexSize, queriesPerSec uint32, concQueries int) *TestRun {
 	index := memory.New()
 	index.Init()
 	// initializing with a `nil` store, that's a bit risky but good enough for the moment
@@ -54,9 +53,9 @@ func NewTestRun(metricsChan chan *schema.MetricData, queriesChan chan string, ad
 		queriesChan:      queriesChan,
 		addsPerSec:       addsPerSec,
 		addThreads:       addThreads,
-		addDelay:         addDelay,
 		initialIndexSize: initialIndexSize,
 		queriesPerSec:    queriesPerSec,
+		concQueries:      concQueries,
 		done:             make(chan struct{}),
 	}
 
@@ -72,6 +71,7 @@ func (t *TestRun) Run(ctx context.Context, start chan struct{}) {
 	log.Printf("TestRun started")
 	defer close(t.done)
 	workerThreads, workerCtx := errgroup.WithContext(ctx)
+	log.Printf("TestRun pre-population starting")
 	t.prepopulateIndex()
 	log.Printf("pre-populated the index with %d entries", t.initialIndexSize)
 	t.startTime = time.Now()
@@ -174,7 +174,7 @@ func (t *TestRun) queryRoutine(ctx context.Context) func() error {
 		defer log.Printf("queryRoutine thread ended")
 		limiter := rate.NewLimiter(rate.Limit(t.queriesPerSec), int(t.queriesPerSec))
 		var wg sync.WaitGroup
-		active := make(chan struct{}, 1000)
+		active := make(chan struct{}, t.concQueries)
 		count := 0
 		ticker := time.NewTicker(time.Second * 5)
 	LOOP:

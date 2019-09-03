@@ -12,6 +12,7 @@
 /cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
 /cmd/mt-kafka-persist-sniff/mt-kafka-persist-sniff
 /cmd/mt-schemas-explain/mt-schemas-explain
+/cmd/mt-simulate-lock-congestion/mt-simulate-lock-congestion
 /cmd/mt-split-metrics-by-ttl/mt-split-metrics-by-ttl
 /cmd/mt-store-cat/mt-store-cat
 /cmd/mt-store-cp-experimental/mt-store-cp-experimental
