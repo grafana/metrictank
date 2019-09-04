@@ -66,3 +66,14 @@ func (s Stat) Report() {
 	}
 	s.mut.Unlock()
 }
+
+// ReportComputer reports the stat in a computer friendly form in microseconds.
+func (s Stat) ReportComputer() {
+	s.mut.Lock()
+	mean := int64(s.Total) / int64(s.Count) / 1e3
+	p50 := s.td.Quantile(0.50) / 1e3
+	p95 := s.td.Quantile(0.95) / 1e3
+	p99 := s.td.Quantile(0.99) / 1e3
+	fmt.Println(s.Name, s.Count, mean, p50, p95, p99, s.Max.Nanoseconds()/1e3)
+	s.mut.Unlock()
+}

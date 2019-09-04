@@ -108,6 +108,11 @@ func (t *TestRun) PrintStats() {
 	metricUpdate.Report()
 	fmt.Println()
 	queryExec.Report()
+	fmt.Println()
+	fmt.Println()
+	metricAdd.ReportComputer()
+	metricUpdate.ReportComputer()
+	queryExec.ReportComputer()
 }
 
 func getPartitionFromName(name string, partitionCount uint32) int32 {
