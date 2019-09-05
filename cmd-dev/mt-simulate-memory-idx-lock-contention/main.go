@@ -17,7 +17,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/cmd/mt-simulate-lock-congestion/runner"
+	"github.com/grafana/metrictank/cmd-dev/mt-simulate-memory-idx-lock-contention/runner"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/schema"
@@ -60,13 +60,13 @@ func main() {
 	memoryIdxFlags := memory.ConfigSetup()
 
 	flag.Usage = func() {
-		fmt.Println("mt-simulate-lock-congestion")
+		fmt.Println("mt-simulate-memory-idx-lock-contention")
 		fmt.Println()
 		fmt.Println("Simulates index lock congestion")
 		fmt.Println()
 		fmt.Println("Usage:")
 		fmt.Println()
-		fmt.Printf("	mt-simulate-lock-congestion [flags] [memory-idx memory-idx flags]\n")
+		fmt.Printf("	mt-simulate-memory-idx-lock-contention [flags] [memory-idx memory-idx flags]\n")
 		fmt.Println()
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
