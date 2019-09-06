@@ -17,6 +17,17 @@ func ConsolidateContext(ctx context.Context, in []schema.Point, aggNum uint32, c
 	return Consolidate(in, aggNum, consolidator)
 }
 
+// ConsolidateNudged consolidates points in a "mostly-stable" way, meaning if you run the same function again so that the input
+// receives new points at the end and old points get removed at the beginning, we keep picking the same points to consolidate together,
+// except for cases where there's a few points and a low MaxDataPoints. See nudgeMaybe()
+// interval is the interval between the input points
+func ConsolidateNudged(points []schema.Point, interval, maxDataPoints uint32, consolidator Consolidator) ([]schema.Point, uint32) {
+	aggNum := AggEvery(uint32(len(points)), maxDataPoints)
+	points = nudgeMaybe(points, aggNum, interval)
+	points = Consolidate(points, aggNum, consolidator)
+	return points, interval * aggNum
+}
+
 // Consolidate consolidates `in`, aggNum points at a time via the given function
 // note: the returned slice repurposes in's backing array.
 func Consolidate(in []schema.Point, aggNum uint32, consolidator Consolidator) []schema.Point {
@@ -73,11 +84,7 @@ func AggEvery(numPoints, maxPoints uint32) uint32 {
 	return (numPoints + maxPoints - 1) / maxPoints
 }
 
-// ConsolidateStable consolidates points in a "stable" way, meaning if you run the same function again so that the input
-// receives new points at the end and old points get removed at the beginning, we keep picking the same points to consolidate together
-// interval is the interval between the input points
-func ConsolidateStable(points []schema.Point, interval, maxDataPoints uint32, consolidator Consolidator) ([]schema.Point, uint32) {
-	aggNum := AggEvery(uint32(len(points)), maxDataPoints)
+func nudgeMaybe(points []schema.Point, aggNum, interval uint32) []schema.Point {
 	// note that the amount of points to strip by nudging is always < 1 postAggInterval's worth.
 	// there's 2 important considerations here:
 	// 1) we shouldn't make any too drastic alterations of the timerange returned compared to the requested time range
@@ -97,14 +104,12 @@ func ConsolidateStable(points []schema.Point, interval, maxDataPoints uint32, co
 	// note that in this case (where we don't nudge) the timestamps in output are not cleanly divisible by postAggInterval
 
 	// we only start stripping if we have more than 2*4=8 points
-	// see the unit tests which explore cases like this (TestConsolidateStableNoTrimDueToNotManyPoints)
+	// see the unit tests which explore cases like this (TestConsolidateNudgedNoTrimDueToNotManyPoints)
 	if len(points) > int(2*aggNum) {
 		_, num := nudge(points[0].Ts, interval, aggNum)
 		points = points[num:]
 	}
-	points = Consolidate(points, aggNum, consolidator)
-	interval *= aggNum
-	return points, interval
+	return points
 }
 
 // Nudge computes the parameters for nudging:
