@@ -720,7 +720,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// timestamps and could not include either of them.
 	// so the caller can just compare rc.From and rc.To and if equal, immediately return [] to the client.
 
-	if consolidator == consolidation.None {
+	if req.Archive == 0 {
 		rc.From = prevBoundary(req.From, req.ArchInterval) + 1
 		rc.To = prevBoundary(req.To, req.ArchInterval) + 1
 		rc.AMKey = schema.AMKey{MKey: req.MKey}
