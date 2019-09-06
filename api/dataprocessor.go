@@ -379,8 +379,8 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 			}
 			return divideContext(
 				ctx,
-				consolidation.Consolidate(sumFixed, req.AggNum, consolidation.Sum),
-				consolidation.Consolidate(cntFixed, req.AggNum, consolidation.Sum),
+				consolidation.ConsolidateContext(ctx, sumFixed, req.AggNum, consolidation.Sum),
+				consolidation.ConsolidateContext(ctx, cntFixed, req.AggNum, consolidation.Sum),
 			), req.OutInterval, nil
 		} else {
 			fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
