@@ -78,7 +78,7 @@ func AggEvery(numPoints, maxPoints uint32) uint32 {
 // interval is the interval between the input points
 func ConsolidateStable(points []schema.Point, interval, maxDataPoints uint32, consolidator Consolidator) ([]schema.Point, uint32) {
 	aggNum := AggEvery(uint32(len(points)), maxDataPoints)
-	// note that the amount of points to strip is always < 1 postAggInterval's worth.
+	// note that the amount of points to strip by nudging is always < 1 postAggInterval's worth.
 	// there's 2 important considerations here:
 	// 1) we shouldn't make any too drastic alterations of the timerange returned compared to the requested time range
 	// 2) the stripping effort shouldn't significantly alter the output otherwise things get confusing
@@ -91,7 +91,7 @@ func ConsolidateStable(points []schema.Point, interval, maxDataPoints uint32, co
 	// that are expected to go into the aggregation
 	// e.g. consider a case where we have points with ts 140,150,160,170
 	// aggNum = aggEvery(4/1) = 4, postAggInterval is thus 40.
-	// strict application of the logic would return 1 point with ts=200 (aggregation of all points 170-200 which is 1 point)
+	// strict application of nudging would return 1 point with ts=200 (aggregation of all points 170-200 which is 1 point)
 	// and strip the first 3 points,
 	// which is not what we want. since we only have a small set of points, better to incorporate all points into 1 bucket with ts 170.
 	// note that in this case (where we don't nudge) the timestamps in output are not cleanly divisible by postAggInterval
@@ -107,7 +107,9 @@ func ConsolidateStable(points []schema.Point, interval, maxDataPoints uint32, co
 	return points, interval
 }
 
-// Nudge computes the parameters for nudging.
+// Nudge computes the parameters for nudging:
+// * the diff to add to the old start point to compute the timestamp of the new start point
+// * number of points to strip from the start.
 // let's say a series has points A,B,C,D and we must consolidate with numAgg=2.
 // if we wait a step, point E appears into the visible window and A will slide out of the window.
 // there's a few approaches you can take wrt such changes across refreshes:
@@ -116,8 +118,8 @@ func ConsolidateStable(points []schema.Point, interval, maxDataPoints uint32, co
 //    after a step, return consolidate(B,C), consolidate(D,E)
 //    => this looks weird across refreshes:
 //       both the values as well as the timestamps change everywhere, points jump around on the chart
-// 2) graphite-style nudging: trim a few of the first points away as needed, so that the first TS
-//    is always a multiple of the postConsolidationInterval (note: assumes input is quantized!)
+// 2) graphite-style nudging: trim a few of the first points away as needed, such that the first TS
+//    will be the first one to fill a "full" aggregation bucket. (note: assumes input is quantized!)
 //    on first load return consolidate(A,B), consolidate(C,D)
 //    after a step, return consolidate(C,D), consolidate(E)
 //    => same points are always consolidated together, no jumping around.

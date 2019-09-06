@@ -276,8 +276,9 @@ func TestConsolidateStableShouldBeStableWithPrevious(t *testing.T) {
 func TestConsolidateStableABitMoreData(t *testing.T) {
 	testConsolidateStable(
 		// another trimming example with a bit more data
-		// logic is as follows: 13 points, mdp 3 => aggregate every 5
-		// so first agg point should be 10,20,30,40,50, which is incomplete
+		// logic is as follows: 13 points, mdp 3 => aggregate every 5.
+		// so first agg point needs input points with ts 10,20,30,40,50,
+		// but the bucket is incomplete (there is no point with ts 10)
 		// so nudge it away.
 		// this actually leaves us with only 9 points, so in theory we could
 		// use more and smaller buckets of 3 or 4 points,
