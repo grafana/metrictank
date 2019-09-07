@@ -46,21 +46,32 @@ type getTargetsResp struct {
 	err    error
 }
 
-// Fix assures all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
-// graphite does this quantization before storing, we may want to do that as well at some point
-// note: values are quantized to the right because we can't lie about the future:
-// e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
-// values to earlier in time.
-func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
-	// first point should have the first timestamp >= from that divides by interval
+// first point should have the first timestamp >= from that divides by interval
+func fixFirst(from, interval uint32) uint32 {
 	first := from
 	remain := from % interval
 	if remain != 0 {
 		first = from + interval - remain
 	}
+	return first
+}
 
-	// last point should have the last timestamp < to that divides by interval (because to is always exclusive)
-	last := (to - 1) - ((to - 1) % interval)
+// last point should have the last timestamp < to that divides by interval (because to is always exclusive)
+// note: this is the exact same as prevBoundary()
+func fixLast(to, interval uint32) uint32 {
+	return (to - 1) - ((to - 1) % interval)
+}
+
+// Fix assures a series is in quantized form:
+// all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
+// graphite does this quantization before storing, we may want to do that as well at some point
+// note: values are quantized to the right because we can't lie about the future:
+// e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
+// values to earlier in time.
+func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
+
+	first := fixFirst(from, interval)
+	last := fixLast(to, interval)
 
 	if last < first {
 		// the requested range is too narrow for the requested interval
@@ -325,6 +336,9 @@ LOOP:
 
 }
 
+// getTarget returns the series for the request in canonical form.
+// as ConsolidateContext just processes what it's been given (not "stable" or bucket-aligned to the output interval)
+// we simply make sure to pass it the right input such that the output is canonical.
 func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req models.Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
 	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
@@ -396,9 +410,9 @@ func logLoad(typ string, key schema.AMKey, from, to uint32) {
 	log.Debugf("DP load from %-6s %20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
 }
 
-// getSeriesFixed gets the series and makes sure the output is quantized
-// (needed because the raw chunks don't contain quantized data)
-// TODO: we can probably forego Fix if archive > 0
+// getSeriesFixed fetches the series and returns it in quantized, pre-canonical form.
+// TODO: we can probably forego Fix if archive > 0, because only raw chunks are not quantized yet.
+// the requested consolidator is the one that will be used for selecting the archive to read from
 func (s *Server) getSeriesFixed(ctx context.Context, ss *models.StorageStats, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
 	select {
 	case <-ctx.Done():
@@ -425,7 +439,7 @@ func (s *Server) getSeriesFixed(ctx context.Context, ss *models.StorageStats, re
 	// note: Fix() returns res.Points back to the pool
 	// this is safe because nothing else is still using it
 	// you can confirm this by analyzing what happens in prior calls such as itertoPoints and s.getSeries()
-	return Fix(res.Points, req.From, req.To, req.ArchInterval), nil
+	return Fix(res.Points, rctx.From, rctx.To, req.ArchInterval), nil
 }
 
 // getSeries returns points from mem (and store if needed), within the range from (inclusive) - to (exclusive)
@@ -611,7 +625,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 // check for duplicate series names for the same query. If found merge the results.
 // each first uniquely-identified series's backing datapoints slice is reused
 // any subsequent non-uniquely-identified series is merged into the former and has its
-// datapoints slice returned to the pool.
+// datapoints slice returned to the pool. input series must be canonical
 func mergeSeries(in []models.Series) []models.Series {
 	type segment struct {
 		target string
@@ -637,7 +651,7 @@ func mergeSeries(in []models.Series) []models.Series {
 		if len(series) == 1 {
 			merged[i] = series[0]
 		} else {
-			//we use the first series in the list as our result.  We check over every
+			// we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
 			log.Debugf("DP mergeSeries: %s has multiple series.", series[0].Target)
@@ -664,9 +678,9 @@ type requestContext struct {
 	ctx context.Context
 
 	// request by external user.
-	Req *models.Req
+	Req *models.Req // note: we don't actually modify Req, so by value would work too
 
-	// internal request needed to satisfy user request.
+	// internal request needed to fetch and fix the data.
 	Cons  consolidation.Consolidator // to satisfy avg request from user, this would be sum or cnt
 	From  uint32                     // may be different than user request, see below
 	To    uint32                     // may be different than user request, see below
@@ -686,8 +700,9 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	}
 
 	// while aggregated archives are quantized, raw intervals are not.  quantizing happens after fetching the data,
-	// So we have to adjust the range to get the right data.
+	// So for raw data, we have to adjust the range to get the right data.
 	// (ranges described as a..b include both and b)
+	// Assuming minutely data:
 	// REQ           0[---FROM---60]----------120-----------180[----TO----240]  any request from 1..60 to 181..240 should ...
 	// QUANTD RESULT 0----------[60]---------[120]---------[180]                return points 60, 120 and 180 (simply because of to/from and inclusive/exclusive rules) ..
 	// STORED DATA   0[----------60][---------120][---------180][---------240]  but data for 60 may be at 1..60, data for 120 at 61..120 and for 180 at 121..180 (due to quantizing)
@@ -709,7 +724,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// such a fetch request would include the requested point
 	// but we know Fix() will later create the output according to these rules:
 	// * first point should have the first timestamp >= from that divides by interval (that would be 60 in this case)
-	// * last point should have the last timestamp < to that divides by interval (because to is always exclusive) (that would be 0 in this case)
+	// * last point should have the last timestamp < to that divides by interval (because to is always exclusive) (that would be 0 in this case, unless we change to to 61)
 	// which wouldn't make sense of course. one could argue it should output one point with ts=60,
 	// but to do that, we have to "broaden" the `to` requested by the user, covering a larger time frame they didn't actually request.
 	// and we deviate from the quantizing model.
@@ -728,6 +743,56 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		rc.From = req.From
 		rc.To = req.To
 		rc.AMKey = schema.GetAMKey(req.MKey, consolidator.Archive(), req.ArchInterval)
+	}
+
+	if req.AggNum > 1 {
+		// the series needs to be pre-canonical. There's 2 aspects to this
+
+		// 1) `from` adjustment.
+		// we may need to rewind the from so that we make sure to include all the necessary input raw data
+		// to be able to compute the first aggregated point of the canonical output
+		// because getTarget() output must be in canonical form.
+		// e.g. with req.ArchInterval = 10, req.OutInterval = 30, req.AggNum = 3
+		// points must be 40,50,60 , 70,80,90 such that they consolidate to 60, 90, ...
+		// so the fixed output must start at 40, or generally speaking at a point with ts such that ts-archInterval % outInterval = 0.
+
+		// So if the user requested a rc.From value of 55 (for archive=0 we would have adjusted rc.From to 51 per the rules above to make sure
+		// to include any point that would correspond to the first fixed value, 60, but that doesn't matter here)
+		// our firstPointTs would be 60 here.
+		// but because we eventually want to consolidate into a point with ts=60, we also need the points that will be fix-adjusted to 40 and 50.
+		// so From needs to be lowered by 20 to become 35 (or 31 if adjusted).
+
+		firstPointTs := fixFirst(rc.From, req.ArchInterval)              // e.g. fixFirst(55/51, 10) = 60.
+		remainder := (firstPointTs - req.ArchInterval) % req.OutInterval // (60-10) % 30 = 20
+
+		if rc.From > remainder {
+			rc.From -= remainder
+		} else {
+			// in case someone's requesting stupidly low timestamps like from=15, we don't want to get negative timestamps and run into trouble.
+			// so in this - very rare - case, we basically adjust into the future instead of to the past.
+			rc.From = rc.From + req.OutInterval - remainder
+		}
+
+		// 2) `to` adjustment.
+		// if the series has some excess at the end, it may aggregate into a bucket with a timestamp out of the desired range.
+		// for example: imagine we take the case from above, and the user specified a `to` of 115.
+		// a native 30s series would end with point 90. We should not include any points that would go into an aggregation bucket with timestamp higher than 90.
+		// (such as 100 or 110 which would technically be allowed by the `to` specification)
+		// so the proper to value is the highest value that does not result in points going into an out-of-bounds bucket.
+
+		// example: for 10s data (note that the 2 last colums should always match!)
+		// * means it has been adjusted due to querying raw archive, per above
+		// rc.To old - rc.To new - will fetch data - will be fixed to - will be aggregated to a bucket with ts - native 30s series will have last point for given rc.To old
+		// 91        - 91        - ...,90          - 90               - 90                                     - 90
+		// 90        - 61        - ...,60          - 60               - 60                                     - 60
+		// 180       - 151       - ...,150         - 150              - 150                                    - 150
+		//*180->171  - 151       - ...,150         - 150              - 150                                    - 150
+		// 181       - 181       - ...,180         - 180              - 180                                    - 180
+		//*181->181  - 180       - ...,180         - 180              - 180                                    - 180
+		// 240       - 211       - ...,210         - 210              - 210                                    - 210
+		//*240->231  - 211       - ...,210         - 210              - 210                                    - 210
+
+		rc.To = fixLast(rc.To, req.OutInterval) + 1
 	}
 
 	return &rc
