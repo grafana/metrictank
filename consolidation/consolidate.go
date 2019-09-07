@@ -30,6 +30,8 @@ func ConsolidateNudged(points []schema.Point, interval, maxDataPoints uint32, co
 
 // Consolidate consolidates `in`, aggNum points at a time via the given function
 // note: the returned slice repurposes in's backing array.
+// it will always aggregate aggNum-sized groups of points together, with the timestamp of the last of them, and it always starts at the beginning,
+// possibly having a point at the end that didn't incorporate as much data
 func Consolidate(in []schema.Point, aggNum uint32, consolidator Consolidator) []schema.Point {
 	num := int(aggNum)
 	aggFunc := GetAggFunc(consolidator)
