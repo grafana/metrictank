@@ -9,13 +9,14 @@ import (
 )
 
 type WriteQueue struct {
-	sync.RWMutex
-	archives    map[schema.MKey]*idx.Archive
 	shutdown    chan struct{}
 	done        chan struct{}
 	maxBuffered int
 	maxDelay    time.Duration
 	flushed     chan struct{}
+
+	archives map[schema.MKey]*idx.Archive
+	sync.RWMutex
 
 	idx *UnpartitionedMemoryIdx
 }
