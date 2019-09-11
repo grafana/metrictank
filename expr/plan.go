@@ -233,7 +233,7 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 			if o.Consolidator == 0 {
 				o.Consolidator = consolidation.Avg
 			}
-			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateStable(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
+			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
 		}
 	}
 	return out, nil

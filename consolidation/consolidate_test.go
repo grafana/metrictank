@@ -194,8 +194,8 @@ func TestConsolidationFunctions(t *testing.T) {
 	validate(cases, t)
 }
 
-func TestConsolidateStableNoAgg(t *testing.T) {
-	testConsolidateStable(
+func TestConsolidateNudgedNoAgg(t *testing.T) {
+	testConsolidateNudged(
 		[]schema.Point{
 			{Val: 1, Ts: 10},
 			{Val: 2, Ts: 20},
@@ -211,8 +211,8 @@ func TestConsolidateStableNoAgg(t *testing.T) {
 		t)
 }
 
-func TestConsolidateStableNoTrimDueToNotManyPoints(t *testing.T) {
-	testConsolidateStable(
+func TestConsolidateNudgedNoTrimDueToNotManyPoints(t *testing.T) {
+	testConsolidateNudged(
 		[]schema.Point{
 			{Val: 1, Ts: 20},
 			{Val: 2, Ts: 30},
@@ -227,8 +227,8 @@ func TestConsolidateStableNoTrimDueToNotManyPoints(t *testing.T) {
 		40,
 		t)
 }
-func TestConsolidateStableShouldTrim(t *testing.T) {
-	testConsolidateStable(
+func TestConsolidateNudgedShouldTrim(t *testing.T) {
+	testConsolidateNudged(
 		// more points, we should trim to get proper alignment
 		[]schema.Point{
 			{Val: 1, Ts: 20},
@@ -248,8 +248,8 @@ func TestConsolidateStableShouldTrim(t *testing.T) {
 		20,
 		t)
 }
-func TestConsolidateStableShouldBeStableWithPrevious(t *testing.T) {
-	testConsolidateStable(
+func TestConsolidateNudgedShouldBeStableWithPrevious(t *testing.T) {
+	testConsolidateNudged(
 		// and now we learn why
 		// one point out of the window and a new one at the back
 		// should result in the same consolidated points for everything in the middle
@@ -273,11 +273,12 @@ func TestConsolidateStableShouldBeStableWithPrevious(t *testing.T) {
 		t)
 }
 
-func TestConsolidateStableABitMoreData(t *testing.T) {
-	testConsolidateStable(
+func TestConsolidateNudgedABitMoreData(t *testing.T) {
+	testConsolidateNudged(
 		// another trimming example with a bit more data
-		// logic is as follows: 13 points, mdp 3 => aggregate every 5
-		// so first agg point should be 10,20,30,40,50, which is incomplete
+		// logic is as follows: 13 points, mdp 3 => aggregate every 5.
+		// so first agg point needs input points with ts 10,20,30,40,50,
+		// but the bucket is incomplete (there is no point with ts 10)
 		// so nudge it away.
 		// this actually leaves us with only 9 points, so in theory we could
 		// use more and smaller buckets of 3 or 4 points,
@@ -308,8 +309,8 @@ func TestConsolidateStableABitMoreData(t *testing.T) {
 		50,
 		t)
 }
-func TestConsolidateStableABitMoreDataEven(t *testing.T) {
-	testConsolidateStable(
+func TestConsolidateNudgedABitMoreDataEven(t *testing.T) {
+	testConsolidateNudged(
 		// now we actually have a clean start at 10, so we can incorporate it
 		[]schema.Point{
 			{Val: 1, Ts: 10},   // bucket 1
@@ -337,8 +338,8 @@ func TestConsolidateStableABitMoreDataEven(t *testing.T) {
 		50,
 		t)
 }
-func testConsolidateStable(in []schema.Point, inInt uint32, mdp uint32, expOut []schema.Point, expOutInt uint32, t *testing.T) {
-	out, outInt := ConsolidateStable(in, inInt, mdp, Sum)
+func testConsolidateNudged(in []schema.Point, inInt uint32, mdp uint32, expOut []schema.Point, expOutInt uint32, t *testing.T) {
+	out, outInt := ConsolidateNudged(in, inInt, mdp, Sum)
 	if outInt != expOutInt {
 		t.Fatalf("output interval mismatch: expected: %v, got: %v", expOutInt, outInt)
 	}

@@ -311,7 +311,27 @@ type pbCase struct {
 	boundary uint32
 }
 
-func TestPrevBoundary(t *testing.T) {
+func TestAlignForward(t *testing.T) {
+	cases := []pbCase{
+		{1, 60, 60},
+		{2, 60, 60},
+		{3, 60, 60},
+		{57, 60, 60},
+		{58, 60, 60},
+		{59, 60, 60},
+		{60, 60, 60},
+		{61, 60, 120},
+		{62, 60, 120},
+		{63, 60, 120},
+	}
+	for _, c := range cases {
+		if ret := alignForward(c.ts, c.span); ret != c.boundary {
+			t.Fatalf("alignBackward for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
+		}
+	}
+}
+
+func TestAlignBackward(t *testing.T) {
 	cases := []pbCase{
 		{1, 60, 0},
 		{2, 60, 0},
@@ -325,8 +345,8 @@ func TestPrevBoundary(t *testing.T) {
 		{63, 60, 60},
 	}
 	for _, c := range cases {
-		if ret := prevBoundary(c.ts, c.span); ret != c.boundary {
-			t.Fatalf("prevBoundary for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
+		if ret := alignBackward(c.ts, c.span); ret != c.boundary {
+			t.Fatalf("alignBackward for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
 		}
 	}
 }
@@ -371,6 +391,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
 				req := models.NewReq(id, "", "", from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
+				req.Archive = 0
 				req.ArchInterval = 10
 				points, err := srv.getSeriesFixed(test.NewContext(), &models.StorageStats{}, req, consolidation.None)
 				if err != nil {
@@ -384,8 +405,201 @@ func TestGetSeriesFixed(t *testing.T) {
 	}
 }
 
+// TestGetSeriesFixedVariableOutInterval tests that getSeriesFixed returns series in pre-canonical form.
+func TestGetSeriesFixedVariableOutInterval(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	store := mdata.NewMockStore()
+	store.Drop = true
+
+	mdata.SetSingleAgg(conf.Sum, conf.Avg, conf.Min, conf.Max)
+	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, 0))
+
+	cache := cache.NewCCache()
+	metrics := mdata.NewAggMetrics(store, cache, false, nil, 0, 0, 0)
+	srv, _ := NewServer()
+	srv.BindBackendStore(store)
+	srv.BindMemoryStore(metrics)
+	srv.BindCache(cache)
+
+	cases := []struct {
+		in           []schema.Point
+		from         uint32
+		to           uint32
+		outInterval  uint32
+		archInterval uint32
+		out          []schema.Point
+	}{
+		{
+			in: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60},
+				{Val: 7, Ts: 70},
+			},
+			from:         40,
+			to:           60,
+			outInterval:  10, // no normalizing
+			archInterval: 10,
+			out: []schema.Point{
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+			},
+		},
+		{
+			in: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60},
+				{Val: 7, Ts: 70},
+			},
+			from:         30,
+			to:           65,
+			outInterval:  30, // aggNum=3
+			archInterval: 10,
+			out: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30}, // first point after normalizing
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60}, // second point after normalizing
+			},
+		},
+		{
+			in: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30},
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60},
+				{Val: 7, Ts: 70},
+			},
+			from:         21,
+			to:           65,
+			outInterval:  30, // aggNum=3
+			archInterval: 10,
+			out: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30}, // first point after normalizing
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60}, // second point after normalizing
+			},
+		},
+		{
+			// here Fix will also be involved
+			in: []schema.Point{
+				{Val: 1, Ts: 8},
+				{Val: 2, Ts: 19},
+				{Val: 3, Ts: 28},
+				{Val: 4, Ts: 36},
+				{Val: 5, Ts: 47},
+				{Val: 6, Ts: 58},
+				{Val: 7, Ts: 69},
+			},
+			from:         21,
+			to:           65,
+			outInterval:  30, // aggNum=3
+			archInterval: 10,
+			out: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30}, // first point after normalizing
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60}, // second point after normalizing
+			},
+		},
+		{
+			// here Fix will also be involved
+			in: []schema.Point{
+				{Val: 1, Ts: 8},
+				{Val: 2, Ts: 19},
+				{Val: 3, Ts: 28},
+				{Val: 4, Ts: 36},
+				{Val: 5, Ts: 47},
+				{Val: 6, Ts: 58},
+				{Val: 7, Ts: 69},
+				{Val: 8, Ts: 77},
+				{Val: 9, Ts: 88},
+				{Val: 10, Ts: 99},
+			},
+			from:         21,
+			to:           85,
+			outInterval:  30, // aggNum=3. a native 30s would end at 60. so we should too
+			archInterval: 10,
+			out: []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+				{Val: 3, Ts: 30}, // first point after normalizing
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60}, // second point after normalizing
+			},
+		},
+		{
+			// here Fix will also be involved
+			in: []schema.Point{
+				{Val: 1, Ts: 8},
+				{Val: 2, Ts: 19},
+				{Val: 3, Ts: 28},
+				{Val: 4, Ts: 36},
+				{Val: 5, Ts: 47},
+				{Val: 6, Ts: 58},
+				{Val: 7, Ts: 69},
+				{Val: 8, Ts: 77},
+				{Val: 9, Ts: 88},
+				{Val: 10, Ts: 99},
+			},
+			from:         21,
+			to:           85,
+			outInterval:  10, // in contrast with the previous case we don't have to be canonical wrt a 30s series, and can now honor the 10s interval
+			archInterval: 10,
+			out: []schema.Point{
+				{Val: 3, Ts: 30},
+				{Val: 4, Ts: 40},
+				{Val: 5, Ts: 50},
+				{Val: 6, Ts: 60},
+				{Val: 7, Ts: 70},
+				{Val: 8, Ts: 80},
+			},
+		},
+	}
+
+	for num, testCase := range cases {
+		// create metric and add data points
+		id := test.GetMKey(num)
+		metric := metrics.GetOrCreate(id, 0, 1, testCase.archInterval)
+		for _, dataPoint := range testCase.in {
+			metric.Add(dataPoint.Ts, dataPoint.Val)
+		}
+
+		req := models.NewReq(id, "", "", testCase.from, testCase.to, 1000, testCase.archInterval, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
+		req.Archive = 0
+		req.ArchInterval = testCase.archInterval
+		req.OutInterval = testCase.outInterval
+		req.AggNum = testCase.outInterval / req.ArchInterval
+		result, err := srv.getSeriesFixed(test.NewContext(), &models.StorageStats{}, req, consolidation.None)
+		if err != nil {
+			t.Errorf("case %d: interval %d, aggNum %d, from %d to %d -> error: %s", num, testCase.outInterval, req.AggNum, testCase.from, testCase.to, err)
+		}
+		if !reflect.DeepEqual(testCase.out, result) {
+			t.Errorf("case %d: interval %d, aggNum %d, from %d to %d -> expected: %v - got %v", num, testCase.outInterval, req.AggNum, testCase.from, testCase.to, testCase.out, result)
+		}
+	}
+}
+
 func reqRaw(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16) models.Req {
 	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
+	req.Archive = 0
 	return req
 }
 func reqOut(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive int, archInterval, ttl, outInterval, aggNum uint32) models.Req {
