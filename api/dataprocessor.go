@@ -46,20 +46,18 @@ type getTargetsResp struct {
 	err    error
 }
 
-// first point should have the first timestamp >= from that divides by interval
-func fixFirst(from, interval uint32) uint32 {
-	first := from
-	remain := from % interval
+// alignForward aligns ts to the next timestamp that divides by the interval, except if it is already aligned
+func alignForward(ts, interval uint32) uint32 {
+	first := ts
+	remain := ts % interval
 	if remain != 0 {
-		first = from + interval - remain
+		first = ts + interval - remain
 	}
 	return first
 }
 
-// last point should have the last timestamp < to that divides by interval (because to is always exclusive)
-// note: this is the exact same as prevBoundary()
-func fixLast(to, interval uint32) uint32 {
-	return (to - 1) - ((to - 1) % interval)
+func alignBackward(ts uint32, span uint32) uint32 {
+	return ts - ((ts-1)%span + 1)
 }
 
 // Fix assures a series is in quantized form:
@@ -70,8 +68,8 @@ func fixLast(to, interval uint32) uint32 {
 // values to earlier in time.
 func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
-	first := fixFirst(from, interval)
-	last := fixLast(to, interval)
+	first := alignForward(from, interval)
+	last := alignBackward(to, interval)
 
 	if last < first {
 		// the requested range is too narrow for the requested interval
@@ -687,10 +685,6 @@ type requestContext struct {
 	AMKey schema.AMKey               // set by combining Req's key, consolidator and archive info
 }
 
-func prevBoundary(ts uint32, span uint32) uint32 {
-	return ts - ((ts-1)%span + 1)
-}
-
 func newRequestContext(ctx context.Context, req *models.Req, consolidator consolidation.Consolidator) *requestContext {
 
 	rc := requestContext{
@@ -736,8 +730,8 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// so the caller can just compare rc.From and rc.To and if equal, immediately return [] to the client.
 
 	if req.Archive == 0 {
-		rc.From = prevBoundary(req.From, req.ArchInterval) + 1
-		rc.To = prevBoundary(req.To, req.ArchInterval) + 1
+		rc.From = alignBackward(req.From, req.ArchInterval) + 1
+		rc.To = alignBackward(req.To, req.ArchInterval) + 1
 		rc.AMKey = schema.AMKey{MKey: req.MKey}
 	} else {
 		rc.From = req.From
@@ -762,7 +756,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// but because we eventually want to consolidate into a point with ts=60, we also need the points that will be fix-adjusted to 40 and 50.
 		// so From needs to be lowered by 20 to become 35 (or 31 if adjusted).
 
-		firstPointTs := fixFirst(rc.From, req.ArchInterval)              // e.g. fixFirst(55/51, 10) = 60.
+		firstPointTs := alignForward(rc.From, req.ArchInterval)          // e.g. alignForward(55/51, 10) = 60.
 		remainder := (firstPointTs - req.ArchInterval) % req.OutInterval // (60-10) % 30 = 20
 
 		if rc.From > remainder {
@@ -792,7 +786,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// 240       - 211       - ...,210         - 210              - 210                                    - 210
 		//*240->231  - 211       - ...,210         - 210              - 210                                    - 210
 
-		rc.To = fixLast(rc.To, req.OutInterval) + 1
+		rc.To = alignBackward(rc.To, req.OutInterval) + 1
 	}
 
 	return &rc

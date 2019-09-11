@@ -311,7 +311,7 @@ type pbCase struct {
 	boundary uint32
 }
 
-func TestPrevBoundary(t *testing.T) {
+func TestAlignBackward(t *testing.T) {
 	cases := []pbCase{
 		{1, 60, 0},
 		{2, 60, 0},
@@ -325,8 +325,8 @@ func TestPrevBoundary(t *testing.T) {
 		{63, 60, 60},
 	}
 	for _, c := range cases {
-		if ret := prevBoundary(c.ts, c.span); ret != c.boundary {
-			t.Fatalf("prevBoundary for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
+		if ret := alignBackward(c.ts, c.span); ret != c.boundary {
+			t.Fatalf("alignBackward for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
 		}
 	}
 }
