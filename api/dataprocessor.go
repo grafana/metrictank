@@ -756,15 +756,12 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// but because we eventually want to consolidate into a point with ts=60, we also need the points that will be fix-adjusted to 40 and 50.
 		// so From needs to be lowered by 20 to become 35 (or 31 if adjusted).
 
-		remainder := alignBackward(rc.From, req.ArchInterval) % req.OutInterval // (60-10) % 30 = 20
-
-		if rc.From > remainder {
-			rc.From -= remainder
-		} else {
-			// in case someone's requesting stupidly low timestamps like from=15, we don't want to get negative timestamps and run into trouble.
-			// so in this - very rare - case, we basically adjust into the future instead of to the past.
-			rc.From = rc.From + req.OutInterval - remainder
+		boundary := alignForward(rc.From, req.OutInterval)
+		rewind := req.AggNum * req.ArchInterval
+		if boundary < rewind {
+			panic(fmt.Sprintf("Cannot rewind far back enough (trying to rewind by %d from timestamp %d)", rewind, boundary))
 		}
+		rc.From = boundary - rewind + 1
 
 		// 2) `to` adjustment.
 		// if the series has some excess at the end, it may aggregate into a bucket with a timestamp out of the desired range.
