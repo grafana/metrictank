@@ -351,7 +351,6 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 	}
 
 	memoryIdx, keys := getTestIndexWithMetaTags(b, allMetaTagRecords, 1000)
-	enricher := memoryIdx.metaTagRecords[1].getEnricher(memoryIdx.tags[1].idHasTag)
 
 	defs := make([]idx.Archive, len(keys))
 	i := 0
@@ -367,7 +366,7 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		def = &defs[i%1000]
-		metaTags := enricher.enrich(def.Id, def.Name, def.Tags)
+		metaTags := memoryIdx.metaTagRecords[1].getEnricher(memoryIdx.tags[1].idHasTag).enrich(def.Id, def.Name, def.Tags)
 		if len(metaTags) != 3 {
 			b.Fatalf("Expected result to have length 3, but it had %d", len(metaTags))
 		}
