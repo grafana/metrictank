@@ -80,7 +80,7 @@ func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagque
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
 }
 
-func (m metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
+func (m *metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 	res := (*enricher)(atomic.LoadPointer(&m.enricher))
 	if res != nil {
 		return res
