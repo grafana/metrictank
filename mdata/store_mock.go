@@ -2,7 +2,6 @@ package mdata
 
 import (
 	"context"
-	"errors"
 
 	"github.com/grafana/metrictank/schema"
 
@@ -55,7 +54,7 @@ func (c *MockStore) Search(ctx context.Context, metric schema.AMKey, ttl, start,
 	var ok bool
 
 	if itgens, ok = c.results[metric]; !ok {
-		return res, errors.New("metric not found")
+		return res, nil
 	}
 
 	for _, itgen := range itgens {
