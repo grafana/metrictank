@@ -13,7 +13,7 @@ import (
 type InvalidExpressionError string
 
 func (i InvalidExpressionError) Error() string {
-	return fmt.Sprintf("Invalid expression: %q", i)
+	return fmt.Sprintf("Invalid expression: %s", string(i))
 }
 
 type Expressions []Expression
