@@ -48,16 +48,16 @@ type getTargetsResp struct {
 
 // alignForward aligns ts to the next timestamp that divides by the interval, except if it is already aligned
 func alignForward(ts, interval uint32) uint32 {
-	first := ts
 	remain := ts % interval
-	if remain != 0 {
-		first = ts + interval - remain
+	if remain == 0 {
+		return ts
 	}
-	return first
+	return ts + interval - remain
 }
 
-func alignBackward(ts uint32, span uint32) uint32 {
-	return ts - ((ts-1)%span + 1)
+// alignBackward aligns the ts to the previous ts that divides by the interval, even if it is already aligned
+func alignBackward(ts uint32, interval uint32) uint32 {
+	return ts - ((ts-1)%interval + 1)
 }
 
 // Fix assures a series is in quantized form:
