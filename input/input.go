@@ -106,7 +106,8 @@ func (in DefaultHandler) ProcessMetricPoint(point schema.MetricPoint, format msg
 	}
 
 	m := in.metrics.GetOrCreate(point.MKey, archive.SchemaId, archive.AggId, uint32(archive.Interval))
-	m.Add(point.Time, point.Value)
+	alignedTimestamp := mdata.AggBoundary(point.Time, uint32(archive.Interval))
+	m.Add(alignedTimestamp, point.Value)
 }
 
 // ProcessMetricData assures the data is stored and the metadata is in the index
@@ -176,5 +177,6 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 	archive, _, _ := in.metricIndex.AddOrUpdate(mkey, md, partition)
 
 	m := in.metrics.GetOrCreate(mkey, archive.SchemaId, archive.AggId, uint32(md.Interval))
-	m.Add(uint32(md.Time), md.Value)
+	alignedTimestamp := mdata.AggBoundary(uint32(md.Time), uint32(md.Interval))
+	m.Add(alignedTimestamp, md.Value)
 }

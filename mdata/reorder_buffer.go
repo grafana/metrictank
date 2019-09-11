@@ -29,8 +29,6 @@ func NewReorderBuffer(reorderWindow, interval uint32) *ReorderBuffer {
 // Add adds the point if it falls within the window.
 // it returns points that have been purged out of the buffer, as well as whether the add succeeded.
 func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
-	ts = AggBoundary(ts, rob.interval)
-
 	// out of order and too old
 	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
 		return nil, errors.ErrMetricTooOld
