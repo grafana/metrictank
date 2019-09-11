@@ -311,6 +311,26 @@ type pbCase struct {
 	boundary uint32
 }
 
+func TestAlignForward(t *testing.T) {
+	cases := []pbCase{
+		{1, 60, 60},
+		{2, 60, 60},
+		{3, 60, 60},
+		{57, 60, 60},
+		{58, 60, 60},
+		{59, 60, 60},
+		{60, 60, 60},
+		{61, 60, 120},
+		{62, 60, 120},
+		{63, 60, 120},
+	}
+	for _, c := range cases {
+		if ret := alignForward(c.ts, c.span); ret != c.boundary {
+			t.Fatalf("alignBackward for ts %d with span %d should be %d, not %d", c.ts, c.span, c.boundary, ret)
+		}
+	}
+}
+
 func TestAlignBackward(t *testing.T) {
 	cases := []pbCase{
 		{1, 60, 0},
