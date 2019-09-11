@@ -756,8 +756,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// but because we eventually want to consolidate into a point with ts=60, we also need the points that will be fix-adjusted to 40 and 50.
 		// so From needs to be lowered by 20 to become 35 (or 31 if adjusted).
 
-		firstPointTs := alignForward(rc.From, req.ArchInterval)          // e.g. alignForward(55/51, 10) = 60.
-		remainder := (firstPointTs - req.ArchInterval) % req.OutInterval // (60-10) % 30 = 20
+		remainder := alignBackward(rc.From, req.ArchInterval) % req.OutInterval // (60-10) % 30 = 20
 
 		if rc.From > remainder {
 			rc.From -= remainder
