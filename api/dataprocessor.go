@@ -339,8 +339,7 @@ LOOP:
 // we simply make sure to pass it the right input such that the output is canonical.
 func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req models.Req) (points []schema.Point, interval uint32, err error) {
 	defer doRecover(&err)
-	readRollup := req.Archive != 0 // do we need to read from a downsampled series?
-	normalize := req.AggNum > 1    // do we need to normalize points at runtime?
+	normalize := req.AggNum > 1 // do we need to normalize points at runtime?
 	// normalize is runtime consolidation but only for the purpose of bringing high-res
 	// series to the same resolution of lower res series.
 
@@ -350,57 +349,36 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 		log.Debugf("DP getTarget() %s normalize:false", req.DebugString())
 	}
 
-	if !readRollup && !normalize {
+	// the easy case: we're reading the raw data.
+	if req.Archive == 0 {
 		fixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.None)
-		return fixed, req.OutInterval, err
-	} else if !readRollup && normalize {
-		fixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.None)
+		if err != nil || !normalize {
+			return fixed, req.OutInterval, err
+		}
+		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
+	}
+
+	// here we're reading rollup data
+	if req.Consolidator == consolidation.Avg {
+		sum, err := s.getSeriesFixed(ctx, ss, req, consolidation.Sum)
 		if err != nil {
 			return nil, req.OutInterval, err
 		}
-		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
-	} else if readRollup && !normalize {
-		if req.Consolidator == consolidation.Avg {
-			sumFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Sum)
-			if err != nil {
-				return nil, req.OutInterval, err
-			}
-			cntFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Cnt)
-			if err != nil {
-				return nil, req.OutInterval, err
-			}
-			return divideContext(
-				ctx,
-				sumFixed,
-				cntFixed,
-			), req.OutInterval, nil
-		} else {
-			fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
+		cnt, err := s.getSeriesFixed(ctx, ss, req, consolidation.Cnt)
+		if err != nil {
+			return nil, req.OutInterval, err
+		}
+		if normalize {
+			sum = consolidation.ConsolidateContext(ctx, sum, req.AggNum, consolidation.Sum)
+			cnt = consolidation.ConsolidateContext(ctx, cnt, req.AggNum, consolidation.Sum)
+		}
+		return divideContext(ctx, sum, cnt), req.OutInterval, nil
+	} else {
+		fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
+		if err != nil || !normalize {
 			return fixed, req.OutInterval, err
 		}
-	} else {
-		// readRollup && normalize
-		if req.Consolidator == consolidation.Avg {
-			sumFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Sum)
-			if err != nil {
-				return nil, req.OutInterval, err
-			}
-			cntFixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.Cnt)
-			if err != nil {
-				return nil, req.OutInterval, err
-			}
-			return divideContext(
-				ctx,
-				consolidation.ConsolidateContext(ctx, sumFixed, req.AggNum, consolidation.Sum),
-				consolidation.ConsolidateContext(ctx, cntFixed, req.AggNum, consolidation.Sum),
-			), req.OutInterval, nil
-		} else {
-			fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
-			if err != nil {
-				return nil, req.OutInterval, err
-			}
-			return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
-		}
+		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
 	}
 }
 
