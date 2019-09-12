@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"sync"
 	"sync/atomic"
 	"unsafe"
 
@@ -20,8 +21,9 @@ type recordId uint32
 
 // list of meta records keyed by a unique identifier used as ID
 type metaTagRecords struct {
-	records  map[recordId]tagquery.MetaTagRecord
-	enricher unsafe.Pointer
+	records      map[recordId]tagquery.MetaTagRecord
+	enricher     unsafe.Pointer
+	enricherLock sync.Mutex
 }
 
 func newMetaTagRecords() *metaTagRecords {
@@ -86,13 +88,18 @@ func (m *metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 		return res
 	}
 
+	// we acquire the enricher lock to ensure that multiple threads don't
+	// all re-instantiate it at the same time
+	m.enricherLock.Lock()
+	defer m.enricherLock.Unlock()
+
+	res = (*enricher)(atomic.LoadPointer(&m.enricher))
+	if res != nil {
+		return res
+	}
+
 	// if no enricher is present yet, then we instantiate one and store its reference
 	// to reuse it later.
-	// there is an unlikely race condition where we receive multiple calls to FindByTag
-	// from multiple requests at the same time, which would result in multiple enrichers
-	// getting instantiated. in such a case the last one would overwrite the previous
-	// ones and there shouldn't be any issues. this case is very unlikely, so it doesn't
-	// seem to be worth it to add a lock for that.
 
 	// if provided size is valid, it's not possible for lru.New to return an error
 	cache, _ := lru.New(enrichmentCacheSize)
