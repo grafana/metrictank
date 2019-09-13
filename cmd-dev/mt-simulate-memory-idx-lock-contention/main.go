@@ -120,6 +120,7 @@ func main() {
 		log.Fatalf("Failed read series: %s", err.Error())
 	}
 	testRun := runner.NewTestRun(metricGenerator.Out, queryGenerator.Out, uint32(*addsPerSec), uint32(*addThreads), uint32(*initialIndexSize), uint32(*queriesPerSec), *concQueries)
+
 	go func() {
 		ticker := time.NewTicker(time.Second * 2)
 		for range ticker.C {
@@ -130,13 +131,6 @@ func main() {
 	testRun.Init(ctx)
 	go testRun.Run()
 
-	// TODO: this looks like a duplicate (see above): confirm we can remove this without affecting results
-	go func() {
-		ticker := time.NewTicker(time.Second * 2)
-		for range ticker.C {
-			runtime.GC()
-		}
-	}()
 	time.Sleep(*runDuration)
 	log.Printf("stopping the benchmark")
 	cancel()
