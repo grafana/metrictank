@@ -28,5 +28,5 @@ it simulates a workload on the memory-idx, by preloading it with data, and then 
 
 ## obtaining the files
 
-TODO
+Use the `mt-index-cat` utility to dump the metric names of the Metrictank index you want to test with into a file, then write a list of queries to issue into another file. Those two files can then be used as input by using the `series-file` and `queries-file` parameters.
 
