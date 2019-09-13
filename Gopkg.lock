@@ -792,6 +792,14 @@
   revision = "ef6db91d284a0e7badaa1f0c404c30aa7dee3aed"
 
 [[projects]]
+  digest = "1:20998b12ca59a28c75b02dedfe8eaf6e56d0f3cd38d796d6107ca344c1a7024d"
+  name = "github.com/spenczar/tdigest"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "c30a5bef6c2a91b32b7044b570024f0faf39c959"
+  version = "v2.1.0"
+
+[[projects]]
   digest = "1:c97e8a5e5c435c3287f581cdb4441ba34577ec6ead8422bfedafa6269af7abf6"
   name = "github.com/tinylib/msgp"
   packages = ["msgp"]
@@ -942,6 +950,14 @@
   pruneopts = "NUT"
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
   version = "v0.3.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:9fdc2b55e8e0fafe4b41884091e51e77344f7dc511c5acedcfd98200003bff90"
+  name = "golang.org/x/time"
+  packages = ["rate"]
+  pruneopts = "NUT"
+  revision = "9d24e82272b4f38b78bc8cff74fa936d31ccd8ef"
 
 [[projects]]
   branch = "master"
@@ -1186,11 +1202,13 @@
     "github.com/sergi/go-diff/diffmatchpatch",
     "github.com/sirupsen/logrus",
     "github.com/smartystreets/goconvey/convey",
+    "github.com/spenczar/tdigest",
     "github.com/tinylib/msgp/msgp",
     "github.com/uber/jaeger-client-go",
     "github.com/uber/jaeger-client-go/config",
     "github.com/uber/jaeger-client-go/log",
     "golang.org/x/sync/errgroup",
+    "golang.org/x/time/rate",
     "gopkg.in/macaron.v1",
   ]
   solver-name = "gps-cdcl"
