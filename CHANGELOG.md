@@ -1,4 +1,4 @@
-# master
+# v0.13.0: Meta tags beta, sharding by tags, new importer (bigtable!), response stats, memory-idx write queue and many fixes. Sept 17, 2019.
 
 ## breaking changes
 
@@ -26,9 +26,16 @@
 
 * bigtable importer #1291
 * Make the importer utilities rely on TSDB-GW for authentication and org-association #1335
+* fix TTL bug: calculate TTL relative to now when inserting into cassandra. #1448
 
 ## other
 
+* meta tags (beta feature): 
+  - Implement series lookup and filtering by meta tag #1423 
+  - Meta tag enrichment #1433
+  - Auto complete with meta tags #1438
+  - Batch update meta records #1442
+  Left to do: rule persistence.
 * fix kafka backlog processing to not get stuck/timeout if no messages #1315, #1328, #1350, #1352, #1360
 * memleak fix: Prevent blocked go routines to hang forever #1333, #1337
 * update jaeger client v2.15.0 -> v2.16.0, jaeger-lib v1.2.1 -> v2.0.0 #1339
@@ -46,10 +53,7 @@
 * flush aggregates more eagerly when we can #1425
 * Peer query speculative fixes and improvements #1430
 * support sharding by tags #1427, #1436, #1444
-* meta tags: 
-  - Implement series lookup and filtering by meta tag #1423 
-  - Meta tag enrichment #1433
-  - Auto complete with meta tags #1438
+* Fix uneven length panics #1452
 
 ## new query api functions
 
