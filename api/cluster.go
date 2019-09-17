@@ -464,7 +464,7 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 }
 
 // peerQuerySpeculativeChan takes a request and the path to request it on, then fans it out
-// across the cluster. If any peer fails requests to other peers are aborted. If enough
+// across the cluster. If any peer fails, we try another replica. If enough
 // peers have been heard from (based on speculation-threshold configuration), and we
 // are missing the others, try to speculatively query other members of the shard group.
 // ctx:          request context
