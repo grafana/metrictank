@@ -492,7 +492,7 @@ func findPickle(nodes []idx.Node, request models.GraphiteFind, fromUnix, toUnix 
 var treejsonContext = make(map[string]int)
 
 func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
-	tree := models.NewSeriesTree()
+	tree := models.SeriesTree{}
 	seen := make(map[string]struct{})
 
 	for _, g := range nodes {
@@ -530,7 +530,7 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 		}
 		tree.Add(&t)
 	}
-	return *tree
+	return tree
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {

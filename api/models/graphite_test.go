@@ -9,9 +9,8 @@ import (
 
 func TestEmptySeriesTree(t *testing.T) {
 	// mimic what findTreejson does
-	tree := NewSeriesTree()
-	treev := *tree
-	out, err := json.Marshal(treev)
+	tree := SeriesTree{}
+	out, err := json.Marshal(tree)
 	if err != nil {
 		t.Error(err)
 	}

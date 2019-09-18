@@ -228,10 +228,6 @@ func NewSeriesPickleItem(path string, isLeaf bool, intervals [][]int64) SeriesPi
 
 type SeriesTree []SeriesTreeItem
 
-func NewSeriesTree() *SeriesTree {
-	return &SeriesTree{}
-}
-
 func (s *SeriesTree) Add(i *SeriesTreeItem) {
 	*s = append(*s, *i)
 }
