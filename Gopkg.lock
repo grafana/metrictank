@@ -232,13 +232,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "fix-29"
   digest = "1:d2e68004ab21e836f35f06412fe7aa124db1953d359e59f6ba3ccdb3d3a6b194"
   name = "github.com/go-macaron/binding"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "7538b0224e585444e53b0c226d9a9440fd32e217"
-  source = "https://github.com/Dieterbe/binding.git"
+  revision = "b46ef76bb2e7179ad61ee71a73fe9afb199545a2"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"

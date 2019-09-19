@@ -59,8 +59,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/go-macaron/binding"
-  source = "https://github.com/Dieterbe/binding.git"
-  branch = "fix-29"
+  version = "v1.0.0"
 
 [[constraint]]
   name = "github.com/gocql/gocql"
