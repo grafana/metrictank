@@ -511,7 +511,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	return res, true, nil
 }
 
-func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
+func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord, _ bool) (uint32, uint32, error) {
 	if !TagSupport || !MetaTagSupport {
 		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
 		return 0, 0, errors.NewBadRequest("Tag/Meta-Tag support is disabled")

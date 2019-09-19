@@ -42,6 +42,6 @@ CREATE TABLE IF NOT EXISTS %s.%s (
     metatags text,
     createdat bigint,
     lastupdate bigint,
-    PRIMARY KEY ((orgid, expressions))
+    PRIMARY KEY (orgid, expressions)
 )
 """

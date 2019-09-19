@@ -165,5 +165,5 @@ type MetricIndex interface {
 	// MetaTagRecordSwap takes a set of meta tag records and completely replaces
 	// the existing ones with the new ones.
 	// It returns how many records have been added, deleted and potential errors
-	MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error)
+	MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord, persist bool) (uint32, uint32, error)
 }

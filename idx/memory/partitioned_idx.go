@@ -549,7 +549,7 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagqu
 	return record, created, nil
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
+func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord, persist bool) (uint32, uint32, error) {
 	g, _ := errgroup.WithContext(context.Background())
 
 	results := make([]struct {
@@ -562,7 +562,7 @@ func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquer
 		m, partNum := m, i
 		g.Go(func() error {
 			var err error
-			results[partNum].added, results[partNum].deleted, err = m.MetaTagRecordSwap(orgId, records)
+			results[partNum].added, results[partNum].deleted, err = m.MetaTagRecordSwap(orgId, records, persist)
 			return err
 		})
 		i++
