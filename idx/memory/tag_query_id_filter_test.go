@@ -20,7 +20,7 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 	}
 
 	for i := range metaRecords {
-		index.MetaTagRecordUpsert(1, metaRecords[i])
+		index.MetaTagRecordUpsert(1, metaRecords[i], false)
 	}
 
 	ctx := &TagQueryContext{

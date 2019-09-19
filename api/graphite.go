@@ -1361,7 +1361,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 	var created bool
 	if s.MetricIndex != nil {
 		var err error
-		localResult, created, err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
+		localResult, created, err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record, upsertRequest.Propagate)
 		if err != nil {
 			response.Write(ctx, response.WrapError(err))
 			return

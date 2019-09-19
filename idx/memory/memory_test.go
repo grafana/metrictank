@@ -1047,7 +1047,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
 
-	createdRecord, created, err := ix.MetaTagRecordUpsert(1, record1)
+	createdRecord, created, err := ix.MetaTagRecordUpsert(1, record1, false)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
 	}
@@ -1058,7 +1058,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record1, createdRecord)
 	}
 
-	createdRecord, created, err = ix.MetaTagRecordUpsert(1, record2)
+	createdRecord, created, err = ix.MetaTagRecordUpsert(1, record2, false)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
 	}
@@ -1106,7 +1106,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	}
 
 	// record3 has the same queries as record2, so it should completely replace it
-	createdRecord, created, err = ix.MetaTagRecordUpsert(1, record3)
+	createdRecord, created, err = ix.MetaTagRecordUpsert(1, record3, false)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
 	}

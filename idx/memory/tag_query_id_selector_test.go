@@ -42,7 +42,7 @@ func selectAndCompareResults(t *testing.T, expression tagquery.Expression, metaR
 	}
 
 	for i := range metaRecords {
-		index.MetaTagRecordUpsert(1, metaRecords[i])
+		index.MetaTagRecordUpsert(1, metaRecords[i], false)
 	}
 
 	ctx := &TagQueryContext{

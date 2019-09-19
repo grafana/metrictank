@@ -459,7 +459,7 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 // 1) The relevant meta record as it is after this operation
 // 2) A bool that is true if the record has been created, or false if updated
 // 3) An error which is nil if no error has occurred
-func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
+func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord, _ bool) (tagquery.MetaTagRecord, bool, error) {
 	res := tagquery.MetaTagRecord{}
 
 	if !TagSupport || !MetaTagSupport {

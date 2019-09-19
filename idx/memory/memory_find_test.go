@@ -368,7 +368,7 @@ func testTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+	}, false)
 
 	expected := make(map[string]uint64)
 	expected["all"] = 168000
@@ -399,7 +399,7 @@ func testTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "dc5"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+	}, false)
 
 	expected := make(map[string]uint64)
 	expected["dc3"] = 33600
@@ -476,11 +476,11 @@ func testTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "directionMeta", Value: "read"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+	}, false)
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "directionMeta2", Value: "read"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+	}, false)
 
 	expected := []string{"dc", "device", "disk", "direction", "directionMeta", "directionMeta2"}
 	queryAndCompareTagKeys(t, "d", expected)
@@ -508,7 +508,7 @@ func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+	}, false)
 
 	expected := []string{"all", "dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
 	queryAndCompareTagKeys(t, "", expected)
@@ -638,7 +638,7 @@ func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "host2", Value: "all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
-	})
+	}, false)
 
 	metaRecordExpression2, err := tagquery.ParseExpression("name=~.+")
 	if err != nil {
@@ -647,7 +647,7 @@ func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression2},
-	})
+	}, false)
 
 	type testCase struct {
 		prefix string
@@ -767,7 +767,7 @@ func testAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "another", Value: "tag"}, tagquery.Tag{Key: "meta", Value: "tag"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+	}, false)
 
 	type testCase struct {
 		prefix string
@@ -878,7 +878,7 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "metric", Value: "all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
-	})
+	}, false)
 
 	metaRecordExpression2, err := tagquery.ParseExpression("metric=~disk_.+")
 	if err != nil {
@@ -887,7 +887,7 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "metric", Value: "disk_all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression2},
-	})
+	}, false)
 
 	metaRecordExpression3, err := tagquery.ParseExpression("name!=")
 	if err != nil {
@@ -896,7 +896,7 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "meta1", Value: "all_metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression3},
-	})
+	}, false)
 
 	type testCase struct {
 		tag    string
@@ -1025,7 +1025,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "direction", Value: "none"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
-	})
+	}, false)
 
 	metaRecordExpression2, err := tagquery.ParseExpression("name!=")
 	if err != nil {
@@ -1034,7 +1034,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression2},
-	})
+	}, false)
 
 	type testCase struct {
 		tag    string
