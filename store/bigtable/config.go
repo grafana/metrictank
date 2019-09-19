@@ -41,8 +41,10 @@ func (cfg *StoreConfig) Validate(schemaMaxChunkSpan uint32) error {
 	if CliConfig.MaxChunkSpan%time.Second != 0 {
 		return errors.New("max-chunkspan must be a whole number of seconds")
 	}
-	if uint32(CliConfig.MaxChunkSpan.Seconds()) < schemaMaxChunkSpan {
-		return fmt.Errorf("max-chunkspan must be at least as high as the max chunkspan used in your storage-schemas (which is %d)", schemaMaxChunkSpan)
+	if CliConfig.Enabled {
+		if uint32(CliConfig.MaxChunkSpan.Seconds()) < schemaMaxChunkSpan {
+			return fmt.Errorf("max-chunkspan must be at least as high as the max chunkspan used in your storage-schemas (which is %d)", schemaMaxChunkSpan)
+		}
 	}
 	return nil
 }
