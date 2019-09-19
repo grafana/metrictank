@@ -71,14 +71,6 @@
   version = "v1.23.0"
 
 [[projects]]
-  digest = "1:a1b2cc5ad53b08fbfb4dfe962a2e145325acb4b874ea44beb02d4b5b158c2079"
-  name = "github.com/Unknwon/com"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "28b053d5a2923b87ce8c5a08f3af779894a72758"
-  version = "v1"
-
-[[projects]]
   branch = "master"
   digest = "1:b123c5196e46bf2dfa2de71d5e9493995fc110d5e7e63a6c274fc6b64edf1da0"
   name = "github.com/alyu/configparser"
@@ -240,11 +232,12 @@
   version = "v0.3.0"
 
 [[projects]]
-  digest = "1:246b6b7dd18a7796fc91d1d3d361e0c9bfdd307653d8265d2f764898b3ec5fe3"
+  digest = "1:d2e68004ab21e836f35f06412fe7aa124db1953d359e59f6ba3ccdb3d3a6b194"
   name = "github.com/go-macaron/binding"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "a453235199f8898e01647db8820f937a184fbd09"
+  revision = "b46ef76bb2e7179ad61ee71a73fe9afb199545a2"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -844,6 +837,14 @@
   version = "v2.0.0"
 
 [[projects]]
+  digest = "1:074551979ff3363545bf927dd9cbe2ddca50ef2efecac993f667e917929ddc5a"
+  name = "github.com/unknwon/com"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "41959bdd855fb7db467f78865d5f9044507df1cd"
+  version = "v2"
+
+[[projects]]
   digest = "1:d04de18a0e0bf8fcdb79e8dc755c9b15dbe7f1b2ea3f8fbf11e55ea2d26ac182"
   name = "go.opencensus.io"
   packages = [
@@ -1144,12 +1145,12 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:97e5872ff9e9b9049c1489fbca23beb16e34f22a0ad772a9d6b10f6c11dcadf8"
+  digest = "1:da15bef7d4cc80ca732a7c9257186adda1ee794cf250f8b503d71a58a956de83"
   name = "gopkg.in/macaron.v1"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "4974334b10dbb6f5c0e17f4c10555ff050a16329"
-  version = "v1.1.8"
+  revision = "213788aac5bca04b4ef40b4b3ab821d417dbf396"
+  version = "v1.3.4"
 
 [solve-meta]
   analyzer-name = "dep"
