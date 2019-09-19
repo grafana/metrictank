@@ -244,6 +244,9 @@ If the new record has no meta tags associated with it, then an existing record w
 same set of expressions gets deleted.
 When an existing record gets updated the returned property `created` is `false`,
 otherwise it's `true`.
+If the `propagate` argument is `true` and the Metrictank instance which receives this
+upsert request has index updating enabled, the modification will be persisted in the
+persistent index. This is currently only implemented in the Cassandra index.
 
 ## Example
 
@@ -304,6 +307,9 @@ This route is an alternative to the above "upsert". It accepts a list of meta ta
 and replaces all existing records with the new ones. This is useful for users who first
 generate all of their meta tag records and then want to simply replace all the records in
 Metrictank with the generated ones.
+If the `propagate` argument is `true` and the Metrictank instance which receives this swap
+request has index updating enabled, the swap will also be persisted in the persistent
+index. This is currently only implemented in the Cassandra index.
 
 ## Example
 
