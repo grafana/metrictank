@@ -7,6 +7,18 @@ import (
 	"github.com/grafana/metrictank/idx"
 )
 
+func TestEmptySeriesTree(t *testing.T) {
+	// mimic what findTreejson does
+	tree := SeriesTree{}
+	out, err := json.Marshal(tree)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(out) != "[]" {
+		t.Errorf("expected output '[]'. got %q", out)
+	}
+}
+
 func TestGraphiteNames(t *testing.T) {
 
 	cases := []struct {
