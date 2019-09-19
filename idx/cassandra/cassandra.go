@@ -423,22 +423,20 @@ func (c *CasIdx) loadMetaRecords() map[uint32][]tagquery.MetaTagRecord {
 
 func (c *CasIdx) applyMetaRecords(orgId uint32, records []tagquery.MetaTagRecord) {
 	for _, record := range records {
-		_, _, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, record)
+		_, _, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, record, false)
 		if err != nil {
 			log.Errorf("cassandra-idx: applyMetaRecords() failed to apply meta record: %s", err)
 		}
 	}
 }
 
-func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
-	record, created, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, upsertRecord)
+func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord, persist bool) (tagquery.MetaTagRecord, bool, error) {
+	record, created, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, upsertRecord, persist)
 	if err != nil {
 		return record, created, err
 	}
 
-	// TODO figure out how to determine which of the MT instances with updateCassIdx == true should flush a given record,
-	// currently they'll all flush it
-	if c.Config.updateCassIdx {
+	if c.Config.updateCassIdx && persist {
 		var err error
 
 		// if a record has no meta tags associated with it, then we delete it

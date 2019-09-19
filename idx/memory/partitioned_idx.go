@@ -520,7 +520,7 @@ func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTa
 	return nil
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
+func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagquery.MetaTagRecord, persist bool) (tagquery.MetaTagRecord, bool, error) {
 	g, _ := errgroup.WithContext(context.Background())
 
 	var i int
@@ -531,9 +531,9 @@ func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagqu
 		g.Go(func() error {
 			var err error
 			if partNum == 0 {
-				record, created, err = m.MetaTagRecordUpsert(orgId, rawRecord)
+				record, created, err = m.MetaTagRecordUpsert(orgId, rawRecord, persist)
 			} else {
-				_, _, err = m.MetaTagRecordUpsert(orgId, rawRecord)
+				_, _, err = m.MetaTagRecordUpsert(orgId, rawRecord, persist)
 			}
 
 			return err

@@ -34,7 +34,7 @@ func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, c
 	}
 
 	for i := range metaTags {
-		idx.MetaTagRecordUpsert(1, metaTags[i])
+		idx.MetaTagRecordUpsert(1, metaTags[i], false)
 	}
 
 	return idx, mkeys

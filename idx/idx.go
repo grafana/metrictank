@@ -156,7 +156,7 @@ type MetricIndex interface {
 	// 1) The relevant meta record as it is after this operation
 	// 2) A bool that is true if the record has been created, or false if updated
 	// 3) An error which is nil if no error has occurred
-	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error)
+	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord, persist bool) (tagquery.MetaTagRecord, bool, error)
 
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
