@@ -648,7 +648,7 @@ func (s *Server) indexMetaTagRecordSwap(ctx *middleware.Context, req models.Inde
 		}
 	}
 
-	added, deleted, err := s.MetricIndex.MetaTagRecordSwap(req.OrgId, metaTagRecords)
+	added, deleted, err := s.MetricIndex.MetaTagRecordSwap(req.OrgId, metaTagRecords, false)
 	if err != nil {
 		response.Write(ctx, response.WrapError(fmt.Errorf("Error when swapping meta tag records: %s", err)))
 		return

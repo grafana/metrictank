@@ -1436,7 +1436,7 @@ func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.M
 	var added, deleted uint32
 	if s.MetricIndex != nil {
 		var err error
-		added, deleted, err = s.MetricIndex.MetaTagRecordSwap(ctx.OrgId, metaTagRecords)
+		added, deleted, err = s.MetricIndex.MetaTagRecordSwap(ctx.OrgId, metaTagRecords, swapRequest.Propagate)
 		if err != nil {
 			response.Write(ctx, response.WrapError(err))
 			return

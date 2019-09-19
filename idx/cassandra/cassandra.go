@@ -455,6 +455,44 @@ func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTag
 	return record, created, nil
 }
 
+func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord, persist bool) (uint32, uint32, error) {
+	added, deleted, err := c.MemoryIndex.MetaTagRecordSwap(orgId, records, persist)
+	if !c.Config.updateCassIdx || err != nil {
+		return added, deleted, err
+	}
+
+	batch := c.Session.NewBatch(gocql.LoggedBatch)
+	batch.Query(fmt.Sprintf("DELETE FROM %s WHERE orgid=?", c.Config.MetaRecordTable), orgId)
+	var expressions, metaTags []byte
+	var qry string
+
+	now := time.Now().UnixNano() / 1000000
+	for _, record := range records {
+		expressions, err = record.Expressions.MarshalJSON()
+		if err != nil {
+			return 0, 0, fmt.Errorf("Failed to marshal expressions: %s", err)
+		}
+		metaTags, err = record.MetaTags.MarshalJSON()
+		if err != nil {
+			return 0, 0, fmt.Errorf("Failed to marshal meta tags: %s", err)
+		}
+		qry = fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?)", c.Config.MetaRecordTable)
+		batch.Query(
+			qry,
+			orgId,
+			expressions,
+			metaTags,
+			now,
+			now)
+	}
+
+	err = c.flushMetaRecordUpdate(func() error {
+		return c.Session.ExecuteBatch(batch)
+	})
+
+	return added, deleted, err
+}
+
 func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, created bool) error {
 	var write func() error
 	expressions, err := record.Expressions.MarshalJSON()
