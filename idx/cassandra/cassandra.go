@@ -467,12 +467,17 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 		return added, deleted, err
 	}
 
+	now := time.Now().UnixNano() / 1000000
 	batch := c.Session.NewBatch(gocql.LoggedBatch).RetryPolicy(&metaRecordRetryPolicy)
-	batch.Query(fmt.Sprintf("DELETE FROM %s WHERE orgid=?", c.Config.MetaRecordTable), orgId)
+
+	// within a batch operation we need to specify timestamps using "USING TIMESTAMP" to ensure
+	// that the statement execution happens in the order we require.
+	// the leading DELETE statement gets the timestamp now - 1000 to ensure that it gets executed
+	// before the sub-sequent inserts.
+	batch.Query(fmt.Sprintf("DELETE FROM %s USING TIMESTAMP ? WHERE orgid=?", c.Config.MetaRecordTable), now-1000, orgId)
 	var expressions, metaTags []byte
 	var qry string
 
-	now := time.Now().UnixNano() / 1000000
 	for _, record := range records {
 		expressions, err = record.Expressions.MarshalJSON()
 		if err != nil {
@@ -482,12 +487,13 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 		if err != nil {
 			return 0, 0, fmt.Errorf("Failed to marshal meta tags: %s", err)
 		}
-		qry = fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?)", c.Config.MetaRecordTable)
+		qry = fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
 		batch.Query(
 			qry,
 			orgId,
 			expressions,
 			metaTags,
+			now,
 			now,
 			now)
 	}
