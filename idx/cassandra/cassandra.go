@@ -51,6 +51,12 @@ var (
 	// metric idx.cassandra.save.skipped is how many saves have been skipped due to the writeQueue being full
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
+
+	metaRecordRetryPolicy = gocql.ExponentialBackoffRetryPolicy{
+		NumRetries: 10,
+		Min:        time.Millisecond * time.Duration(10),
+		Max:        time.Second,
+	}
 )
 
 type writeReq struct {
@@ -461,7 +467,7 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 		return added, deleted, err
 	}
 
-	batch := c.Session.NewBatch(gocql.LoggedBatch)
+	batch := c.Session.NewBatch(gocql.LoggedBatch).RetryPolicy(&metaRecordRetryPolicy)
 	batch.Query(fmt.Sprintf("DELETE FROM %s WHERE orgid=?", c.Config.MetaRecordTable), orgId)
 	var expressions, metaTags []byte
 	var qry string
@@ -486,15 +492,12 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 			now)
 	}
 
-	err = c.flushMetaRecordUpdate(func() error {
-		return c.Session.ExecuteBatch(batch)
-	})
+	err = c.Session.ExecuteBatch(batch)
 
 	return added, deleted, err
 }
 
 func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, created bool) error {
-	var write func() error
 	expressions, err := record.Expressions.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("Failed to marshal expressions: %s", err)
@@ -504,33 +507,26 @@ func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, 
 		return fmt.Errorf("Failed to marshal meta tags: %s", err)
 	}
 
-	if created {
-		write = func() error {
-			now := time.Now().UnixNano() / 1000000
-			qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?)", c.Config.MetaRecordTable)
-			return c.Session.Query(
-				qry,
-				orgId,
-				expressions,
-				metaTags,
-				now,
-				now).Exec()
+	now := time.Now().UnixNano() / 1000000
 
-		}
-	} else {
-		write = func() error {
-			now := time.Now().UnixNano() / 1000000
-			qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
-			return c.Session.Query(
-				qry,
-				orgId,
-				expressions,
-				metaTags,
-				now).Exec()
-		}
+	if created {
+		qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?)", c.Config.MetaRecordTable)
+		return c.Session.Query(
+			qry,
+			orgId,
+			expressions,
+			metaTags,
+			now,
+			now).RetryPolicy(&metaRecordRetryPolicy).Exec()
 	}
 
-	return c.flushMetaRecordUpdate(write)
+	qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
+	return c.Session.Query(
+		qry,
+		orgId,
+		expressions,
+		metaTags,
+		now).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
 func (c *CasIdx) deleteMetaRecord(orgId uint32, record tagquery.MetaTagRecord) error {
@@ -539,35 +535,12 @@ func (c *CasIdx) deleteMetaRecord(orgId uint32, record tagquery.MetaTagRecord) e
 		return fmt.Errorf("Failed to marshal record expressions: %s", err)
 	}
 
-	delete := func() error {
-		qry := fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND expressions=?", c.Config.MetaRecordTable)
-		return c.Session.Query(
-			qry,
-			orgId,
-			expressions,
-		).Exec()
-	}
-
-	return c.flushMetaRecordUpdate(delete)
-}
-
-func (c *CasIdx) flushMetaRecordUpdate(flush func() error) error {
-	var err error
-	var attempts uint8
-	for {
-		err = flush()
-		if err == nil {
-			return nil
-		}
-
-		attempts++
-
-		if attempts >= 3 {
-			return err
-		}
-
-		time.Sleep(time.Duration(attempts*100) * time.Millisecond)
-	}
+	qry := fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND expressions=?", c.Config.MetaRecordTable)
+	return c.Session.Query(
+		qry,
+		orgId,
+		expressions,
+	).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
