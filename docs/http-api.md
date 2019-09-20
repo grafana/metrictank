@@ -264,10 +264,10 @@ otherwise it's `true`.
 ~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
 [
   {
-    "MetaTags": [
+    "metaTags": [
       "mytag=value"
     ],
-    "Expressions": [
+    "expressions": [
       "a=b",
       "c=d"
     ]
