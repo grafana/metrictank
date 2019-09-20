@@ -40,7 +40,7 @@ func newMetaTagRecords() *metaTagRecords {
 // 3) The id of the record that has been replaced if an update was performed
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
-func (m metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
+func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
 	// after altering meta records we need to reinstantiate the enricher the next time we want to use it
 	defer atomic.StorePointer(&m.enricher, nil)
 
