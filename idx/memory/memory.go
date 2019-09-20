@@ -471,6 +471,10 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	var mti metaTagIndex
 	var ok bool
 
+	// expressions need to be sorted because the unique ID of a meta record is
+	// its sorted set of expressions
+	upsertRecord.Expressions.Sort()
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -522,6 +526,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 
 	var addedRecords, deletedRecords uint32
 	for _, record := range records {
+		record.Expressions.Sort()
+
 		recordId, _, _, _, err := newMtr.upsert(record)
 		if err != nil {
 			return 0, 0, err
