@@ -517,22 +517,24 @@ func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, 
 	now := time.Now().UnixNano() / 1000000
 
 	if created {
-		qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?)", c.Config.MetaRecordTable)
+		qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
 		return c.Session.Query(
 			qry,
 			orgId,
 			expressions,
 			metaTags,
 			now,
+			now,
 			now).RetryPolicy(&metaRecordRetryPolicy).Exec()
 	}
 
-	qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
+	qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
 	return c.Session.Query(
 		qry,
 		orgId,
 		expressions,
 		metaTags,
+		now,
 		now).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
@@ -542,9 +544,10 @@ func (c *CasIdx) deleteMetaRecord(orgId uint32, record tagquery.MetaTagRecord) e
 		return fmt.Errorf("Failed to marshal record expressions: %s", err)
 	}
 
-	qry := fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND expressions=?", c.Config.MetaRecordTable)
+	qry := fmt.Sprintf("DELETE FROM %s USING TIMESTAMP ? WHERE orgid=? AND expressions=?", c.Config.MetaRecordTable)
 	return c.Session.Query(
 		qry,
+		time.Now().UnixNano()/1000000,
 		orgId,
 		expressions,
 	).RetryPolicy(&metaRecordRetryPolicy).Exec()
