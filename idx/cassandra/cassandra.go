@@ -463,7 +463,7 @@ func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTag
 
 func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord, persist bool) (uint32, uint32, error) {
 	added, deleted, err := c.MemoryIndex.MetaTagRecordSwap(orgId, records, persist)
-	if !c.Config.updateCassIdx || err != nil {
+	if !c.Config.updateCassIdx || err != nil || !persist {
 		return added, deleted, err
 	}
 
