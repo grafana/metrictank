@@ -33,22 +33,22 @@ type MetaTagRecordUpsertResultByNode struct {
 }
 
 type MetaTagRecordUpsertResult struct {
-	MetaTags []string `json:"metaTags"`
-	Queries  []string `json:"queries"`
-	Created  bool     `json:"created"`
+	MetaTags    []string `json:"metaTags"`
+	Expressions []string `json:"expressions"`
+	Created     bool     `json:"created"`
 }
 
 type IndexMetaTagRecordUpsert struct {
-	OrgId    uint32   `json:"orgId" binding:"Required"`
-	MetaTags []string `json:"metaTags" binding:"Required"`
-	Queries  []string `json:"queries" binding:"Required"`
+	OrgId       uint32   `json:"orgId" binding:"Required"`
+	MetaTags    []string `json:"metaTags" binding:"Required"`
+	Expressions []string `json:"expressions" binding:"Required"`
 }
 
 func (m IndexMetaTagRecordUpsert) Trace(span opentracing.Span) {
 	span.SetTag("orgId", m.OrgId)
 	span.LogFields(
 		traceLog.String("metaTags", fmt.Sprintf("%q", m.MetaTags)),
-		traceLog.String("queries", fmt.Sprintf("%q", m.Queries)),
+		traceLog.String("expressions", fmt.Sprintf("%q", m.Expressions)),
 	)
 }
 
