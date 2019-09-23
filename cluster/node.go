@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"time"
@@ -289,6 +290,8 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 		log.Errorf("CLU failed to inject span into headers: %s", err.Error())
 	}
 	req.Header.Add("Content-Type", "application/json")
+	ua := fmt.Sprintf("metrictank/%s (mode %s; state %s) Go/%s", n.Version, n.Mode.String(), n.State.String(), runtime.Version())
+	req.Header.Set("User-Agent", ua)
 	rsp, err := client.Do(req)
 
 	select {
