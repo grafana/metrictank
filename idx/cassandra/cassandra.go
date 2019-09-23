@@ -52,10 +52,14 @@ var (
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 
+	// try executing each query 10 times
+	// when a query fails we retry 9 times with the following sleep times in-between
+	// 100ms, 200ms, 400ms, 800ms, 1.6s, 3.2s, 6.4s, 12.8s, 20s
+	// the total time to fail is 45.5s, which is less than the default http timeout
 	metaRecordRetryPolicy = gocql.ExponentialBackoffRetryPolicy{
-		NumRetries: 10,
-		Min:        time.Millisecond * time.Duration(10),
-		Max:        time.Second,
+		NumRetries: 9,
+		Min:        time.Millisecond * time.Duration(100),
+		Max:        time.Second * time.Duration(20),
 	}
 )
 
