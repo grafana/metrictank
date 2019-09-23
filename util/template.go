@@ -1,30 +1,43 @@
 package util
 
 import (
-	"github.com/pelletier/go-toml"
+	"io"
 	"log"
+	"os"
+
+	"github.com/pelletier/go-toml"
 )
 
-var tomlFiles = make(map[string]*toml.Tree)
-
-func readTomlFile(TomlFilename string) *toml.Tree {
-	tree, ok := tomlFiles[TomlFilename]
-	if ok {
-		return tree
-	}
-	tree, err := toml.LoadFile(TomlFilename)
+func ReadAllEntries(fileReader io.Reader) (map[string]string, error) {
+	tree, err := toml.LoadReader(fileReader)
 	if err != nil {
-		log.Fatalf("Error decoding file %q:\n%s\n", TomlFilename, err)
+		return nil, err
 	}
-	tomlFiles[TomlFilename] = tree
-	return tree
+
+	res := make(map[string]string)
+	for _, key := range tree.Keys() {
+		res[key] = tree.Get(key).(string)
+	}
+
+	return res, nil
 }
 
-func ReadEntry(TomlFilename string, EntryName string) interface{} {
-	tree := readTomlFile(TomlFilename)
-	val := tree.Get(EntryName)
-	if val == nil {
-		log.Fatalf("Error %q does not exist in %q", EntryName, TomlFilename)
+func ReadEntry(schemaFile, entry string) string {
+	schemaFileReader, err := os.Open(schemaFile)
+	if err != nil {
+		log.Fatalf("Failed to open schema file %s: %s", schemaFile, err)
 	}
-	return val
+	defer schemaFileReader.Close()
+
+	tableSchemas, err := ReadAllEntries(schemaFileReader)
+	if err != nil {
+		log.Fatalf("Failed to read schemas from file %s: %s", schemaFile, err)
+	}
+
+	schemaTable, ok := tableSchemas["schema_table"]
+	if !ok {
+		log.Fatalf("Table schemas are missing section \"schema_table\"")
+	}
+
+	return schemaTable
 }

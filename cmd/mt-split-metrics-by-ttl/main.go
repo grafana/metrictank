@@ -45,6 +45,11 @@ func main() {
 	}
 	flag.Parse()
 
+	err := storeConfig.ParseSchemasFromSchemaFile()
+	if err != nil {
+		panic(fmt.Sprintf("Error parsing schemas file: %s", err))
+	}
+
 	var ttls []uint32
 	if flag.NArg() < 1 {
 		flag.Usage()

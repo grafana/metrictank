@@ -2,8 +2,13 @@ package cassandra
 
 import (
 	"flag"
+	"fmt"
+	"io"
+	"os"
 
 	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/util"
+	log "github.com/sirupsen/logrus"
 )
 
 type StoreConfig struct {
@@ -30,6 +35,10 @@ type StoreConfig struct {
 	Username                 string
 	Password                 string
 	SchemaFile               string
+
+	// tableSchemas get set by reading and parsing the SchemaFile in the method ParseSchemas()
+	schemaKeyspace string
+	schemaTable    string
 }
 
 // return StoreConfig with default values set.
@@ -61,6 +70,40 @@ func NewStoreConfig() *StoreConfig {
 	}
 }
 
+func (cfg *StoreConfig) ParseSchemas(schemaFileReader io.Reader) error {
+	tableSchemas, err := util.ReadAllEntries(schemaFileReader)
+	if err != nil {
+		return fmt.Errorf("Failed to read schemas from file %s: %s", CliConfig.SchemaFile, err)
+	}
+
+	var ok bool
+	cfg.schemaKeyspace, ok = tableSchemas["schema_keyspace"]
+	if !ok {
+		return fmt.Errorf("Table schema section \"schema_keyspace\" is missing")
+	}
+
+	cfg.schemaTable, ok = tableSchemas["schema_table"]
+	if !ok {
+		return fmt.Errorf("Table schema section \"schema_table\" is missing")
+	}
+
+	return nil
+}
+
+func (cfg *StoreConfig) ParseSchemasFromSchemaFile() error {
+	schemaFileReader, err := os.Open(cfg.SchemaFile)
+	if err != nil {
+		return fmt.Errorf("Failed to open schema file %s: %s", cfg.SchemaFile, err)
+	}
+	defer schemaFileReader.Close()
+
+	if err := cfg.ParseSchemas(schemaFileReader); err != nil {
+		return fmt.Errorf("cassandra-store: Failed when reading and parsing schemas file. %s", err)
+	}
+
+	return nil
+}
+
 var CliConfig = NewStoreConfig()
 
 func ConfigSetup() *flag.FlagSet {
@@ -90,4 +133,11 @@ func ConfigSetup() *flag.FlagSet {
 	cas.StringVar(&CliConfig.SchemaFile, "schema-file", CliConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
 	globalconf.Register("cassandra", cas, flag.ExitOnError)
 	return cas
+}
+
+func ConfigProcess() {
+	err := CliConfig.ParseSchemasFromSchemaFile()
+	if err != nil {
+		log.Fatalf("cassandra-store: Failed when reading and parsing schemas file. %s", err)
+	}
 }

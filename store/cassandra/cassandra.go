@@ -16,7 +16,6 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/util"
 	hostpool "github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
@@ -133,8 +132,14 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		return nil, err
 	}
 
-	schemaKeyspace := util.ReadEntry(config.SchemaFile, "schema_keyspace").(string)
-	schemaTable := util.ReadEntry(config.SchemaFile, "schema_table").(string)
+	schemaKeyspace, ok := config.tableSchemas["schema_keyspace"]
+	if !ok {
+		return nil, fmt.Errorf("Table schemas are missing section \"schema_keyspace\"")
+	}
+	schemaTable, ok := config.tableSchemas["schema_table"]
+	if !ok {
+		return nil, fmt.Errorf("Table schemas are missing section \"schema_table\"")
+	}
 
 	ttlTables := GetTTLTables(ttls, config.WindowFactor, Table_name_format)
 

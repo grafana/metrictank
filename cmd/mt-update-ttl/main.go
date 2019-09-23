@@ -89,6 +89,8 @@ func main() {
 	ttlIn := dur.MustParseNDuration("ttl", flag.Arg(0))
 	ttlOut := dur.MustParseNDuration("ttl", flag.Arg(1))
 
+	cassandra.ConfigProcess()
+
 	// note: cassandraStore will not be aware via its TTLTables attribute of the other, pre-existing tables,
 	// only of the table we're copying to. but that's ok because we don't exercise any functionality that
 	// needs that

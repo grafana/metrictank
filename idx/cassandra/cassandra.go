@@ -18,7 +18,6 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -129,26 +128,23 @@ func (c *CasIdx) InitBare() error {
 		return fmt.Errorf("failed to create cassandra session: %s", err)
 	}
 
-	// read templates
-	schemaKeyspace := util.ReadEntry(c.Config.SchemaFile, "schema_keyspace").(string)
-	schemaTable := util.ReadEntry(c.Config.SchemaFile, "schema_table").(string)
-
 	// create the keyspace or ensure it exists
 	if c.Config.CreateKeyspace {
 		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.Config.Keyspace)
-		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.Config.Keyspace)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(c.Config.schemaKeyspace, c.Config.Keyspace)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
 		}
 		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.Table)
-		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.Config.Keyspace, c.Config.Table)).Exec()
+		err = tmpSession.Query(fmt.Sprintf(c.Config.schemaTable, c.Config.Keyspace, c.Config.Table)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
-		c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_archive_table", c.Config.ArchiveTable)
+
+		c.EnsureTableExists(tmpSession, c.Config.schemaArchiveTable, c.Config.ArchiveTable)
 
 		if memory.MetaTagSupport {
-			c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_meta_record_table", c.Config.MetaRecordTable)
+			c.EnsureTableExists(tmpSession, c.Config.schemaMetaRecordTable, c.Config.MetaRecordTable)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
@@ -193,7 +189,7 @@ func (c *CasIdx) InitBare() error {
 // schemaFile:  file containing table definition
 // entryName:   identifier of the schema within the file
 // tableName:   name of the table in cassandra
-func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName, tableName string) error {
+func (c *CasIdx) EnsureTableExists(session *gocql.Session, tableSchema, tableName string) error {
 	var err error
 	if session == nil {
 		session, err = c.cluster.CreateSession()
@@ -201,8 +197,6 @@ func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName
 			return fmt.Errorf("failed to create cassandra session: %s", err)
 		}
 	}
-
-	tableSchema := util.ReadEntry(schemaFile, entryName).(string)
 
 	if c.Config.CreateKeyspace {
 		log.Infof("cassandra-idx: ensuring that table %s exists.", tableName)

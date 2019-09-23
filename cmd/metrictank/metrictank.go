@@ -187,6 +187,7 @@ func main() {
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
 	cassandra.ConfigProcess()
+	cassandraStore.ConfigProcess()
 	bigtable.ConfigProcess()
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 	jaeger.ConfigProcess()

@@ -184,8 +184,11 @@ func main() {
 		show = out.Template(format)
 	}
 
+	err := cassandra.CliConfig.ParseSchemasFromSchemaFile()
+	perror(err)
+
 	idx := cassandra.New(cassandra.CliConfig)
-	err := idx.InitBare()
+	err = idx.InitBare()
 	perror(err)
 
 	// from should either be a unix timestamp, or a specification that graphite/metrictank will recognize.

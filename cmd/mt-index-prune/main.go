@@ -107,10 +107,12 @@ func main() {
 
 	cassFlags.Parse(os.Args[cassI+1:])
 	cassandra.CliConfig.Enabled = true
+
+	err = cassandra.CliConfig.ParseSchemasFromSchemaFile()
+	perror(err)
+
 	cassIdx := cassandra.New(cassandra.CliConfig)
 	err = cassIdx.InitBare()
-	perror(err)
-	err = cassIdx.EnsureTableExists(nil, cassIdx.Config.SchemaFile, "schema_archive_table", cassIdx.Config.ArchiveTable)
 	perror(err)
 
 	// we don't want to filter any metric definitions during the loading

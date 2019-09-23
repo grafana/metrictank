@@ -99,6 +99,7 @@ func main() {
 
 	mdata.ConfigProcess()
 	cassandra.ConfigProcess()
+	cassandraStore.ConfigProcess()
 	bigtable.ConfigProcess()
 	bigTableStore.ConfigProcess(mdata.MaxChunkSpan())
 

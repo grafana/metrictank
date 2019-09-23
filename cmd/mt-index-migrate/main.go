@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// ensure the dest table exists.
-	schemaTable := util.ReadEntry(*schemaFile, "schema_table").(string)
+	schemaTable := util.ReadEntry(*schemaFile, "schema_table")
 	err = dstSession.Query(fmt.Sprintf(schemaTable, *dstKeyspace, *dstTable)).Exec()
 	if err != nil {
 		log.Fatalf("cassandra-idx failed to initialize cassandra table. %s", err.Error())

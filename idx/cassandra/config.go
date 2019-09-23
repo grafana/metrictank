@@ -3,9 +3,15 @@ package cassandra
 import (
 	"errors"
 	"flag"
+	"fmt"
+	"io"
+	"os"
 	"time"
 
+	"github.com/grafana/metrictank/idx/memory"
+
 	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -43,6 +49,12 @@ type IdxConfig struct {
 	ProtoVer                 int
 	DisableInitialHostLookup bool
 	InitLoadConcurrency      int
+
+	// tableSchemas get set by reading and parsing the SchemaFile in the method ParseSchemas()
+	schemaKeyspace        string
+	schemaTable           string
+	schemaArchiveTable    string
+	schemaMetaRecordTable string
 }
 
 // NewIdxConfig returns IdxConfig with default values set.
@@ -83,6 +95,53 @@ func (cfg *IdxConfig) Validate() error {
 	if cfg.Timeout == 0 {
 		return errors.New("timeout must be greater than 0. " + timeUnits)
 	}
+
+	return nil
+}
+
+func (cfg *IdxConfig) ParseSchemas(schemaFileReader io.Reader) error {
+	tableSchemas, err := util.ReadAllEntries(schemaFileReader)
+	if err != nil {
+		return fmt.Errorf("Failed to read schemas from file %s: %s", CliConfig.SchemaFile, err)
+	}
+
+	var ok bool
+	cfg.schemaKeyspace, ok = tableSchemas["schema_keyspace"]
+	if !ok {
+		return fmt.Errorf("Table schema section \"schema_keyspace\" is missing")
+	}
+
+	cfg.schemaTable, ok = tableSchemas["schema_table"]
+	if !ok {
+		return fmt.Errorf("Table schema section \"schema_table\" is missing")
+	}
+
+	cfg.schemaArchiveTable, ok = tableSchemas["schema_archive_table"]
+	if !ok {
+		return fmt.Errorf("Table schema section \"schema_archive_table\" is missing")
+	}
+
+	if memory.MetaTagSupport {
+		cfg.schemaMetaRecordTable, ok = tableSchemas["schema_meta_record_table"]
+		if !ok {
+			return fmt.Errorf("Table schema section \"schema_meta_record_table\" is missing")
+		}
+	}
+
+	return nil
+}
+
+func (cfg *IdxConfig) ParseSchemasFromSchemaFile() error {
+	schemaFileReader, err := os.Open(cfg.SchemaFile)
+	if err != nil {
+		return fmt.Errorf("Failed to open schema file %s: %s", cfg.SchemaFile, err)
+	}
+	defer schemaFileReader.Close()
+
+	if err := cfg.ParseSchemas(schemaFileReader); err != nil {
+		return fmt.Errorf("cassandra-store: Failed when reading and parsing schemas file. %s", err)
+	}
+
 	return nil
 }
 
@@ -120,9 +179,15 @@ func ConfigSetup() *flag.FlagSet {
 	return casIdx
 }
 
-// ConfigProcess calls IdxConfig.Validate() on CliConfig. If an error is discovered this will exit with status set to 1.
+// ConfigProcess validates CliConfig and parses the table schema file.
+// If an error is discovered this will exit with status set to 1.
 func ConfigProcess() {
 	if err := CliConfig.Validate(); err != nil {
 		log.Fatalf("cassandra-idx: Config validation error. %s", err)
+	}
+
+	err := CliConfig.ParseSchemasFromSchemaFile()
+	if err != nil {
+		log.Fatalf("cassandra-idx: Failed when reading and parsing schemas file. %s", err)
 	}
 }

@@ -125,6 +125,7 @@ func main() {
 		flag.Usage()
 		os.Exit(-1)
 	}
+
 	var tableSelector, metricSelector, format string
 	tableSelector = flag.Arg(0)
 	if tableSelector != "tables" {
@@ -185,6 +186,11 @@ func main() {
 		}
 	}
 
+	err := storeConfig.ParseSchemasFromSchemaFile()
+	if err != nil {
+		log.Fatalf("Error parsing schemas file: %s", err)
+	}
+
 	store, err := cassandra.NewCassandraStore(storeConfig, nil)
 	if err != nil {
 		log.Fatalf("failed to initialize cassandra. %s", err.Error())
@@ -203,6 +209,12 @@ func main() {
 	idxConfig.Auth = storeConfig.Auth
 	idxConfig.Username = storeConfig.Username
 	idxConfig.Password = storeConfig.Password
+
+	err = idxConfig.ParseSchemasFromSchemaFile()
+	if err != nil {
+		log.Fatalf("Error parsing schemas file: %s", err)
+	}
+
 	idx := cassandra_idx.New(idxConfig)
 	err = idx.InitBare()
 	if err != nil {
