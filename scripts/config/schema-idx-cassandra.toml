@@ -40,7 +40,6 @@ CREATE TABLE IF NOT EXISTS %s.%s (
     orgid int,
     expressions text,
     metatags text,
-    createdat bigint,
     lastupdate bigint,
     PRIMARY KEY (orgid, expressions)
 )

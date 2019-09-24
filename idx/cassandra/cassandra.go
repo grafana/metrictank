@@ -438,75 +438,70 @@ func (c *CasIdx) applyMetaRecords(orgId uint32, records []tagquery.MetaTagRecord
 	}
 }
 
-func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord, persist bool) (tagquery.MetaTagRecord, bool, error) {
-	record, created, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, upsertRecord, persist)
-	if err != nil {
-		return record, created, err
-	}
-
+func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord, persist bool) (tagquery.MetaTagRecord, bool, error) {
 	if c.Config.updateCassIdx && persist {
 		var err error
 
 		// if a record has no meta tags associated with it, then we delete it
 		if len(record.MetaTags) > 0 {
-			err = c.persistMetaRecord(orgId, record, created)
+			err = c.persistMetaRecord(orgId, record)
 		} else {
 			err = c.deleteMetaRecord(orgId, record)
 		}
 
 		if err != nil {
 			log.Errorf("Failed to update meta records in cassandra: %s", err)
-			return record, created, fmt.Errorf("Failed to update cassandra: %s", err)
+			return record, false, fmt.Errorf("Failed to update cassandra: %s", err)
 		}
 	}
 
-	return record, created, nil
+	return c.MemoryIndex.MetaTagRecordUpsert(orgId, record, persist)
 }
 
 func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord, persist bool) (uint32, uint32, error) {
-	added, deleted, err := c.MemoryIndex.MetaTagRecordSwap(orgId, records, persist)
-	if !c.Config.updateCassIdx || err != nil || !persist {
-		return added, deleted, err
+	if c.Config.updateCassIdx && persist {
+		now := time.Now().UnixNano() / 1000000
+		batch := c.Session.NewBatch(gocql.LoggedBatch).RetryPolicy(&metaRecordRetryPolicy)
+
+		// within a batch operation we need to specify timestamps using "USING TIMESTAMP" to ensure
+		// that the statement execution happens in the order we require.
+		// the leading DELETE statement gets the timestamp now - 1000 to ensure that it gets executed
+		// before the sub-sequent inserts.
+		batch.Query(fmt.Sprintf("DELETE FROM %s USING TIMESTAMP ? WHERE orgid=?", c.Config.MetaRecordTable), now-1000, orgId)
+		var expressions, metaTags []byte
+		var qry string
+		var err error
+
+		for _, record := range records {
+			record.Expressions.Sort()
+			expressions, err = record.Expressions.MarshalJSON()
+			if err != nil {
+				return 0, 0, fmt.Errorf("Failed to marshal expressions: %s", err)
+			}
+			metaTags, err = record.MetaTags.MarshalJSON()
+			if err != nil {
+				return 0, 0, fmt.Errorf("Failed to marshal meta tags: %s", err)
+			}
+			qry = fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
+			batch.Query(
+				qry,
+				orgId,
+				expressions,
+				metaTags,
+				now,
+				now)
+		}
+
+		err = c.Session.ExecuteBatch(batch)
+		if err != nil {
+			return 0, 0, err
+		}
 	}
 
-	now := time.Now().UnixNano() / 1000000
-	batch := c.Session.NewBatch(gocql.LoggedBatch).RetryPolicy(&metaRecordRetryPolicy)
-
-	// within a batch operation we need to specify timestamps using "USING TIMESTAMP" to ensure
-	// that the statement execution happens in the order we require.
-	// the leading DELETE statement gets the timestamp now - 1000 to ensure that it gets executed
-	// before the sub-sequent inserts.
-	batch.Query(fmt.Sprintf("DELETE FROM %s USING TIMESTAMP ? WHERE orgid=?", c.Config.MetaRecordTable), now-1000, orgId)
-	var expressions, metaTags []byte
-	var qry string
-
-	for _, record := range records {
-		record.Expressions.Sort()
-		expressions, err = record.Expressions.MarshalJSON()
-		if err != nil {
-			return 0, 0, fmt.Errorf("Failed to marshal expressions: %s", err)
-		}
-		metaTags, err = record.MetaTags.MarshalJSON()
-		if err != nil {
-			return 0, 0, fmt.Errorf("Failed to marshal meta tags: %s", err)
-		}
-		qry = fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
-		batch.Query(
-			qry,
-			orgId,
-			expressions,
-			metaTags,
-			now,
-			now,
-			now)
-	}
-
-	err = c.Session.ExecuteBatch(batch)
-
-	return added, deleted, err
+	return c.MemoryIndex.MetaTagRecordSwap(orgId, records, persist)
 }
 
-func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, created bool) error {
+func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord) error {
 	expressions, err := record.Expressions.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("Failed to marshal expressions: %s", err)
@@ -517,19 +512,6 @@ func (c *CasIdx) persistMetaRecord(orgId uint32, record tagquery.MetaTagRecord, 
 	}
 
 	now := time.Now().UnixNano() / 1000000
-
-	if created {
-		qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, createdat, lastupdate) VALUES (?, ?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
-		return c.Session.Query(
-			qry,
-			orgId,
-			expressions,
-			metaTags,
-			now,
-			now,
-			now).RetryPolicy(&metaRecordRetryPolicy).Exec()
-	}
-
 	qry := fmt.Sprintf("INSERT INTO %s (orgid, expressions, metatags, lastupdate) VALUES (?, ?, ?, ?) USING TIMESTAMP ?", c.Config.MetaRecordTable)
 	return c.Session.Query(
 		qry,
