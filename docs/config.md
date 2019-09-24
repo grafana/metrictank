@@ -248,9 +248,9 @@ buffer-size = 20000
 
 ```
 [chunk-cache]
-# maximum size of chunk cache in bytes. (1024 ^ 3) * 4 = 4294967296 = 4G
+# maximum size of chunk cache in bytes. 512 MB = (1024 ^ 2) * 512 = 536870912
 # 0 disables cache
-max-size = 4294967296
+max-size = 536870912
 ```
 
 ## http api ##
