@@ -432,11 +432,9 @@ func (c *CasIdx) loadMetaRecords() map[uint32][]tagquery.MetaTagRecord {
 }
 
 func (c *CasIdx) applyMetaRecords(orgId uint32, records []tagquery.MetaTagRecord) {
-	for _, record := range records {
-		_, _, err := c.MemoryIndex.MetaTagRecordUpsert(orgId, record, false)
-		if err != nil {
-			log.Errorf("cassandra-idx: applyMetaRecords() failed to apply meta record: %s", err)
-		}
+	_, _, err := c.MemoryIndex.MetaTagRecordSwap(orgId, records, false)
+	if err != nil {
+		log.Errorf("cassandra-idx: applyMetaRecords() failed to apply meta record: %s", err)
 	}
 }
 
