@@ -10,7 +10,7 @@ import (
 //go:generate msgp
 
 type MetaTagRecordUpsert struct {
-	MetaTags    []string `json:"metaTags" binding:"Required"`
+	MetaTags    []string `json:"metaTags"`
 	Expressions []string `json:"expressions" binding:"Required"`
 	Propagate   bool     `json:"propagate"`
 }
@@ -40,7 +40,7 @@ type MetaTagRecordUpsertResult struct {
 
 type IndexMetaTagRecordUpsert struct {
 	OrgId       uint32   `json:"orgId" binding:"Required"`
-	MetaTags    []string `json:"metaTags" binding:"Required"`
+	MetaTags    []string `json:"metaTags"`
 	Expressions []string `json:"expressions" binding:"Required"`
 }
 
