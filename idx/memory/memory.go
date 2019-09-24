@@ -67,6 +67,7 @@ var (
 	matchCacheSize               = 1000
 	enrichmentCacheSize          = 10000
 	MetaTagSupport               = false
+	MetaTagRecordReloadInterval  = 10 * time.Second
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -88,6 +89,7 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
 	memoryIdx.BoolVar(&MetaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
+	memoryIdx.DurationVar(&MetaTagRecordReloadInterval, "meta-tag-record-reload-interval", 10*time.Second, "the interval at which meta records get reloaded from the backend store")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 	return memoryIdx
 }

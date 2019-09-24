@@ -409,7 +409,11 @@ func (c *CasIdx) rebuildIndex() {
 
 func (c *CasIdx) metaRecordLoader() {
 	c.loadMetaRecordsTicker = make(chan struct{})
-	ticker := time.NewTicker(time.Second * time.Duration(10))
+	if memory.MetaTagRecordReloadInterval == 0 {
+		return
+	}
+
+	ticker := time.NewTicker(memory.MetaTagRecordReloadInterval)
 
 	go func() {
 		defer ticker.Stop()
