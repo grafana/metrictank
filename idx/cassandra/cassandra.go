@@ -71,12 +71,13 @@ type writeReq struct {
 // CasIdx implements the the "MetricIndex" interface
 type CasIdx struct {
 	memory.MemoryIndex
-	Config           *IdxConfig
-	cluster          *gocql.ClusterConfig
-	Session          *gocql.Session
-	writeQueue       chan writeReq
-	wg               sync.WaitGroup
-	updateInterval32 uint32
+	Config                *IdxConfig
+	cluster               *gocql.ClusterConfig
+	Session               *gocql.Session
+	writeQueue            chan writeReq
+	wg                    sync.WaitGroup
+	updateInterval32      uint32
+	loadMetaRecordsTicker chan struct{}
 }
 
 type cqlIterator interface {
@@ -149,6 +150,7 @@ func (c *CasIdx) InitBare() error {
 
 		if memory.MetaTagSupport {
 			c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_meta_record_table", c.Config.MetaRecordTable)
+			c.metaRecordLoader()
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
@@ -253,6 +255,10 @@ func (c *CasIdx) Init() error {
 }
 
 func (c *CasIdx) Stop() {
+	if memory.MetaTagSupport {
+		close(c.loadMetaRecordsTicker)
+	}
+
 	log.Info("cassandra-idx: stopping")
 	c.MemoryIndex.Stop()
 
@@ -390,10 +396,7 @@ func (c *CasIdx) rebuildIndex() {
 		go func() {
 			gate <- struct{}{}
 
-			records := c.loadMetaRecords()
-			for orgId, values := range records {
-				c.applyMetaRecords(orgId, values)
-			}
+			c.reloadMetaRecords()
 
 			wg.Done()
 			<-gate
@@ -404,7 +407,35 @@ func (c *CasIdx) rebuildIndex() {
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (c *CasIdx) loadMetaRecords() map[uint32][]tagquery.MetaTagRecord {
+func (c *CasIdx) metaRecordLoader() {
+	c.loadMetaRecordsTicker = make(chan struct{})
+	ticker := time.NewTicker(time.Second * time.Duration(10))
+
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.reloadMetaRecords()
+			case <-c.loadMetaRecordsTicker:
+				// shutdown
+				return
+			}
+		}
+	}()
+}
+
+func (c *CasIdx) reloadMetaRecords() {
+	records := c.readMetaRecords()
+	for orgId, records := range records {
+		_, _, err := c.MemoryIndex.MetaTagRecordSwap(orgId, records, false)
+		if err != nil {
+			log.Errorf("cassandra-idx: reloadMetaRecords() failed to apply meta record: %s", err)
+		}
+	}
+}
+
+func (c *CasIdx) readMetaRecords() map[uint32][]tagquery.MetaTagRecord {
 	q := fmt.Sprintf("SELECT orgid, expressions, metatags FROM %s", c.Config.MetaRecordTable)
 	var orgId uint32
 	var expressions, metatags string
@@ -429,13 +460,6 @@ func (c *CasIdx) loadMetaRecords() map[uint32][]tagquery.MetaTagRecord {
 	}
 
 	return res
-}
-
-func (c *CasIdx) applyMetaRecords(orgId uint32, records []tagquery.MetaTagRecord) {
-	_, _, err := c.MemoryIndex.MetaTagRecordSwap(orgId, records, false)
-	if err != nil {
-		log.Errorf("cassandra-idx: applyMetaRecords() failed to apply meta record: %s", err)
-	}
 }
 
 func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord, persist bool) (tagquery.MetaTagRecord, bool, error) {
