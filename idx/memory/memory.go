@@ -540,10 +540,21 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 		addedRecords++
 	}
 
+	m.RLock()
+	oldMtr, ok := m.metaTagRecords[orgId]
+	if ok {
+		if oldMtr.hashRecords() == newMtr.hashRecords() {
+			// the old and the new records are the same, so there is no need to change anyting
+			m.RUnlock()
+			return 0, 0, nil
+		}
+	}
+
+	m.RUnlock()
 	m.Lock()
 	defer m.Unlock()
 
-	oldMtr, ok := m.metaTagRecords[orgId]
+	oldMtr, ok = m.metaTagRecords[orgId]
 	if ok {
 		deletedRecords = uint32(len(oldMtr.records))
 	}
