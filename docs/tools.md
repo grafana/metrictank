@@ -735,8 +735,6 @@ Usage of ./mt-whisper-importer-writer:
     	Number of Partitions (default 1)
   -partition-scheme string
     	method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv) (default "bySeries")
-  -ttls string
-    	list of ttl strings used by MT separated by ',' (default "35d")
   -uri-path string
     	the URI on which we expect chunks to get posted (default "/metrics/import")
 ```
