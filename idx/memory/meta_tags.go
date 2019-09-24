@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"sort"
+	"strings"
 	"sync/atomic"
 	"unsafe"
 
@@ -44,7 +46,10 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	// after altering meta records we need to reinstantiate the enricher the next time we want to use it
 	defer atomic.StorePointer(&m.enricher, nil)
 
-	id := recordId(record.HashExpressions())
+	record.Expressions.Sort()
+	record.MetaTags.Sort()
+
+	id := recordId(record.HashExpressions(nil))
 	var oldRecord *tagquery.MetaTagRecord
 	var oldId recordId
 
@@ -78,6 +83,30 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	}
 
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
+}
+
+func (m *metaTagRecords) hashRecords() uint32 {
+	builder := &strings.Builder{}
+
+	i := 0
+	recordIds := make([]recordId, len(m.records))
+	for recordId := range m.records {
+		recordIds[i] = recordId
+		i++
+	}
+
+	sort.Slice(recordIds, func(i, j int) bool {
+		return recordIds[i] < recordIds[j]
+	})
+
+	h := tagquery.QueryHash()
+	for _, recordId := range recordIds {
+		record := m.records[recordId]
+		h.Write([]byte{byte(record.HashRecord(builder)), byte(';')})
+		builder.Reset()
+	}
+
+	return h.Sum32()
 }
 
 func (m *metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {

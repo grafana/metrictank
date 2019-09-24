@@ -61,10 +61,13 @@ func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
 
 // HashExpressions returns a hash of all expressions in this meta tag record
 // It is assumed that the expressions are already sorted
-func (m *MetaTagRecord) HashExpressions() uint32 {
-	builder := strings.Builder{}
+func (m *MetaTagRecord) HashExpressions(builder *strings.Builder) uint32 {
+	if builder == nil {
+		builder = &strings.Builder{}
+	}
+
 	for _, query := range m.Expressions {
-		query.StringIntoBuilder(&builder)
+		query.StringIntoBuilder(builder)
 
 		// trailing ";" doesn't matter, this is only hash input
 		builder.WriteString(";")
@@ -72,6 +75,37 @@ func (m *MetaTagRecord) HashExpressions() uint32 {
 
 	h := QueryHash()
 	h.Write([]byte(builder.String()))
+	return h.Sum32()
+}
+
+func (m *MetaTagRecord) HashMetaTags(builder *strings.Builder) uint32 {
+	if builder == nil {
+		builder = &strings.Builder{}
+	}
+
+	for _, metaTag := range m.MetaTags {
+		metaTag.StringIntoBuilder(builder)
+
+		// trailing ";" doesn't matter, this is only hash input
+		builder.WriteString(";")
+	}
+
+	h := QueryHash()
+	h.Write([]byte(builder.String()))
+	return h.Sum32()
+}
+
+func (m *MetaTagRecord) HashRecord(builder *strings.Builder) uint32 {
+	if builder == nil {
+		builder = &strings.Builder{}
+	}
+
+	expressionsHash := m.HashExpressions(builder)
+	builder.Reset()
+	metaTagHash := m.HashMetaTags(builder)
+
+	h := QueryHash()
+	h.Write([]byte{byte(expressionsHash), byte(metaTagHash)})
 	return h.Sum32()
 }
 

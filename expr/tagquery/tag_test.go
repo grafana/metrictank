@@ -310,3 +310,19 @@ func TestTag_StringIntoBuilder(t *testing.T) {
 		})
 	}
 }
+
+func TestTagSorting(t *testing.T) {
+	tags1 := Tags{Tag{Key: "key1", Value: "value1"}, Tag{Key: "key2", Value: "value2"}}
+	tags2 := Tags{Tag{Key: "key2", Value: "value2"}, Tag{Key: "key1", Value: "value1"}}
+
+	if reflect.DeepEqual(tags1, tags2) {
+		t.Fatalf("Expected tags1 and tags2 to be different")
+	}
+
+	tags1.Sort()
+	tags2.Sort()
+
+	if !reflect.DeepEqual(tags1, tags2) {
+		t.Fatalf("Expected tags1 and tags2 to be the same")
+	}
+}

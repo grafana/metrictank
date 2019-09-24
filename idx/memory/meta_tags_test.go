@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"hash"
 	"testing"
 
@@ -64,7 +65,7 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 		t.Fatalf("metaTagRecords was expected to have 1 entry, but it had %d", len(metaTagRecords.records))
 	}
 
-	_, ok := metaTagRecords.records[recordId(record.HashExpressions())]
+	_, ok := metaTagRecords.records[recordId(record.HashExpressions(nil))]
 	if !ok {
 		t.Fatalf("We expected the record to be found at the index of its hash, but it wasn't")
 	}
@@ -302,5 +303,79 @@ func TestDeletingMetaRecord(t *testing.T) {
 	_, ok := metaTagRecords.records[id]
 	if ok {
 		t.Fatalf("Expected returned record id to not be present, but it was")
+	}
+}
+
+func TestComparingMetaTagRecords(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
+	mtr1 := newMetaTagRecords()
+	mtr2 := newMetaTagRecords()
+
+	if mtr1.hashRecords() != mtr2.hashRecords() {
+		t.Fatalf("TC1: Expected meta tag records to be the same")
+	}
+
+	record1, err := tagquery.ParseMetaTagRecord([]string{"meta1=tag1"}, []string{"expr1=value1"})
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing meta tag record: %s", err)
+	}
+
+	mtr1.upsert(record1)
+
+	if mtr1.hashRecords() == mtr2.hashRecords() {
+		t.Fatalf("TC2: Expected meta tag records to be the different")
+	}
+
+	mtr2.upsert(record1)
+
+	if mtr1.hashRecords() != mtr2.hashRecords() {
+		t.Fatalf("TC3: Expected meta tag records to be the same")
+	}
+
+	record2, err := tagquery.ParseMetaTagRecord([]string{"meta2=tag2"}, []string{"expr2=value2"})
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing meta tag record: %s", err)
+	}
+
+	mtr1.upsert(record2)
+
+	if mtr1.hashRecords() == mtr2.hashRecords() {
+		t.Fatalf("TC4: Expected meta tag records to be the different")
+	}
+
+	mtr2.upsert(record2)
+
+	if mtr1.hashRecords() != mtr2.hashRecords() {
+		t.Fatalf("TC5: Expected meta tag records to be the same")
+	}
+
+	// create another instance of metaTagRecords and populate it in reverse order
+	mtr3 := newMetaTagRecords()
+	mtr3.upsert(record2)
+	mtr3.upsert(record1)
+
+	if mtr1.hashRecords() != mtr3.hashRecords() {
+		t.Fatalf("TC6: Expected meta tag records to be the same")
+	}
+}
+
+func BenchmarkMetaTagRecordsHashing(b *testing.B) {
+	mtrCount := 10000
+	mtr := newMetaTagRecords()
+	for i := 0; i < mtrCount; i++ {
+		record, err := tagquery.ParseMetaTagRecord([]string{fmt.Sprintf("meta%d=tag%d", i, i)}, []string{fmt.Sprintf("expr%d=value%d", i, i)})
+		if err != nil {
+			b.Fatalf("Unexpected error when parsing meta tag record: %s", err)
+		}
+		mtr.upsert(record)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		mtr.hashRecords()
 	}
 }

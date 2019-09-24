@@ -22,7 +22,7 @@ func ParseTags(tags []string) (Tags, error) {
 		res[i] = tag
 	}
 
-	sort.Sort(res)
+	res.Sort()
 
 	return res, nil
 }
@@ -46,18 +46,18 @@ func ParseTagsFromMetricName(name string) (Tags, error) {
 	}
 
 	res = append(res, Tag{Key: "name", Value: nameValue})
-	sort.Sort(res)
+	res.Sort()
 
 	return res, nil
 }
 
-func (t Tags) Len() int      { return len(t) }
-func (t Tags) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
-func (t Tags) Less(i, j int) bool {
-	if t[i].Key == t[j].Key {
-		return t[i].Value < t[j].Value
-	}
-	return t[i].Key < t[j].Key
+func (t Tags) Sort() {
+	sort.Slice(t, func(i, j int) bool {
+		if t[i].Key == t[j].Key {
+			return t[i].Value < t[j].Value
+		}
+		return t[i].Key < t[j].Key
+	})
 }
 
 func (t Tags) Strings() []string {

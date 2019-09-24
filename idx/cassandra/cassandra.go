@@ -506,6 +506,7 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 			if err != nil {
 				return 0, 0, fmt.Errorf("Failed to marshal expressions: %s", err)
 			}
+			record.MetaTags.Sort()
 			metaTags, err = record.MetaTags.MarshalJSON()
 			if err != nil {
 				return 0, 0, fmt.Errorf("Failed to marshal meta tags: %s", err)

@@ -528,8 +528,6 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 
 	var addedRecords, deletedRecords uint32
 	for _, record := range records {
-		record.Expressions.Sort()
-
 		recordId, _, _, _, err := newMtr.upsert(record)
 		if err != nil {
 			return 0, 0, err
