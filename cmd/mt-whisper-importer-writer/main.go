@@ -7,13 +7,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/schema"
-	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/cluster"
@@ -32,7 +30,6 @@ var (
 	confFile        = flag.String("config", "/etc/metrictank/metrictank.ini", "configuration file path")
 	exitOnError     = flag.Bool("exit-on-error", false, "Exit with a message when there's an error")
 	httpEndpoint    = flag.String("http-endpoint", "0.0.0.0:8080", "The http endpoint to listen on")
-	ttlsStr         = flag.String("ttls", "35d", "list of ttl strings used by MT separated by ','")
 	partitionScheme = flag.String("partition-scheme", "bySeries", "method used for partitioning metrics. This should match the settings of tsdb-gw. (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv)")
 	uriPath         = flag.String("uri-path", "/metrics/import", "the URI on which we expect chunks to get posted")
 	numPartitions   = flag.Int("num-partitions", 1, "Number of Partitions")
@@ -101,12 +98,6 @@ func main() {
 	cassandra.ConfigProcess()
 	bigtable.ConfigProcess()
 	bigTableStore.ConfigProcess(mdata.MaxChunkSpan())
-
-	splits := strings.Split(*ttlsStr, ",")
-	ttls := make([]uint32, 0)
-	for _, split := range splits {
-		ttls = append(ttls, dur.MustParseNDuration("ttl", split))
-	}
 
 	if (cassandraStore.CliConfig.Enabled && bigTableStore.CliConfig.Enabled) || !(cassandraStore.CliConfig.Enabled || bigTableStore.CliConfig.Enabled) {
 		log.Fatalf("exactly 1 backend store plugin must be enabled. cassandra: %t bigtable: %t", cassandraStore.CliConfig.Enabled, bigTableStore.CliConfig.Enabled)
