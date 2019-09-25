@@ -41,6 +41,11 @@ func doRecover(errp *error) {
 	return
 }
 
+type getTargetResp struct {
+	series models.Series
+	err    error
+}
+
 type getTargetsResp struct {
 	series []models.Series
 	err    error
@@ -275,7 +280,7 @@ func (s *Server) getTargetsLocal(ctx context.Context, ss *models.StorageStats, r
 	rCtx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
 	defer span.Finish()
 	span.LogFields(traceLog.Int("num_reqs", len(reqs)))
-	responses := make(chan getTargetsResp, len(reqs))
+	responses := make(chan getTargetResp, len(reqs))
 
 	var wg sync.WaitGroup
 	reqLimiter := util.NewLimiter(getTargetsConcurrency)
@@ -293,23 +298,13 @@ LOOP:
 		wg.Add(1)
 		go func(req models.Req) {
 			pre := time.Now()
-			points, interval, err := s.getTarget(rCtx, ss, req)
+			series, err := s.getTarget(rCtx, ss, req)
 			if err != nil {
 				cancel() // cancel all other requests.
-				responses <- getTargetsResp{nil, err}
 			} else {
 				getTargetDuration.Value(time.Now().Sub(pre))
-				responses <- getTargetsResp{[]models.Series{{
-					Target:       req.Target, // always simply the metric name from index
-					Datapoints:   points,
-					Interval:     interval,
-					QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was
-					QueryFrom:    req.From,
-					QueryTo:      req.To,
-					QueryCons:    req.ConsReq,
-					Consolidator: req.Consolidator,
-				}}, nil}
 			}
+			responses <- getTargetResp{series, err}
 			wg.Done()
 			// pop an item of our limiter so that other requests can be processed.
 			reqLimiter.Release()
@@ -325,7 +320,7 @@ LOOP:
 			tags.Error.Set(span, true)
 			return nil, resp.err
 		}
-		out = append(out, resp.series...)
+		out = append(out, resp.series)
 	}
 
 	ss.Trace(span)
@@ -337,7 +332,7 @@ LOOP:
 // getTarget returns the series for the request in canonical form.
 // as ConsolidateContext just processes what it's been given (not "stable" or bucket-aligned to the output interval)
 // we simply make sure to pass it the right input such that the output is canonical.
-func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req models.Req) (points []schema.Point, interval uint32, err error) {
+func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req models.Req) (out models.Series, err error) {
 	defer doRecover(&err)
 	normalize := req.AggNum > 1 // do we need to normalize points at runtime?
 	// normalize is runtime consolidation but only for the purpose of bringing high-res
@@ -349,37 +344,49 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 		log.Debugf("DP getTarget() %s normalize:false", req.DebugString())
 	}
 
+	out = models.Series{
+		Target:       req.Target, // always simply the metric name from index
+		Interval:     req.OutInterval,
+		QueryPatt:    req.Pattern, // foo.* or foo.bar whatever the etName arg was
+		QueryFrom:    req.From,
+		QueryTo:      req.To,
+		QueryCons:    req.ConsReq,
+		Consolidator: req.Consolidator,
+	}
+
 	// the easy case: we're reading the raw data.
 	if req.Archive == 0 {
-		fixed, err := s.getSeriesFixed(ctx, ss, req, consolidation.None)
+		out.Datapoints, err = s.getSeriesFixed(ctx, ss, req, consolidation.None)
 		if err != nil || !normalize {
-			return fixed, req.OutInterval, err
+			return out, err
 		}
-		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
+		out.Datapoints = consolidation.ConsolidateContext(ctx, out.Datapoints, req.AggNum, req.Consolidator)
+		return out, nil
 	}
 
 	// here we're reading rollup data
 	if req.Consolidator == consolidation.Avg {
 		sum, err := s.getSeriesFixed(ctx, ss, req, consolidation.Sum)
 		if err != nil {
-			return nil, req.OutInterval, err
+			return out, err
 		}
 		cnt, err := s.getSeriesFixed(ctx, ss, req, consolidation.Cnt)
 		if err != nil {
-			return nil, req.OutInterval, err
+			return out, err
 		}
 		if normalize {
 			sum = consolidation.ConsolidateContext(ctx, sum, req.AggNum, consolidation.Sum)
 			cnt = consolidation.ConsolidateContext(ctx, cnt, req.AggNum, consolidation.Sum)
 		}
-		return divideContext(ctx, sum, cnt), req.OutInterval, nil
+		out.Datapoints = divideContext(ctx, sum, cnt)
 	} else {
-		fixed, err := s.getSeriesFixed(ctx, ss, req, req.Consolidator)
+		out.Datapoints, err = s.getSeriesFixed(ctx, ss, req, req.Consolidator)
 		if err != nil || !normalize {
-			return fixed, req.OutInterval, err
+			return out, err
 		}
-		return consolidation.ConsolidateContext(ctx, fixed, req.AggNum, req.Consolidator), req.OutInterval, nil
+		out.Datapoints = consolidation.ConsolidateContext(ctx, out.Datapoints, req.AggNum, req.Consolidator)
 	}
+	return out, nil
 }
 
 func logLoad(typ string, key schema.AMKey, from, to uint32) {
