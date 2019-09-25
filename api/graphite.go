@@ -202,8 +202,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	// render API is modeled after graphite, so from exclusive, to inclusive.
 	// in MT, from is inclusive, to is exclusive (which is akin to slice syntax)
 	// so we must adjust
-	fromUnix += 1
-	toUnix += 1
+	fromUnix++
+	toUnix++
 
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {

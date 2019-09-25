@@ -15,15 +15,19 @@ import (
 // Req is a request for data by MKey and parameters such as consolidator, max points, etc
 type Req struct {
 	// these fields can be set straight away:
-	MKey         schema.MKey                `json:"key"`     // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
-	Target       string                     `json:"target"`  // the target we should return either to graphite or as if we're graphite.  simply the graphite metric key from the index
-	Pattern      string                     `json:"pattern"` // the original query pattern specified by user (not wrapped by any functions). e.g. `foo.b*`. To be able to tie the result data back to the data need as requested
-	From         uint32                     `json:"from"`
-	To           uint32                     `json:"to"`
-	MaxPoints    uint32                     `json:"maxPoints"`
-	RawInterval  uint32                     `json:"rawInterval"`  // the interval of the raw metric before any consolidation
-	Consolidator consolidation.Consolidator `json:"consolidator"` // consolidation method for rollup archive and normalization. (not runtime consolidation)
-	// requested consolidation method. could be 0 (meaning use configured default)
+	MKey        schema.MKey `json:"key"`     // metric key aka metric definition id (orgid.<hash>), often same as target for graphite-metrictank requests
+	Target      string      `json:"target"`  // the target we should return either to graphite or as if we're graphite.  simply the graphite metric key from the index
+	Pattern     string      `json:"pattern"` // the original query pattern specified by user (not wrapped by any functions). e.g. `foo.b*`. To be able to tie the result data back to the data need as requested
+	From        uint32      `json:"from"`
+	To          uint32      `json:"to"`
+	MaxPoints   uint32      `json:"maxPoints"`
+	RawInterval uint32      `json:"rawInterval"` // the interval of the raw metric before any consolidation
+	// the consolidation method for rollup archive and normalization. (not runtime consolidation)
+	// ConsReq 0 -> configured value
+	// Conseq != 0 -> closest value we can offer based on config
+	Consolidator consolidation.Consolidator `json:"consolidator"`
+	// requested consolidation method via consolidateBy(), if any.
+	// could be 0 if it was not specified or reset by a "special" functions. in which case, we use the configured default.
 	// we need to make this differentiation to tie back to the original request (and we can't just fill in the concrete consolidation in the request,
 	// because one request may result in multiple series with different consolidators)
 	ConsReq  consolidation.Consolidator `json:"consolidator_req"`

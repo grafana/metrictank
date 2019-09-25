@@ -56,7 +56,7 @@ func (p Plan) Dump(w io.Writer) {
 	fmt.Fprintf(w, "To: %d\n", p.To)
 }
 
-// Plan validates the expressions and comes up with the initial (potentially non-optimal) execution plan
+// NewPlan validates the expressions and comes up with the initial (potentially non-optimal) execution plan
 // which is just a list of requests and the expressions.
 // traverse tree and as we go down:
 // * make sure function exists
