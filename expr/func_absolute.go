@@ -41,6 +41,7 @@ func (s *FuncAbsolute) Exec(cache map[Req][]models.Series) ([]models.Series, err
 		transformed.Interval = serie.Interval
 		transformed.Consolidator = serie.Consolidator
 		transformed.QueryCons = serie.QueryCons
+		transformed.Meta = serie.Meta.Copy()
 
 		for k, v := range serie.Tags {
 			transformed.Tags[k] = v

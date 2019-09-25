@@ -220,6 +220,7 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 	var out []models.Series
 	p.data = input
 	for _, fn := range p.funcs {
+		// TODO track in all function execs
 		series, err := fn.Exec(p.data)
 		if err != nil {
 			return nil, err
@@ -234,6 +235,11 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 				o.Consolidator = consolidation.Avg
 			}
 			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
+			out[i].Meta = out[i].Meta.CopyWithChange(func(in models.SeriesMetaProperties) models.SeriesMetaProperties {
+				in.AggNumRC = consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
+				in.ConsolidatorRC = o.Consolidator
+				return in
+			})
 		}
 	}
 	return out, nil

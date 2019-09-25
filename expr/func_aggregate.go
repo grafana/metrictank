@@ -55,7 +55,10 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		commonTags[k] = v
 	}
 
+	meta := make(models.SeriesMeta)
+
 	for _, serie := range series {
+		meta.Merge(serie.Meta)
 		for k, v := range serie.Tags {
 			if commonTags[k] != v {
 				delete(commonTags, k)
@@ -73,6 +76,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		Interval:     series[0].Interval,
 		Consolidator: cons,
 		QueryCons:    queryCons,
+		Meta:         meta,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 

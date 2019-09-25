@@ -25,6 +25,45 @@ type Series struct {
 	QueryTo      uint32                     // to tie series back to request it came from
 	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
 	Consolidator consolidation.Consolidator // consolidator to actually use (for fetched series this may not be 0, default must be resolved. if series created by function, may be 0)
+	Meta         SeriesMeta                 // note: this series could be a "just fetched" series, or one derived from many other series
+}
+
+// SeriesMeta counts the number of series for each set of meta properties
+type SeriesMeta map[SeriesMetaProperties]uint32
+
+// SeriesMetaProperties describes the (fetching and normalization) properties of a series
+type SeriesMetaProperties struct {
+	SchemaID              uint16                     // id of storage-schemas rule this series corresponds to
+	Archive               uint8                      // which archive was being read from
+	AggNumNorm            uint32                     // aggNum for normalization
+	AggNumRC              uint32                     // aggNum runtime consolidation
+	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
+	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation (if applicable)
+}
+
+// Merge merges SeriesMeta b into a
+func (a SeriesMeta) Merge(b SeriesMeta) {
+	for bk, bv := range b {
+		a[bk] += bv
+	}
+}
+
+// Copy creates a copy of SeriesMeta
+func (a SeriesMeta) Copy() SeriesMeta {
+	out := make(SeriesMeta)
+	for k, v := range a {
+		out[k] = v
+	}
+	return out
+}
+
+// CopyWithChange creates a copy of SeriesMeta, but executes the requested change on each each SeriesMeta
+func (a SeriesMeta) CopyWithChange(fn func(in SeriesMetaProperties) SeriesMetaProperties) SeriesMeta {
+	out := make(SeriesMeta)
+	for k, v := range a {
+		out[fn(k)] = v
+	}
+	return out
 }
 
 func (s *Series) SetTags() {
