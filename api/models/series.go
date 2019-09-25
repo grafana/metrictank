@@ -216,6 +216,75 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 	b = append(b, ']')
 	return b, nil
 }
+func (series SeriesByTarget) MarshalJSONFastWithMeta(b []byte) ([]byte, error) {
+	b = append(b, '[')
+	for _, s := range series {
+		b = append(b, `{"target":`...)
+		b = strconv.AppendQuoteToASCII(b, s.Target)
+		if len(s.Tags) != 0 {
+			b = append(b, `,"tags":{`...)
+			for name, value := range s.Tags {
+				b = strconv.AppendQuoteToASCII(b, name)
+				b = append(b, ':')
+				b = strconv.AppendQuoteToASCII(b, value)
+				b = append(b, ',')
+			}
+			// Replace trailing comma with a closing bracket
+			b[len(b)-1] = '}'
+		}
+		b = append(b, `,"datapoints":[`...)
+		for _, p := range s.Datapoints {
+			b = append(b, '[')
+			if math.IsNaN(p.Val) {
+				b = append(b, `null,`...)
+			} else {
+				b = strconv.AppendFloat(b, p.Val, 'f', -1, 64)
+				b = append(b, ',')
+			}
+			b = strconv.AppendUint(b, uint64(p.Ts), 10)
+			b = append(b, `],`...)
+		}
+		if len(s.Datapoints) != 0 {
+			b = b[:len(b)-1] // cut last comma
+		}
+		b = append(b, `],"meta":`...)
+		b, _ = s.Meta.MarshalJSONFast(b)
+		b = append(b, `},`...)
+	}
+	if len(series) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+}
+
+func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
+	b = append(b, '[')
+	for props, count := range meta {
+		b = append(b, `{"schema-id":`...)
+		// TODO make user friendly return the actual rule
+		b = strconv.AppendUint(b, uint64(props.SchemaID), 10)
+		b = append(b, `,"archive":`...)
+		b = strconv.AppendUint(b, uint64(props.Archive), 10)
+		b = append(b, `,"aggnum-norm":`...)
+		b = strconv.AppendUint(b, uint64(props.AggNumNorm), 10)
+		b = append(b, `,"consolidate-normfetch":"`...)
+		b = append(b, props.ConsolidatorNormFetch.String()...)
+		b = append(b, `","aggnum-rc":`...)
+		b = strconv.AppendUint(b, uint64(props.AggNumRC), 10)
+		b = append(b, `,"consolidate-rc":"`...)
+		b = append(b, props.ConsolidatorRC.String()...)
+		b = append(b, `","count":`...)
+		b = strconv.AppendUint(b, uint64(count), 10)
+		b = append(b, `},`...)
+	}
+	if len(meta) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+
+}
 
 func (series SeriesByTarget) MarshalJSON() ([]byte, error) {
 	return series.MarshalJSONFast(nil)
