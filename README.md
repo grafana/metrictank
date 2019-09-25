@@ -29,6 +29,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 * Flexible tenancy: can be used as single tenant or multi tenant. Selected data can be shared across all tenants.
 * Input options: carbon, metrics2.0, kafka, Prometheus (soon: json or msgpack over http)
 * Guards against excessive data requests
+* Data backfill/import from whisper
 
 ## Limitations
 
