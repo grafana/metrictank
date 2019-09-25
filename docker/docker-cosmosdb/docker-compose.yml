@@ -40,7 +40,7 @@ services:
 
   kafka:
     hostname: kafka
-    image: raintank/kafka:latest
+    image: raintank/kafka
     environment:
       ADVERTISED_HOST: kafka
       NUM_PARTITIONS: 8
@@ -53,7 +53,7 @@ services:
 
   graphite:
     hostname: graphite
-    image: graphiteapp/graphite-statsd:latest
+    image: graphiteapp/graphite-statsd
     ports:
      - "8080:80"
 
@@ -65,7 +65,7 @@ services:
 
   tsdb-gw:
     hostname: tsdb-gw
-    image: raintank/tsdb-gw:latest
+    image: raintank/tsdb-gw
     ports:
       - "8081:80"
     environment:
