@@ -24,8 +24,8 @@ var (
 
 func init() {
 	flags := flag.NewFlagSet("chunk-cache", flag.ExitOnError)
-	// (1024 ^ 3) * 4 = 4294967296 = 4G
-	flags.Uint64Var(&maxSize, "max-size", 4294967296, "Maximum size of chunk cache in bytes. 0 disables cache")
+	// 512 MB = (1024 ^ 2) * 512 = 536870912
+	flags.Uint64Var(&maxSize, "max-size", 536870912, "Maximum size of chunk cache in bytes. 0 disables cache")
 	globalconf.Register("chunk-cache", flags, flag.ExitOnError)
 }
 
