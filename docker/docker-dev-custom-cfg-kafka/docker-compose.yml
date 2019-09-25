@@ -148,7 +148,7 @@ services:
 
   tsdb-gw:
     hostname: tsdb-gw
-    image: raintank/tsdb-gw:0.9.0
+    image: raintank/tsdb-gw
     ports:
      - "9000:80"
     volumes:
