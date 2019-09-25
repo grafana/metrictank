@@ -138,7 +138,7 @@ func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 	return out
 }
 
-// divideContext wraps a Consolidate() call with a context.Context condition
+// divideContext wraps a divide() call with a context.Context condition
 // important: pointsB will be released to the pool. do not keep a reference to it
 func divideContext(ctx context.Context, pointsA, pointsB []schema.Point) []schema.Point {
 	select {
