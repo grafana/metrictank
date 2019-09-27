@@ -91,6 +91,10 @@ func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks, ready uint32
 // ParseRetentions parses retention definitions into a Retentions structure
 func ParseRetentions(defs string) (Retentions, error) {
 	retentions := make(Retentions, 0)
+	cnt := strings.Count(defs, ",")
+	if cnt > 254 {
+		return nil, errors.New("no more than 255 individual retensions per rule supported")
+	}
 	for i, def := range strings.Split(defs, ",") {
 		def = strings.TrimSpace(def)
 		parts := strings.Split(def, ":")
