@@ -29,9 +29,11 @@ type Series struct {
 }
 
 // SeriesMeta counts the number of series for each set of meta properties
-type SeriesMeta map[SeriesMetaProperties]uint32
+// note: it's illegal for SeriesMeta to include multiple entries that include the same properties
+type SeriesMeta []SeriesMetaProperties
 
-// SeriesMetaProperties describes the (fetching and normalization) properties of a series
+// SeriesMetaProperties describes the properties of a series
+// (fetching and normalization and the count of series corresponding to them)
 type SeriesMetaProperties struct {
 	SchemaID              uint16                     // id of storage-schemas rule this series corresponds to
 	Archive               uint8                      // which archive was being read from
@@ -39,29 +41,42 @@ type SeriesMetaProperties struct {
 	AggNumRC              uint32                     // aggNum runtime consolidation
 	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
 	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation (if applicable)
+	Count                 uint32
 }
 
 // Merge merges SeriesMeta b into a
-func (a SeriesMeta) Merge(b SeriesMeta) {
-	for bk, bv := range b {
-		a[bk] += bv
+// counts for identical properties get added together
+func (a SeriesMeta) Merge(b SeriesMeta) SeriesMeta {
+	// note: to see which properties are equivalent we should not consider the count
+	indices := make(map[SeriesMetaProperties]int)
+	for i, v := range a {
+		v.Count = 0
+		indices[v] = i
 	}
+	for j, v := range b {
+		v.Count = 0
+		index, ok := indices[v]
+		if ok {
+			a[index].Count += b[j].Count
+		} else {
+			a = append(a, b[j])
+		}
+	}
+	return a
 }
 
 // Copy creates a copy of SeriesMeta
 func (a SeriesMeta) Copy() SeriesMeta {
-	out := make(SeriesMeta)
-	for k, v := range a {
-		out[k] = v
-	}
+	out := make(SeriesMeta, len(a))
+	copy(out, a)
 	return out
 }
 
-// CopyWithChange creates a copy of SeriesMeta, but executes the requested change on each each SeriesMeta
+// CopyWithChange creates a copy of SeriesMeta, but executes the requested change on each each SeriesMetaProperties
 func (a SeriesMeta) CopyWithChange(fn func(in SeriesMetaProperties) SeriesMetaProperties) SeriesMeta {
-	out := make(SeriesMeta)
-	for k, v := range a {
-		out[fn(k)] = v
+	out := make(SeriesMeta, len(a))
+	for i, v := range a {
+		out[i] = fn(v)
 	}
 	return out
 }
@@ -260,7 +275,7 @@ func (series SeriesByTarget) MarshalJSONFastWithMeta(b []byte) ([]byte, error) {
 
 func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 	b = append(b, '[')
-	for props, count := range meta {
+	for _, props := range meta {
 		b = append(b, `{"schema-id":`...)
 		// TODO make user friendly return the actual rule
 		b = strconv.AppendUint(b, uint64(props.SchemaID), 10)
@@ -275,7 +290,7 @@ func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 		b = append(b, `,"consolidate-rc":"`...)
 		b = append(b, props.ConsolidatorRC.String()...)
 		b = append(b, `","count":`...)
-		b = strconv.AppendUint(b, uint64(count), 10)
+		b = strconv.AppendUint(b, uint64(props.Count), 10)
 		b = append(b, `},`...)
 	}
 	if len(meta) != 0 {

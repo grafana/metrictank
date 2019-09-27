@@ -55,10 +55,10 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		commonTags[k] = v
 	}
 
-	meta := make(models.SeriesMeta)
+	var meta models.SeriesMeta
 
 	for _, serie := range series {
-		meta.Merge(serie.Meta)
+		meta = meta.Merge(serie.Meta)
 		for k, v := range serie.Tags {
 			if commonTags[k] != v {
 				delete(commonTags, k)
