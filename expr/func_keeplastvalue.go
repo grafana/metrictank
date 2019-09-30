@@ -46,10 +46,12 @@ func (s *FuncKeepLastValue) Exec(cache map[Req][]models.Series) ([]models.Series
 	}
 	limit := int(s.limit)
 	outSeries := make([]models.Series, len(series))
-	for i, serie := range series {
-		serie.Target = fmt.Sprintf("keepLastValue(%s)", serie.Target)
+	for i, in := range series {
+		serie := in.CopyBare()
+		serie.Target = fmt.Sprintf("keepLastValue(%s)", in.Target)
 		serie.QueryPatt = serie.Target
-
+		serie.Tags = in.Tags
+		serie.Meta = in.Meta
 		out := pointSlicePool.Get().([]schema.Point)
 
 		var consecutiveNaNs int

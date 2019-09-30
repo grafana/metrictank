@@ -34,15 +34,9 @@ func (s *FuncDerivative) Exec(cache map[Req][]models.Series) ([]models.Series, e
 	outSeries := make([]models.Series, len(series))
 	for i, serie := range series {
 		serie.Target = fmt.Sprintf("derivative(%s)", serie.Target)
+		serie.Tags = serie.CopyTagsWith("derivative", "1")
 		serie.QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
 		out := pointSlicePool.Get().([]schema.Point)
-
-		newTags := make(map[string]string, len(serie.Tags)+1)
-		for k, v := range serie.Tags {
-			newTags[k] = v
-		}
-		newTags["derivative"] = "1"
-		serie.Tags = newTags
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {

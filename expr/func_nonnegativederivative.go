@@ -37,17 +37,13 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 	}
 
 	outSeries := make([]models.Series, len(series))
-	for i, serie := range series {
-		serie.Target = fmt.Sprintf("nonNegativeDerivative(%s)", serie.Target)
-		serie.QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", serie.QueryPatt)
+	for i, in := range series {
+		serie := in.CopyBare()
+		serie.Target = fmt.Sprintf("nonNegativeDerivative(%s)", in.Target)
+		serie.QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", in.QueryPatt)
+		serie.Tags = serie.CopyTagsWith("nonNegativeDerivative", "1")
+		serie.Meta = in.Meta
 		out := pointSlicePool.Get().([]schema.Point)
-
-		newTags := make(map[string]string, len(serie.Tags)+1)
-		for k, v := range serie.Tags {
-			newTags[k] = v
-		}
-		newTags["nonNegativeDerivative"] = "1"
-		serie.Tags = newTags
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {

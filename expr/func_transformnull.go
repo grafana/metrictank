@@ -55,6 +55,7 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series
 			Interval:     serie.Interval,
 			Consolidator: serie.Consolidator,
 			QueryCons:    serie.QueryCons,
+			Meta:         serie.Meta,
 		}
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {

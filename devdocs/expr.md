@@ -1,19 +1,23 @@
 ## Management of point slices
 
-The `models.Series` attribute `Datapoints []schema.Point` needs special atention:
+The `models.Series` type, even when passed by value, has a few fields that need special attention:
+* `Datapoints []schema.Point`
+* `Tags       map[string]string`
+* `Meta       SeriesMeta`
 
-many processing functions will transform some of the points in datapoint slices. logically speaking, some output values are different than their input values,
-while some may remain the same. they need a place to store their output.
+Many processing functions will want to return an output series that differs from the input, in terms of (some of the) datapoints may have changed value, tags or metadata.
+They need a place to store their output but we cannot simply operate on the input series, or even a copy of it, as the underlying datastructures are shared.
 
 Goals:
-* processing functions should not modify data in slices if those slices need to remain original (e.g. because they're re-used later)
-* minimize allocations of new slices foremost and data copying (if point in= point out) as a smaller concern
+* processing functions should not modify data if that data needs to remain original (e.g. because of re-use of the same input data elsewhere)
+* minimize allocations of new structures foremost
+* minimize data copying as a smaller concern
 * simple code
 
 there's 2 main choices:
 
 1) copy-on-write:
-- each function does not modify data in their inputs, they allocate new slices (or better: get from pool) in which they should store their output point values 
+- each function does not modify data in their inputs, they allocate new structures (or possibly get from pool) if there's differences with input
 - storing output data into new slice can typically be done in same pass as processing the input data
 - if you have lots of processing steps (graphite function calls) in a row, we will be creating more slices and copy data (for unmodified points) than strictly necessary.
 - getting a slice from the pool may cause a stall if it's not large enough and runtime needs to re-allocate and copy
@@ -42,8 +46,8 @@ e.g. an avg of 3 series will create 1 new series (from pool), but won't put the 
 another processing step may require the same input data.
 
 function implementations:
-* must not modify existing slices
-* should use the pool to get new slices in which to store their new/modified data.
+* must not modify existing slices or maps or other composite datastructures (at the time of writing, it's only slices/maps)
+* should use the pool to get new slices in which to store their new/modified datapoints.
 * should add said new slices into the cache so it can later be cleaned
 
 ## consolidateBy

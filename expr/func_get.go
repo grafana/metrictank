@@ -24,6 +24,8 @@ func (s FuncGet) Context(context Context) Context {
 func (s FuncGet) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
 	series := cache[s.req]
 
+	// this function is the only exception to the COW pattern
+	// it is allowed to modify the series directly to set the needed tags
 	for k := range series {
 		series[k].SetTags()
 	}

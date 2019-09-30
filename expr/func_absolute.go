@@ -35,18 +35,14 @@ func (s *FuncAbsolute) Exec(cache map[Req][]models.Series) ([]models.Series, err
 	for i, serie := range series {
 		transformed := &out[i]
 		transformed.Target = fmt.Sprintf("absolute(%s)", serie.Target)
-		transformed.QueryPatt = fmt.Sprintf("absolute(%s)", serie.QueryPatt)
-		transformed.Tags = make(map[string]string, len(serie.Tags)+1)
+		transformed.Tags = serie.CopyTagsWith("absolute", "1")
 		transformed.Datapoints = pointSlicePool.Get().([]schema.Point)
 		transformed.Interval = serie.Interval
-		transformed.Consolidator = serie.Consolidator
+		transformed.QueryPatt = fmt.Sprintf("absolute(%s)", serie.QueryPatt)
 		transformed.QueryCons = serie.QueryCons
-		transformed.Meta = serie.Meta.Copy()
+		transformed.Consolidator = serie.Consolidator
+		transformed.Meta = serie.Meta
 
-		for k, v := range serie.Tags {
-			transformed.Tags[k] = v
-		}
-		transformed.Tags["absolute"] = "1"
 		for _, p := range serie.Datapoints {
 			p.Val = math.Abs(p.Val)
 			transformed.Datapoints = append(transformed.Datapoints, p)

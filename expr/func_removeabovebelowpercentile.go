@@ -55,13 +55,7 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 			serie.Target = fmt.Sprintf("removeBelowPercentile(%s, %g)", serie.Target, s.n)
 		}
 		serie.QueryPatt = serie.Target
-
-		newTags := make(map[string]string, len(serie.Tags)+1)
-		for k, v := range serie.Tags {
-			newTags[k] = v
-		}
-		newTags["nPercentile"] = fmt.Sprintf("%g", s.n)
-		serie.Tags = newTags
+		serie.Tags = serie.CopyTagsWith("nPercentile", fmt.Sprintf("%g", s.n))
 
 		percentile := getPercentileValue(serie.Datapoints, s.n, sortedDatapointVals)
 

@@ -48,6 +48,7 @@ func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 			Interval:     serie.Interval,
 			Consolidator: serie.Consolidator,
 			QueryCons:    serie.QueryCons,
+			Meta:         serie.Meta,
 		}
 		outputs = append(outputs, s)
 		cache[Req{}] = append(cache[Req{}], s)

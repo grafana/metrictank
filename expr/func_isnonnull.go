@@ -36,16 +36,13 @@ func (s *FuncIsNonNull) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		transformed := &out[i]
 		transformed.Target = fmt.Sprintf("isNonNull(%s)", serie.Target)
 		transformed.QueryPatt = fmt.Sprintf("isNonNull(%s)", serie.QueryPatt)
-		transformed.Tags = make(map[string]string, len(serie.Tags)+1)
+		transformed.Tags = serie.CopyTagsWith("isNonNull", "1")
 		transformed.Datapoints = pointSlicePool.Get().([]schema.Point)
 		transformed.Interval = serie.Interval
 		transformed.Consolidator = serie.Consolidator
 		transformed.QueryCons = serie.QueryCons
+		transformed.Meta = serie.Meta.Copy()
 
-		for k, v := range serie.Tags {
-			transformed.Tags[k] = v
-		}
-		transformed.Tags["isNonNull"] = "1"
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = 0

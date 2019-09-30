@@ -220,7 +220,6 @@ func (p Plan) Run(input map[Req][]models.Series) ([]models.Series, error) {
 	var out []models.Series
 	p.data = input
 	for _, fn := range p.funcs {
-		// TODO track in all function execs
 		series, err := fn.Exec(p.data)
 		if err != nil {
 			return nil, err

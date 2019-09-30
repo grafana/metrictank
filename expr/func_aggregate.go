@@ -50,10 +50,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 	// The tags for the aggregated series is only the tags that are
 	// common to all input series
-	commonTags := make(map[string]string, len(series[0].Tags))
-	for k, v := range series[0].Tags {
-		commonTags[k] = v
-	}
+	commonTags := series[0].CopyTags()
 
 	var meta models.SeriesMeta
 
@@ -70,12 +67,12 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	name := s.agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
 	output := models.Series{
 		Target:       name,
-		QueryPatt:    name,
 		Tags:         commonTags,
 		Datapoints:   out,
 		Interval:     series[0].Interval,
-		Consolidator: cons,
+		QueryPatt:    name,
 		QueryCons:    queryCons,
+		Consolidator: cons,
 		Meta:         meta,
 	}
 	cache[Req{}] = append(cache[Req{}], output)

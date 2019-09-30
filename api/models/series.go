@@ -16,9 +16,9 @@ import (
 //go:generate msgp
 
 type Series struct {
-	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
-	Datapoints   []schema.Point
+	Target       string            // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Tags         map[string]string // Must be set initially via call to `SetTags()`
+	Datapoints   []schema.Point
 	Interval     uint32
 	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
 	QueryFrom    uint32                     // to tie series back to request it came from
@@ -163,26 +163,50 @@ func (s *Series) buildTargetFromTags() {
 	s.Target = buf.String()
 }
 
+// Copy returns a deep copy.
+// The returned value does not link to the same memory space for any of the properties
 func (s Series) Copy(emptyDatapoints []schema.Point) Series {
-	newSeries := Series{
+	return Series{
 		Target:       s.Target,
-		Datapoints:   emptyDatapoints,
-		Tags:         make(map[string]string, len(s.Tags)),
+		Datapoints:   append(emptyDatapoints, s.Datapoints...),
+		Tags:         s.CopyTags(),
 		Interval:     s.Interval,
 		QueryPatt:    s.QueryPatt,
 		QueryFrom:    s.QueryFrom,
 		QueryTo:      s.QueryTo,
 		QueryCons:    s.QueryCons,
 		Consolidator: s.Consolidator,
+		Meta:         s.Meta.Copy(),
 	}
+}
 
-	newSeries.Datapoints = append(newSeries.Datapoints, s.Datapoints...)
+// CopyBare returns a bare copy.
+// The returned value does not link to the same memory space for any of the properties
+// because it resets all reference types
+func (s Series) CopyBare() Series {
+	s.Datapoints = nil
+	s.Tags = nil
+	s.Meta = nil
+	return s
+}
 
+// CopyTags makes a deep copy of the tags
+func (s *Series) CopyTags() map[string]string {
+	out := make(map[string]string, len(s.Tags))
 	for k, v := range s.Tags {
-		newSeries.Tags[k] = v
+		out[k] = v
 	}
+	return out
+}
 
-	return newSeries
+// CopyTagsWith makes a deep copy of the tags and sets the given tag
+func (s *Series) CopyTagsWith(key, val string) map[string]string {
+	out := make(map[string]string, len(s.Tags)+1)
+	for k, v := range s.Tags {
+		out[k] = v
+	}
+	out[key] = val
+	return out
 }
 
 type SeriesByTarget []Series

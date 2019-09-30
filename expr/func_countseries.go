@@ -45,6 +45,11 @@ func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		out = append(out, p)
 	}
 
+	var meta models.SeriesMeta
+	for _, s := range series {
+		meta = meta.Merge(s.Meta)
+	}
+
 	output := models.Series{
 		Target:       name,
 		QueryPatt:    name,
@@ -53,6 +58,7 @@ func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		Interval:     series[0].Interval,
 		Consolidator: cons,
 		QueryCons:    queryCons,
+		Meta:         meta,
 	}
 	cache[Req{}] = append(cache[Req{}], output)
 

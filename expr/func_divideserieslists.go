@@ -67,6 +67,7 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 			Interval:     divisor.Interval,
 			Consolidator: dividend.Consolidator,
 			QueryCons:    dividend.QueryCons,
+			Meta:         dividend.Meta.Copy().Merge(divisor.Meta),
 		}
 		cache[Req{}] = append(cache[Req{}], output)
 		series = append(series, output)
