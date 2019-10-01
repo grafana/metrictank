@@ -4,17 +4,13 @@ set -x
 set -e
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-cd ${DIR}
-source version-tag.sh
+cd ${DIR}/..
+source ${DIR}/version-tag.sh
 
 # regular image
-rm -rf build/*
-mkdir -p build
-cp ../build/* build/
-
 if [ -z "$1" ]
 then
-    docker build -t grafana/metrictank .
+    docker build -t grafana/metrictank -f ${DIR}/Dockerfile .
     docker tag grafana/metrictank grafana/metrictank:$tag
     docker tag grafana/metrictank grafana/metrictank:$version
 
