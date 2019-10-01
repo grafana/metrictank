@@ -40,8 +40,8 @@ type SeriesMetaProperties struct {
 	AggNumNorm            uint32                     // aggNum for normalization
 	AggNumRC              uint32                     // aggNum runtime consolidation
 	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
-	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation (if applicable)
-	Count                 uint32
+	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation to honor maxdatapoints (if applicable).
+	Count                 uint32                     // number of series corresponding to these properties
 }
 
 // Merge merges SeriesMeta b into a
