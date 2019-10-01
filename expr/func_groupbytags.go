@@ -122,6 +122,8 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			Interval:     series[0].Interval,
 			Consolidator: cons,
 			QueryCons:    queryCons,
+			QueryFrom:    group.s[0].QueryFrom,
+			QueryTo:      group.s[0].QueryTo,
 			Meta:         group.m,
 		}
 		newSeries.SetTags()

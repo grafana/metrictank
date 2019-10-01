@@ -36,13 +36,10 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 		return nil, err
 	}
 
-	outSeries := make([]models.Series, len(series))
-	for i, in := range series {
-		serie := in.CopyBare()
-		serie.Target = fmt.Sprintf("nonNegativeDerivative(%s)", in.Target)
-		serie.QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", in.QueryPatt)
-		serie.Tags = serie.CopyTagsWith("nonNegativeDerivative", "1")
-		serie.Meta = in.Meta
+	for i, serie := range series {
+		series[i].Target = fmt.Sprintf("nonNegativeDerivative(%s)", serie.Target)
+		series[i].QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", serie.QueryPatt)
+		series[i].Tags = serie.CopyTagsWith("nonNegativeDerivative", "1")
 		out := pointSlicePool.Get().([]schema.Point)
 
 		prev := math.NaN()
@@ -52,11 +49,10 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 			p.Val = delta
 			out = append(out, p)
 		}
-		serie.Datapoints = out
-		outSeries[i] = serie
+		series[i].Datapoints = out
 	}
-	cache[Req{}] = append(cache[Req{}], outSeries...)
-	return outSeries, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }
 
 func nonNegativeDelta(val, prev, maxValue float64) (float64, float64) {

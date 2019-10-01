@@ -19,15 +19,17 @@ there's 2 main choices:
 1) copy-on-write:
 - each function does not modify data in their inputs, they allocate new structures (or possibly get from pool) if there's differences with input
 - storing output data into new slice can typically be done in same pass as processing the input data
-- if you have lots of processing steps (graphite function calls) in a row, we will be creating more slices and copy data (for unmodified points) than strictly necessary.
+- if you have lots of processing steps (graphite function calls) in a row, we will be creating more slices and copy more data than strictly necessary (intermediate copies. also some points may not change).
 - getting a slice from the pool may cause a stall if it's not large enough and runtime needs to re-allocate and copy
 - allows us to pass the same data into multiple processing steps (reuse input data)
 
-2)copy in advance:
-- give each processing step a copied slice in which they can do whatever they want (e.g. modify in place)
+2) copy in advance:
+- provide each processing function with input series in which they can do whatever they want (e.g. modify in place)
+- practically, we would create a deep copy between fetching the input series and handing it off to the first processing function.
 - works well if you have many processing steps in a row that can just modify in place
 - copying up front, in a separate pass. also causes a stall
 - often copying may be unnessary, but we can't know that in advance (unless we expand the expr tree to mark whether it'll do a write)
+- means we cannot cache intermediate results, unless we also make deep copies anny time we want to cache and hand off for further processing.
 
 
 for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach, so we chose COW.
@@ -41,14 +43,18 @@ expr library does the rest.  It manages the series/pointslices and gets new ones
 Once the data is returned to the client, and the client is done using the returned data, it should call plan.Clean(),
 which returns all data back to the pool  (both input data or newly generated series, whether they made it into the final output or not).
 
-note that individual processing functions only request slices from the pool, they don't put anything on it.
-e.g. an avg of 3 series will create 1 new series (from pool), but won't put the 3 inputs back in the pool, because
-another processing step may require the same input data.
 
 function implementations:
-* must not modify existing slices or maps or other composite datastructures (at the time of writing, it's only slices/maps)
+
+* must not modify existing slices or maps or other composite datastructures (at the time of writing, it's only slices/maps), with the exception of FuncGet.
 * should use the pool to get new slices in which to store their new/modified datapoints.
 * should add said new slices into the cache so it can later be cleaned
+
+example: an averageSeries() of 3 series:
+* will create an output series value.
+* it will use a new datapoints slice, retrieved from pool, because the points will be different. also it will allocate a new meta section and tags map because they are different from the input series also.
+* won't put the 3 inputs back in the pool, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
+* It will however store the newly created series into the pool such that it can later be reclaimed.
 
 ## consolidateBy
 
@@ -100,7 +106,7 @@ So:
 By combining the pass-down and pass-up we can give the user max power and correctness. In particular it also solves the problem with Graphite where data can be read from a different consolidation archive than what it used for runtime consolidation. While this is sometimes desirable (e.g. using special* functions), often - for most/simple requests - it is not. See
 (see https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 
-[*] Special functions: e.g. summarize, perSecond, derivative, intergral. passing consolidate settings across these function calls would lead to bad results.
+[*] Special functions: e.g. summarize, perSecond, derivative, integral. passing consolidate settings across these function calls would lead to bad results.
 
 see also https://github.com/grafana/metrictank/issues/463#issuecomment-275199880
 

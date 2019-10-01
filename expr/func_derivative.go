@@ -31,11 +31,10 @@ func (s *FuncDerivative) Exec(cache map[Req][]models.Series) ([]models.Series, e
 		return nil, err
 	}
 
-	outSeries := make([]models.Series, len(series))
 	for i, serie := range series {
-		serie.Target = fmt.Sprintf("derivative(%s)", serie.Target)
-		serie.Tags = serie.CopyTagsWith("derivative", "1")
-		serie.QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
+		series[i].Target = fmt.Sprintf("derivative(%s)", serie.Target)
+		series[i].Tags = serie.CopyTagsWith("derivative", "1")
+		series[i].QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
 		out := pointSlicePool.Get().([]schema.Point)
 
 		prev := math.NaN()
@@ -49,9 +48,8 @@ func (s *FuncDerivative) Exec(cache map[Req][]models.Series) ([]models.Series, e
 			prev = val
 			out = append(out, p)
 		}
-		serie.Datapoints = out
-		outSeries[i] = serie
+		series[i].Datapoints = out
 	}
-	cache[Req{}] = append(cache[Req{}], outSeries...)
-	return outSeries, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }

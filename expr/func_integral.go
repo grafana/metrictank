@@ -31,17 +31,11 @@ func (s *FuncIntegral) Exec(cache map[Req][]models.Series) ([]models.Series, err
 		return nil, err
 	}
 
-	out := make([]models.Series, len(series))
 	for i, serie := range series {
-		transformed := &out[i]
-		transformed.Target = fmt.Sprintf("integral(%s)", serie.Target)
-		transformed.Tags = serie.CopyTagsWith("integral", "1")
-		transformed.Datapoints = pointSlicePool.Get().([]schema.Point)
-		transformed.QueryPatt = fmt.Sprintf("integral(%s)", serie.QueryPatt)
-		transformed.Interval = serie.Interval
-		transformed.Consolidator = serie.Consolidator
-		transformed.QueryCons = serie.QueryCons
-		transformed.Meta = serie.Meta
+		series[i].Target = fmt.Sprintf("integral(%s)", serie.Target)
+		series[i].Tags = serie.CopyTagsWith("integral", "1")
+		series[i].QueryPatt = fmt.Sprintf("integral(%s)", serie.QueryPatt)
+		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
 
 		current := 0.0
 		for _, p := range serie.Datapoints {
@@ -49,10 +43,9 @@ func (s *FuncIntegral) Exec(cache map[Req][]models.Series) ([]models.Series, err
 				current += p.Val
 				p.Val = current
 			}
-			transformed.Datapoints = append(transformed.Datapoints, p)
+			series[i].Datapoints = append(series[i].Datapoints, p)
 		}
-		cache[Req{}] = append(cache[Req{}], *transformed)
 	}
-
-	return out, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }

@@ -37,6 +37,5 @@ func (s *FuncMovingAverage) Exec(cache map[Req][]models.Series) ([]models.Series
 	if err != nil {
 		return nil, err
 	}
-	//cache[Req{}] = append(cache[Req{}], out)
 	return series, nil
 }

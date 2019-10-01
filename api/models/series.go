@@ -18,7 +18,6 @@ import (
 type Series struct {
 	Target       string            // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Tags         map[string]string // Must be set initially via call to `SetTags()`
-	Datapoints   []schema.Point
 	Interval     uint32
 	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
 	QueryFrom    uint32                     // to tie series back to request it came from
@@ -26,6 +25,7 @@ type Series struct {
 	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
 	Consolidator consolidation.Consolidator // consolidator to actually use (for fetched series this may not be 0, default must be resolved. if series created by function, may be 0)
 	Meta         SeriesMeta                 // note: this series could be a "just fetched" series, or one derived from many other series
+	Datapoints   []schema.Point
 }
 
 // SeriesMeta counts the number of series for each set of meta properties
@@ -178,16 +178,6 @@ func (s Series) Copy(emptyDatapoints []schema.Point) Series {
 		Consolidator: s.Consolidator,
 		Meta:         s.Meta.Copy(),
 	}
-}
-
-// CopyBare returns a bare copy.
-// The returned value does not link to the same memory space for any of the properties
-// because it resets all reference types
-func (s Series) CopyBare() Series {
-	s.Datapoints = nil
-	s.Tags = nil
-	s.Meta = nil
-	return s
 }
 
 // CopyTags makes a deep copy of the tags

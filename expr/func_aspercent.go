@@ -271,6 +271,8 @@ Loop:
 		Interval:     series[0].Interval,
 		Consolidator: cons,
 		QueryCons:    queryCons,
+		QueryFrom:    series[0].QueryFrom,
+		QueryTo:      series[0].QueryTo,
 		Tags:         map[string]string{"name": name},
 		Meta:         meta,
 	}

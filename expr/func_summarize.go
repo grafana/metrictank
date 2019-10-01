@@ -70,6 +70,8 @@ func (s *FuncSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		output := models.Series{
 			Target:     newName(serie.Target),
 			QueryPatt:  newName(serie.QueryPatt),
+			QueryFrom:  serie.QueryFrom,
+			QueryTo:    serie.QueryTo,
 			Tags:       serie.CopyTagsWith("summarize", s.intervalString),
 			Datapoints: out,
 			Interval:   interval,
