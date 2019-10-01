@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -35,6 +36,8 @@ func (s *FuncDerivative) Exec(cache map[Req][]models.Series) ([]models.Series, e
 		series[i].Target = fmt.Sprintf("derivative(%s)", serie.Target)
 		series[i].Tags = serie.CopyTagsWith("derivative", "1")
 		series[i].QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
+		series[i].Consolidator = consolidation.None
+		series[i].QueryCons = consolidation.None
 		out := pointSlicePool.Get().([]schema.Point)
 
 		prev := math.NaN()

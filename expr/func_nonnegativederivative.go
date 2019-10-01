@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -40,6 +41,8 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 		series[i].Target = fmt.Sprintf("nonNegativeDerivative(%s)", serie.Target)
 		series[i].QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", serie.QueryPatt)
 		series[i].Tags = serie.CopyTagsWith("nonNegativeDerivative", "1")
+		series[i].Consolidator = consolidation.None
+		series[i].QueryCons = consolidation.None
 		out := pointSlicePool.Get().([]schema.Point)
 
 		prev := math.NaN()
