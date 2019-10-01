@@ -40,7 +40,7 @@ type Req struct {
 	ArchInterval uint32 `json:"archInterval"` // the interval corresponding to the archive we'll fetch
 	TTL          uint32 `json:"ttl"`          // the ttl of the archive we'll fetch
 	OutInterval  uint32 `json:"outInterval"`  // the interval of the output data, after any runtime consolidation
-	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive
+	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive (normalization)
 }
 
 func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
