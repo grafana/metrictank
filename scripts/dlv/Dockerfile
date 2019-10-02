@@ -30,7 +30,7 @@ COPY scripts/config/schema-idx-scylladb.toml /usr/share/metrictank/examples/sche
 
 COPY --from=gobase /tmp/build/* /usr/bin/
 
-COPY scripts/util/wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
+COPY scripts/util/wait_for_endpoint_debug.sh /usr/bin/wait_for_endpoint_debug.sh
 
 COPY --from=gobase /go/bin/dlv /usr/bin/dlv
 
