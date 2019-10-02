@@ -86,9 +86,10 @@ consolidateBy(
     "max"
 )
 ```
-
-parsing starts at the root and continues until leaves are resolved.
-Execution follows, and it happens the other way around (first leaves are fetched, then functions are applied until we hit the root)
+There's 2 important information flows to be aware of: parsing and after it, execution.
+* Parsing starts at the root and continues until leaves are resolved, and we know which series need to be fetched.
+* Execution happens the other way around: first the data at the leaves is fetched, then functions are applied until we hit the root.
+  At that point function processing is complete; we can do some final work (like merging of series that are the same metric but a different raw interval, and maxDatapoints consolidation) and return the data back to the user.
 
 So:
 1) at parse time, consolidation settings encountered in consolidateBy calls are passed down the tree (e.g. via the context, typically until it hits the data request.
