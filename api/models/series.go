@@ -72,7 +72,7 @@ func (a SeriesMeta) Copy() SeriesMeta {
 	return out
 }
 
-// CopyWithChange creates a copy of SeriesMeta, but executes the requested change on each each SeriesMetaProperties
+// CopyWithChange creates a copy of SeriesMeta, but executes the requested change on each SeriesMetaProperties
 func (a SeriesMeta) CopyWithChange(fn func(in SeriesMetaProperties) SeriesMetaProperties) SeriesMeta {
 	out := make(SeriesMeta, len(a))
 	for i, v := range a {
