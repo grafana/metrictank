@@ -6,7 +6,6 @@ ENV MT_SRC_DIR $GOPATH/src/github.com/grafana/metrictank
 RUN mkdir -p $MT_SRC_DIR
 ADD . $MT_SRC_DIR
 RUN $MT_SRC_DIR/scripts/build.sh
-RUN cp -r $MT_SRC_DIR/build /tmp/build
 
 
 FROM alpine:3.10.0
@@ -24,7 +23,7 @@ COPY scripts/config/schema-idx-cassandra.toml /etc/metrictank/schema-idx-cassand
 COPY scripts/config/schema-store-scylladb.toml /usr/share/metrictank/examples/schema-store-scylladb.toml
 COPY scripts/config/schema-idx-scylladb.toml /usr/share/metrictank/examples/schema-idx-scylladb.toml
 
-COPY --from=gobase /tmp/build/* /usr/bin/
+COPY --from=gobase /go/src/github.com/grafana/metrictank/build/* /usr/bin/
 
 COPY scripts/util/wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
 
