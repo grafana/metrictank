@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -36,18 +37,13 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 		return nil, err
 	}
 
-	outSeries := make([]models.Series, len(series))
 	for i, serie := range series {
-		serie.Target = fmt.Sprintf("nonNegativeDerivative(%s)", serie.Target)
-		serie.QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", serie.QueryPatt)
+		series[i].Target = fmt.Sprintf("nonNegativeDerivative(%s)", serie.Target)
+		series[i].QueryPatt = fmt.Sprintf("nonNegativeDerivative(%s)", serie.QueryPatt)
+		series[i].Tags = serie.CopyTagsWith("nonNegativeDerivative", "1")
+		series[i].Consolidator = consolidation.None
+		series[i].QueryCons = consolidation.None
 		out := pointSlicePool.Get().([]schema.Point)
-
-		newTags := make(map[string]string, len(serie.Tags)+1)
-		for k, v := range serie.Tags {
-			newTags[k] = v
-		}
-		newTags["nonNegativeDerivative"] = "1"
-		serie.Tags = newTags
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {
@@ -56,11 +52,10 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 			p.Val = delta
 			out = append(out, p)
 		}
-		serie.Datapoints = out
-		outSeries[i] = serie
+		series[i].Datapoints = out
 	}
-	cache[Req{}] = append(cache[Req{}], outSeries...)
-	return outSeries, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }
 
 func nonNegativeDelta(val, prev, maxValue float64) (float64, float64) {

@@ -119,6 +119,7 @@ func (s *FuncAsPercent) execWithNodes(series, totals []models.Series, cache map[
 				nonesSerie.QueryPatt = fmt.Sprintf("asPercent(%s,MISSING)", serie1.QueryPatt)
 				nonesSerie.Target = fmt.Sprintf("asPercent(%s,MISSING)", serie1.Target)
 				nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
+				nonesSerie.Meta = serie1.Meta.Copy()
 
 				if nones == nil {
 					nones = pointSlicePool.Get().([]schema.Point)
@@ -195,6 +196,7 @@ func (s *FuncAsPercent) execWithoutNodes(series, totals []models.Series, cache m
 			}
 			serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalVal)
 		}
+		serie.Meta = serie.Meta.Merge(totalsSerie.Meta)
 		outSeries = append(outSeries, serie)
 		cache[Req{}] = append(cache[Req{}], serie)
 	}
@@ -247,9 +249,11 @@ func sumSeries(series []models.Series, cache map[Req][]models.Series) models.Ser
 	out := pointSlicePool.Get().([]schema.Point)
 	crossSeriesSum(series, &out)
 	var queryPatts []string
+	var meta models.SeriesMeta
 
 Loop:
 	for _, v := range series {
+		meta = meta.Merge(v.Meta)
 		// avoid duplicates
 		for _, qp := range queryPatts {
 			if qp == v.QueryPatt {
@@ -267,7 +271,10 @@ Loop:
 		Interval:     series[0].Interval,
 		Consolidator: cons,
 		QueryCons:    queryCons,
+		QueryFrom:    series[0].QueryFrom,
+		QueryTo:      series[0].QueryTo,
 		Tags:         map[string]string{"name": name},
+		Meta:         meta,
 	}
 	cache[Req{}] = append(cache[Req{}], sum)
 	return sum

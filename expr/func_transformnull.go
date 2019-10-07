@@ -39,31 +39,23 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series
 		custom = false
 	}
 
-	var out []models.Series
-	for _, serie := range series {
+	for i, serie := range series {
 		var target string
 		if custom {
 			target = fmt.Sprintf("transFormNull(%s,%f)", serie.Target, s.def)
 		} else {
 			target = fmt.Sprintf("transFormNull(%s)", serie.Target)
 		}
-		transformed := models.Series{
-			Target:       target,
-			QueryPatt:    target,
-			Tags:         serie.Tags,
-			Datapoints:   pointSlicePool.Get().([]schema.Point),
-			Interval:     serie.Interval,
-			Consolidator: serie.Consolidator,
-			QueryCons:    serie.QueryCons,
-		}
+		series[i].Target = target
+		series[i].QueryPatt = target
+		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = s.def
 			}
-			transformed.Datapoints = append(transformed.Datapoints, p)
+			series[i].Datapoints = append(series[i].Datapoints, p)
 		}
-		out = append(out, transformed)
-		cache[Req{}] = append(cache[Req{}], transformed)
 	}
-	return out, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }

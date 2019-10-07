@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -31,21 +32,13 @@ func (s *FuncIntegral) Exec(cache map[Req][]models.Series) ([]models.Series, err
 		return nil, err
 	}
 
-	out := make([]models.Series, len(series))
 	for i, serie := range series {
-		transformed := &out[i]
-		transformed.Target = fmt.Sprintf("integral(%s)", serie.Target)
-		transformed.QueryPatt = fmt.Sprintf("integral(%s)", serie.QueryPatt)
-		transformed.Tags = make(map[string]string, len(serie.Tags)+1)
-		transformed.Datapoints = pointSlicePool.Get().([]schema.Point)
-		transformed.Interval = serie.Interval
-		transformed.Consolidator = serie.Consolidator
-		transformed.QueryCons = serie.QueryCons
-
-		for k, v := range serie.Tags {
-			transformed.Tags[k] = v
-		}
-		transformed.Tags["integral"] = "1"
+		series[i].Target = fmt.Sprintf("integral(%s)", serie.Target)
+		series[i].Tags = serie.CopyTagsWith("integral", "1")
+		series[i].QueryPatt = fmt.Sprintf("integral(%s)", serie.QueryPatt)
+		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
+		series[i].Consolidator = consolidation.None
+		series[i].QueryCons = consolidation.None
 
 		current := 0.0
 		for _, p := range serie.Datapoints {
@@ -53,10 +46,9 @@ func (s *FuncIntegral) Exec(cache map[Req][]models.Series) ([]models.Series, err
 				current += p.Val
 				p.Val = current
 			}
-			transformed.Datapoints = append(transformed.Datapoints, p)
+			series[i].Datapoints = append(series[i].Datapoints, p)
 		}
-		cache[Req{}] = append(cache[Req{}], *transformed)
 	}
-
-	return out, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }

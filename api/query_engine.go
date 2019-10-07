@@ -34,9 +34,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 	var seenIntervals = make(map[uint32]struct{})
 	var targets = make(map[string]struct{})
 
-	for i := range reqs {
-		req := &reqs[i]
-		req.Archive = -1
+	for _, req := range reqs {
 		targets[req.Target] = struct{}{}
 	}
 	numTargets := uint32(len(targets))
@@ -58,6 +56,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 	// (starting with raw, then rollups in decreasing precision)
 	// that retains all the data we need and does not exceed minIntervalSoft.
 	// fallback to lowest res option (which *should* have the longest TTL)
+	var found bool
 	for i := range reqs {
 		req := &reqs[i]
 		retentions := mdata.Schemas.Get(req.SchemaId).Retentions
@@ -66,7 +65,8 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 			if ret.Ready > from {
 				continue
 			}
-			req.Archive = i
+			found = true
+			req.Archive = uint8(i)
 			req.TTL = uint32(ret.MaxRetention())
 			if i == 0 {
 				// The first retention is raw data, so use its native interval
@@ -79,7 +79,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 				break
 			}
 		}
-		if req.Archive == -1 {
+		if !found {
 			return nil, 0, 0, errUnSatisfiable
 		}
 
@@ -121,7 +121,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 				archInterval := uint32(ret.SecondsPerPoint)
 				if interval == archInterval && ret.Ready <= from {
 					// we're in luck. this will be more efficient than runtime consolidation
-					req.Archive = req.Archive + 1 + i
+					req.Archive = req.Archive + 1 + uint8(i)
 					req.ArchInterval = archInterval
 					req.TTL = uint32(ret.MaxRetention())
 					req.OutInterval = archInterval
@@ -141,7 +141,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 			}
 		}
 		pointsFetch += tsRange / req.ArchInterval
-		reqRenderChosenArchive.Value(req.Archive)
+		reqRenderChosenArchive.ValueUint32(uint32(req.Archive))
 	}
 
 	pointsPerSerie := tsRange / interval

@@ -33,6 +33,7 @@ type GraphiteFunc interface {
 	// * not modify slices of points that they get from their inputs
 	// * use the pool to get new slices in which to store any new/modified dat
 	// * add the newly created slices into the cache so they can be reclaimed after the output is consumed
+	// * not modify other properties on its input series, such as Tags map or Meta
 	Exec(map[Req][]models.Series) ([]models.Series, error)
 }
 

@@ -352,6 +352,17 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 		QueryTo:      req.To,
 		QueryCons:    req.ConsReq,
 		Consolidator: req.Consolidator,
+		Meta: []models.SeriesMetaProperties{
+			{
+				// note that for simplicity, we pretend that a read of rollup avg data is a read of 1 "avg series"
+				// rather than a runtime divide of 2 series
+				SchemaID:              req.SchemaId,
+				Archive:               req.Archive,
+				AggNumNorm:            req.AggNum,
+				ConsolidatorNormFetch: req.Consolidator,
+				Count:                 1,
+			},
+		},
 	}
 
 	// the easy case: we're reading the raw data.
@@ -650,6 +661,9 @@ func mergeSeries(in []models.Series) []models.Series {
 				pointSlicePool.Put(series[j].Datapoints[:0])
 			}
 			merged[i] = series[0]
+			for j := 1; j < len(series); j++ {
+				merged[i].Meta = merged[i].Meta.Merge(series[j].Meta)
+			}
 		}
 		i++
 	}

@@ -16,8 +16,7 @@ import (
 //go:generate msgp
 
 type Series struct {
-	Target       string // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
-	Datapoints   []schema.Point
+	Target       string            // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
 	Tags         map[string]string // Must be set initially via call to `SetTags()`
 	Interval     uint32
 	QueryPatt    string                     // to tie series back to request it came from. e.g. foo.bar.*, or if series outputted by func it would be e.g. scale(foo.bar.*,0.123456)
@@ -25,6 +24,61 @@ type Series struct {
 	QueryTo      uint32                     // to tie series back to request it came from
 	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
 	Consolidator consolidation.Consolidator // consolidator to actually use (for fetched series this may not be 0, default must be resolved. if series created by function, may be 0)
+	Meta         SeriesMeta                 // note: this series could be a "just fetched" series, or one derived from many other series
+	Datapoints   []schema.Point
+}
+
+// SeriesMeta counts the number of series for each set of meta properties
+// note: it's illegal for SeriesMeta to include multiple entries that include the same properties
+type SeriesMeta []SeriesMetaProperties
+
+// SeriesMetaProperties describes the properties of a series
+// (fetching and normalization and the count of series corresponding to them)
+type SeriesMetaProperties struct {
+	SchemaID              uint16                     // id of storage-schemas rule this series corresponds to
+	Archive               uint8                      // which archive was being read from
+	AggNumNorm            uint32                     // aggNum for normalization
+	AggNumRC              uint32                     // aggNum runtime consolidation
+	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
+	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation to honor maxdatapoints (if applicable).
+	Count                 uint32                     // number of series corresponding to these properties
+}
+
+// Merge merges SeriesMeta b into a
+// counts for identical properties get added together
+func (a SeriesMeta) Merge(b SeriesMeta) SeriesMeta {
+	// note: to see which properties are equivalent we should not consider the count
+	indices := make(map[SeriesMetaProperties]int)
+	for i, v := range a {
+		v.Count = 0
+		indices[v] = i
+	}
+	for j, v := range b {
+		v.Count = 0
+		index, ok := indices[v]
+		if ok {
+			a[index].Count += b[j].Count
+		} else {
+			a = append(a, b[j])
+		}
+	}
+	return a
+}
+
+// Copy creates a copy of SeriesMeta
+func (a SeriesMeta) Copy() SeriesMeta {
+	out := make(SeriesMeta, len(a))
+	copy(out, a)
+	return out
+}
+
+// CopyWithChange creates a copy of SeriesMeta, but executes the requested change on each SeriesMetaProperties
+func (a SeriesMeta) CopyWithChange(fn func(in SeriesMetaProperties) SeriesMetaProperties) SeriesMeta {
+	out := make(SeriesMeta, len(a))
+	for i, v := range a {
+		out[i] = fn(v)
+	}
+	return out
 }
 
 func (s *Series) SetTags() {
@@ -109,26 +163,40 @@ func (s *Series) buildTargetFromTags() {
 	s.Target = buf.String()
 }
 
+// Copy returns a deep copy.
+// The returned value does not link to the same memory space for any of the properties
 func (s Series) Copy(emptyDatapoints []schema.Point) Series {
-	newSeries := Series{
+	return Series{
 		Target:       s.Target,
-		Datapoints:   emptyDatapoints,
-		Tags:         make(map[string]string, len(s.Tags)),
+		Datapoints:   append(emptyDatapoints, s.Datapoints...),
+		Tags:         s.CopyTags(),
 		Interval:     s.Interval,
 		QueryPatt:    s.QueryPatt,
 		QueryFrom:    s.QueryFrom,
 		QueryTo:      s.QueryTo,
 		QueryCons:    s.QueryCons,
 		Consolidator: s.Consolidator,
+		Meta:         s.Meta.Copy(),
 	}
+}
 
-	newSeries.Datapoints = append(newSeries.Datapoints, s.Datapoints...)
-
+// CopyTags makes a deep copy of the tags
+func (s *Series) CopyTags() map[string]string {
+	out := make(map[string]string, len(s.Tags))
 	for k, v := range s.Tags {
-		newSeries.Tags[k] = v
+		out[k] = v
 	}
+	return out
+}
 
-	return newSeries
+// CopyTagsWith makes a deep copy of the tags and sets the given tag
+func (s *Series) CopyTagsWith(key, val string) map[string]string {
+	out := make(map[string]string, len(s.Tags)+1)
+	for k, v := range s.Tags {
+		out[k] = v
+	}
+	out[key] = val
+	return out
 }
 
 type SeriesByTarget []Series
@@ -176,6 +244,75 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 	}
 	b = append(b, ']')
 	return b, nil
+}
+func (series SeriesByTarget) MarshalJSONFastWithMeta(b []byte) ([]byte, error) {
+	b = append(b, '[')
+	for _, s := range series {
+		b = append(b, `{"target":`...)
+		b = strconv.AppendQuoteToASCII(b, s.Target)
+		if len(s.Tags) != 0 {
+			b = append(b, `,"tags":{`...)
+			for name, value := range s.Tags {
+				b = strconv.AppendQuoteToASCII(b, name)
+				b = append(b, ':')
+				b = strconv.AppendQuoteToASCII(b, value)
+				b = append(b, ',')
+			}
+			// Replace trailing comma with a closing bracket
+			b[len(b)-1] = '}'
+		}
+		b = append(b, `,"datapoints":[`...)
+		for _, p := range s.Datapoints {
+			b = append(b, '[')
+			if math.IsNaN(p.Val) {
+				b = append(b, `null,`...)
+			} else {
+				b = strconv.AppendFloat(b, p.Val, 'f', -1, 64)
+				b = append(b, ',')
+			}
+			b = strconv.AppendUint(b, uint64(p.Ts), 10)
+			b = append(b, `],`...)
+		}
+		if len(s.Datapoints) != 0 {
+			b = b[:len(b)-1] // cut last comma
+		}
+		b = append(b, `],"meta":`...)
+		b, _ = s.Meta.MarshalJSONFast(b)
+		b = append(b, `},`...)
+	}
+	if len(series) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+}
+
+func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
+	b = append(b, '[')
+	for _, props := range meta {
+		b = append(b, `{"schema-id":`...)
+		// TODO make user friendly return the actual rule
+		b = strconv.AppendUint(b, uint64(props.SchemaID), 10)
+		b = append(b, `,"archive":`...)
+		b = strconv.AppendUint(b, uint64(props.Archive), 10)
+		b = append(b, `,"aggnum-norm":`...)
+		b = strconv.AppendUint(b, uint64(props.AggNumNorm), 10)
+		b = append(b, `,"consolidate-normfetch":"`...)
+		b = append(b, props.ConsolidatorNormFetch.String()...)
+		b = append(b, `","aggnum-rc":`...)
+		b = strconv.AppendUint(b, uint64(props.AggNumRC), 10)
+		b = append(b, `,"consolidate-rc":"`...)
+		b = append(b, props.ConsolidatorRC.String()...)
+		b = append(b, `","count":`...)
+		b = strconv.AppendUint(b, uint64(props.Count), 10)
+		b = append(b, `},`...)
+	}
+	if len(meta) != 0 {
+		b = b[:len(b)-1] // cut last comma
+	}
+	b = append(b, ']')
+	return b, nil
+
 }
 
 func (series SeriesByTarget) MarshalJSON() ([]byte, error) {

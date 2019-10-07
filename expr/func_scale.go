@@ -34,23 +34,15 @@ func (s *FuncScale) Exec(cache map[Req][]models.Series) ([]models.Series, error)
 	if err != nil {
 		return nil, err
 	}
-	var outputs []models.Series
-	for _, serie := range series {
+	for i, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: v.Val * s.factor, Ts: v.Ts})
 		}
-		s := models.Series{
-			Target:       fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor),
-			QueryPatt:    fmt.Sprintf("scale(%s,%f)", serie.QueryPatt, s.factor),
-			Tags:         serie.Tags,
-			Datapoints:   out,
-			Interval:     serie.Interval,
-			Consolidator: serie.Consolidator,
-			QueryCons:    serie.QueryCons,
-		}
-		outputs = append(outputs, s)
-		cache[Req{}] = append(cache[Req{}], s)
+		series[i].Target = fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor)
+		series[i].QueryPatt = fmt.Sprintf("scale(%s,%f)", serie.QueryPatt, s.factor)
+		series[i].Datapoints = out
 	}
-	return outputs, nil
+	cache[Req{}] = append(cache[Req{}], series...)
+	return series, nil
 }

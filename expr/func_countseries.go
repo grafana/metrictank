@@ -45,15 +45,19 @@ func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		out = append(out, p)
 	}
 
-	output := models.Series{
-		Target:       name,
-		QueryPatt:    name,
-		Tags:         map[string]string{"name": name},
-		Datapoints:   out,
-		Interval:     series[0].Interval,
-		Consolidator: cons,
-		QueryCons:    queryCons,
+	var meta models.SeriesMeta
+	for _, s := range series {
+		meta = meta.Merge(s.Meta)
 	}
+
+	output := series[0]
+	output.Target = name
+	output.QueryPatt = name
+	output.Tags = map[string]string{"name": name}
+	output.Datapoints = out
+	output.Consolidator = cons
+	output.QueryCons = queryCons
+	output.Meta = meta
 	cache[Req{}] = append(cache[Req{}], output)
 
 	return []models.Series{output}, nil

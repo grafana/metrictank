@@ -35,33 +35,29 @@ type Req struct {
 	SchemaId uint16                     `json:"schemaId"`
 	AggId    uint16                     `json:"aggId"`
 
-	// these fields need some more coordination and are typically set later
-	Archive      int    `json:"archive"`      // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
+	// these fields need some more coordination and are typically set later (after request alignment)
+	Archive      uint8  `json:"archive"`      // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
 	ArchInterval uint32 `json:"archInterval"` // the interval corresponding to the archive we'll fetch
 	TTL          uint32 `json:"ttl"`          // the ttl of the archive we'll fetch
 	OutInterval  uint32 `json:"outInterval"`  // the interval of the output data, after any runtime consolidation
 	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive (normalization)
 }
 
+// NewReq creates a new request. It sets all properties minus the ones that need request alignment
 func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
 	return Req{
-		key,
-		target,
-		patt,
-		from,
-		to,
-		maxPoints,
-		rawInterval,
-		cons,
-		consReq,
-		node,
-		schemaId,
-		aggId,
-		-1, // this is supposed to be updated still!
-		0,  // this is supposed to be updated still
-		0,  // this is supposed to be updated still
-		0,  // this is supposed to be updated still
-		0,  // this is supposed to be updated still
+		MKey:         key,
+		Target:       target,
+		Pattern:      patt,
+		From:         from,
+		To:           to,
+		MaxPoints:    maxPoints,
+		RawInterval:  rawInterval,
+		Consolidator: cons,
+		ConsReq:      consReq,
+		Node:         node,
+		SchemaId:     schemaId,
+		AggId:        aggId,
 	}
 }
 
@@ -83,20 +79,20 @@ func (r Req) TraceLog(span opentracing.Span) {
 		log.Object("key", r.MKey),
 		log.String("target", r.Target),
 		log.String("pattern", r.Pattern),
-		log.Int("from", int(r.From)),
-		log.Int("to", int(r.To)),
-		log.Int("span", int(r.To-r.From-1)),
-		log.Int("mdp", int(r.MaxPoints)),
-		log.Int("rawInterval", int(r.RawInterval)),
+		log.Uint32("from", r.From),
+		log.Uint32("to", r.To),
+		log.Uint32("span", r.To-r.From-1),
+		log.Uint32("mdp", r.MaxPoints),
+		log.Uint32("rawInterval", r.RawInterval),
 		log.String("cons", r.Consolidator.String()),
 		log.String("consReq", r.ConsReq.String()),
-		log.Int("schemaId", int(r.SchemaId)),
-		log.Int("aggId", int(r.AggId)),
-		log.Int("archive", r.Archive),
-		log.Int("archInterval", int(r.ArchInterval)),
-		log.Int("TTL", int(r.TTL)),
-		log.Int("outInterval", int(r.OutInterval)),
-		log.Int("aggNum", int(r.AggNum)),
+		log.Uint32("schemaId", uint32(r.SchemaId)),
+		log.Uint32("aggId", uint32(r.AggId)),
+		log.Uint32("archive", uint32(r.Archive)),
+		log.Uint32("archInterval", r.ArchInterval),
+		log.Uint32("TTL", r.TTL),
+		log.Uint32("outInterval", r.OutInterval),
+		log.Uint32("aggNum", r.AggNum),
 	)
 }
 

@@ -45,7 +45,11 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		return nil, errors.New("No tags specified")
 	}
 
-	groups := make(map[string][]models.Series)
+	type Group struct {
+		s []models.Series
+		m models.SeriesMeta
+	}
+	groups := make(map[string]Group)
 	useName := false
 
 	groupTags := s.tags
@@ -99,15 +103,18 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 
 		key := buffer.String()
 
-		groups[key] = append(groups[key], serie)
+		group := groups[key]
+		group.s = append(group.s, serie)
+		group.m = group.m.Merge(serie.Meta)
+		groups[key] = group
 	}
 
 	output := make([]models.Series, 0, len(groups))
 	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 
 	// Now, for each key perform the requested aggregation
-	for name, groupSeries := range groups {
-		cons, queryCons := summarizeCons(groupSeries)
+	for name, group := range groups {
+		cons, queryCons := summarizeCons(group.s)
 
 		newSeries := models.Series{
 			Target:       name,
@@ -115,12 +122,15 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			Interval:     series[0].Interval,
 			Consolidator: cons,
 			QueryCons:    queryCons,
+			QueryFrom:    group.s[0].QueryFrom,
+			QueryTo:      group.s[0].QueryTo,
+			Meta:         group.m,
 		}
 		newSeries.SetTags()
 
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
 
-		aggFunc(groupSeries, &newSeries.Datapoints)
+		aggFunc(group.s, &newSeries.Datapoints)
 		cache[Req{}] = append(cache[Req{}], newSeries)
 
 		output = append(output, newSeries)
