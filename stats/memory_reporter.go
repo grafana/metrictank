@@ -5,17 +5,26 @@ import (
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/grafana/metrictank/util"
 )
 
 // MemoryReporter sources memory stats from the runtime and reports them
 // It also reports gcPercent based on the GOGC environment variable
 type MemoryReporter struct {
-	mem           runtime.MemStats
-	gcCyclesTotal uint32
+	mem                  runtime.MemStats
+	gcCyclesTotal        uint32
+	timeBoundGetMemStats func() interface{}
 }
 
 func NewMemoryReporter() *MemoryReporter {
-	return registry.getOrAdd("memory", &MemoryReporter{}).(*MemoryReporter)
+	reporter := registry.getOrAdd("memory", &MemoryReporter{}).(*MemoryReporter)
+	reporter.timeBoundGetMemStats = util.TimeBoundWithCacheFunc(func() interface{} {
+		mem := &runtime.MemStats{}
+		runtime.ReadMemStats(mem)
+		return mem
+	}, 500*time.Millisecond, 1*time.Minute)
+	return reporter
 }
 
 func getGcPercent() int {
@@ -37,7 +46,7 @@ func getGcPercent() int {
 }
 
 func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
-	runtime.ReadMemStats(&m.mem)
+	m.mem = *m.timeBoundGetMemStats().(*runtime.MemStats)
 	gcPercent := getGcPercent()
 
 	// metric memory.total_bytes_allocated is a counter of total number of bytes allocated during process lifetime
