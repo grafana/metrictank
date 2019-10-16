@@ -126,16 +126,16 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 			numGoRoutineAtRest := runtime.NumGoroutine()
 			endTime := time.Now()
 
-			var i int
+			functionReturnChan := make(chan int, 1)
+			executionDurationChan := make(chan time.Duration, 1)
 			fn := func() interface{} {
-				result := tt.functionReturns[i]
-				time.Sleep(tt.executionDurations[i])
-				return result
+				time.Sleep(<-executionDurationChan)
+				return <-functionReturnChan
 			}
 			decoratedFunc := TimeBoundWithCacheFunc(fn, tt.timeout, tt.maxAge)
 			var cacheTimestamp time.Time
 
-			for i = range tt.executionDurations {
+			for i := range tt.executionDurations {
 				// compute end time for all function executions of the test
 				tolerance := 1 * time.Millisecond
 				finishesAt := time.Now().Add(tt.executionDurations[i] + tolerance)
@@ -143,6 +143,8 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 					endTime = finishesAt
 				}
 
+				functionReturnChan <- tt.functionReturns[i]
+				executionDurationChan <- tt.executionDurations[i]
 				beforeExecution := time.Now()
 				result := decoratedFunc()
 				executionDuration := time.Now().Sub(beforeExecution)
