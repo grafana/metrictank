@@ -23,7 +23,7 @@ func NewMemoryReporter() *MemoryReporter {
 		mem := &runtime.MemStats{}
 		runtime.ReadMemStats(mem)
 		return mem
-	}, 500*time.Millisecond, 1*time.Minute)
+	}, 5*time.Second, 1*time.Minute)
 	return reporter
 }
 
