@@ -145,8 +145,7 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 
 			for i := range tt.executionDurations {
 				// compute end time for all function executions of the test
-				tolerance := 1 * time.Millisecond
-				finishesAt := time.Now().Add(tt.executionDurations[i] + tolerance)
+				finishesAt := time.Now().Add(tt.executionDurations[i])
 				if finishesAt.After(endTime) {
 					endTime = finishesAt
 				}
@@ -165,6 +164,7 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 				// check that function execution took around tt.timeout
 				// if the function does not have a cached result or the cache is stale due to maxAge, the timeout is not enforced
 				cacheIsStale := time.Now().After(cacheTimestamp.Add(tt.maxAge))
+				tolerance := 1 * time.Millisecond
 				if !cacheIsStale && executionDuration > tt.timeout+tolerance {
 					t.Errorf("iteration %v: decoratedFunc() took too long to execute %v which is greater than timeout (%v)", i, executionDuration, tt.timeout)
 				}
@@ -175,7 +175,8 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 			}
 
 			// detects if any goroutine is leaked after all processing is supposed to be complete
-			time.Sleep(time.Until(endTime))
+			tolerance := 100 * time.Millisecond
+			time.Sleep(time.Until(endTime.Add(tolerance)))
 			extraGoRoutines := runtime.NumGoroutine() - numGoRoutineAtRest
 			if extraGoRoutines > 0 {
 				t.Errorf("too many goroutines left after processing: %d", extraGoRoutines)
