@@ -34,11 +34,12 @@ func TimeBoundWithCacheFunc(fn func() interface{}, timeout, maxAge time.Duration
 			// call took too long, use cached result if not too old
 			if time.Since(previousTimestamp) < maxAge && previousResult != nil {
 				return previousResult
+			} else {
+				// in case the result did not arrive in time but the previous result was too old
+				result = <-done
 			}
 		}
-		if result == nil { // in case the result did not arrive in time but the previous result was too old
-			result = <-done
-		}
+
 		previousTimestamp = time.Now()
 		previousResult = result
 		return result
