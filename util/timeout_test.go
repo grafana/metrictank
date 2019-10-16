@@ -156,21 +156,21 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 				result := decoratedFunc()
 				executionDuration := time.Now().Sub(beforeExecution)
 
-				// save last time a result was cached
-				if tt.executionDurations[i] <= tt.timeout {
-					cacheTimestamp = time.Now()
-				}
-
 				// check that function execution took around tt.timeout
 				// if the function does not have a cached result or the cache is stale due to maxAge, the timeout is not enforced
 				cacheIsStale := time.Now().After(cacheTimestamp.Add(tt.maxAge))
-				tolerance := 1 * time.Millisecond
+				tolerance := 20 * time.Millisecond
 				if !cacheIsStale && executionDuration > tt.timeout+tolerance {
 					t.Errorf("iteration %v: decoratedFunc() took too long to execute %v which is greater than timeout (%v)", i, executionDuration, tt.timeout)
 				}
 
 				if !reflect.DeepEqual(result, tt.expectedResults[i]) {
 					t.Errorf("iteration %v: decoratedFunc() = %v, want %v", i, result, tt.expectedResults[i])
+				}
+
+				// save last time a result was cached
+				if tt.executionDurations[i] <= tt.timeout {
+					cacheTimestamp = time.Now()
 				}
 			}
 
