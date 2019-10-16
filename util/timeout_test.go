@@ -8,6 +8,14 @@ import (
 )
 
 func TestTimeBoundWithCacheFunc(t *testing.T) {
+	testMachineLatency := 50 * time.Millisecond
+
+	zeroDuration := 0 * time.Millisecond
+	veryShortDuration := 1 * time.Millisecond
+	shortDuration := veryShortDuration + testMachineLatency*2
+	longDuration := shortDuration + testMachineLatency*2
+	veryLongDuration := longDuration + testMachineLatency*2
+
 	tests := []struct {
 		name               string
 		functionReturns    []int
@@ -19,114 +27,114 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 		{
 			name:               "immediate",
 			functionReturns:    []int{42},
-			executionDurations: []time.Duration{0},
+			executionDurations: []time.Duration{zeroDuration},
 			expectedResults:    []int{42},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "immediate_zero_timeout",
 			functionReturns:    []int{42},
-			executionDurations: []time.Duration{0},
+			executionDurations: []time.Duration{zeroDuration},
 			expectedResults:    []int{42},
-			timeout:            0 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            zeroDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "immediate_zero_maxage",
 			functionReturns:    []int{42},
-			executionDurations: []time.Duration{0},
+			executionDurations: []time.Duration{zeroDuration},
 			expectedResults:    []int{42},
-			timeout:            50 * time.Millisecond,
-			maxAge:             0 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             zeroDuration,
 		},
 		{
 			name:               "slow_notimeout",
 			functionReturns:    []int{42},
-			executionDurations: []time.Duration{100 * time.Millisecond},
+			executionDurations: []time.Duration{shortDuration},
 			expectedResults:    []int{42},
-			timeout:            500 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            longDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "slow_timeout",
 			functionReturns:    []int{42},
-			executionDurations: []time.Duration{100 * time.Millisecond},
+			executionDurations: []time.Duration{longDuration},
 			expectedResults:    []int{42},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "fast_then_slow_timeout",
 			functionReturns:    []int{42, 88},
-			executionDurations: []time.Duration{10 * time.Millisecond, 100 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, longDuration},
 			expectedResults:    []int{42, 42},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "fast_then_fast",
 			functionReturns:    []int{42, 88},
-			executionDurations: []time.Duration{10 * time.Millisecond, 20 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, veryShortDuration},
 			expectedResults:    []int{42, 88},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "slow_timeout_then_slow_timeout",
 			functionReturns:    []int{42, 88},
-			executionDurations: []time.Duration{100 * time.Millisecond, 100 * time.Millisecond},
+			executionDurations: []time.Duration{longDuration, longDuration},
 			expectedResults:    []int{42, 42},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "fast_then_fast_then_slow_timeout",
 			functionReturns:    []int{42, 88, 1},
-			executionDurations: []time.Duration{10 * time.Millisecond, 1 * time.Millisecond, 100 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, veryShortDuration, longDuration},
 			expectedResults:    []int{42, 88, 88},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "fast_then_slow_then_fast_never_timeout",
 			functionReturns:    []int{42, 88, 1},
-			executionDurations: []time.Duration{1 * time.Millisecond, 100 * time.Millisecond, 2 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, longDuration, veryShortDuration},
 			expectedResults:    []int{42, 88, 1},
-			timeout:            500 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            veryLongDuration, //FIXME: only use?
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "fast_then_slow_timeout_then_fast",
 			functionReturns:    []int{42, 88, 1},
-			executionDurations: []time.Duration{1 * time.Millisecond, 100 * time.Millisecond, 2 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, longDuration, veryShortDuration},
 			expectedResults:    []int{42, 42, 1},
-			timeout:            50 * time.Millisecond,
-			maxAge:             5 * time.Minute,
+			timeout:            shortDuration,
+			maxAge:             veryLongDuration,
 		},
 		{
 			name:               "stale_cache_fast_then_slow_timeout",
 			functionReturns:    []int{42, 88},
-			executionDurations: []time.Duration{10 * time.Millisecond, 100 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, veryLongDuration},
 			expectedResults:    []int{42, 88},
-			timeout:            50 * time.Millisecond,
-			maxAge:             30 * time.Millisecond,
+			timeout:            longDuration,
+			maxAge:             shortDuration,
 		},
 		{
 			name:               "stale_cache_slow_timeout_then_slow_timeout",
 			functionReturns:    []int{42, 88},
-			executionDurations: []time.Duration{100 * time.Millisecond, 100 * time.Millisecond},
+			executionDurations: []time.Duration{veryLongDuration, veryLongDuration},
 			expectedResults:    []int{42, 88},
-			timeout:            50 * time.Millisecond,
-			maxAge:             30 * time.Millisecond,
+			timeout:            longDuration,
+			maxAge:             shortDuration,
 		},
 		{
 			name:               "stale_cache_fast_then_slow_timeout_then_fast_then_slow",
 			functionReturns:    []int{42, 88, 1, 33},
-			executionDurations: []time.Duration{1 * time.Millisecond, 100 * time.Millisecond, 2 * time.Millisecond, 100 * time.Millisecond},
+			executionDurations: []time.Duration{veryShortDuration, veryLongDuration, veryShortDuration, veryLongDuration},
 			expectedResults:    []int{42, 88, 1, 33},
-			timeout:            50 * time.Millisecond,
-			maxAge:             30 * time.Millisecond,
+			timeout:            longDuration,
+			maxAge:             shortDuration,
 		},
 	}
 	for _, tt := range tests {
@@ -159,8 +167,7 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 				// check that function execution took around tt.timeout
 				// if the function does not have a cached result or the cache is stale due to maxAge, the timeout is not enforced
 				cacheIsStale := time.Now().After(cacheTimestamp.Add(tt.maxAge))
-				tolerance := 20 * time.Millisecond
-				if !cacheIsStale && executionDuration > tt.timeout+tolerance {
+				if !cacheIsStale && executionDuration > tt.timeout+testMachineLatency {
 					t.Errorf("iteration %v: decoratedFunc() took too long to execute %v which is greater than timeout (%v)", i, executionDuration, tt.timeout)
 				}
 
@@ -175,8 +182,7 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 			}
 
 			// detects if any goroutine is leaked after all processing is supposed to be complete
-			tolerance := 100 * time.Millisecond
-			time.Sleep(time.Until(endTime.Add(tolerance)))
+			time.Sleep(time.Until(endTime.Add(testMachineLatency)))
 			extraGoRoutines := runtime.NumGoroutine() - numGoRoutineAtRest
 			if extraGoRoutines > 0 {
 				t.Errorf("too many goroutines left after processing: %d", extraGoRoutines)
