@@ -223,7 +223,7 @@ func TestExpressionsParsingAndBackToString(t *testing.T) {
 				t.Fatalf("Error when parsing expression: %s", err)
 			}
 
-			e.StringIntoBuilder(&builder)
+			e.StringIntoWriter(&builder)
 			res := builder.String()
 			builder.Reset()
 

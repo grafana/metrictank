@@ -3,6 +3,7 @@ package tagquery
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -64,11 +65,20 @@ func (t Tags) Strings() []string {
 	builder := strings.Builder{}
 	res := make([]string, len(t))
 	for i := range t {
-		t[i].StringIntoBuilder(&builder)
+		t[i].StringIntoWriter(&builder)
 		res[i] = builder.String()
 		builder.Reset()
 	}
 	return res
+}
+
+func (t Tags) Sort() {
+	sort.Slice(t, func(i, j int) bool {
+		if t[i].Key == t[j].Key {
+			return t[i].Value < t[j].Value
+		}
+		return t[i].Key < t[j].Key
+	})
 }
 
 // MarshalJSON satisfies the json.Marshaler interface
@@ -119,8 +129,8 @@ func ParseTag(tag string) (Tag, error) {
 	return res, nil
 }
 
-func (t *Tag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(t.Key)
-	builder.WriteString("=")
-	builder.WriteString(t.Value)
+func (t *Tag) StringIntoWriter(writer io.StringWriter) {
+	writer.WriteString(t.Key)
+	writer.WriteString("=")
+	writer.WriteString(t.Value)
 }

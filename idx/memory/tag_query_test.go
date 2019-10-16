@@ -508,7 +508,7 @@ TEST_CASES:
 		builder := strings.Builder{}
 		builder.WriteString(fmt.Sprintf("TC %d: ", tc))
 		for _, expr := range expressions {
-			expr.StringIntoBuilder(&builder)
+			expr.StringIntoWriter(&builder)
 			builder.WriteString(";")
 		}
 		t.Run(builder.String(), func(t *testing.T) {

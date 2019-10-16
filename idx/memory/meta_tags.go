@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"sort"
 	"sync/atomic"
 	"unsafe"
 
@@ -44,7 +45,10 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	// after altering meta records we need to reinstantiate the enricher the next time we want to use it
 	defer atomic.StorePointer(&m.enricher, nil)
 
+	record.Expressions.Sort()
+
 	id := recordId(record.HashExpressions())
+
 	var oldRecord *tagquery.MetaTagRecord
 	var oldId recordId
 
@@ -64,6 +68,8 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	if !record.HasMetaTags() {
 		return 0, &record, oldId, oldRecord, nil
 	}
+
+	record.MetaTags.Sort()
 
 	// now find the best position to insert the new/updated record, starting from id
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
@@ -113,6 +119,40 @@ func (m *metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
 	atomic.StorePointer(&m.enricher, (unsafe.Pointer)(res))
 
 	return res
+}
+
+func (m *metaTagRecords) hashRecords() uint32 {
+	i := 0
+	recordIds := make([]recordId, len(m.records))
+	for recordId := range m.records {
+		recordIds[i] = recordId
+		i++
+	}
+
+	sort.Slice(recordIds, func(i, j int) bool {
+		return recordIds[i] < recordIds[j]
+	})
+
+	h := tagquery.QueryHash()
+	var record tagquery.MetaTagRecord
+	var recordHash uint64
+	for _, recordId := range recordIds {
+		record = m.records[recordId]
+		recordHash = record.HashRecord()
+
+		h.Write([]byte{
+			byte(recordHash),
+			byte(recordHash >> 8),
+			byte(recordHash >> 16),
+			byte(recordHash >> 24),
+			byte(recordHash >> 32),
+			byte(recordHash >> 40),
+			byte(recordHash >> 48),
+			byte(recordHash >> 56),
+		})
+	}
+
+	return h.Sum32()
 }
 
 type enricher struct {

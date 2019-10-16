@@ -518,8 +518,6 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 	newMti := make(metaTagIndex)
 
 	for _, record := range records {
-		record.Expressions.Sort()
-
 		recordId, _, _, _, err := newMtr.upsert(record)
 		if err != nil {
 			return err
@@ -529,6 +527,17 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 			newMti.insertRecord(keyValue, recordId)
 		}
 	}
+
+	m.RLock()
+	oldMtr, ok := m.metaTagRecords[orgId]
+	if ok {
+		if oldMtr.hashRecords() == newMtr.hashRecords() {
+			// the old and the new records are the same, so there is no need to change anyting
+			m.RUnlock()
+			return nil
+		}
+	}
+	m.RUnlock()
 
 	m.Lock()
 	defer m.Unlock()

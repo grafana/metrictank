@@ -3,6 +3,7 @@ package tagquery
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strings"
@@ -34,7 +35,7 @@ func (e Expressions) Strings() []string {
 	builder := strings.Builder{}
 	res := make([]string, len(e))
 	for i := range e {
-		e[i].StringIntoBuilder(&builder)
+		e[i].StringIntoWriter(&builder)
 		res[i] = builder.String()
 		builder.Reset()
 	}
@@ -185,8 +186,8 @@ type Expression interface {
 	// regarding this query expression applied to its tags
 	GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter
 
-	// StringIntoBuilder takes a builder and writes a string representation of this expression into it
-	StringIntoBuilder(builder *strings.Builder)
+	// StringIntoWriter takes a string writer and writes a representation of this expression into it
+	StringIntoWriter(writer io.StringWriter)
 }
 
 // ParseExpression returns an expression that's been generated from the given
@@ -413,29 +414,29 @@ const (
 	MATCH_NONE                            // special case of expression that matches no metric (f.e. key!=.*)
 )
 
-func (o ExpressionOperator) StringIntoBuilder(builder *strings.Builder) {
+func (o ExpressionOperator) StringIntoWriter(writer io.StringWriter) {
 	switch o {
 	case EQUAL:
-		builder.WriteString("=")
+		writer.WriteString("=")
 	case NOT_EQUAL:
-		builder.WriteString("!=")
+		writer.WriteString("!=")
 	case MATCH:
-		builder.WriteString("=~")
+		writer.WriteString("=~")
 	case MATCH_TAG:
-		builder.WriteString("=~")
+		writer.WriteString("=~")
 	case NOT_MATCH:
-		builder.WriteString("!=~")
+		writer.WriteString("!=~")
 	case PREFIX:
-		builder.WriteString("^=")
+		writer.WriteString("^=")
 	case PREFIX_TAG:
-		builder.WriteString("^=")
+		writer.WriteString("^=")
 	case HAS_TAG:
-		builder.WriteString("!=")
+		writer.WriteString("!=")
 	case NOT_HAS_TAG:
-		builder.WriteString("=")
+		writer.WriteString("=")
 	case MATCH_ALL:
-		builder.WriteString("=")
+		writer.WriteString("=")
 	case MATCH_NONE:
-		builder.WriteString("!=")
+		writer.WriteString("!=")
 	}
 }

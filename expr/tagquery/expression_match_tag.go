@@ -1,6 +1,7 @@
 package tagquery
 
 import (
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -89,7 +90,7 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefi
 	}
 }
 
-func (e *expressionMatchTag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString("__tag=~")
-	builder.WriteString(e.value)
+func (e *expressionMatchTag) StringIntoWriter(writer io.StringWriter) {
+	writer.WriteString("__tag=~")
+	writer.WriteString(e.value)
 }

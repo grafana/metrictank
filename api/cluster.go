@@ -267,7 +267,7 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 		expressions := make(tagquery.Expressions, len(tags))
 		builder := strings.Builder{}
 		for i := range tags {
-			tags[i].StringIntoBuilder(&builder)
+			tags[i].StringIntoWriter(&builder)
 
 			expressions[i], err = tagquery.ParseExpression(builder.String())
 			if err != nil {

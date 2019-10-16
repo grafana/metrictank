@@ -1,7 +1,7 @@
 package tagquery
 
 import (
-	"strings"
+	"io"
 
 	"github.com/grafana/metrictank/schema"
 )
@@ -52,8 +52,8 @@ func (e *expressionMatchAll) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefi
 	return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Pass }
 }
 
-func (e *expressionMatchAll) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString(e.key)
-	e.originalOperator.StringIntoBuilder(builder)
-	builder.WriteString(e.value)
+func (e *expressionMatchAll) StringIntoWriter(writer io.StringWriter) {
+	writer.WriteString(e.key)
+	e.originalOperator.StringIntoWriter(writer)
+	writer.WriteString(e.value)
 }

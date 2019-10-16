@@ -72,7 +72,7 @@ func (m *MetricData) PartitionID(method PartitionByMethod, partitions int32) (in
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
 		h := util.NewFnv32aStringWriter()
-		if err := writeSortedTagString(&h, m.Name, m.Tags); err != nil {
+		if err := writeSortedTagString(h, m.Name, m.Tags); err != nil {
 			return 0, err
 		}
 		partition = int32(h.Sum32()) % partitions
@@ -116,7 +116,7 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 		if len(m.nameWithTags) > 0 {
 			h.WriteString(m.nameWithTags)
 		} else {
-			if err := writeSortedTagString(&h, m.Name, m.Tags); err != nil {
+			if err := writeSortedTagString(h, m.Name, m.Tags); err != nil {
 				return 0, err
 			}
 		}

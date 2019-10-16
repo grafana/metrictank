@@ -1,6 +1,7 @@
 package tagquery
 
 import (
+	"io"
 	"strings"
 
 	"github.com/grafana/metrictank/schema"
@@ -61,7 +62,7 @@ func (e *expressionPrefixTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDef
 	}
 }
 
-func (e *expressionPrefixTag) StringIntoBuilder(builder *strings.Builder) {
-	builder.WriteString("__tag^=")
-	builder.WriteString(e.value)
+func (e *expressionPrefixTag) StringIntoWriter(writer io.StringWriter) {
+	writer.WriteString("__tag^=")
+	writer.WriteString(e.value)
 }

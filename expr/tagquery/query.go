@@ -2,10 +2,9 @@ package tagquery
 
 import (
 	"errors"
-	"hash"
-	"hash/fnv"
 
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/util"
 )
 
 var (
@@ -15,11 +14,11 @@ var (
 
 	// the function we use to get the hash for hashing the meta records
 	// it can be replaced for mocking in tests
-	QueryHash func() hash.Hash32
+	QueryHash func() util.StringHash32
 )
 
 func init() {
-	QueryHash = fnv.New32a
+	QueryHash = util.NewFnv32aStringWriter
 }
 
 type Query struct {
