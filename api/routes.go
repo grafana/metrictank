@@ -48,8 +48,6 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
 	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTagValues{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
 	r.Combo("/index/tags/delSeries", ready, bind(models.IndexTagDelSeries{})).Get(s.indexTagDelSeries).Post(s.indexTagDelSeries)
-	r.Combo("/index/metaTags/upsert", ready, bind(models.IndexMetaTagRecordUpsert{})).Get(s.indexMetaTagRecordUpsert).Post(s.indexMetaTagRecordUpsert)
-	r.Combo("/index/metaTags/swap", ready, bind(models.IndexMetaTagRecordSwap{})).Get(s.indexMetaTagRecordSwap).Post(s.indexMetaTagRecordSwap)
 
 	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
 

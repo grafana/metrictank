@@ -1351,81 +1351,35 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 }
 
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.WrapError(fmt.Errorf("No metric index present")))
+		return
+	}
+
 	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Expressions)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	var localResult tagquery.MetaTagRecord
-	var created bool
-	if s.MetricIndex != nil {
-		var err error
-		localResult, created, err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
-		if err != nil {
-			response.Write(ctx, response.WrapError(err))
-			return
-		}
-
-		if !upsertRequest.Propagate {
-			response.Write(ctx, response.NewJson(200, models.MetaTagRecordUpsertResult{
-				MetaTags:    localResult.MetaTags.Strings(),
-				Expressions: localResult.Expressions.Strings(),
-				Created:     created,
-			}, ""))
-			return
-		}
-	} else if !upsertRequest.Propagate {
+	err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	res := models.MetaTagRecordUpsertResultByNode{
-		Local: models.MetaTagRecordUpsertResult{
-			MetaTags:    localResult.MetaTags.Strings(),
-			Expressions: localResult.Expressions.Strings(),
-			Created:     created,
-		},
-	}
-
-	indexUpsertRequest := models.IndexMetaTagRecordUpsert{
-		OrgId:       ctx.OrgId,
-		MetaTags:    upsertRequest.MetaTags,
-		Expressions: upsertRequest.Expressions,
-	}
-
-	results, errors := s.peerQuery(ctx.Req.Context(), indexUpsertRequest, "metaTagRecordUpsert", "/index/metaTags/upsert")
-
-	if len(errors) > 0 {
-		res.PeerErrors = make(map[string]string, len(errors))
-		for peer, err := range errors {
-			res.PeerErrors[peer] = err.Error()
-		}
-	}
-
-	if len(results) > 0 {
-		res.PeerResults = make(map[string]models.MetaTagRecordUpsertResult, len(results))
-		for peer, resp := range results {
-			peerResp := models.MetaTagRecordUpsertResult{}
-			_, err := peerResp.UnmarshalMsg(resp.buf)
-			if err != nil {
-				res.PeerErrors[peer] = fmt.Sprintf("Error when unmarshaling response: %s", err.Error())
-				continue
-			}
-			res.PeerResults[peer] = peerResp
-		}
-	}
-
-	if len(errors) > 0 {
-		response.Write(ctx, response.NewJson(500, res, ""))
-	} else {
-		response.Write(ctx, response.NewJson(200, res, ""))
-	}
+	response.Write(ctx, response.NewJson(200, struct{ Status string }{Status: "OK"}, ""))
 }
 
 func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.MetaTagRecordSwap) {
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.WrapError(fmt.Errorf("No metric index present")))
+		return
+	}
+
+	var err error
 	metaTagRecords := make([]tagquery.MetaTagRecord, len(swapRequest.Records))
 	for i, rawRecord := range swapRequest.Records {
-		var err error
 		metaTagRecords[i], err = tagquery.ParseMetaTagRecord(rawRecord.MetaTags, rawRecord.Expressions)
 		if err != nil {
 			response.Write(ctx, response.WrapError(fmt.Errorf("Error when parsing record %d: %s", i, err)))
@@ -1433,64 +1387,11 @@ func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.M
 		}
 	}
 
-	var added, deleted uint32
-	if s.MetricIndex != nil {
-		var err error
-		added, deleted, err = s.MetricIndex.MetaTagRecordSwap(ctx.OrgId, metaTagRecords)
-		if err != nil {
-			response.Write(ctx, response.WrapError(err))
-			return
-		}
-
-		if !swapRequest.Propagate {
-			response.Write(ctx, response.NewJson(200, models.MetaTagRecordSwapResult{
-				Added:   added,
-				Deleted: deleted,
-			}, ""))
-			return
-		}
-	} else if !swapRequest.Propagate {
-		response.Write(ctx, response.NewJson(200, models.MetaTagRecordSwapResult{}, ""))
+	err = s.MetricIndex.MetaTagRecordSwap(ctx.OrgId, metaTagRecords)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
 		return
 	}
 
-	res := models.MetaTagRecordSwapResultByNode{
-		Local: models.MetaTagRecordSwapResult{
-			Added:   added,
-			Deleted: deleted,
-		},
-	}
-
-	indexSwapRequest := models.IndexMetaTagRecordSwap{
-		OrgId:   ctx.OrgId,
-		Records: swapRequest.Records,
-	}
-
-	results, errors := s.peerQuery(ctx.Req.Context(), indexSwapRequest, "metaTagRecordSwap", "/index/metaTags/swap")
-
-	if len(errors) > 0 {
-		res.PeerErrors = make(map[string]string, len(errors))
-		for peer, err := range errors {
-			res.PeerErrors[peer] = err.Error()
-		}
-	}
-
-	if len(results) > 0 {
-		res.PeerResults = make(map[string]models.MetaTagRecordSwapResult, len(results))
-		for peer, resp := range results {
-			peerResp := models.MetaTagRecordSwapResult{}
-			_, err := peerResp.UnmarshalMsg(resp.buf)
-			if err != nil {
-				res.PeerErrors[peer] = fmt.Sprintf("Error when unmarshaling response: %s", err.Error())
-				continue
-			}
-			res.PeerResults[peer] = peerResp
-		}
-	}
-
-	if len(errors) > 0 {
-		response.Write(ctx, response.NewJson(500, res, ""))
-	} else {
-		response.Write(ctx, response.NewJson(200, res, ""))
-	}
+	response.Write(ctx, response.NewJson(200, struct{ Status string }{Status: "OK"}, ""))
 }
