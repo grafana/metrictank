@@ -101,7 +101,7 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 			functionReturns:    []int{42, 88, 1},
 			executionDurations: []time.Duration{veryShortDuration, longDuration, veryShortDuration},
 			expectedResults:    []int{42, 88, 1},
-			timeout:            veryLongDuration, //FIXME: only use?
+			timeout:            veryLongDuration,
 			maxAge:             veryLongDuration,
 		},
 		{
