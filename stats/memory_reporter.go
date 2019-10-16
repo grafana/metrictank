@@ -20,8 +20,8 @@ type MemoryReporter struct {
 func NewMemoryReporter() *MemoryReporter {
 	reporter := registry.getOrAdd("memory", &MemoryReporter{}).(*MemoryReporter)
 	reporter.timeBoundGetMemStats = util.TimeBoundWithCacheFunc(func() interface{} {
-		mem := &runtime.MemStats{}
-		runtime.ReadMemStats(mem)
+		mem := runtime.MemStats{}
+		runtime.ReadMemStats(&mem)
 		return mem
 	}, 5*time.Second, 1*time.Minute)
 	return reporter
@@ -46,7 +46,7 @@ func getGcPercent() int {
 }
 
 func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
-	m.mem = *m.timeBoundGetMemStats().(*runtime.MemStats)
+	m.mem = m.timeBoundGetMemStats().(runtime.MemStats)
 	gcPercent := getGcPercent()
 
 	// metric memory.total_bytes_allocated is a counter of total number of bytes allocated during process lifetime
