@@ -241,8 +241,6 @@ has a set of expressions that doesn't exist yet, a new meta record gets created.
 its set of query expressions already exists, the existing meta record will be updated.
 If the new record has no meta tags associated with it, then an existing record with the
 same set of expressions gets deleted.
-When an existing record gets updated the returned property `created` is `false`,
-otherwise it's `true`.
 
 ## Example
 

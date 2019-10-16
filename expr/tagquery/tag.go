@@ -77,6 +77,22 @@ func (t Tags) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.Strings())
 }
 
+func (t *Tags) UnmarshalJSON(data []byte) error {
+	var tagStrings []string
+	err := json.Unmarshal(data, &tagStrings)
+	if err != nil {
+		return err
+	}
+
+	parsed, err := ParseTags(tagStrings)
+	if err != nil {
+		return err
+	}
+
+	*t = parsed
+	return nil
+}
+
 type Tag struct {
 	Key   string
 	Value string

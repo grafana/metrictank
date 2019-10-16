@@ -13,13 +13,13 @@ import (
 // before enableMetaTagSupport was called
 func enableMetaTagSupport() func() {
 	_tagSupport := TagSupport
-	_metaTagSupport := metaTagSupport
+	_metaTagSupport := MetaTagSupport
 	TagSupport = true
-	metaTagSupport = true
+	MetaTagSupport = true
 	tagquery.MetaTagSupport = true
 	return func() {
 		TagSupport = _tagSupport
-		metaTagSupport = _metaTagSupport
+		MetaTagSupport = _metaTagSupport
 		tagquery.MetaTagSupport = _metaTagSupport
 	}
 }
@@ -28,11 +28,11 @@ func enableMetaTagSupport() func() {
 // modify the tag-support feature flag
 // it returns a function to reset the meta-tag-support to the previous setting
 func disableMetaTagSupport() func() {
-	_metaTagSupport := metaTagSupport
-	metaTagSupport = false
+	_metaTagSupport := MetaTagSupport
+	MetaTagSupport = false
 	tagquery.MetaTagSupport = false
 	return func() {
-		metaTagSupport = _metaTagSupport
+		MetaTagSupport = _metaTagSupport
 		tagquery.MetaTagSupport = _metaTagSupport
 	}
 }

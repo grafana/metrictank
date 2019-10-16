@@ -62,6 +62,7 @@ type CasIdx struct {
 	Config           *IdxConfig
 	cluster          *gocql.ClusterConfig
 	Session          *gocql.Session
+	metaRecords      metaRecordStatusByOrg
 	writeQueue       chan writeReq
 	wg               sync.WaitGroup
 	updateInterval32 uint32
@@ -133,29 +134,38 @@ func (c *CasIdx) InitBare() error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
-		c.EnsureArchiveTableExists(tmpSession)
+		err = c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_archive_table", c.Config.ArchiveTable)
+		if err != nil {
+			return err
+		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
-		for attempt := 1; attempt > 0; attempt++ {
+		var err error
+		for attempt := 1; attempt <= 5; attempt++ {
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(c.Config.Keyspace)
 			if err != nil {
-				if attempt >= 5 {
-					return fmt.Errorf("cassandra keyspace %s not found. %d attempts", c.Config.Keyspace, attempt)
-				}
-				log.Warnf("cassandra-idx: cassandra keyspace %s not found. retrying in 5s. attempt: %d", c.Config.Keyspace, attempt)
-				time.Sleep(5 * time.Second)
+				err = fmt.Errorf("cassandra keyspace %s not found", c.Config.Keyspace)
 			} else {
-				if _, ok := keyspaceMetadata.Tables[c.Config.Table]; ok {
-					break
+				if _, ok := keyspaceMetadata.Tables[c.Config.Table]; !ok {
+					err = fmt.Errorf("cassandra table %s not found", c.Config.Table)
 				} else {
-					if attempt >= 5 {
-						return fmt.Errorf("cassandra table %s not found. %d attempts", c.Config.Table, attempt)
-					}
-					log.Warnf("cassandra-idx: cassandra table %s not found. retrying in 5s. attempt: %d", c.Config.Table, attempt)
-					time.Sleep(5 * time.Second)
+					break
 				}
 			}
+
+			if err != nil {
+				if attempt >= 5 {
+					return fmt.Errorf("attempt %d: %s", attempt, err)
+				}
+				log.Warnf("cassandra-idx: attempt %d, retrying in 5s: %s", attempt, err)
+				time.Sleep(5 * time.Second)
+			}
 		}
+	}
+
+	err = c.initMetaRecords(tmpSession)
+	if err != nil {
+		return err
 	}
 
 	tmpSession.Close()
@@ -170,12 +180,14 @@ func (c *CasIdx) InitBare() error {
 	return nil
 }
 
-// EnsureArchiveTableExists checks if the index archive table exists or not. If it does not exist and
-// the create-keyspace flag is true, then it will create it, if it doesn't exist and the create-keyspace
-// flag is false, then it will return an error. If the table exists then it just returns nil.
-// The index archive table is not required for Metrictank to run, it's only required by the
-// mt-index-prune utility to archive old metrics from the index.
-func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
+// EnsureTableExists checks if the specified table exists or not. If it does not exist and the
+// create-keyspace flag is true, then it will create it, if it doesn't exist and the create-keyspace
+// flag is false, then it will return an error. If the table exists then it just returns nil
+// session:    cassandra session
+// schemaFile:  file containing table definition
+// entryName:   identifier of the schema within the file
+// tableName:   name of the table in cassandra
+func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName, tableName string) error {
 	var err error
 	if session == nil {
 		session, err = c.cluster.CreateSession()
@@ -184,11 +196,11 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 		}
 	}
 
-	schemaArchiveTable := util.ReadEntry(c.Config.SchemaFile, "schema_archive_table").(string)
+	tableSchema := util.ReadEntry(schemaFile, entryName).(string)
 
 	if c.Config.CreateKeyspace {
-		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.ArchiveTable)
-		err = session.Query(fmt.Sprintf(schemaArchiveTable, c.Config.Keyspace, c.Config.ArchiveTable)).Exec()
+		log.Infof("cassandra-idx: ensuring that table %s exists.", tableName)
+		err = session.Query(fmt.Sprintf(tableSchema, c.Config.Keyspace, tableName)).Exec()
 		if err != nil {
 			return fmt.Errorf("failed to initialize cassandra table: %s", err)
 		}
@@ -198,8 +210,8 @@ func (c *CasIdx) EnsureArchiveTableExists(session *gocql.Session) error {
 		if err != nil {
 			return fmt.Errorf("failed to read cassandra tables: %s", err)
 		}
-		if _, ok := keyspaceMetadata.Tables[c.Config.ArchiveTable]; !ok {
-			return fmt.Errorf("table %s does not exist", c.Config.ArchiveTable)
+		if _, ok := keyspaceMetadata.Tables[tableName]; !ok {
+			return fmt.Errorf("table %s does not exist", tableName)
 		}
 	}
 	return nil
@@ -366,6 +378,19 @@ func (c *CasIdx) rebuildIndex() {
 			atomic.AddUint32(&num, uint32(c.MemoryIndex.LoadPartition(p, defs)))
 		}(partition)
 	}
+
+	if memory.MetaTagSupport {
+		wg.Add(1)
+		go func() {
+			gate <- struct{}{}
+
+			c.loadMetaRecords()
+
+			wg.Done()
+			<-gate
+		}()
+	}
+
 	wg.Wait()
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }

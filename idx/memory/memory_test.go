@@ -1047,26 +1047,14 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
 	}
 
-	createdRecord, created, err := ix.MetaTagRecordUpsert(1, record1)
+	err = ix.MetaTagRecordUpsert(1, record1)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
-	}
-	if !created {
-		t.Fatalf("Expected record to have been created, but it has not")
-	}
-	if !createdRecord.Equals(&record1) {
-		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record1, createdRecord)
 	}
 
-	createdRecord, created, err = ix.MetaTagRecordUpsert(1, record2)
+	err = ix.MetaTagRecordUpsert(1, record2)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
-	}
-	if !created {
-		t.Fatalf("Expected record to have been created, but it has not")
-	}
-	if !createdRecord.Equals(&record2) {
-		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record2, createdRecord)
 	}
 
 	metaTagRecords := ix.MetaTagRecordList(1)
@@ -1106,15 +1094,9 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	}
 
 	// record3 has the same queries as record2, so it should completely replace it
-	createdRecord, created, err = ix.MetaTagRecordUpsert(1, record3)
+	err = ix.MetaTagRecordUpsert(1, record3)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
-	}
-	if created {
-		t.Fatalf("Expected record to not have been created, but it has")
-	}
-	if !createdRecord.Equals(&record3) {
-		t.Fatalf("Expected returned record to look same as added record, but it does not:\nExpected:\n%+v\nGot:\n%+v\n", record3, createdRecord)
 	}
 
 	metaTagRecords = ix.MetaTagRecordList(1)

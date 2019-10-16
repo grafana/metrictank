@@ -53,7 +53,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			defaultDecision:  expr.GetDefaultDecision(),
 		}
 
-		if !metaTagSupport {
+		if !MetaTagSupport {
 			continue
 		}
 

@@ -152,11 +152,7 @@ type MetricIndex interface {
 	// If an existing record is updated with one that has no meta tags
 	// associated, then this operation results in the deletion of the meta record
 	// because a meta record has no effect without meta tags.
-	// The return values are:
-	// 1) The relevant meta record as it is after this operation
-	// 2) A bool that is true if the record has been created, or false if updated
-	// 3) An error which is nil if no error has occurred
-	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error)
+	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error
 
 	// MetaTagRecordList takes an org id and returns the list of all meta tag records
 	// of that given org.
@@ -164,6 +160,5 @@ type MetricIndex interface {
 
 	// MetaTagRecordSwap takes a set of meta tag records and completely replaces
 	// the existing ones with the new ones.
-	// It returns how many records have been added, deleted and potential errors
-	MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error)
+	MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error
 }

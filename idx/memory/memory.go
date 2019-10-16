@@ -66,7 +66,7 @@ var (
 	writeMaxBatchSize            = 5000
 	matchCacheSize               = 1000
 	enrichmentCacheSize          = 10000
-	metaTagSupport               = false
+	MetaTagSupport               = false
 )
 
 func ConfigSetup() *flag.FlagSet {
@@ -87,7 +87,7 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
 	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
-	memoryIdx.BoolVar(&metaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
+	memoryIdx.BoolVar(&MetaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 	return memoryIdx
 }
@@ -114,7 +114,7 @@ func ConfigProcess() {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
 
-	tagquery.MetaTagSupport = metaTagSupport
+	tagquery.MetaTagSupport = MetaTagSupport
 	tagquery.MatchCacheSize = matchCacheSize
 }
 
@@ -455,21 +455,19 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 // queries, if the set of queries in the given record already exists in another
 // record, then the existing record will be updated, otherwise a new one gets
 // created.
-// The return values are:
-// 1) The relevant meta record as it is after this operation
-// 2) A bool that is true if the record has been created, or false if updated
-// 3) An error which is nil if no error has occurred
-func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) (tagquery.MetaTagRecord, bool, error) {
-	res := tagquery.MetaTagRecord{}
-
-	if !TagSupport || !metaTagSupport {
+func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) error {
+	if !TagSupport || !MetaTagSupport {
 		log.Warn("memory-idx: received tag/meta-tag query, but that feature is disabled")
-		return res, false, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
+		return errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
 	var mtr *metaTagRecords
 	var mti metaTagIndex
 	var ok bool
+
+	// expressions need to be sorted because the unique ID of a meta record is
+	// its sorted set of expressions
+	upsertRecord.Expressions.Sort()
 
 	m.Lock()
 	defer m.Unlock()
@@ -486,9 +484,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 
 	id, record, oldId, oldRecord, err := mtr.upsert(upsertRecord)
 	if err != nil {
-		return res, false, err
+		return err
 	}
-	res = *record
 
 	// if this upsert has updated a previously existing record, then we remove its entries
 	// from the metaTagIndex before inserting the new ones
@@ -501,51 +498,45 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 			mti.insertRecord(keyValue, id)
 		}
 
-		return res, false, nil
+		return nil
 	}
 
 	for _, keyValue := range record.MetaTags {
 		mti.insertRecord(keyValue, id)
 	}
 
-	return res, true, nil
+	return nil
 }
 
-func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) (uint32, uint32, error) {
-	if !TagSupport || !metaTagSupport {
+func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error {
+	if !TagSupport || !MetaTagSupport {
 		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
-		return 0, 0, errors.NewBadRequest("Tag/Meta-Tag support is disabled")
+		return errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
 	newMtr := newMetaTagRecords()
 	newMti := make(metaTagIndex)
 
-	var addedRecords, deletedRecords uint32
 	for _, record := range records {
+		record.Expressions.Sort()
+
 		recordId, _, _, _, err := newMtr.upsert(record)
 		if err != nil {
-			return 0, 0, err
+			return err
 		}
 
 		for _, keyValue := range record.MetaTags {
 			newMti.insertRecord(keyValue, recordId)
 		}
-
-		addedRecords++
 	}
 
 	m.Lock()
 	defer m.Unlock()
 
-	oldMtr, ok := m.metaTagRecords[orgId]
-	if ok {
-		deletedRecords = uint32(len(oldMtr.records))
-	}
-
 	m.metaTagRecords[orgId] = newMtr
 	m.metaTagIndex[orgId] = newMti
 
-	return addedRecords, deletedRecords, nil
+	return nil
 }
 
 func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
@@ -836,7 +827,7 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	}
 
 	var enricher *enricher
-	if metaTagSupport {
+	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tagIndex.idHasTag)
@@ -911,7 +902,7 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		res = append(res, tag)
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		sort.Strings(res)
 		return res
 	}
@@ -958,7 +949,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		res[value] += uint64(len(ids))
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return res
 	}
 
@@ -1030,7 +1021,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		}
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return m.finalizeResult(res, limit, false)
 	}
 
@@ -1074,7 +1065,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	resMap := make(map[string]struct{})
 
 	var enricher *enricher
-	if metaTagSupport {
+	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tags.idHasTag)
@@ -1153,7 +1144,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		}
 	}
 
-	if !metaTagSupport {
+	if !MetaTagSupport {
 		return m.finalizeResult(res, limit, false)
 	}
 
@@ -1192,7 +1183,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	resMap := make(map[string]struct{})
 
 	var enricher *enricher
-	if metaTagSupport {
+	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tags.idHasTag)
