@@ -81,6 +81,14 @@ func TestTimeBoundWithCacheFunc(t *testing.T) {
 			maxAge:             5 * time.Minute,
 		},
 		{
+			name:               "fast_then_fast_then_slow_timeout",
+			functionReturns:    []int{42, 88, 1},
+			executionDurations: []time.Duration{10 * time.Millisecond, 1 * time.Millisecond, 100 * time.Millisecond},
+			expectedResults:    []int{42, 88, 88},
+			timeout:            50 * time.Millisecond,
+			maxAge:             5 * time.Minute,
+		},
+		{
 			name:               "fast_then_slow_then_fast_never_timeout",
 			functionReturns:    []int{42, 88, 1},
 			executionDurations: []time.Duration{1 * time.Millisecond, 100 * time.Millisecond, 2 * time.Millisecond},
