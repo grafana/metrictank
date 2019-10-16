@@ -243,6 +243,11 @@ func (c *CasIdx) Init() error {
 	if memory.IndexRules.Prunable() {
 		go c.prune()
 	}
+
+	if memory.MetaTagSupport {
+		go c.pollStore()
+	}
+
 	return nil
 }
 

@@ -467,6 +467,8 @@ archive-table = metric_idx_archive
 meta-record-table = meta_records
 # Cassandra table to store meta data of meta record batches.
 meta-record-batch-table = meta_record_batches
+# Interval at which to poll store for meta record updates.
+meta-record-poll-interval = 10s
 # comma separated list of cassandra addresses in host:port form
 hosts = localhost:9042
 #cql protocol version to use

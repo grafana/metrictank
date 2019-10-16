@@ -118,6 +118,8 @@ cass config flags:
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -meta-record-batch-table string
     	Cassandra table to store meta data of meta record batches. (default "meta_record_batches")
+  -meta-record-poll-interval duration
+    	Interval at which to poll store for meta record updates. (default 10s)
   -meta-record-table string
     	Cassandra table to store meta records. (default "meta_records")
   -num-conns int
@@ -263,6 +265,8 @@ cass config flags:
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -meta-record-batch-table string
     	Cassandra table to store meta data of meta record batches. (default "meta_record_batches")
+  -meta-record-poll-interval duration
+    	Interval at which to poll store for meta record updates. (default 10s)
   -meta-record-table string
     	Cassandra table to store meta records. (default "meta_records")
   -num-conns int

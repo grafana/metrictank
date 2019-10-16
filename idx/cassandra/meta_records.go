@@ -102,6 +102,13 @@ func (c *CasIdx) initMetaRecords(session *gocql.Session) error {
 	return c.EnsureTableExists(session, c.Config.SchemaFile, "schema_meta_record_batch_table", c.Config.MetaRecordBatchTable)
 }
 
+func (c *CasIdx) pollStore() {
+	for {
+		time.Sleep(c.Config.MetaRecordPollInterval)
+		c.loadMetaRecords()
+	}
+}
+
 func (c *CasIdx) loadMetaRecords() {
 	q := fmt.Sprintf("SELECT batchid, orgid, createdat, lastupdate FROM %s", c.Config.MetaRecordBatchTable)
 	iter := c.Session.Query(q).RetryPolicy(&metaRecordRetryPolicy).Iter()

@@ -34,6 +34,7 @@ type IdxConfig struct {
 	ArchiveTable             string
 	MetaRecordTable          string
 	MetaRecordBatchTable     string
+	MetaRecordPollInterval   time.Duration
 	Hosts                    string
 	CaPath                   string
 	Username                 string
@@ -56,6 +57,7 @@ func NewIdxConfig() *IdxConfig {
 		ArchiveTable:             "metric_idx_archive",
 		MetaRecordTable:          "meta_records",
 		MetaRecordBatchTable:     "meta_record_batches",
+		MetaRecordPollInterval:   time.Second * 10,
 		Consistency:              "one",
 		Timeout:                  time.Second,
 		NumConns:                 10,
@@ -99,6 +101,7 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.StringVar(&CliConfig.ArchiveTable, "archive-table", CliConfig.ArchiveTable, "Cassandra table to archive metricDefinitions in.")
 	casIdx.StringVar(&CliConfig.MetaRecordTable, "meta-record-table", CliConfig.MetaRecordTable, "Cassandra table to store meta records.")
 	casIdx.StringVar(&CliConfig.MetaRecordBatchTable, "meta-record-batch-table", CliConfig.MetaRecordBatchTable, "Cassandra table to store meta data of meta record batches.")
+	casIdx.DurationVar(&CliConfig.MetaRecordPollInterval, "meta-record-poll-interval", CliConfig.MetaRecordPollInterval, "Interval at which to poll store for meta record updates.")
 	casIdx.StringVar(&CliConfig.Consistency, "consistency", CliConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra request timeout")
 	casIdx.IntVar(&CliConfig.NumConns, "num-conns", CliConfig.NumConns, "number of concurrent connections to cassandra")
