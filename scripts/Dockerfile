@@ -1,4 +1,4 @@
-FROM golang:1.11.4-alpine AS gobase
+FROM golang:1.13.1-alpine AS gobase
 RUN apk add --no-cache git bash
 
 # Compile metrictank
