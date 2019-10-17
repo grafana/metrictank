@@ -69,6 +69,8 @@ curl -H "X-Org-Id: 12345" "http://localhost:6060/metrics/find?query=statsd.fakes
 ## Deleting metrics
 
 This will delete any metrics (technically metricdefinitions) matching the query from the index.
+Note that unlike find and render patterns, these queries are recursive.
+So if the delete query matches a branch, every series under that branch will be deleted.
 Note that the data stays in the datastore until it expires.
 Should the metrics enter the system again with the same metadata, the data will show up again.
 
