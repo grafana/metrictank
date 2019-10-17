@@ -6,7 +6,7 @@ test:
 test-all:
 	CGO_ENABLED=1 go test -race ./...
 benchmark:
-	CGO_ENABLED=0 go test -count=10 -run='^$$' -bench=. -benchtime=1ns ./... | tee benchmark.txt
+	CGO_ENABLED=0 go test -count=10 -run='^$$' -bench=. -benchtime=1ms ./... | tee benchmark.txt
 
 stacktest:
 	# count=1 forces uncached runs
