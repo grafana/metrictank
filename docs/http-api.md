@@ -99,9 +99,6 @@ POST /render
 * header `X-Org-Id` required
 * maxDataPoints: int (default: 800)
 * target: mandatory. one or more metric names or patterns, like graphite.
-  note: **no graphite functions are currently supported** except that
-  you can use `consolidateBy(id, '<fn>')` or `consolidateBy(id, "<fn>")` where fn is one of `avg`, `average`, `min`, `max`, `sum`. see
-  [Consolidation](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md)
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
 * format: json, msgp, pickle, or msgpack (default: json)
