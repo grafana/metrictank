@@ -469,6 +469,10 @@ meta-record-table = meta_records
 meta-record-batch-table = meta_record_batches
 # Interval at which to poll store for meta record updates.
 meta-record-poll-interval = 10s
+# Interval at which meta records of old batches get pruned.
+meta-record-prune-interval = 24h
+# The minimum age a batch of meta records must have to be pruned.
+meta-record-prune-age = 72h
 # comma separated list of cassandra addresses in host:port form
 hosts = localhost:9042
 #cql protocol version to use

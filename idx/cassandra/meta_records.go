@@ -163,6 +163,51 @@ func (c *CasIdx) loadMetaRecords() {
 	}
 }
 
+func (c *CasIdx) pruneMetaRecords() {
+	for {
+		time.Sleep(c.Config.MetaRecordPruneInterval)
+
+		q := fmt.Sprintf("SELECT batchid, orgid, createdat FROM %s", c.Config.MetaRecordBatchTable)
+		iter := c.Session.Query(q).RetryPolicy(&metaRecordRetryPolicy).Iter()
+		var batchId gocql.UUID
+		var orgId uint32
+		var createdAt uint64
+		for iter.Scan(&batchId, &orgId, &createdAt) {
+			now := time.Now().Unix()
+			if uint64(now)-uint64(c.Config.MetaRecordPruneAge.Seconds()) <= createdAt/1000 {
+				continue
+			}
+
+			currentBatchId, _, _ := c.metaRecords.getStatus(orgId)
+			if batchId != currentBatchId {
+				err := c.pruneBatch(orgId, batchId)
+				if err != nil {
+					log.Errorf("Error when pruning batch %d/%s: %s", orgId, batchId.String(), err)
+				}
+			}
+		}
+	}
+}
+
+func (c *CasIdx) pruneBatch(orgId uint32, batchId gocql.UUID) error {
+	qry := fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND batchid=?", c.Config.MetaRecordTable)
+	err := c.Session.Query(
+		qry,
+		orgId,
+		batchId,
+	).RetryPolicy(&metaRecordRetryPolicy).Exec()
+	if err != nil {
+		return err
+	}
+
+	qry = fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND batchid=?", c.Config.MetaRecordBatchTable)
+	return c.Session.Query(
+		qry,
+		orgId,
+		batchId,
+	).RetryPolicy(&metaRecordRetryPolicy).Exec()
+}
+
 func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error {
 	if !memory.MetaTagSupport || !memory.TagSupport {
 		return errMetaTagSupportDisabled

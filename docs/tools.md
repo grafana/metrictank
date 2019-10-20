@@ -120,6 +120,10 @@ cass config flags:
     	Cassandra table to store meta data of meta record batches. (default "meta_record_batches")
   -meta-record-poll-interval duration
     	Interval at which to poll store for meta record updates. (default 10s)
+  -meta-record-prune-age duration
+    	The minimum age a batch of meta records must have to be pruned. (default 72h0m0s)
+  -meta-record-prune-interval duration
+    	Interval at which meta records of old batches get pruned. (default 24h0m0s)
   -meta-record-table string
     	Cassandra table to store meta records. (default "meta_records")
   -num-conns int
@@ -267,6 +271,10 @@ cass config flags:
     	Cassandra table to store meta data of meta record batches. (default "meta_record_batches")
   -meta-record-poll-interval duration
     	Interval at which to poll store for meta record updates. (default 10s)
+  -meta-record-prune-age duration
+    	The minimum age a batch of meta records must have to be pruned. (default 72h0m0s)
+  -meta-record-prune-interval duration
+    	Interval at which meta records of old batches get pruned. (default 24h0m0s)
   -meta-record-table string
     	Cassandra table to store meta records. (default "meta_records")
   -num-conns int

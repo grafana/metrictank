@@ -246,6 +246,9 @@ func (c *CasIdx) Init() error {
 
 	if memory.MetaTagSupport {
 		go c.pollStore()
+		if c.Config.updateCassIdx {
+			go c.pruneMetaRecords()
+		}
 	}
 
 	return nil
