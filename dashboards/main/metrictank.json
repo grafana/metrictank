@@ -2166,7 +2166,7 @@
         {
           "hide": false,
           "refId": "D",
-          "target": "groupByNodes(metrictank.stats.$environment.$instance.cluster.notifier.*.message_size.max.gauge32, 'maxSeries',6, 7, 8)",
+          "target": "groupByNodes(metrictank.stats.$environment.$instance.cluster.notifier.*.message_size.max.gauge32, 'max',6, 7, 8)",
           "textEditor": false
         }
       ],
