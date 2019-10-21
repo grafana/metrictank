@@ -104,7 +104,7 @@ POST /render
 * format: json, msgp, pickle, or msgpack (default: json)
 * meta: use 'meta=true' to enable metadata in response (performance measurements)
 * process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
-  (as opposed to proxing to the fallback graphite).
+  (as opposed to proxying to the fallback graphite).
   - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
   - stable: process request without fallback if we have all the needed functions and they are marked as stable.
   - none: always defer to graphite for processing.
