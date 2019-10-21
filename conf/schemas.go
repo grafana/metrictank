@@ -13,8 +13,8 @@ import (
 
 // Schemas contains schema settings
 type Schemas struct {
-	raw           []Schema
-	index         []Schema
+	raw           []Schema // parsed from the config file
+	index         []Schema // the "expanded" structure (built from raw+DefaultSchema) that will actually be used.
 	DefaultSchema Schema
 }
 
