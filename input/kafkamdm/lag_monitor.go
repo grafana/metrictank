@@ -163,23 +163,7 @@ func (l *LagMonitor) Metric() int {
 	}
 	max := 0
 	for p, lag := range l.monitors {
-		status := Status{
-			Lag:  lag.Min(),       // accurate lag, -1 if unknown
-			Rate: int(lag.Rate()), // accurate rate, or 0 if we're not sure
-		}
-		if status.Lag == -1 {
-			// if we have no lag measurements yet,
-			// just assign a priority of 10k for this partition
-			status.Priority = 10000
-		} else {
-			// if we're not sure of rate, we don't want divide by zero
-			// instead assume rate is super low
-			if status.Rate == 0 {
-				status.Priority = status.Lag
-			} else {
-				status.Priority = status.Lag / status.Rate
-			}
-		}
+		status := l.getPartitionPriority(p, lag)
 		if status.Priority > max {
 			max = status.Priority
 		}
@@ -188,6 +172,43 @@ func (l *LagMonitor) Metric() int {
 	l.explanation.Updated = time.Now()
 	l.explanation.Priority = max
 	return max
+}
+
+func (l *LagMonitor) getPartitionPriority(partition int32, lag *lagLogger) Status {
+	status := Status{
+		Lag:  lag.Min(),       // accurate lag, -1 if unknown
+		Rate: int(lag.Rate()), // accurate rate, or 0 if we're not sure
+	}
+	if status.Lag == -1 {
+		// if we have no lag measurements yet,
+		// just assign a priority of 10k for this partition
+		status.Priority = 10000
+	} else {
+		// if we're not sure of rate, we don't want divide by zero
+		// instead assume rate is super low
+		if status.Rate == 0 {
+			status.Priority = status.Lag
+		} else {
+			status.Priority = status.Lag / status.Rate
+		}
+	}
+
+	return status
+}
+
+func (l *LagMonitor) GetPartitionPriority(partition int32) int {
+	l.Lock()
+	defer l.Unlock()
+
+	var lag *lagLogger
+	var ok bool
+	if lag, ok = l.monitors[partition]; !ok {
+		// if we have no lag measurements yet,
+		// just assign a priority of 10k for this partition
+		return 10000
+	}
+
+	return l.getPartitionPriority(partition, lag).Priority
 }
 
 func (l *LagMonitor) Explain() interface{} {

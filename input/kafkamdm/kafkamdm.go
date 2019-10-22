@@ -274,6 +274,7 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 	kafkaStats.Offset.Set(int(currentOffset))
 	kafkaStats.LogSize.Set(int(newest))
 	kafkaStats.Lag.Set(int(newest - currentOffset))
+	kafkaStats.Priority.Set(k.lagMonitor.GetPartitionPriority(partition))
 	go k.trackStats(topic, partition)
 
 	log.Infof("kafkamdm: consuming from %s:%d from offset %d", topic, partition, currentOffset)
@@ -358,6 +359,7 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 			lag := int(newest - currentOffset)
 			kafkaStats.Lag.Set(lag)
 			k.lagMonitor.StoreOffsets(partition, currentOffset, newest, ts)
+			kafkaStats.Priority.Set(k.lagMonitor.GetPartitionPriority(partition))
 		}
 	}
 }
