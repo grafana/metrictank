@@ -274,6 +274,43 @@ curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&e
 ]
 ```
 
+### Render `/render` (return data for a given query)
+
+Graphite-web-like api. It can return JSON, pickle or messagepack output
+
+* Method: GET or POST (recommended. as GET may result in too long URL's)
+* API key type: any (viewer, publisher, editor)
+
+##### Headers
+
+* `Authorization: Bearer <api-key>` required
+
+
+##### Parameters
+
+* maxDataPoints: int (default: 800)
+* target: mandatory. one or more metric names or [patterns](#graphite-patterns).
+* from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
+* to/until : see [timespec format](#tspec)(default: now) (inclusive)
+* format: json, msgp, pickle, or msgpack (default: json)
+* meta: use 'meta=true' to enable metadata in response (performance measurements)
+* process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
+  (as opposed to proxying to the fallback graphite).
+  - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
+  - stable: process request without fallback if we have all the needed functions and they are marked as stable.
+  - none: always defer to graphite for processing.
+
+  If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
+
+Data queried for must be stored under the given org or be public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
+
+#### Example
+
+```bash
+curl -H "Authorization: Bearer $key" "http://localhost:6060/render?target=statsd.fakesite.counters.session_start.*.count&from=3h&to=2h"
+```
+
+
 ---
 
 ## FAQ
