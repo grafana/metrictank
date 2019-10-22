@@ -197,6 +197,9 @@ func (l *LagMonitor) getPartitionPriority(partition int32, lag *lagLogger) Statu
 }
 
 func (l *LagMonitor) GetPartitionPriority(partition int32) int {
+	l.Lock()
+	defer l.Unlock()
+
 	var lag *lagLogger
 	var ok bool
 	if lag, ok = l.monitors[partition]; !ok {
