@@ -235,61 +235,95 @@ metrics based on defined rules.
 POST /metaTags/upsert
 ```
 
-This route can be used to create, update and delete meta tag records. Each record is
-identified by its set of query expressions, if a record gets posted to this URL which
-has a set of expressions that doesn't exist yet, a new meta record gets created. If
-its set of query expressions already exists, the existing meta record will be updated.
-If the new record has no meta tags associated with it, then an existing record with the
-same set of expressions gets deleted.
+This route can be used to create, update and delete meta tag rules (meta records).
+Each meta record is identified by its set of query expressions, if a record gets
+posted to this URL which has a set of expressions that doesn't exist yet, a new
+meta record gets created. If its set of query expressions already exists, then the
+existing meta record gets updated. If the new record has no meta tags associated
+with it, then an existing record with the same set of expressions gets deleted.
+If the following calls are made to a Metrictank that uses the Cassandra persistent
+index and which has index updating enabled, all modifications also get persisted
+into the Cassandra index, from where they can be loaded by other Metrictanks.
 
 ## Example
 
 ```
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
+# we start with no meta records defined
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
 []
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": ["mytag=value"], "expressions": ["a=b", "c=d"]}' | jq
+
+# we insert a simple meta record which assigns the meta tag "meta=tag" to all
+# metrics that match the query expression "real=tag"
+~$ curl -s \
+    'http://localhost:6063/metaTags/upsert' \
+    -H 'Content-Type: application/json' \
+    -d '{"metaTags": ["meta=tag"], "expressions": ["real=tag"]}' \
+    | jq
 {
-  "metaTags": [
-    "mytag=value"
-  ],
-  "expressions": [
-    "a=b",
-    "c=d"
-  ],
-  "created": true
+  "Status": "OK"
 }
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
+
+# we retrieve the list of meta records to confirm that the one we just
+# inserted has been created
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
 [
   {
     "metaTags": [
-      "mytag=value"
+      "meta=tag"
     ],
     "expressions": [
-      "a=b",
-      "c=d"
+      "real=tag"
     ]
   }
 ]
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": [], "expressions": ["a=b", "c=d"]}' | jq
+
+# we modify the existing meta record. note that the set of expressions is the ID
+# of the record, because there is already a record with the same ID the existing
+# record gets replaced
+~$ curl -s \
+    'http://localhost:6063/metaTags/upsert' \
+    -H 'Content-Type: application/json' \
+    -d '{"metaTags": ["meta=tag2"], "expressions": ["real=tag"]}' \
+    | jq
 {
-  "metaTags": [],
-  "expressions": [
-    "a=b",
-    "c=d"
-  ],
-  "created": false
+  "Status": "OK"
 }
-mst@mst-nb1:~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags | jq
+
+# we retrieve the list one more time to see the updated meta record
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
+[
+  {
+    "metaTags": [
+      "meta=tag2"
+    ],
+    "expressions": [
+      "real=tag"
+    ]
+  }
+]
+
+# we delete the record by assigning its ID (its expressions) an empty
+# list of meta tags
+~$ curl -s \
+    http://localhost:6063/metaTags/upsert \
+    -H 'Content-Type: application/json' \
+    -d '{"metaTags": [], "expressions": ["real=tag"]}' \
+    | jq
+{
+  "Status": "OK"
+}
+
+# we retrieve the list one more time to see that it has been deleted
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
 []
-```
-
-The optional boolean parameter "propagate" tells the receiving node that this
-upsert request needs to be propagated among all cluster nodes. Then the request
-would look like this:
-
-```
-~$ curl -s -H 'X-Org-Id: 1' http://localhost:6070/metaTags/upsert -H 'Content-Type: application/json' -d '{"metaTags": ["mytag=value"], "expressions": ["a=b", "c=d"], "propagate": true}' | jq
-```
 
 ## Batch updating all Meta Tag Records
 
@@ -297,41 +331,81 @@ would look like this:
 POST /metaTags/swap
 ```
 
-This route is an alternative to the above "upsert". It accepts a list of meta tag records
-and replaces all existing records with the new ones. This is useful for users who first
-generate all of their meta tag records and then want to simply replace all the records in
-Metrictank with the generated ones.
+This endpoint is an alternative to the above "upsert". It accepts a list of meta tag rules
+(meta records) and replaces all existing records with the new ones. This is useful for users
+who first generate all of their meta records and then want to swap the present set of records
+out by replacing it with the new one.
+Just like in the case of the above upsert call, if these calls are made to a Metrictank that
+uses the Cassandra persistent index and which has index updating enabled, all modifications
+also get persisted into the Cassandra index, from where they can be loaded by other Metrictanks.
 
 ## Example
 
 ```
-~$ curl -s -H 'X-Org-Id: 1' 'http://localhost:6070/metaTags/swap' -H 'Content-Type: application/json' -d '{"propagate": true, "records":[{"metaTags": ["meta=tag"], "expressions": ["name=~.*[2-7]$"]}]}' | jq
+# we start with no meta records defined
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
+[]
+
+# we call swap to replace the current empty set of records with the ones we want
+~$ curl -s \
+    'http://localhost:6063/metaTags/swap' \
+    -H 'Content-Type: application/json' \
+    -d '{"records": [{"metaTags": ["my=tag"], "expressions": ["some=tag"]}]}' \
+    | jq
 {
-  "local": {
-    "deleted": 0,
-    "added": 0
-  },
-  "peerResults": {
-    "metrictank0": {
-      "deleted": 0,
-      "added": 1
-    },
-    "metrictank1": {
-      "deleted": 0,
-      "added": 1
-    },
-    "metrictank2": {
-      "deleted": 0,
-      "added": 1
-    },
-    "metrictank3": {
-      "deleted": 0,
-      "added": 1
-    }
-  },
-  "peerErrors": null
+  "Status": "OK"
 }
-```
+
+# we retrieve the list of records to verify that the new record is there
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
+[
+  {
+    "metaTags": [
+      "my=tag"
+    ],
+    "expressions": [
+      "some=tag"
+    ]
+  }
+]
+
+# we do another swap to delete the existing of records and replace them with a completely new ones
+~$ curl -s \
+    'http://localhost:6063/metaTags/swap' \
+    -H 'Content-Type: application/json' \
+    -d '{"records": [{"metaTags": ["some=metatag"], "expressions": ["a=b"]}, {"metaTags": ["a=b"], "expressions": ["c=d"]}]}' \
+    | jq
+{
+  "Status": "OK"
+}
+
+# we retrieve the list of records one more time to verify that the new records have
+# replaced the old ones
+~$ curl -s \
+    http://localhost:6063/metaTags \
+    | jq
+[
+  {
+    "metaTags": [
+      "some=metatag"
+    ],
+    "expressions": [
+      "a=b"
+    ]
+  },
+  {
+    "metaTags": [
+      "a=b"
+    ],
+    "expressions": [
+      "c=d"
+    ]
+  }
+]
 
 ## Misc
 
