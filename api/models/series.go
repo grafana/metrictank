@@ -9,11 +9,13 @@ import (
 
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/schema"
 	pickle "github.com/kisielk/og-rek"
 )
 
 //go:generate msgp
+//msgp:ignore SeriesMetaPropertiesExport
 
 type Series struct {
 	Target       string            // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
@@ -42,6 +44,34 @@ type SeriesMetaProperties struct {
 	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
 	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation to honor maxdatapoints (if applicable).
 	Count                 uint32                     // number of series corresponding to these properties
+}
+
+// SeriesMetaPropertiesExport is an "export" of a SeriesMetaProperties
+// it is a more user friendly representation
+type SeriesMetaPropertiesExport struct {
+	SchemaName            string                     // name of schema rule used
+	SchemaRetentions      string                     // schema retentions used
+	ArchiveRead           uint8                      // which archive was being read from
+	AggNumNorm            uint32                     // aggNum for normalization
+	AggNumRC              uint32                     // aggNum runtime consolidation
+	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
+	ConsolidatorRC        consolidation.Consolidator // consolidator used for runtime consolidation to honor maxdatapoints (if applicable).
+	Count                 uint32                     // number of series corresponding to these properties
+}
+
+// Export returns a human-friendly version of the SeriesMetaProperties.
+func (smp SeriesMetaProperties) Export() SeriesMetaPropertiesExport {
+	schema := mdata.Schemas.Get(smp.SchemaID)
+	return SeriesMetaPropertiesExport{
+		SchemaName:            schema.Name,
+		SchemaRetentions:      schema.Retentions.Orig,
+		ArchiveRead:           smp.Archive,
+		AggNumNorm:            smp.AggNumNorm,
+		AggNumRC:              smp.AggNumRC,
+		ConsolidatorNormFetch: smp.ConsolidatorNormFetch,
+		ConsolidatorRC:        smp.ConsolidatorRC,
+		Count:                 smp.Count,
+	}
 }
 
 // Merge merges SeriesMeta b into a
@@ -290,21 +320,23 @@ func (series SeriesByTarget) MarshalJSONFastWithMeta(b []byte) ([]byte, error) {
 func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 	b = append(b, '[')
 	for _, props := range meta {
-		b = append(b, `{"schema-id":`...)
-		// TODO make user friendly return the actual rule
-		b = strconv.AppendUint(b, uint64(props.SchemaID), 10)
-		b = append(b, `,"archive":`...)
-		b = strconv.AppendUint(b, uint64(props.Archive), 10)
+		exp := props.Export()
+		b = append(b, `{"schema-name":"`...)
+		b = append(b, exp.SchemaName...)
+		b = append(b, `","schema-retentions":"`...)
+		b = append(b, exp.SchemaRetentions...)
+		b = append(b, `","archive-read":`...)
+		b = strconv.AppendUint(b, uint64(exp.ArchiveRead), 10)
 		b = append(b, `,"aggnum-norm":`...)
-		b = strconv.AppendUint(b, uint64(props.AggNumNorm), 10)
+		b = strconv.AppendUint(b, uint64(exp.AggNumNorm), 10)
 		b = append(b, `,"consolidate-normfetch":"`...)
-		b = append(b, props.ConsolidatorNormFetch.String()...)
+		b = append(b, exp.ConsolidatorNormFetch.String()...)
 		b = append(b, `","aggnum-rc":`...)
-		b = strconv.AppendUint(b, uint64(props.AggNumRC), 10)
+		b = strconv.AppendUint(b, uint64(exp.AggNumRC), 10)
 		b = append(b, `,"consolidate-rc":"`...)
-		b = append(b, props.ConsolidatorRC.String()...)
+		b = append(b, exp.ConsolidatorRC.String()...)
 		b = append(b, `","count":`...)
-		b = strconv.AppendUint(b, uint64(props.Count), 10)
+		b = strconv.AppendUint(b, uint64(exp.Count), 10)
 		b = append(b, `},`...)
 	}
 	if len(meta) != 0 {
