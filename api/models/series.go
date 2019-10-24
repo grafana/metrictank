@@ -39,6 +39,7 @@ type SeriesMeta []SeriesMetaProperties
 type SeriesMetaProperties struct {
 	SchemaID              uint16                     // id of storage-schemas rule this series corresponds to
 	Archive               uint8                      // which archive was being read from
+	ArchInterval          uint32                     // the interval of the archive we fetch
 	AggNumNorm            uint32                     // aggNum for normalization
 	AggNumRC              uint32                     // aggNum runtime consolidation
 	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
@@ -52,6 +53,7 @@ type SeriesMetaPropertiesExport struct {
 	SchemaName            string                     // name of schema rule used
 	SchemaRetentions      string                     // schema retentions used
 	ArchiveRead           uint8                      // which archive was being read from
+	ArchInterval          uint32                     // the interval of the archive we fetch
 	AggNumNorm            uint32                     // aggNum for normalization
 	AggNumRC              uint32                     // aggNum runtime consolidation
 	ConsolidatorNormFetch consolidation.Consolidator // consolidator used for normalization and reading from store (if applicable)
@@ -66,6 +68,7 @@ func (smp SeriesMetaProperties) Export() SeriesMetaPropertiesExport {
 		SchemaName:            schema.Name,
 		SchemaRetentions:      schema.Retentions.Orig,
 		ArchiveRead:           smp.Archive,
+		ArchInterval:          smp.ArchInterval,
 		AggNumNorm:            smp.AggNumNorm,
 		AggNumRC:              smp.AggNumRC,
 		ConsolidatorNormFetch: smp.ConsolidatorNormFetch,
@@ -327,6 +330,8 @@ func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 		b = append(b, exp.SchemaRetentions...)
 		b = append(b, `","archive-read":`...)
 		b = strconv.AppendUint(b, uint64(exp.ArchiveRead), 10)
+		b = append(b, `,"archive-interval":`...)
+		b = strconv.AppendUint(b, uint64(exp.ArchInterval), 10)
 		b = append(b, `,"aggnum-norm":`...)
 		b = strconv.AppendUint(b, uint64(exp.AggNumNorm), 10)
 		b = append(b, `,"consolidate-normfetch":"`...)
