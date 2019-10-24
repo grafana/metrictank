@@ -19,6 +19,7 @@ type KafkaPartition struct {
 	LogSize  Gauge64
 	Lag      Gauge64
 	Priority Gauge64
+	Ready    Bool
 }
 
 func NewKafkaPartition(prefix string) *KafkaPartition {
@@ -27,5 +28,6 @@ func NewKafkaPartition(prefix string) *KafkaPartition {
 	registry.getOrAdd(prefix+".log_size", &k.LogSize)
 	registry.getOrAdd(prefix+".lag", &k.Lag)
 	registry.getOrAdd(prefix+".priority", &k.Priority)
+	registry.getOrAdd(prefix+".ready", &k.Ready)
 	return &k
 }
