@@ -102,7 +102,7 @@ POST /render
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
 * format: json, msgp, pickle, or msgpack (default: json)
-* meta: use 'meta=true' to enable metadata in response (performance measurements)
+* meta: use 'meta=true' to enable metadata in response (see below).
 * process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
   (as opposed to proxying to the fallback graphite).
   - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
@@ -118,6 +118,14 @@ Data queried for must be stored under the given org or be public data (see [mult
 ```bash
 curl -H "X-Org-Id: 12345" "http://localhost:6060/render?target=statsd.fakesite.counters.session_start.*.count&from=3h&to=2h"
 ```
+
+#### Metadata
+
+* response global performance measurements
+* series-specific lineage information describing storage-schemas, read archive, archive interval and any consolidation and normalization applied.
+  note that explicit function calls like summarize are *not* considered runtime consolidation for this purpose.
+
+
 
 ## Get Cluster Status
 
