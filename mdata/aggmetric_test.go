@@ -364,7 +364,8 @@ func TestGetAggregated(t *testing.T) {
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
 	aggSpan := uint32(5)
-	ret := conf.MustParseRetentions("1s:1s:10s:5,5s:1s:10s:5") // note second raw interval matches aggSpan
+	// note: TTL's are ignored
+	ret := conf.MustParseRetentions("1s:5s:10s:5,5s:10s:10s:5") // note second raw interval matches aggSpan
 	agg := conf.Aggregation{
 		Name:              "Default",
 		Pattern:           regexp.MustCompile(".*"),
@@ -409,7 +410,8 @@ func TestGetAggregatedIngestFrom(t *testing.T) {
 	mockstore.Reset()
 	aggSpan := uint32(5)
 	ingestFrom := int64(23)
-	ret := conf.MustParseRetentions("1s:1s:10s:5,5s:1s:10s:5") // note second raw interval matches aggSpan
+	// note: TTL's are ignored
+	ret := conf.MustParseRetentions("1s:5s:10s:5,5s:10s:10s:5") // note second raw interval matches aggSpan
 	agg := conf.Aggregation{
 		Name:              "Default",
 		Pattern:           regexp.MustCompile(".*"),
