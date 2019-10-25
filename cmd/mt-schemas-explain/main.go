@@ -79,7 +79,7 @@ func display(schema conf.Schema) {
 	fmt.Printf("pattern:   %10s\n", schema.Pattern)
 	fmt.Printf("priority:  %10d\n", schema.Priority)
 	fmt.Printf("retentions:%10s %10s %10s %10s %10s %15s %10s\n", "interval", "retention", "chunkspan", "numchunks", "ready", "tablename", "windowsize")
-	for _, ret := range schema.Retentions {
+	for _, ret := range schema.Retentions.Rets {
 		retention := ret.MaxRetention()
 		table := cassandra.GetTable(uint32(retention), *windowFactor, cassandra.Table_name_format)
 		retStr := time.Duration(time.Duration(retention) * time.Second).String()

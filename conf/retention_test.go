@@ -55,8 +55,12 @@ func TestParseRetentions(t *testing.T) {
 		if c.err {
 			continue
 		}
-		if !reflect.DeepEqual(Retentions(c.out), got) {
-			t.Fatalf("case %d: exp retentions\n%v\nbut got\n%v", i, c.out, got)
+		exp := Retentions{
+			Orig: c.in,
+			Rets: c.out,
+		}
+		if !reflect.DeepEqual(Retentions(exp), got) {
+			t.Fatalf("case %d: exp retentions\n%v\nbut got\n%v", i, exp, got)
 		}
 	}
 }

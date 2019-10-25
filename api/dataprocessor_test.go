@@ -364,7 +364,7 @@ func TestGetSeriesFixed(t *testing.T) {
 	store.Drop = true
 
 	mdata.SetSingleAgg(conf.Avg, conf.Min, conf.Max)
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, 0))
+	mdata.SetSingleSchema(conf.MustParseRetentions("10s:100s:10min:10:true"))
 
 	metrics := mdata.NewAggMetrics(store, &cache.MockCache{}, false, nil, 0, 0, 0)
 	srv, _ := NewServer()
@@ -412,7 +412,7 @@ func TestGetSeriesFixedVariableOutInterval(t *testing.T) {
 	store.Drop = true
 
 	mdata.SetSingleAgg(conf.Sum, conf.Avg, conf.Min, conf.Max)
-	mdata.SetSingleSchema(conf.NewRetentionMT(10, 100, 600, 10, 0))
+	mdata.SetSingleSchema(conf.MustParseRetentions("10s:100s:10min:10:true"))
 
 	cache := cache.NewCCache()
 	metrics := mdata.NewAggMetrics(store, cache, false, nil, 0, 0, 0)

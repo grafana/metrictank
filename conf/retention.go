@@ -31,6 +31,20 @@ func (r Retentions) Sub(pos int) Retentions {
 	}
 }
 
+func BuildFromRetentions(rets ...Retention) Retentions {
+	return Retentions{
+		Orig: buildOrigFromRetentions(rets),
+		Rets: rets,
+	}
+}
+func buildOrigFromRetentions(rets []Retention) string {
+	var out []string
+	for _, r := range rets {
+		out = append(out, r.String())
+	}
+	return strings.Join(out, ",")
+}
+
 // Validate assures the retentions are sane.  As the whisper source code says:
 // An ArchiveList must:
 // 1. Have at least one archive config. Example: (60, 86400)
@@ -83,6 +97,22 @@ func (r Retention) MaxRetention() int {
 	return r.SecondsPerPoint * r.NumberOfPoints
 }
 
+func (r Retention) String() string {
+	s := dur.FormatDuration(uint32(r.SecondsPerPoint))
+	s += ":" + dur.FormatDuration(uint32(r.NumberOfPoints*r.SecondsPerPoint))
+	s += ":" + dur.FormatDuration(r.ChunkSpan)
+	s += ":" + strconv.Itoa(int(r.NumChunks))
+	switch r.Ready {
+	case 0:
+		s += ":true"
+	case math.MaxUint32:
+		s += ":false"
+	default:
+		s += ":" + strconv.FormatUint(uint64(r.Ready), 10)
+	}
+	return s
+}
+
 func NewRetention(secondsPerPoint, numberOfPoints int) Retention {
 	return Retention{
 		SecondsPerPoint: secondsPerPoint,
@@ -98,6 +128,14 @@ func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks, ready uint32
 		NumChunks:       numChunks,
 		Ready:           ready,
 	}
+}
+
+func MustParseRetentions(defs string) Retentions {
+	r, err := ParseRetentions(defs)
+	if err != nil {
+		panic(err)
+	}
+	return r
 }
 
 // ParseRetentions parses retention definitions into a Retentions structure

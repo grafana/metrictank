@@ -13,17 +13,17 @@ import (
 )
 
 // testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
-func testAlign(reqs []models.Req, retentions [][]conf.Retention, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
+func testAlign(reqs []models.Req, retentions []string, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
 	var schemas []conf.Schema
 	oriMaxPointsPerReqSoft := maxPointsPerReqSoft
 
-	for _, ret := range retentions {
+	for i, ret := range retentions {
 		schemas = append(schemas, conf.Schema{
 			Pattern:    regexp.MustCompile(".*"),
-			Retentions: conf.Retentions(ret),
+			Retentions: conf.MustParseRetentions(ret),
 		})
 		// make sure maxPointsPerReqSoft is high enough
-		points := (int(reqs[0].To-reqs[0].From) / ret[0].SecondsPerPoint) * len(reqs)
+		points := (int(reqs[0].To-reqs[0].From) / schemas[i].Retentions.Rets[0].SecondsPerPoint) * len(reqs)
 		if points > maxPointsPerReqSoft {
 			maxPointsPerReqSoft = points
 		}
@@ -53,10 +53,8 @@ func TestAlignRequestsBasic(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 60, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 0, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			},
+		[]string{
+			"60s:2min:0:0:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
@@ -74,13 +72,9 @@ func TestAlignRequestsBasicDiff(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 60, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			},
+		[]string{
+			"60s:20min:1h:1:true",
+			"60s:20min:1h:1:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
@@ -99,11 +93,9 @@ func TestAlignRequestsAlerting(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]conf.Retention{{
-			conf.NewRetentionMT(10, 1200, 0, 0, 0),
-		}, {
-			conf.NewRetentionMT(60, 1200, 0, 0, 0),
-		},
+		[]string{
+			"10s:20min:1h:1:true",
+			"60s:20min:1h:1:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 1200, 60, 6),
@@ -121,12 +113,9 @@ func TestAlignRequestsBasicBestEffort(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-			}, {
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-			},
+		[]string{
+			"10s:800s:1h:1:true",
+			"60s:1100s:1h:1:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 800, 60, 6),
@@ -144,11 +133,8 @@ func TestAlignRequestsMultipleIntervalsPerSchema(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(1, 800, 0, 0, 0),
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-			},
+		[]string{
+			"1s:800s:0:0:true,60s:1100s:0:0:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 60, 800, 60, 1),
@@ -166,11 +152,8 @@ func TestAlignRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 30, consolidation.Avg, 0, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			},
+		[]string{
+			"10s:800s:0:0:true,60s:1200s:0:0:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 800, 30, 3),
@@ -188,13 +171,9 @@ func TestAlignRequestsHalfGood(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-			}, {
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1200, 0, 0, 0),
-			},
+		[]string{
+			"10s:800s:0:0:true",
+			"60s:1100s:0:0:true,120s,20min:0:0:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 800, 120, 12),
@@ -212,15 +191,10 @@ func TestAlignRequestsGoodRollup(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			},
+		[]string{
+			// note that in both cases, the first retention doesn't have long enough TTL
+			"10s:1199s:1h:1:true,2min:20min:10min:2:true",
+			"60s:1199s:1h:1:true,2min:20min:10min:2:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
@@ -238,15 +212,10 @@ func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(100, 1200, 600, 2, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(600, 1200, 600, 2, 0),
-			},
+		[]string{
+			// note that in both cases, the first retention doesn't have long enough TTL
+			"10s:1199s:1h:1:true,100s:20min:10min:2:true",
+			"60s:1199s:1h:1:true,10min:20min:10min:2:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 100, 1200, 600, 6),
@@ -264,14 +233,9 @@ func TestAlignRequestsWeird(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 1199, 0, 0, 0),
-				conf.NewRetentionMT(60, 1200, 600, 2, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			},
+		[]string{
+			"10s:1199s:1h:1:true,1min:20min:10min:2:true", // first retention not long enough TTL
+			"60s:1200s:1h:1:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 60, 1200, 60, 1),
@@ -289,15 +253,10 @@ func TestAlignRequestsWeird2(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			},
+		[]string{
+			// note that in both cases, the first retention doesn't have long enough TTL
+			"10s:1100s:1h:1:true,120s:20min:10min:2:true",
+			"60s:1100s:1h:1:true,2min:20min:10min:2:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
@@ -315,15 +274,9 @@ func TestAlignRequestsNoOtherChoice(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1199, 600, 2, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1199, 600, 2, 0),
-			},
+		[]string{
+			"10s:1100s:1h:1:true,120s:1199s:10min:2:true",
+			"60s:1100s:1h:1:true,2min:1199s:10min:2:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1199, 120, 1),
@@ -341,16 +294,9 @@ func TestAlignRequests3rdBand(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(1, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1199, 600, 2, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, 0),
-			},
-			{
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, 0),
-			},
+		[]string{
+			"1s:1100s:1h:1:true,120s:1199s:10min:2:true,4min:20min:10min:2:true",
+			"60s:1100s:1h:1:true,4min:20min:10min:2:true",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 2, 240, 1200, 240, 1),
@@ -368,16 +314,9 @@ func TestAlignRequests2RollupsDisabled(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(10, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1199, 600, 2, math.MaxUint32),
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			},
-			{
-				conf.NewRetentionMT(60, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			},
+		[]string{
+			"10s:1100s:1h:1:true,120s:1199s:10min:2:false,4min:20min:10min:2:false",
+			"60s:1100s:1h:1:true,4min:20min:10min:2:false",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 0, 10, 1100, 60, 6),
@@ -393,16 +332,9 @@ func TestAlignRequestsHuh(t *testing.T) {
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
-		[][]conf.Retention{
-			{
-				conf.NewRetentionMT(1, 1000, 0, 0, 0),
-				conf.NewRetentionMT(120, 1080, 600, 2, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			},
-			{
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			},
+		[]string{
+			"1s:1000s:1h:1:true,120s:1080s:10min:2:true,4min:20min:10min:2:false",
+			"60s:1100s:1h:1:true,4min:20min:10min:2:false",
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0, 1, 120, 1080, 120, 1),
@@ -418,14 +350,14 @@ func TestAlignRequestsDifferentReadyStates(t *testing.T) {
 	testAlign([]models.Req{
 		reqRaw(test.GetMKey(1), 100, 300, 800, 1, consolidation.Avg, 0, 0),
 	},
-		[][]conf.Retention{
-			{
+		[]conf.Retentions{
+			conf.BuildFromRetentions(
 				conf.NewRetentionMT(1, 300, 120, 5, 0),              // TTL not good enough
 				conf.NewRetentionMT(5, 450, 600, 4, math.MaxUint32), // TTL good, but not ready
 				conf.NewRetentionMT(10, 460, 600, 3, 150),           // TTL good, but not ready since long enough
 				conf.NewRetentionMT(20, 470, 600, 2, 101),           // TTL good, but not ready since long enough
 				conf.NewRetentionMT(60, 480, 600, 1, 100),           // TTL good and ready since long enough
-			},
+			),
 		},
 		[]models.Req{
 			reqOut(test.GetMKey(1), 100, 300, 800, 1, consolidation.Avg, 0, 0, 4, 60, 480, 60, 1),
@@ -517,6 +449,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 		{
 			Pattern: regexp.MustCompile("a"),
 			Retentions: conf.Retentions(
+				"10s:35d:0:0:true,10min:60d:0:0:true,2h:180d:0:0:true,6h:2y:0:0:true",
 				[]conf.Retention{
 					conf.NewRetentionMT(10, 35*24*3600, 0, 0, 0),
 					conf.NewRetentionMT(600, 60*24*3600, 0, 0, 0),
@@ -528,6 +461,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 			Pattern: regexp.MustCompile("b"),
 			Retentions: conf.Retentions(
 				[]conf.Retention{
+					"30s:35d:0:0:true,10min:60d:0:0:true,2h:180d:0:0:true,6h:2y:0:0:true",
 					conf.NewRetentionMT(30, 35*24*3600, 0, 0, 0),
 					conf.NewRetentionMT(600, 60*24*3600, 0, 0, 0),
 					conf.NewRetentionMT(7200, 180*24*3600, 0, 0, 0),
@@ -537,6 +471,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 		{
 			Pattern: regexp.MustCompile(".*"),
 			Retentions: conf.Retentions(
+				"60s:35d:0:0:true,10min:60d:0:0:true,2h:180d:0:0:true,6h:2y:0:0:true",
 				[]conf.Retention{
 					conf.NewRetentionMT(60, 35*24*3600, 0, 0, 0),
 					conf.NewRetentionMT(600, 60*24*3600, 0, 0, 0),
