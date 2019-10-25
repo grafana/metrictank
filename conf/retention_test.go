@@ -8,13 +8,15 @@ import (
 
 func TestParseRetentions(t *testing.T) {
 	cases := []struct {
-		in  string
-		err bool
-		out []Retention
+		in             string
+		acceptableOrig string
+		err            bool
+		out            []Retention
 	}{
 		{
-			in:  "1s:1d:1h:2,1m:8d:4h:2:1234567890,10m:120d:6h:1:true,30m:2y:6h:1:false",
-			err: false,
+			in:             "1s:1d:1h:2,1m:8d:4h:2:1234567890,10m:120d:6h:1:true,30m:2y:6h:1:false",
+			acceptableOrig: "1s:1d:1h:2:true,1m:1w1d:4h:2:1234567890,10m:17w1d:6h:1:true,30m:2y:6h:1:false", // equivalent to 'in'
+			err:            false,
 			out: []Retention{
 				{
 					SecondsPerPoint: 1,
@@ -62,5 +64,10 @@ func TestParseRetentions(t *testing.T) {
 		if !reflect.DeepEqual(Retentions(exp), got) {
 			t.Fatalf("case %d: exp retentions\n%v\nbut got\n%v", i, exp, got)
 		}
+		orig := buildOrigFromRetentions(got.Rets)
+		if orig != c.acceptableOrig {
+			t.Fatalf("case %d: exp orig\n%v\nbut got\n%v", i, c.in, orig)
+		}
+
 	}
 }
