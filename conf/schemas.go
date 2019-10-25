@@ -37,12 +37,9 @@ func NewSchemas(schemas []Schema) Schemas {
 	s := Schemas{
 		raw: schemas,
 		DefaultSchema: Schema{
-			Name:    "default",
-			Pattern: regexp.MustCompile(".*"),
-			Retentions: Retentions{
-				Orig: "1s:1day:10mim:2:true",
-				Rets: []Retention{NewRetentionMT(1, 3600*24*1, 600, 2, 0)},
-			},
+			Name:       "default",
+			Pattern:    regexp.MustCompile(".*"),
+			Retentions: MustParseRetentions("1s:1d:10m:2:true"),
 		},
 	}
 	s.BuildIndex()
