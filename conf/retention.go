@@ -17,7 +17,19 @@ const Month_sec = 60 * 60 * 24 * 28
 
 var errReadyFormat = errors.New("'ready' field must be a bool or unsigned integer")
 
-type Retentions []Retention
+type Retentions struct {
+	Orig string
+	Rets []Retention
+}
+
+// Sub returns a "subslice" of Retentions starting at the given pos.
+func (r Retentions) Sub(pos int) Retentions {
+	origSplit := strings.Split(r.Orig, ":")
+	return Retentions{
+		Orig: strings.Join(origSplit[pos:], ":"),
+		Rets: r.Rets[pos:],
+	}
+}
 
 // Validate assures the retentions are sane.  As the whisper source code says:
 // An ArchiveList must:
@@ -26,13 +38,13 @@ type Retentions []Retention
 // 3. Higher precision archives' precision must evenly divide all lower precision archives' precision.
 // 4. Lower precision archives must cover larger time intervals than higher precision archives.
 // 5. Each archive must have at least enough points to consolidate to the next archive
-func (rets Retentions) Validate() error {
-	if len(rets) == 0 {
+func (r Retentions) Validate() error {
+	if len(r.Rets) == 0 {
 		return fmt.Errorf("No retentions")
 	}
-	for i := 1; i < len(rets); i++ {
-		prev := rets[i-1]
-		ret := rets[i]
+	for i := 1; i < len(r.Rets); i++ {
+		prev := r.Rets[i-1]
+		ret := r.Rets[i]
 
 		if prev.SecondsPerPoint >= ret.SecondsPerPoint {
 			return fmt.Errorf("retention must have lower resolution than prior retention")
@@ -90,16 +102,18 @@ func NewRetentionMT(secondsPerPoint int, ttl, chunkSpan, numChunks, ready uint32
 
 // ParseRetentions parses retention definitions into a Retentions structure
 func ParseRetentions(defs string) (Retentions, error) {
-	retentions := make(Retentions, 0)
+	retentions := Retentions{
+		Orig: defs,
+	}
 	cnt := strings.Count(defs, ",")
 	if cnt > 254 {
-		return nil, errors.New("no more than 255 individual retensions per rule supported")
+		return retentions, errors.New("no more than 255 individual retensions per rule supported")
 	}
 	for i, def := range strings.Split(defs, ",") {
 		def = strings.TrimSpace(def)
 		parts := strings.Split(def, ":")
 		if len(parts) < 2 || len(parts) > 5 {
-			return nil, fmt.Errorf("bad retentions spec %q", def)
+			return retentions, fmt.Errorf("bad retentions spec %q", def)
 		}
 
 		// try old format
@@ -114,24 +128,24 @@ func ParseRetentions(defs string) (Retentions, error) {
 			// try new format
 			retention, err = ParseRetentionNew(def)
 			if err != nil {
-				return nil, err
+				return retentions, err
 			}
 		}
 		if i != 0 && !schema.IsSpanValid(uint32(retention.SecondsPerPoint)) {
-			return nil, fmt.Errorf("invalid retention: can't encode span of %d", retention.SecondsPerPoint)
+			return retentions, fmt.Errorf("invalid retention: can't encode span of %d", retention.SecondsPerPoint)
 
 		}
 		if len(parts) >= 3 {
 			retention.ChunkSpan, err = dur.ParseNDuration(parts[2])
 			if err != nil {
-				return nil, err
+				return retentions, err
 			}
 			if (Month_sec % retention.ChunkSpan) != 0 {
-				return nil, errors.New("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
+				return retentions, errors.New("chunkSpan must fit without remainders into month_sec (28*24*60*60)")
 			}
 			_, ok := chunk.RevChunkSpans[retention.ChunkSpan]
 			if !ok {
-				return nil, fmt.Errorf("chunkSpan %s is not a valid value (https://github.com/grafana/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", parts[2])
+				return retentions, fmt.Errorf("chunkSpan %s is not a valid value (https://github.com/grafana/metrictank/blob/master/docs/memory-server.md#valid-chunk-spans)", parts[2])
 			}
 		} else {
 			// default to a valid chunkspan that can hold at least 100 points, or select the largest one otherwise.
@@ -148,7 +162,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 		if len(parts) >= 4 {
 			i, err := strconv.Atoi(parts[3])
 			if err != nil {
-				return nil, err
+				return retentions, err
 			}
 			retention.NumChunks = uint32(i)
 		}
@@ -163,7 +177,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 			} else {
 				readyBool, err := strconv.ParseBool(parts[4])
 				if err != nil {
-					return nil, errReadyFormat
+					return retentions, errReadyFormat
 				}
 				if !readyBool {
 					retention.Ready = math.MaxUint32
@@ -171,7 +185,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 			}
 		}
 
-		retentions = append(retentions, retention)
+		retentions.Rets = append(retentions.Rets, retention)
 	}
 	return retentions, retentions.Validate()
 }

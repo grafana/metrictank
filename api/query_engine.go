@@ -59,7 +59,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 	var found bool
 	for i := range reqs {
 		req := &reqs[i]
-		retentions := mdata.Schemas.Get(req.SchemaId).Retentions
+		retentions := mdata.Schemas.Get(req.SchemaId).Retentions.Rets
 		for i, ret := range retentions {
 			// skip non-ready option.
 			if ret.Ready > from {
@@ -116,7 +116,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 			// we have to deliver an interval higher than what we originally came up with
 
 			// let's see first if we can deliver it via lower-res rollup archives, if we have any
-			retentions := mdata.Schemas.Get(req.SchemaId).Retentions
+			retentions := mdata.Schemas.Get(req.SchemaId).Retentions.Rets
 			for i, ret := range retentions[req.Archive+1:] {
 				archInterval := uint32(ret.SecondsPerPoint)
 				if interval == archInterval && ret.Ready <= from {
