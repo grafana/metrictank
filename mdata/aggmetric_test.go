@@ -131,7 +131,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 	mockCache.AddIfHotCb = func() { calledCb <- true }
 
 	chunkAddCount, chunkSpan := uint32(10), uint32(300)
-	rets := conf.MustParseRetentions("1s:1s:5min:5:0")
+	rets := conf.MustParseRetentions("1s:1s:5min:5:true")
 	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), rets, 0, chunkSpan, nil, false, 0)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
@@ -245,7 +245,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		XFilesFactor:      0.5,
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
-	ret := conf.MustParseRetentions("1s:1s:2min:5:0")
+	ret := conf.MustParseRetentions("1s:1s:2min:5:true")
 	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, 1, &agg, false, 0))
 
 	// basic adds and verifies with test data
@@ -283,7 +283,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
-	rets := conf.MustParseRetentions("1s:1s:10:5:0")
+	rets := conf.MustParseRetentions("1s:1s:10s:5:true")
 	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), rets, 0, 1, nil, true, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
@@ -311,7 +311,7 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
 	ingestFrom := int64(25)
-	ret := conf.MustParseRetentions("1s:1s:10s:5:0")
+	ret := conf.MustParseRetentions("1s:1s:10s:5:true")
 	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, ingestFrom)
 	m.Add(10, 10)
 	m.Add(11, 11)
@@ -364,7 +364,7 @@ func TestGetAggregated(t *testing.T) {
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
 	aggSpan := uint32(5)
-	ret := conf.MustParseRetentions("1s:1s:10s:5:true,5s:1s:10s:5:0") // note second raw interval matches aggSpan
+	ret := conf.MustParseRetentions("1s:1s:10s:5,5s:1s:10s:5") // note second raw interval matches aggSpan
 	agg := conf.Aggregation{
 		Name:              "Default",
 		Pattern:           regexp.MustCompile(".*"),
@@ -409,7 +409,7 @@ func TestGetAggregatedIngestFrom(t *testing.T) {
 	mockstore.Reset()
 	aggSpan := uint32(5)
 	ingestFrom := int64(23)
-	ret := conf.MustParseRetentions("1s:1s:10s:5:true,5s:1s:10s:5:0") // note second raw interval matches aggSpan
+	ret := conf.MustParseRetentions("1s:1s:10s:5,5s:1s:10s:5") // note second raw interval matches aggSpan
 	agg := conf.Aggregation{
 		Name:              "Default",
 		Pattern:           regexp.MustCompile(".*"),
@@ -455,19 +455,9 @@ func BenchmarkAggMetricAdd(b *testing.B) {
 
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
-	retentions := conf.Retentions{
-		Orig: "10s:10000000000,30min:1:true",
-		Rets: []conf.Retention{{
-			SecondsPerPoint: 10,
-			NumberOfPoints:  10e9, // TTL
-			ChunkSpan:       1800, // 30 min. contains 180 points at 10s resolution
-			NumChunks:       1,
-			Ready:           0,
-		},
-		},
-	}
-
-	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), retentions, 0, 10, nil, false, 0)
+	// each chunk contains 180 points
+	rets := conf.MustParseRetentions("10s:1000000000s,30min:1")
+	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), rets, 0, 10, nil, false, 0)
 
 	max := uint32(b.N*10 + 1)
 	for t := uint32(1); t < max; t += 10 {

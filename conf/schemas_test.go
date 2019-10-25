@@ -9,19 +9,31 @@ import (
 func schemasForTest() Schemas {
 	return NewSchemas([]Schema{
 		{
-			Name:       "a",
-			Pattern:    regexp.MustCompile("^a\\..*"),
-			Retentions: MustParseRetentions("10s:1h:10min:0:true,1h:1d:6h:0:true"),
+			Name:    "a",
+			Pattern: regexp.MustCompile("^a\\..*"),
+			Retentions: BuildFromRetentions(
+				NewRetentionMT(10, 3600, 60*10, 0, 0),
+				NewRetentionMT(3600, 86400, 60*60*6, 0, 0),
+			),
 		},
 		{
-			Name:       "b",
-			Pattern:    regexp.MustCompile("^b\\..*"),
-			Retentions: MustParseRetentions("1s:60s:10min:0:true,30s:2min:30min:0:true,10min:1d:6h:0:true"),
+			Name:    "b",
+			Pattern: regexp.MustCompile("^b\\..*"),
+			Retentions: BuildFromRetentions(
+				NewRetentionMT(1, 60, 60*10, 0, 0),
+				NewRetentionMT(30, 120, 60*30, 0, 0),
+				NewRetentionMT(600, 86400, 60*60*6, 0, 0),
+			),
 		},
 		{
-			Name:       "default",
-			Pattern:    regexp.MustCompile(".*"),
-			Retentions: MustParseRetentions("1s:60s:10min:0:true,60s:1h:2h:0:true,10min:1d:6h:0:true,1h:7d:6h:0:true"),
+			Name:    "default",
+			Pattern: regexp.MustCompile(".*"),
+			Retentions: BuildFromRetentions(
+				NewRetentionMT(1, 60, 60*10, 0, 0),
+				NewRetentionMT(60, 3600, 60*60*2, 0, 0),
+				NewRetentionMT(600, 86400, 60*60*6, 0, 0),
+				NewRetentionMT(3600, 86400*7, 60*60*6, 0, 0),
+			),
 		},
 	})
 }
@@ -111,9 +123,12 @@ func TestMatch(t *testing.T) {
 func TestDefaultSchema(t *testing.T) {
 	schemas := NewSchemas([]Schema{
 		{
-			Name:       "a",
-			Pattern:    regexp.MustCompile("^a\\..*"),
-			Retentions: MustParseRetentions("10s:1h:10min:0:true,1h:1d:6h:0:true"),
+			Name:    "a",
+			Pattern: regexp.MustCompile("^a\\..*"),
+			Retentions: BuildFromRetentions(
+				NewRetentionMT(10, 3600, 60*10, 0, 0),
+				NewRetentionMT(3600, 86400, 60*60*6, 0, 0),
+			),
 		},
 	})
 
