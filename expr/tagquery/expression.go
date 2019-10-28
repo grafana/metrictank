@@ -187,7 +187,7 @@ type Expression interface {
 	GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter
 
 	// StringIntoWriter takes a string writer and writes a representation of this expression into it
-	StringIntoWriter(writer io.StringWriter)
+	StringIntoWriter(writer io.Writer)
 }
 
 // ParseExpression returns an expression that's been generated from the given
@@ -414,29 +414,29 @@ const (
 	MATCH_NONE                            // special case of expression that matches no metric (f.e. key!=.*)
 )
 
-func (o ExpressionOperator) StringIntoWriter(writer io.StringWriter) {
+func (o ExpressionOperator) StringIntoWriter(writer io.Writer) {
 	switch o {
 	case EQUAL:
-		writer.WriteString("=")
+		writer.Write([]byte("="))
 	case NOT_EQUAL:
-		writer.WriteString("!=")
+		writer.Write([]byte("!="))
 	case MATCH:
-		writer.WriteString("=~")
+		writer.Write([]byte("=~"))
 	case MATCH_TAG:
-		writer.WriteString("=~")
+		writer.Write([]byte("=~"))
 	case NOT_MATCH:
-		writer.WriteString("!=~")
+		writer.Write([]byte("!=~"))
 	case PREFIX:
-		writer.WriteString("^=")
+		writer.Write([]byte("^="))
 	case PREFIX_TAG:
-		writer.WriteString("^=")
+		writer.Write([]byte("^="))
 	case HAS_TAG:
-		writer.WriteString("!=")
+		writer.Write([]byte("!="))
 	case NOT_HAS_TAG:
-		writer.WriteString("=")
+		writer.Write([]byte("="))
 	case MATCH_ALL:
-		writer.WriteString("=")
+		writer.Write([]byte("="))
 	case MATCH_NONE:
-		writer.WriteString("!=")
+		writer.Write([]byte("!="))
 	}
 }

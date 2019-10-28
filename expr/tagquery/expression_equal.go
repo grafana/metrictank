@@ -77,8 +77,8 @@ func (e *expressionEqual) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDe
 	}
 }
 
-func (e *expressionEqual) StringIntoWriter(writer io.StringWriter) {
-	writer.WriteString(e.key)
-	writer.WriteString("=")
-	writer.WriteString(e.value)
+func (e *expressionEqual) StringIntoWriter(writer io.Writer) {
+	writer.Write([]byte(e.key))
+	writer.Write([]byte("="))
+	writer.Write([]byte(e.value))
 }

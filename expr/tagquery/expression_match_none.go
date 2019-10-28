@@ -48,8 +48,8 @@ func (e *expressionMatchNone) GetMetricDefinitionFilter(_ IdTagLookup) MetricDef
 	return func(_ schema.MKey, _ string, _ []string) FilterDecision { return Fail }
 }
 
-func (e *expressionMatchNone) StringIntoWriter(writer io.StringWriter) {
-	writer.WriteString(e.key)
+func (e *expressionMatchNone) StringIntoWriter(writer io.Writer) {
+	writer.Write([]byte(e.key))
 	e.originalOperator.StringIntoWriter(writer)
-	writer.WriteString(e.value)
+	writer.Write([]byte(e.value))
 }

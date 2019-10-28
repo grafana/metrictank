@@ -65,7 +65,7 @@ func (e *expressionNotHasTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDef
 	}
 }
 
-func (e *expressionNotHasTag) StringIntoWriter(writer io.StringWriter) {
-	writer.WriteString(e.key)
-	writer.WriteString("=")
+func (e *expressionNotHasTag) StringIntoWriter(writer io.Writer) {
+	writer.Write([]byte(e.key))
+	writer.Write([]byte("="))
 }

@@ -62,7 +62,7 @@ func (e *expressionPrefixTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDef
 	}
 }
 
-func (e *expressionPrefixTag) StringIntoWriter(writer io.StringWriter) {
-	writer.WriteString("__tag^=")
-	writer.WriteString(e.value)
+func (e *expressionPrefixTag) StringIntoWriter(writer io.Writer) {
+	writer.Write([]byte("__tag^="))
+	writer.Write([]byte(e.value))
 }

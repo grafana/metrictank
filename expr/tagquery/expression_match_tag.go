@@ -90,7 +90,7 @@ func (e *expressionMatchTag) GetMetricDefinitionFilter(_ IdTagLookup) MetricDefi
 	}
 }
 
-func (e *expressionMatchTag) StringIntoWriter(writer io.StringWriter) {
-	writer.WriteString("__tag=~")
-	writer.WriteString(e.value)
+func (e *expressionMatchTag) StringIntoWriter(writer io.Writer) {
+	writer.Write([]byte("__tag=~"))
+	writer.Write([]byte(e.value))
 }

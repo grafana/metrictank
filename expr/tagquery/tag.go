@@ -129,8 +129,8 @@ func ParseTag(tag string) (Tag, error) {
 	return res, nil
 }
 
-func (t *Tag) StringIntoWriter(writer io.StringWriter) {
-	writer.WriteString(t.Key)
-	writer.WriteString("=")
-	writer.WriteString(t.Value)
+func (t *Tag) StringIntoWriter(writer io.Writer) {
+	writer.Write([]byte(t.Key))
+	writer.Write([]byte("="))
+	writer.Write([]byte(t.Value))
 }
