@@ -267,7 +267,7 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 		expressions := make(tagquery.Expressions, len(tags))
 		builder := strings.Builder{}
 		for i := range tags {
-			tags[i].StringIntoBuilder(&builder)
+			tags[i].StringIntoWriter(&builder)
 
 			expressions[i], err = tagquery.ParseExpression(builder.String())
 			if err != nil {
@@ -605,54 +605,4 @@ func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Trac
 	}()
 
 	return resultChan, errorChan
-}
-
-func (s *Server) indexMetaTagRecordUpsert(ctx *middleware.Context, req models.IndexMetaTagRecordUpsert) {
-	if s.MetricIndex == nil {
-		response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{}))
-		return
-	}
-
-	record, err := tagquery.ParseMetaTagRecord(req.MetaTags, req.Expressions)
-	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-		return
-	}
-
-	result, created, err := s.MetricIndex.MetaTagRecordUpsert(req.OrgId, record)
-	if err != nil {
-		response.Write(ctx, response.WrapError(err))
-		return
-	}
-
-	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordUpsertResult{
-		MetaTags:    result.MetaTags.Strings(),
-		Expressions: result.Expressions.Strings(),
-		Created:     created,
-	}))
-}
-
-func (s *Server) indexMetaTagRecordSwap(ctx *middleware.Context, req models.IndexMetaTagRecordSwap) {
-	if s.MetricIndex == nil {
-		response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordSwapResult{}))
-		return
-	}
-
-	metaTagRecords := make([]tagquery.MetaTagRecord, len(req.Records))
-	for i, rawRecord := range req.Records {
-		var err error
-		metaTagRecords[i], err = tagquery.ParseMetaTagRecord(rawRecord.MetaTags, rawRecord.Expressions)
-		if err != nil {
-			response.Write(ctx, response.WrapError(fmt.Errorf("Error when parsing record %d: %s", i, err)))
-			return
-		}
-	}
-
-	added, deleted, err := s.MetricIndex.MetaTagRecordSwap(req.OrgId, metaTagRecords)
-	if err != nil {
-		response.Write(ctx, response.WrapError(fmt.Errorf("Error when swapping meta tag records: %s", err)))
-		return
-	}
-
-	response.Write(ctx, response.NewMsgp(200, &models.MetaTagRecordSwapResult{Added: added, Deleted: deleted}))
 }

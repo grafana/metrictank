@@ -34,3 +34,23 @@ CREATE TABLE IF NOT EXISTS %s.%s (
 ) WITH compaction = {'class': 'SizeTieredCompactionStrategy'}
     AND compression = {'sstable_compression': 'org.apache.cassandra.io.compress.LZ4Compressor'}
 """
+
+schema_meta_record_table = """
+CREATE TABLE IF NOT EXISTS %s.%s (
+   batchid uuid,
+   orgid int,
+   expressions text,
+   metatags text,
+   PRIMARY KEY ((batchid, orgid), expressions)
+)
+"""
+
+schema_meta_record_batch_table = """
+CREATE TABLE IF NOT EXISTS %s.%s (
+   orgid int,
+   batchid uuid,
+   createdat bigint,
+   lastupdate bigint,
+   PRIMARY KEY ((orgid), batchid)
+)
+"""

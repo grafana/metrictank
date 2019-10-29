@@ -3,6 +3,7 @@ package tagquery
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
 	"strings"
@@ -34,7 +35,7 @@ func (e Expressions) Strings() []string {
 	builder := strings.Builder{}
 	res := make([]string, len(e))
 	for i := range e {
-		e[i].StringIntoBuilder(&builder)
+		e[i].StringIntoWriter(&builder)
 		res[i] = builder.String()
 		builder.Reset()
 	}
@@ -57,6 +58,22 @@ func (e Expressions) Sort() {
 // it is used by the api endpoint /metaTags to list the meta tag records
 func (e Expressions) MarshalJSON() ([]byte, error) {
 	return json.Marshal(e.Strings())
+}
+
+func (e *Expressions) UnmarshalJSON(data []byte) error {
+	var expressionStrings []string
+	err := json.Unmarshal(data, &expressionStrings)
+	if err != nil {
+		return err
+	}
+
+	parsed, err := ParseExpressions(expressionStrings)
+	if err != nil {
+		return err
+	}
+
+	*e = parsed
+	return nil
 }
 
 // Expression represents one expression inside a query of one or many expressions.
@@ -169,8 +186,8 @@ type Expression interface {
 	// regarding this query expression applied to its tags
 	GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter
 
-	// StringIntoBuilder takes a builder and writes a string representation of this expression into it
-	StringIntoBuilder(builder *strings.Builder)
+	// StringIntoWriter takes a string writer and writes a representation of this expression into it
+	StringIntoWriter(writer io.Writer)
 }
 
 // ParseExpression returns an expression that's been generated from the given
@@ -397,29 +414,29 @@ const (
 	MATCH_NONE                            // special case of expression that matches no metric (f.e. key!=.*)
 )
 
-func (o ExpressionOperator) StringIntoBuilder(builder *strings.Builder) {
+func (o ExpressionOperator) StringIntoWriter(writer io.Writer) {
 	switch o {
 	case EQUAL:
-		builder.WriteString("=")
+		writer.Write([]byte("="))
 	case NOT_EQUAL:
-		builder.WriteString("!=")
+		writer.Write([]byte("!="))
 	case MATCH:
-		builder.WriteString("=~")
+		writer.Write([]byte("=~"))
 	case MATCH_TAG:
-		builder.WriteString("=~")
+		writer.Write([]byte("=~"))
 	case NOT_MATCH:
-		builder.WriteString("!=~")
+		writer.Write([]byte("!=~"))
 	case PREFIX:
-		builder.WriteString("^=")
+		writer.Write([]byte("^="))
 	case PREFIX_TAG:
-		builder.WriteString("^=")
+		writer.Write([]byte("^="))
 	case HAS_TAG:
-		builder.WriteString("!=")
+		writer.Write([]byte("!="))
 	case NOT_HAS_TAG:
-		builder.WriteString("=")
+		writer.Write([]byte("="))
 	case MATCH_ALL:
-		builder.WriteString("=")
+		writer.Write([]byte("="))
 	case MATCH_NONE:
-		builder.WriteString("!=")
+		writer.Write([]byte("!="))
 	}
 }

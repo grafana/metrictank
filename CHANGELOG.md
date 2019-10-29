@@ -2,6 +2,7 @@
 
 ## breaking changes
 
+* as of v0.13.0-75-geaac736a Metrictank requires two new Cassandra tables if the meta tag feature is enabled and the Cassandra index is used. It only creates them automatically if `cassandra-idx-create-keyspace` is set to true.
 * as of v0.12.0-404-gc7715cb2 we clean up poorly formatted graphite metrics better. To the extent that they have previously worked, queries may need some adjusting
   #1435
 * version v0.12.0-96-g998933c3 introduces config options for the cassandra/scylladb index table names.

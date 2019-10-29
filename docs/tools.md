@@ -116,6 +116,16 @@ cass config flags:
     	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -meta-record-batch-table string
+    	Cassandra table to store meta data of meta record batches. (default "meta_record_batches")
+  -meta-record-poll-interval duration
+    	Interval at which to poll store for meta record updates. (default 10s)
+  -meta-record-prune-age duration
+    	The minimum age a batch of meta records must have to be pruned. (default 72h0m0s)
+  -meta-record-prune-interval duration
+    	Interval at which meta records of old batches get pruned. (default 24h0m0s)
+  -meta-record-table string
+    	Cassandra table to store meta records. (default "meta_records")
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -password string
@@ -257,6 +267,16 @@ cass config flags:
     	Number of partitions to load concurrently on startup. (default 1)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
+  -meta-record-batch-table string
+    	Cassandra table to store meta data of meta record batches. (default "meta_record_batches")
+  -meta-record-poll-interval duration
+    	Interval at which to poll store for meta record updates. (default 10s)
+  -meta-record-prune-age duration
+    	The minimum age a batch of meta records must have to be pruned. (default 72h0m0s)
+  -meta-record-prune-interval duration
+    	Interval at which meta records of old batches get pruned. (default 24h0m0s)
+  -meta-record-table string
+    	Cassandra table to store meta records. (default "meta_records")
   -num-conns int
     	number of concurrent connections to cassandra (default 10)
   -password string

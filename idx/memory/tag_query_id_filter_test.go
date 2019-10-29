@@ -92,7 +92,7 @@ func testFilterByMetaTagWithEqual(t *testing.T) {
 
 	_, mds := getTestArchives(10)
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch := []schema.MetricDefinition{mds[3], mds[5], mds[6]}
 		expectedFail := append(append(mds[:3], mds[4]), mds[7:]...)
 
@@ -142,7 +142,7 @@ func testFilterByMetaTagWithNotEqualAndWithNotHasTag(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[0], mds[1], mds[2], mds[4], mds[7], mds[8], mds[9]}
 		expectedFail = []schema.MetricDefinition{mds[3], mds[5], mds[6]}
 	} else {
@@ -192,7 +192,7 @@ func testFilterByMetaTagWithEqualAndWithHasTag(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[3], mds[5], mds[6]}
 		expectedFail = []schema.MetricDefinition{mds[0], mds[1], mds[2], mds[4], mds[7], mds[8], mds[9]}
 	} else {
@@ -267,7 +267,7 @@ func testFilterByMetaTagWithPatternMatching(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[2], mds[3]}
 		expectedFail = append(mds[:2], mds[4:]...)
 	} else {
@@ -327,7 +327,7 @@ func testFilterByMetaTagWithTagOperators(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[7], mds[9]}
 		expectedFail = []schema.MetricDefinition{mds[0], mds[1], mds[2], mds[3], mds[4], mds[5], mds[6], mds[8]}
 	} else {
@@ -413,7 +413,7 @@ func testFilterByMultipleOfManyMetaTagValues(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[2], mds[3], mds[4], mds[5]}
 		expectedFail = []schema.MetricDefinition{mds[0], mds[1], mds[6], mds[7], mds[8], mds[9]}
 	} else {
@@ -497,7 +497,7 @@ func testFilterByMultipleOfManyMetaTags(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[2], mds[3]}
 		expectedFail = []schema.MetricDefinition{mds[0], mds[1], mds[4], mds[5], mds[6], mds[7], mds[8], mds[9]}
 	} else {
@@ -561,7 +561,7 @@ func testFilterByOverlappingMetaTags(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[1]}
 		expectedFail = append(mds[2:], mds[0])
 	} else {
@@ -613,7 +613,7 @@ func testFilterSubtractingMetricTagsFromMetaTag(t *testing.T) {
 	var expectedMatch []schema.MetricDefinition
 	var expectedFail []schema.MetricDefinition
 
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedMatch = []schema.MetricDefinition{mds[1], mds[3], mds[5]}
 		expectedFail = []schema.MetricDefinition{mds[0], mds[2], mds[4], mds[6], mds[7], mds[8], mds[9]}
 	} else {

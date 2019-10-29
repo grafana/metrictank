@@ -117,7 +117,7 @@ func testSelectByMetaTag(t *testing.T) {
 
 	// with meta tag support disabled we expect an empty result set
 	expectedRes := make(IdSet)
-	if metaTagSupport {
+	if MetaTagSupport {
 		expectedRes = IdSet{mds[3].Id: struct{}{}, mds[5].Id: struct{}{}}
 	}
 
@@ -157,7 +157,7 @@ func testSelectByMetaTagAndMetricTagUsingSameKeyAndValue(t *testing.T) {
 	}
 
 	var expectedRes IdSet
-	if metaTagSupport {
+	if MetaTagSupport {
 		// if meta tag support is enabled we expect mds[3] to get returned based on its metric tag tag1=value3
 		// and we also expect mds[4] to get returned based on its associated meta tag tag1=value3
 		expectedRes = IdSet{mds[3].Id: struct{}{}, mds[4].Id: struct{}{}}
@@ -203,7 +203,7 @@ func testSelectByMetaTagAndMetricTagUsingDifferentKeyAndValue(t *testing.T) {
 	}
 
 	var expectedRes IdSet
-	if metaTagSupport {
+	if MetaTagSupport {
 		// if meta tag support is enabled we expect mds[3] to get returned based on its metric tag tag1=value2.3
 		// and we also expect mds[4] to get returned based on its associated meta tag tag1=value3
 		expectedRes = IdSet{mds[3].Id: struct{}{}, mds[4].Id: struct{}{}}
@@ -249,7 +249,7 @@ func testSelectMetaTagWhichConflictsMetricTag(t *testing.T) {
 	}
 
 	var expectedRes IdSet
-	if metaTagSupport {
+	if MetaTagSupport {
 		// if meta tag support is enabled we expect mds[3] to get returned based on its metric tag tag1=value2.3
 		// and we also expect mds[4] to get returned based on its associated meta tag tag1=value3
 		expectedRes = IdSet{mds[3].Id: struct{}{}, mds[4].Id: struct{}{}, mds[5].Id: struct{}{}}

@@ -1,5 +1,12 @@
 package util
 
+import "hash"
+
+type StringHash64 interface {
+	hash.Hash64
+	WriteString(string) (int, error)
+}
+
 // Sum64aStringWriter is mostly a copy of fnv.sum64a
 // the only difference is the additional method WriteString(),
 // due to this additional method it satisfies the io.StringWriter
@@ -10,8 +17,9 @@ type Sum64aStringWriter uint64
 const offset64 = 14695981039346656037
 const prime64 = 1099511628211
 
-func NewFnv64aStringWriter() Sum64aStringWriter {
-	return Sum64aStringWriter(offset64)
+func NewFnv64aStringWriter() StringHash64 {
+	var s Sum64aStringWriter = offset64
+	return &s
 }
 
 func (s *Sum64aStringWriter) BlockSize() int { return 1 }

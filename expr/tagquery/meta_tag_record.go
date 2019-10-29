@@ -2,7 +2,6 @@ package tagquery
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/grafana/metrictank/schema"
 )
@@ -62,17 +61,36 @@ func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
 // HashExpressions returns a hash of all expressions in this meta tag record
 // It is assumed that the expressions are already sorted
 func (m *MetaTagRecord) HashExpressions() uint32 {
-	builder := strings.Builder{}
-	for _, query := range m.Expressions {
-		query.StringIntoBuilder(&builder)
+	h := QueryHash()
+	for _, expression := range m.Expressions {
+		expression.StringIntoWriter(h)
 
 		// trailing ";" doesn't matter, this is only hash input
-		builder.WriteString(";")
+		h.WriteString(";")
 	}
 
-	h := QueryHash()
-	h.Write([]byte(builder.String()))
 	return h.Sum32()
+}
+
+// HashMetaTags returns a hash of all meta tags in this meta tag record
+// It is assumed that the meta tags are already sorted
+func (m *MetaTagRecord) HashMetaTags() uint32 {
+	h := QueryHash()
+	for _, metaTag := range m.MetaTags {
+		metaTag.StringIntoWriter(h)
+
+		// trailing ";" doesn't matter, this is only hash input
+		h.WriteString(";")
+	}
+
+	return h.Sum32()
+}
+
+func (m *MetaTagRecord) HashRecord() uint64 {
+	expressionsHash := m.HashExpressions()
+	metaTagHash := m.HashMetaTags()
+
+	return uint64(expressionsHash) | uint64(metaTagHash)<<32
 }
 
 // EqualExpressions compares another meta tag record's expressions to
