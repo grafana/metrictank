@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
 
 	"github.com/grafana/metrictank/errors"
@@ -13,9 +14,16 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
-// the collision avoidance window defines how many times we try to find a higher
-// slot that's free if two record hashes collide
-var collisionAvoidanceWindow = uint32(1024)
+var (
+	// the collision avoidance window defines how many times we try to find a higher
+	// slot that's free if two record hashes collide
+	collisionAvoidanceWindow = uint32(1024)
+
+	// metric idx.memory.meta-tags.enrichment-cache.ops.hit is a counter of enrichment cache hits
+	enrichmentCacheHits = stats.NewCounter32("idx.memory.meta-tags.enrichment-cache.ops.hit")
+	// metric idx.memory.meta-tags.enrichment-cache.ops.miss is a counter of enrichment cache misses
+	enrichmentCacheMisses = stats.NewCounter32("idx.memory.meta-tags.enrichment-cache.ops.miss")
+)
 
 type recordId uint32
 
@@ -172,8 +180,10 @@ func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.T
 
 	cachedRes, ok := e.cache.Get(sum)
 	if ok {
+		enrichmentCacheHits.Inc()
 		return cachedRes.(tagquery.Tags)
 	}
+	enrichmentCacheMisses.Inc()
 
 	var res tagquery.Tags
 	var matches []int
