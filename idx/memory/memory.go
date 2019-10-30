@@ -871,6 +871,10 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		}
 	}
 
+	if enricher != nil {
+		enricher.reportStats()
+	}
+
 	results := make([]idx.Node, len(byPath))
 
 	i := 0
@@ -1114,6 +1118,10 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		}
 	}
 
+	if enricher != nil {
+		enricher.reportStats()
+	}
+
 	// handle special case of the name tag
 	if len(prefix) == 0 || strings.HasPrefix("name", prefix) {
 		resMap["name"] = struct{}{}
@@ -1240,6 +1248,10 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 				}
 			}
 		}
+	}
+
+	if enricher != nil {
+		enricher.reportStats()
 	}
 
 	res := make([]string, len(resMap))

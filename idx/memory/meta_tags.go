@@ -23,6 +23,8 @@ var (
 	enrichmentCacheHits = stats.NewCounter32("idx.memory.meta-tags.enrichment-cache.ops.hit")
 	// metric idx.memory.meta-tags.enrichment-cache.ops.miss is a counter of enrichment cache misses
 	enrichmentCacheMisses = stats.NewCounter32("idx.memory.meta-tags.enrichment-cache.ops.miss")
+	// metric idx.memory.meta-tags.enrichment-cache.entries is a the number of entries in the enrichment cache
+	enrichmentCacheEntries = stats.NewGauge32("idx.memory.meta-tags.enrichment-cache.entries")
 )
 
 type recordId uint32
@@ -167,6 +169,10 @@ type enricher struct {
 	filters []tagquery.MetricDefinitionFilter
 	tags    []tagquery.Tags
 	cache   *lru.Cache
+}
+
+func (e *enricher) reportStats() {
+	enrichmentCacheEntries.Set(e.cache.Len())
 }
 
 func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
