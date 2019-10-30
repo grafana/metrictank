@@ -365,7 +365,7 @@ func TestComparingMetaTagRecords(t *testing.T) {
 	}
 }
 
-func TestEnricher(t *testing.T) {
+func getEnricherWithTestData(t *testing.T) ([]schema.MetricDefinition, *enricher) {
 	mtr := newMetaTagRecords()
 
 	records := generateMetaRecords(t,
@@ -406,6 +406,37 @@ func TestEnricher(t *testing.T) {
 		return false
 	})
 
+	return testMetrics, enricher
+}
+
+func TestEnricher(t *testing.T) {
+	testMetrics, enricher := getEnricherWithTestData(t)
+
+	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
+	expectedTags := tagquery.Tags{{Key: "meta1", Value: "tag1"}}
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
+	}
+
+	tags = enricher.enrich(testMetrics[1].Id, testMetrics[1].Name, testMetrics[1].Tags)
+	expectedTags = tagquery.Tags{{Key: "meta2", Value: "tag2"}}
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
+	}
+
+	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
+	tags.Sort()
+	expectedTags = tagquery.Tags{{Key: "meta1", Value: "tag1"}, {Key: "meta2", Value: "tag2"}}
+	expectedTags.Sort()
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
+	}
+}
+
+func TestEnricherWithUniqueMetaTags(t *testing.T) {
+	testMetrics, e := getEnricherWithTestData(t)
+	enricher := e.uniqueMetaTags()
+
 	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
 	expectedTags := tagquery.Tags{{Key: "meta1", Value: "tag1"}}
 	if !reflect.DeepEqual(tags, expectedTags) {
@@ -418,12 +449,37 @@ func TestEnricher(t *testing.T) {
 		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
 	}
 
+	// we expect no tags to be enriched, because both present meta records have already been used once
+	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
+	if len(tags) == 0 {
+		tags = nil
+	}
+
+	expectedTags = nil
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
+	}
+
+	// when we re-initialize the enricher with unique meta tags and run the same query one more time
+	// then there should be results, but only once
+	enricher = e.uniqueMetaTags()
+
 	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
 	tags.Sort()
 	expectedTags = tagquery.Tags{{Key: "meta1", Value: "tag1"}, {Key: "meta2", Value: "tag2"}}
 	expectedTags.Sort()
 	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
+		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
+	}
+
+	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
+	if len(tags) == 0 {
+		tags = nil
+	}
+
+	expectedTags = nil
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
 	}
 }
 
