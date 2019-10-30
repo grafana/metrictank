@@ -202,6 +202,8 @@ a counter of findCache misses
 the duration of a get of one metric in the memory idx
 * `idx.memory.list`:  
 the duration of memory idx listings
+* `idx.memory.meta-tags.enrichment-cache.entries`:  
+a the number of entries in the enrichment cache
 * `idx.memory.meta-tags.enrichment-cache.ops.hit`:  
 a counter of enrichment cache hits
 * `idx.memory.meta-tags.enrichment-cache.ops.miss`:  
