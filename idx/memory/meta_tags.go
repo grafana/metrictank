@@ -199,32 +199,32 @@ func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.T
 	return res
 }
 
-func (e *enricher) uniqueMetaTags() *enricherWithUniqueMetaTags {
-	var res enricherWithUniqueMetaTags
+func (e *enricher) uniqueMetaRecords() *enricherWithUniqueMetaRecords {
+	var res enricherWithUniqueMetaRecords
 	res.enricher = *e
 	res.initialize()
 
 	return &res
 }
 
-// enricherWithUniqueMetaTags has the same purpose as the normal enricher, but it is
+// enricherWithUniqueMetaRecords has the same purpose as the normal enricher, but it is
 // different because it uses each meta record only once to enrich metrics. this can be
 // used as a performance optimization in cases where we only want to retrieve all unique
 // meta tags matching a set of ids, but we don't necessarily need to associate them with
 // every metric that matches a meta tag (f.e. autocomplete)
-type enricherWithUniqueMetaTags struct {
+type enricherWithUniqueMetaRecords struct {
 	enricher
 	metaRecordsToUse map[int]struct{}
 }
 
-func (e *enricherWithUniqueMetaTags) initialize() {
+func (e *enricherWithUniqueMetaRecords) initialize() {
 	e.metaRecordsToUse = make(map[int]struct{}, len(e.filters))
 	for i := range e.filters {
 		e.metaRecordsToUse[i] = struct{}{}
 	}
 }
 
-func (e *enricherWithUniqueMetaTags) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
+func (e *enricherWithUniqueMetaRecords) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
 	cachedRes, ok := e.enricher.cache.Get(id.Key)
 	if ok {
 		enrichmentCacheHits.Inc()

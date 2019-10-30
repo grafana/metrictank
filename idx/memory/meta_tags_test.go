@@ -435,7 +435,7 @@ func TestEnricher(t *testing.T) {
 
 func TestEnricherWithUniqueMetaTags(t *testing.T) {
 	testMetrics, e := getEnricherWithTestData(t)
-	enricher := e.uniqueMetaTags()
+	enricher := e.uniqueMetaRecords()
 
 	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
 	expectedTags := tagquery.Tags{{Key: "meta1", Value: "tag1"}}
@@ -462,7 +462,7 @@ func TestEnricherWithUniqueMetaTags(t *testing.T) {
 
 	// when we re-initialize the enricher with unique meta tags and run the same query one more time
 	// then there should be results, but only once
-	enricher = e.uniqueMetaTags()
+	enricher = e.uniqueMetaRecords()
 
 	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
 	tags.Sort()
