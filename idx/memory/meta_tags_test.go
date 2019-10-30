@@ -2,9 +2,11 @@ package memory
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
 )
 
@@ -360,6 +362,68 @@ func TestComparingMetaTagRecords(t *testing.T) {
 
 	if mtr1.hashRecords() != mtr3.hashRecords() {
 		t.Fatalf("TC6: Expected meta tag records to be the same")
+	}
+}
+
+func TestEnricher(t *testing.T) {
+	mtr := newMetaTagRecords()
+
+	records := generateMetaRecords(t,
+		[][]string{{"meta1=tag1"}, {"meta2=tag2"}},
+		[][]string{{"expr1=value1"}, {"expr2=value2"}},
+	)
+	for _, record := range records {
+		mtr.upsert(record)
+	}
+
+	testMetrics := []schema.MetricDefinition{
+		{
+			Name: "metric1",
+			Tags: []string{"expr1=value1"},
+		}, {
+			Name: "metric2",
+			Tags: []string{"expr2=value2"},
+		}, {
+			Name: "metric3",
+			Tags: []string{"expr1=value1", "expr2=value2"},
+		},
+	}
+	for i := range testMetrics {
+		testMetrics[i].SetId()
+	}
+
+	enricher := mtr.getEnricher(func(id schema.MKey, tag, value string) bool {
+		for _, metric := range testMetrics {
+			if metric.Id == id {
+				searchTag := tag + "=" + value
+				for _, haveTag := range metric.Tags {
+					if searchTag == haveTag {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	})
+
+	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
+	expectedTags := tagquery.Tags{{Key: "meta1", Value: "tag1"}}
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
+	}
+
+	tags = enricher.enrich(testMetrics[1].Id, testMetrics[1].Name, testMetrics[1].Tags)
+	expectedTags = tagquery.Tags{{Key: "meta2", Value: "tag2"}}
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
+	}
+
+	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
+	tags.Sort()
+	expectedTags = tagquery.Tags{{Key: "meta1", Value: "tag1"}, {Key: "meta2", Value: "tag2"}}
+	expectedTags.Sort()
+	if !reflect.DeepEqual(tags, expectedTags) {
+		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
 	}
 }
 
