@@ -38,15 +38,30 @@ func disableMetaTagSupport() func() {
 	}
 }
 
+func generateMetaRecords(t *testing.T, metaTags, tags [][]string) []tagquery.MetaTagRecord {
+	t.Helper()
+	if len(metaTags) != len(tags) {
+		t.Fatalf("Invalid params to generateMetaRecords, need same number of metaTags and tags")
+	}
+
+	res := make([]tagquery.MetaTagRecord, len(metaTags))
+	var err error
+	for i := 0; i < len(res); i++ {
+		res[i], err = tagquery.ParseMetaTagRecord(metaTags[i], tags[i])
+		if err != nil {
+			t.Fatalf("Invalid meta tags / tags (%q/%q): %s", metaTags[i], tags[i], err.Error())
+		}
+	}
+
+	return res
+}
+
 func TestInsertSimpleMetaTagRecord(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
 	metaTagRecords := newMetaTagRecords()
-	recordToInsert, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=abc", "anotherTag=theValue"}, []string{"metricTag!=a", "match=~this"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
+	recordToInsert := generateMetaRecords(t, [][]string{{"metaTag1=abc", "anotherTag=theValue"}}, [][]string{{"metricTag!=a", "match=~this"}})[0]
 
 	_, record, oldId, oldRecord, err := metaTagRecords.upsert(recordToInsert)
 	if err != nil {
@@ -79,26 +94,15 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	// define the values for two metric records with the same meta tags, but different queries
-	recordToInsert1, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~a", "tag2=~b"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
-	recordToInsert2, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"tag1=~c", "tag2=~d"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
-
-	// define the values for an update which is going to replace
-	// the first metric record because it has the same tag queries
-	recordToUpdate, err := tagquery.ParseMetaTagRecord([]string{"metaTag1=value2"}, []string{"tag1=~a", "tag2=~b"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
+	// the third meta record is going to replace the first meta record because it has the same tag queries
+	records := generateMetaRecords(t,
+		[][]string{{"metaTag1=value1"}, {"metaTag1=value1"}, {"metaTag1=value2"}},
+		[][]string{{"tag1=~a", "tag2=~b"}, {"tag1=~c", "tag2=~d"}, {"tag1=~a", "tag2=~b"}},
+	)
 
 	metaTagRecords := newMetaTagRecords()
-	metaTagRecords.upsert(recordToInsert1)
-	metaTagRecords.upsert(recordToInsert2)
+	metaTagRecords.upsert(records[0])
+	metaTagRecords.upsert(records[1])
 
 	if len(metaTagRecords.records) != 2 {
 		t.Fatalf("Expected 2 meta tag records, but there were %d", len(metaTagRecords.records))
@@ -107,10 +111,10 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	var found1, found2 bool
 	var recordIdToUpdate recordId
 	for i, record := range metaTagRecords.records {
-		if record.Equals(&recordToInsert1) {
+		if record.Equals(&records[0]) {
 			found1 = true
 			recordIdToUpdate = i
-		} else if record.Equals(&recordToInsert2) {
+		} else if record.Equals(&records[1]) {
 			found2 = true
 		}
 	}
@@ -119,7 +123,7 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 		t.Fatalf("Expected both meta tag records to be found, but at least one wasn't: %t / %t", found1, found2)
 	}
 
-	id, record, oldId, oldRecord, err := metaTagRecords.upsert(recordToUpdate)
+	id, record, oldId, oldRecord, err := metaTagRecords.upsert(records[2])
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
 	}
@@ -132,7 +136,7 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	if oldId != id {
 		t.Fatalf("Expected the new id after updating to be %d (same as the old id), but it was %d", oldId, id)
 	}
-	if oldRecord == nil || !oldRecord.Equals(&recordToInsert1) {
+	if oldRecord == nil || !oldRecord.Equals(&records[0]) {
 		t.Fatalf("Expected the old record to not be nil, but it was")
 	}
 	if len(metaTagRecords.records) != 2 {
@@ -142,10 +146,10 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	// the order of the records may have changed again due to sorting by id
 	found1, found2 = false, false
 	for _, record := range metaTagRecords.records {
-		if record.Equals(&recordToUpdate) {
+		if record.Equals(&records[2]) {
 			found1 = true
 		}
-		if record.Equals(&recordToInsert2) {
+		if record.Equals(&records[1]) {
 			found2 = true
 		}
 	}
@@ -209,19 +213,19 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	metaTagRecords := newMetaTagRecords()
-	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
-	metaTagRecords.upsert(record)
-	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
-	metaTagRecords.upsert(record)
-	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
-	metaTagRecords.upsert(record)
+	records := generateMetaRecords(t,
+		[][]string{{"metaTag1=value1"}, {"metaTag2=value2"}, {"metaTag3=value3"}, {"metaTag4=value4"}, {"metaTag3=value4"}},
+		[][]string{{"metricTag1=value1"}, {"metricTag2=value2"}, {"metricTag3=value3"}, {"metricTag4=value4"}, {"metricTag3=value3"}},
+	)
+	for i := 0; i < 3; i++ {
+		metaTagRecords.upsert(records[i])
+	}
 	if len(metaTagRecords.records) != 3 {
 		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords.records))
 	}
 
 	// adding a 4th record with the same hash but different queries
-	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag4=value4"}, []string{"metricTag4=value4"})
-	id, returnedRecord, oldId, oldRecord, err := metaTagRecords.upsert(record)
+	id, returnedRecord, oldId, oldRecord, err := metaTagRecords.upsert(records[3])
 	if err == nil {
 		t.Fatalf("Expected an error to be returned, but there was none")
 	}
@@ -242,8 +246,7 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// updating the third record with the same hash and equal queries, but different meta tags
-	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value4"}, []string{"metricTag3=value3"})
-	id, returnedRecord, oldId, oldRecord, err = metaTagRecords.upsert(record)
+	id, returnedRecord, oldId, oldRecord, err = metaTagRecords.upsert(records[4])
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
 	}
@@ -252,17 +255,16 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// check if the returned new record looks as expected
-	if !returnedRecord.Equals(&record) {
-		t.Fatalf("New record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, returnedRecord)
+	if !returnedRecord.Equals(&records[4]) {
+		t.Fatalf("New record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &records[4], returnedRecord)
 	}
 	if oldId != 3 {
 		t.Fatalf("Expected oldId to be 3, but it was %d", oldId)
 	}
 
 	// check if the returned old record looks as expected
-	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag3=value3"}, []string{"metricTag3=value3"})
-	if !oldRecord.Equals(&record) {
-		t.Fatalf("Old record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &record, oldRecord)
+	if !oldRecord.Equals(&records[2]) {
+		t.Fatalf("Old record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &records[2], oldRecord)
 	}
 	if len(metaTagRecords.records) != 3 {
 		t.Fatalf("Expected 3 meta tag records to be present, but there were %d", len(metaTagRecords.records))
@@ -275,11 +277,13 @@ func TestDeletingMetaRecord(t *testing.T) {
 
 	// Adding 2 meta records
 	metaTagRecords := newMetaTagRecords()
-	record, _ := tagquery.ParseMetaTagRecord([]string{"metaTag1=value1"}, []string{"metricTag1=value1"})
-	metaTagRecords.upsert(record)
+	records := generateMetaRecords(t,
+		[][]string{{"metaTag1=value1"}, {"metaTag2=value2"}, {}},
+		[][]string{{"metricTag1=value1"}, {"metricTag2=value2"}, {"metricTag2=value2"}},
+	)
 
-	record, _ = tagquery.ParseMetaTagRecord([]string{"metaTag2=value2"}, []string{"metricTag2=value2"})
-	idOfRecord2, _, _, _, _ := metaTagRecords.upsert(record)
+	metaTagRecords.upsert(records[0])
+	idOfRecord2, _, _, _, _ := metaTagRecords.upsert(records[1])
 
 	if len(metaTagRecords.records) != 2 {
 		t.Fatalf("Expected that 2 meta tag records exist, but there were %d", len(metaTagRecords.records))
@@ -287,16 +291,15 @@ func TestDeletingMetaRecord(t *testing.T) {
 
 	// then we delete one record again
 	// upserting a meta tag record with one that has no meta tags results in deletion
-	record.MetaTags = nil
-	id, returnedRecord, oldId, _, err := metaTagRecords.upsert(record)
+	id, returnedRecord, oldId, _, err := metaTagRecords.upsert(records[2])
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
 	}
 	if len(returnedRecord.MetaTags) != 0 {
 		t.Fatalf("Expected returned meta tag record to have 0 meta tags, but it had %d", len(returnedRecord.MetaTags))
 	}
-	if !returnedRecord.Equals(&record) {
-		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", record.Expressions, returnedRecord.Expressions)
+	if !returnedRecord.Equals(&records[2]) {
+		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", records[2].Expressions, returnedRecord.Expressions)
 	}
 	if oldId != idOfRecord2 {
 		t.Fatalf("Expected the oldId to be the id of record2 (%d), but it was %d", idOfRecord2, oldId)
@@ -314,6 +317,11 @@ func TestComparingMetaTagRecords(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
+	records := generateMetaRecords(t,
+		[][]string{{"meta1=tag1"}, {"meta2=tag2"}},
+		[][]string{{"expr1=value1"}, {"expr2=value2"}},
+	)
+
 	mtr1 := newMetaTagRecords()
 	mtr2 := newMetaTagRecords()
 
@@ -321,35 +329,25 @@ func TestComparingMetaTagRecords(t *testing.T) {
 		t.Fatalf("TC1: Expected meta tag records to be the same")
 	}
 
-	record1, err := tagquery.ParseMetaTagRecord([]string{"meta1=tag1"}, []string{"expr1=value1"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %s", err)
-	}
-
-	mtr1.upsert(record1)
+	mtr1.upsert(records[0])
 
 	if mtr1.hashRecords() == mtr2.hashRecords() {
 		t.Fatalf("TC2: Expected meta tag records to be the different")
 	}
 
-	mtr2.upsert(record1)
+	mtr2.upsert(records[0])
 
 	if mtr1.hashRecords() != mtr2.hashRecords() {
 		t.Fatalf("TC3: Expected meta tag records to be the same")
 	}
 
-	record2, err := tagquery.ParseMetaTagRecord([]string{"meta2=tag2"}, []string{"expr2=value2"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %s", err)
-	}
-
-	mtr1.upsert(record2)
+	mtr1.upsert(records[1])
 
 	if mtr1.hashRecords() == mtr2.hashRecords() {
 		t.Fatalf("TC4: Expected meta tag records to be the different")
 	}
 
-	mtr2.upsert(record2)
+	mtr2.upsert(records[1])
 
 	if mtr1.hashRecords() != mtr2.hashRecords() {
 		t.Fatalf("TC5: Expected meta tag records to be the same")
@@ -357,8 +355,8 @@ func TestComparingMetaTagRecords(t *testing.T) {
 
 	// create another instance of metaTagRecords and populate it in reverse order
 	mtr3 := newMetaTagRecords()
-	mtr3.upsert(record2)
-	mtr3.upsert(record1)
+	mtr3.upsert(records[1])
+	mtr3.upsert(records[0])
 
 	if mtr1.hashRecords() != mtr3.hashRecords() {
 		t.Fatalf("TC6: Expected meta tag records to be the same")
