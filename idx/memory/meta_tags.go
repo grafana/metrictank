@@ -188,11 +188,9 @@ func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.T
 	enrichmentCacheMisses.Inc()
 
 	var res tagquery.Tags
-	var matches []int
 	for i := range e.filters {
 		if e.filters[i](id, name, tags) == tagquery.Pass {
 			res = append(res, e.tags[i]...)
-			matches = append(matches, i)
 		}
 	}
 
