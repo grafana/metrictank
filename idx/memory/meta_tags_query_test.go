@@ -10,26 +10,30 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
-func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, count uint32) (*UnpartitionedMemoryIdx, []schema.MKey) {
+func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, count uint32, idGen func(uint32) string) (*UnpartitionedMemoryIdx, []schema.MKey) {
 	t.Helper()
 	idx := NewUnpartitionedMemoryIdx()
 
-	mds := make([]schema.MetricData, count)
+	var md schema.MetricData
 	mkeys := make([]schema.MKey, count)
-	for i := range mds {
-		mds[i].Name = "test.name"
-		mds[i].OrgId = 1
-		mds[i].Interval = 1
-		mds[i].Value = 1
-		mds[i].Time = 1
-		mds[i].Tags = []string{fmt.Sprintf("tag1=iterator%d", i), fmt.Sprintf("tag2=%d", i+1)}
-		mds[i].SetId()
+	for i := uint32(0); i < count; i++ {
+		md.Name = "test.name"
+		md.OrgId = 1
+		md.Interval = 1
+		md.Value = 1
+		md.Time = 1
+		md.Tags = []string{fmt.Sprintf("tag1=iterator%d", i), fmt.Sprintf("tag2=%d", i+1)}
+		md.SetId()
 
-		mkey, err := schema.MKeyFromString(mds[i].Id)
-		if err != nil {
-			t.Fatalf("Unexpected error when getting mkey from string %s: %s", mds[i].Id, err)
+		if idGen != nil {
+			md.Tags = append(md.Tags, idGen(i))
 		}
-		idx.AddOrUpdate(mkey, &mds[i], 1)
+
+		mkey, err := schema.MKeyFromString(md.Id)
+		if err != nil {
+			t.Fatalf("Unexpected error when getting mkey from string %s: %s", md.Id, err)
+		}
+		idx.AddOrUpdate(mkey, &md, 1)
 		mkeys[i] = mkey
 	}
 
@@ -77,7 +81,7 @@ func TestSimpleMetaTagQueryWithSingleEqualExpression(t *testing.T) {
 		t.Fatalf("Error when parsing meta tag record: %s", err)
 	}
 
-	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10)
+	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10, nil)
 
 	expressions, err := tagquery.ParseExpressions([]string{"metatag1=value1"})
 	if err != nil {
@@ -96,7 +100,7 @@ func TestSimpleMetaTagQueryWithMatchAndUnequalExpression(t *testing.T) {
 		t.Fatalf("Error when parsing meta tag record: %s", err)
 	}
 
-	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10)
+	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10, nil)
 
 	expressions, err := tagquery.ParseExpressions([]string{"metatag1=value1"})
 	if err != nil {
@@ -115,7 +119,7 @@ func TestSimpleMetaTagQueryWithMatchAndNotMatchExpression(t *testing.T) {
 		t.Fatalf("Error when parsing meta tag record: %s", err)
 	}
 
-	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10)
+	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10, nil)
 
 	expressions, err := tagquery.ParseExpressions([]string{"metatag1=value1"})
 	if err != nil {
@@ -137,7 +141,7 @@ func TestSimpleMetaTagQueryWithManyTypesOfExpression(t *testing.T) {
 		t.Fatalf("Error when parsing meta tag record: %s", err)
 	}
 
-	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10)
+	idx, mkeys := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10, nil)
 
 	expressions, err := tagquery.ParseExpressions([]string{"metatag1=value1"})
 	if err != nil {
@@ -164,7 +168,7 @@ func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
 		t.Fatalf("Error when parsing meta tag record: %s", err)
 	}
 
-	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10)
+	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord}, 10, nil)
 
 	expressions, err := tagquery.ParseExpressions([]string{"tag1=~.+"})
 	if err != nil {
@@ -226,7 +230,7 @@ func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
 		t.Fatalf("Error when parsing meta tag record: %s", err)
 	}
 
-	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord1, metaTagRecord2}, 10)
+	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{metaTagRecord1, metaTagRecord2}, 10, nil)
 
 	expressions, err := tagquery.ParseExpressions([]string{"tag1=~.+"})
 	if err != nil {
@@ -350,7 +354,7 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 		cursor++
 	}
 
-	memoryIdx, keys := getTestIndexWithMetaTags(b, allMetaTagRecords, 1000)
+	memoryIdx, keys := getTestIndexWithMetaTags(b, allMetaTagRecords, 1000, nil)
 
 	defs := make([]idx.Archive, len(keys))
 	i := 0
@@ -391,6 +395,94 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 
 		for k := range resToCompare {
 			delete(resToCompare, k)
+		}
+	}
+}
+
+func BenchmarkFindByMetaTagIndexSize100kMetaRecordCount200(b *testing.B) {
+	benchmarkFindByMetaTag(b, 100000, 200)
+}
+
+func BenchmarkFindByMetaTagIndexSize1mMetaRecordCount1000(b *testing.B) {
+	benchmarkFindByMetaTag(b, 1000000, 1000)
+}
+
+func BenchmarkFindByMetaTagIndexSize1mMetaRecordCount10000(b *testing.B) {
+	benchmarkFindByMetaTag(b, 1000000, 10000)
+}
+
+// getMetaRecordsForMetaTagQueryBenchmark generates the given number of meta records it assumes that
+// the index they get applied to has at least <count> host=hostname? tags
+func getMetaRecordsForMetaTagQueryBenchmark(b *testing.B, count int, metaTags [][]string, tagGen func(uint32) string) []tagquery.MetaTagRecord {
+	metaRecords := make([]tagquery.MetaTagRecord, count)
+	cursor := 0
+	var err error
+	for i := range metaRecords {
+		metaRecords[i], err = tagquery.ParseMetaTagRecord(
+			metaTags[cursor%len(metaTags)],
+			[]string{tagGen(uint32(i))},
+		)
+		cursor++
+		if err != nil {
+			b.Fatalf("Failed to parse meta record: %s", err.Error())
+		}
+	}
+
+	return metaRecords
+}
+
+func getQueriesForMetaTagQueryBenchmark(b *testing.B, count int, queryGen func(uint32) []string) []tagquery.Query {
+	queries := make([]tagquery.Query, count)
+	var err error
+	for i := 0; i < 2; i++ {
+		queries[i], err = tagquery.NewQueryFromStrings(queryGen(uint32(i)), 0)
+		if err != nil {
+			b.Fatalf("Error when parsing query: %s", err.Error())
+		}
+	}
+	return queries
+}
+
+func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount int) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
+	// reset enrichmentCacheSize back to original value when we're done
+	_enrichmentCacheSize := enrichmentCacheSize
+	defer func() { enrichmentCacheSize = _enrichmentCacheSize }()
+	enrichmentCacheSize = indexSize
+
+	metaTagSets := [][]string{
+		{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"},
+		{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"},
+	}
+	tagGen := func(id uint32) string {
+		return fmt.Sprintf("host=hostname%d", id%uint32(metaRecordCount))
+	}
+	metaRecords := getMetaRecordsForMetaTagQueryBenchmark(b, metaRecordCount, metaTagSets, tagGen)
+	index, _ := getTestIndexWithMetaTags(b, metaRecords, uint32(indexSize), tagGen)
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("dc=datacenter%d", (id%uint32(len(metaRecords)))+1)}
+	}
+	queries := getQueriesForMetaTagQueryBenchmark(b, 2, queryGen)
+
+	var res []idx.Node
+	expectedResCount := indexSize / len(metaTagSets)
+	expectedTagsPerDef := 3
+	expectedMetaTagsPerDef := 3
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		res = index.FindByTag(1, queries[i%len(queries)])
+		if len(res) != expectedResCount {
+			b.Fatalf("Unexpected result. Expected %d items, got %d", expectedResCount, len(res))
+		}
+		if len(res[0].Defs[0].Tags) != expectedTagsPerDef {
+			b.Fatalf("Unexpected number of tags in result. Expected %d, got %d", expectedTagsPerDef, len(res[0].Defs[0].Tags))
+		}
+		if len(res[0].MetaTags) != expectedMetaTagsPerDef {
+			b.Fatalf("Unexpected number of meta tags in result. Expected %d, got %d", expectedMetaTagsPerDef, len(res[0].MetaTags))
 		}
 	}
 }
