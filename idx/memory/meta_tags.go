@@ -6,7 +6,6 @@ import (
 	"unsafe"
 
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/util"
 
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -175,16 +174,13 @@ func (e *enricher) reportStats() {
 	enrichmentCacheEntries.Set(e.cache.Len())
 }
 
+// enrich takes a metric id, the name string and its tags as strings and evaluates the
+// expressions of all meta records to determine which meta tags need to be associated
+// with that given metric.
+// it is heavily cached, the cache key is org agnostic because the enricher needs to
+// be instantiated once per org.
 func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
-	h := util.NewFnv64aStringWriter()
-	h.WriteString(name)
-	for i := range tags {
-		h.WriteString(";")
-		h.WriteString(tags[i])
-	}
-	sum := h.Sum64()
-
-	cachedRes, ok := e.cache.Get(sum)
+	cachedRes, ok := e.cache.Get(id.Key)
 	if ok {
 		enrichmentCacheHits.Inc()
 		return cachedRes.(tagquery.Tags)
@@ -192,15 +188,13 @@ func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.T
 	enrichmentCacheMisses.Inc()
 
 	var res tagquery.Tags
-	var matches []int
 	for i := range e.filters {
 		if e.filters[i](id, name, tags) == tagquery.Pass {
 			res = append(res, e.tags[i]...)
-			matches = append(matches, i)
 		}
 	}
 
-	e.cache.Add(sum, res)
+	e.cache.Add(id.Key, res)
 
 	return res
 }
