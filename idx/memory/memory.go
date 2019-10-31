@@ -1197,10 +1197,14 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return nil
 	}
 
+	// check whether the tag of which we're looking up values is a metric tag
+	// if so we can skip the meta tag enrichment
+	_, isMetricTag := tags[tag]
+
 	resMap := make(map[string]struct{})
 
 	var enricher *enricher
-	if MetaTagSupport {
+	if MetaTagSupport && !isMetricTag {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
 			enricher = mtr.getEnricher(tags.idHasTag)
