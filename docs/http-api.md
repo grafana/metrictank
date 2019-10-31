@@ -324,6 +324,7 @@ into the Cassandra index, from where they can be loaded by other Metrictanks.
     http://localhost:6063/metaTags \
     | jq
 []
+```
 
 ## Batch updating all Meta Tag Records
 
