@@ -1077,11 +1077,11 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 
 	resMap := make(map[string]struct{})
 
-	var enricher *enricher
+	var enricher *enricherWithUniqueMetaRecords
 	if MetaTagSupport {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
-			enricher = mtr.getEnricher(tags.idHasTag)
+			enricher = mtr.getEnricher(tags.idHasTag).uniqueMetaRecords()
 		}
 	}
 
@@ -1203,11 +1203,11 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 	resMap := make(map[string]struct{})
 
-	var enricher *enricher
+	var enricher *enricherWithUniqueMetaRecords
 	if MetaTagSupport && !isMetricTag {
 		mtr, ok := m.metaTagRecords[orgId]
 		if ok {
-			enricher = mtr.getEnricher(tags.idHasTag)
+			enricher = mtr.getEnricher(tags.idHasTag).uniqueMetaRecords()
 		}
 	}
 
