@@ -1,43 +1,90 @@
 package memory
 
 import (
-	"sort"
-	"sync/atomic"
-	"unsafe"
-
-	"github.com/grafana/metrictank/stats"
+	"sync"
 
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
-	lru "github.com/hashicorp/golang-lru"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	// the collision avoidance window defines how many times we try to find a higher
 	// slot that's free if two record hashes collide
 	collisionAvoidanceWindow = uint32(1024)
-
-	// metric idx.memory.meta-tags.enrichment-cache.ops.hit is a counter of enrichment cache hits
-	enrichmentCacheHits = stats.NewCounter32("idx.memory.meta-tags.enrichment-cache.ops.hit")
-	// metric idx.memory.meta-tags.enrichment-cache.ops.miss is a counter of enrichment cache misses
-	enrichmentCacheMisses = stats.NewCounter32("idx.memory.meta-tags.enrichment-cache.ops.miss")
-	// metric idx.memory.meta-tags.enrichment-cache.entries is a the number of entries in the enrichment cache
-	enrichmentCacheEntries = stats.NewGauge32("idx.memory.meta-tags.enrichment-cache.entries")
 )
 
 type recordId uint32
 
 // list of meta records keyed by a unique identifier used as ID
 type metaTagRecords struct {
-	records  map[recordId]tagquery.MetaTagRecord
-	enricher unsafe.Pointer
+	metaRecordLock sync.Mutex // used to ensure that we never run multiple swap operations concurrently
+	records        map[recordId]tagquery.MetaTagRecord
 }
 
 func newMetaTagRecords() *metaTagRecords {
 	return &metaTagRecords{
 		records: make(map[recordId]tagquery.MetaTagRecord),
 	}
+}
+
+func (m *metaTagRecords) length() int {
+	return len(m.records)
+}
+
+func (m *metaTagRecords) prune(toPrune map[recordId]struct{}, pruned map[recordId]tagquery.MetaTagRecord) {
+	for recordId := range toPrune {
+		pruned[recordId] = m.records[recordId]
+		delete(m.records, recordId)
+	}
+}
+
+func (m *metaTagRecords) getPrunable(toKeep map[recordId]struct{}) map[recordId]struct{} {
+	toPrune := make(map[recordId]struct{}, len(m.records)-len(toKeep))
+	for recordId := range m.records {
+		if _, ok := toKeep[recordId]; !ok {
+			toPrune[recordId] = struct{}{}
+		}
+	}
+	return toPrune
+}
+
+func (m *metaTagRecords) getMetaTagsByRecordIds(recordIds map[recordId]struct{}) tagquery.Tags {
+	res := make(tagquery.Tags, 0, len(recordIds))
+	for recordId := range recordIds {
+		record, ok := m.records[recordId]
+		if ok {
+			res = append(res, record.MetaTags...)
+		}
+	}
+	return res
+}
+
+// recordExists takes a meta record and checks if it already exists
+// it returns 3 values:
+// 1) recordId of the given record, if it is present
+// 2) true if there is a record with the same query expressions (identity)
+// 3) true if 2) is true and that record also has the same meta tags
+func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, bool, bool) {
+	id := recordId(record.HashExpressions())
+	var checkingId recordId
+
+	// loop over existing records, starting from id, trying to find one that has
+	// the exact same queries as the one we're upserting
+	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
+		checkingId = id + recordId(i)
+		if existingRecord, ok := m.records[checkingId]; ok {
+			if record.Expressions.Equal(existingRecord.Expressions) {
+				if record.MetaTags.Equal(existingRecord.MetaTags) {
+					return checkingId, true, true
+				}
+				return checkingId, true, false
+			}
+		}
+	}
+
+	return 0, false, false
 }
 
 // upsert inserts or updates a meta tag record according to the given specifications
@@ -51,9 +98,6 @@ func newMetaTagRecords() *metaTagRecords {
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
 func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
-	// after altering meta records we need to reinstantiate the enricher the next time we want to use it
-	defer atomic.StorePointer(&m.enricher, nil)
-
 	record.Expressions.Sort()
 
 	id := recordId(record.HashExpressions())
@@ -65,7 +109,7 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
 		if existingRecord, ok := m.records[id+recordId(i)]; ok {
-			if record.EqualExpressions(&existingRecord) {
+			if record.Expressions.Equal(existingRecord.Expressions) {
 				oldRecord = &existingRecord
 				oldId = id + recordId(i)
 				delete(m.records, oldId)
@@ -95,152 +139,241 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
 }
 
-func (m *metaTagRecords) getEnricher(lookup tagquery.IdTagLookup) *enricher {
-	res := (*enricher)(atomic.LoadPointer(&m.enricher))
-	if res != nil {
-		return res
+// metaTagEnricher is responsible for "enriching" metrics resulting from a query by
+// looking up their associations with the defined meta records.
+// there are 4 operations to modify it's state, they all get executed asynchronously
+// via a queue which gets consumed by a worker thread. that's why the enricher also has
+// its own locking which is independent from the main index lock.
+// following are the 4 state changing operations:
+// 1) adding a meta record
+// 2) deleting a meta record
+// 3) adding a metric key
+// 4) deleting a metric key
+// all used metric keys are org-agnostic because we instantiate one enricher per org
+type metaTagEnricher struct {
+	// the enricher lock
+	sync.RWMutex
+	// wait group to wait for the worker on shutdown
+	wg sync.WaitGroup
+	// filters to check whether a metric definition matches the requirements of a meta record,
+	// keyed by the according meta record id
+	filtersByRecord map[recordId]tagquery.MetricDefinitionFilter
+	// mapping from metric key to list of meta record ids, used to do the enrichment
+	recordsByMetric map[schema.Key]map[recordId]struct{}
+	// lookup table from event types to event handlers used by the event queue consumer routine
+	eventHandlers map[enricherEventType]func(interface{})
+	// the event queue, all state changing operations get pushed through this queue
+	eventQueue chan enricherEvent
+}
+
+type enricherEventType uint8
+
+const (
+	addMetric enricherEventType = iota
+	delMetric
+	addMetaRecord
+	delMetaRecord
+)
+
+type enricherEvent struct {
+	// eventType gets looked up from the eventHandlers map to obtain the handler for the payload
+	eventType enricherEventType
+	payload   interface{}
+}
+
+func newEnricher() *metaTagEnricher {
+	res := &metaTagEnricher{
+		filtersByRecord: make(map[recordId]tagquery.MetricDefinitionFilter),
+		recordsByMetric: make(map[schema.Key]map[recordId]struct{}),
 	}
 
-	// if no enricher is present yet, then we instantiate one and store its reference
-	// to reuse it later.
-	// there is an unlikely race condition where we receive multiple calls to FindByTag
-	// from multiple requests at the same time, which would result in multiple enrichers
-	// getting instantiated. in such a case the last one would overwrite the previous
-	// ones and there shouldn't be any issues. this case is very unlikely, so it doesn't
-	// seem to be worth it to add a lock for that.
-
-	// if provided size is valid, it's not possible for lru.New to return an error
-	cache, _ := lru.New(enrichmentCacheSize)
-	res = &enricher{
-		filters: make([]tagquery.MetricDefinitionFilter, len(m.records)),
-		tags:    make([]tagquery.Tags, len(m.records)),
-		cache:   cache,
+	// eventHandlers gets instantiated as a struct member so it can be modified for testability
+	res.eventHandlers = map[enricherEventType]func(interface{}){
+		addMetric:     res._addMetric,
+		delMetric:     res._delMetric,
+		addMetaRecord: res._addMetaRecord,
+		delMetaRecord: res._delMetaRecord,
 	}
 
-	i := 0
-	for _, record := range m.records {
-		res.filters[i] = record.GetMetricDefinitionFilter(lookup)
-		res.tags[i] = record.MetaTags
-		i++
-	}
-
-	// to atomically store a pointer, unfortunately we need to use unsafe.Pointer
-	atomic.StorePointer(&m.enricher, (unsafe.Pointer)(res))
-
+	res.start()
 	return res
 }
 
-func (m *metaTagRecords) hashRecords() uint32 {
-	i := 0
-	recordIds := make([]recordId, len(m.records))
-	for recordId := range m.records {
-		recordIds[i] = recordId
-		i++
+// start creates the go routine which consumes the event queue and processes received events
+func (e *metaTagEnricher) start() {
+	e.eventQueue = make(chan enricherEvent, 1000)
+
+	e.wg.Add(1)
+	go func() {
+		defer e.wg.Done()
+
+		var handler func(interface{})
+		var ok bool
+
+		for event := range e.eventQueue {
+			handler, ok = e.eventHandlers[event.eventType]
+			if !ok {
+				log.Errorf("metaTagEnricher received unknown event type: %d", event.eventType)
+				continue
+			}
+
+			// handlers are responsible for type casting the payload
+			handler(event.payload)
+		}
+	}()
+}
+
+func (e *metaTagEnricher) stop() {
+	close(e.eventQueue)
+	e.wg.Wait()
+}
+
+func (e *metaTagEnricher) addMetric(md *schema.MetricDefinition, indexLock *sync.RWMutex) {
+	e.eventQueue <- enricherEvent{
+		eventType: addMetric,
+		payload: struct {
+			md   *schema.MetricDefinition
+			lock *sync.RWMutex
+		}{md: md, lock: indexLock},
+	}
+}
+
+// _addMetric is used by the event queue consumer to add metrics to the enricher.
+// this operation requires the metric definition to get passed through each of the
+// filter functions generated from the defined meta records to determine which meta
+// records shall get assigned to added metric.
+// this operation can be relatively expensive compared to all other operations of
+// the enricher, so it is important that it only gets called asynchronously via the
+// event queue.
+func (e *metaTagEnricher) _addMetric(payload interface{}) {
+	data := payload.(struct {
+		md   *schema.MetricDefinition
+		lock *sync.RWMutex
+	})
+	recordIds := make(map[recordId]struct{})
+
+	// enricher read lock is not necessary here because the event queue processor is
+	// single threaded and there are no state-modifying operations which do not go
+	// through the event queue.
+	// however, the main index read lock is necessary because the filter functions
+	// may do lookups on the index.
+	if data.lock != nil {
+		data.lock.RLock()
+	}
+	for record, filter := range e.filtersByRecord {
+		if filter(data.md.Id, data.md.Name, data.md.Tags) == tagquery.Pass {
+			recordIds[record] = struct{}{}
+		}
+	}
+	if data.lock != nil {
+		data.lock.RUnlock()
 	}
 
-	sort.Slice(recordIds, func(i, j int) bool {
-		return recordIds[i] < recordIds[j]
+	if len(recordIds) > 0 {
+		e.Lock()
+		e.recordsByMetric[data.md.Id.Key] = recordIds
+		e.Unlock()
+	}
+}
+
+func (e *metaTagEnricher) delMetric(md *schema.MetricDefinition) {
+	e.eventQueue <- enricherEvent{
+		eventType: delMetric,
+		payload:   md,
+	}
+}
+
+func (e *metaTagEnricher) _delMetric(payload interface{}) {
+	md := payload.(*schema.MetricDefinition)
+	e.Lock()
+	delete(e.recordsByMetric, md.Id.Key)
+	e.Unlock()
+}
+
+func (e *metaTagEnricher) addMetaRecord(id recordId, filter tagquery.MetricDefinitionFilter, keys []schema.Key) {
+	e.eventQueue <- enricherEvent{
+		eventType: addMetaRecord,
+		payload: struct {
+			id     recordId
+			filter tagquery.MetricDefinitionFilter
+			keys   []schema.Key
+		}{id: id, filter: filter, keys: keys},
+	}
+}
+
+func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
+	data := payload.(struct {
+		id     recordId
+		filter tagquery.MetricDefinitionFilter
+		keys   []schema.Key
 	})
 
-	h := tagquery.QueryHash()
-	var record tagquery.MetaTagRecord
-	var recordHash uint64
-	for _, recordId := range recordIds {
-		record = m.records[recordId]
-		recordHash = record.HashRecord()
+	e.Lock()
+	e.filtersByRecord[data.id] = data.filter
+	e.Unlock()
 
-		h.Write([]byte{
-			byte(recordHash),
-			byte(recordHash >> 8),
-			byte(recordHash >> 16),
-			byte(recordHash >> 24),
-			byte(recordHash >> 32),
-			byte(recordHash >> 40),
-			byte(recordHash >> 48),
-			byte(recordHash >> 56),
-		})
-	}
-
-	return h.Sum32()
-}
-
-type enricher struct {
-	filters []tagquery.MetricDefinitionFilter
-	tags    []tagquery.Tags
-	cache   *lru.Cache
-}
-
-func (e *enricher) reportStats() {
-	enrichmentCacheEntries.Set(e.cache.Len())
-}
-
-// enrich takes a metric id, the name string and its tags as strings and evaluates the
-// expressions of all meta records to determine which meta tags need to be associated
-// with that given metric.
-// it is heavily cached, the cache key is org agnostic because the enricher needs to
-// be instantiated once per org.
-func (e *enricher) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
-	cachedRes, ok := e.cache.Get(id.Key)
-	if ok {
-		enrichmentCacheHits.Inc()
-		return cachedRes.(tagquery.Tags)
-	}
-	enrichmentCacheMisses.Inc()
-
-	var res tagquery.Tags
-	for i := range e.filters {
-		if e.filters[i](id, name, tags) == tagquery.Pass {
-			res = append(res, e.tags[i]...)
+	for _, key := range data.keys {
+		// we acquire one write lock per iteration, instead of one for the whole loop,
+		// because the performance of addMetaRecord operations is less important than
+		// the enrich() calls which are used by the query processing
+		e.Lock()
+		if _, ok := e.recordsByMetric[key]; ok {
+			e.recordsByMetric[key][data.id] = struct{}{}
+			e.Unlock()
+			continue
 		}
-	}
-
-	e.cache.Add(id.Key, res)
-
-	return res
-}
-
-func (e *enricher) uniqueMetaRecords() *enricherWithUniqueMetaRecords {
-	var res enricherWithUniqueMetaRecords
-	res.enricher = *e
-	res.initialize()
-
-	return &res
-}
-
-// enricherWithUniqueMetaRecords has the same purpose as the normal enricher, but it is
-// different because it uses each meta record only once to enrich metrics. this can be
-// used as a performance optimization in cases where we only want to retrieve all unique
-// meta tags matching a set of ids, but we don't necessarily need to associate them with
-// every metric that matches a meta tag (f.e. autocomplete)
-type enricherWithUniqueMetaRecords struct {
-	enricher
-	metaRecordsToUse map[int]struct{}
-}
-
-func (e *enricherWithUniqueMetaRecords) initialize() {
-	e.metaRecordsToUse = make(map[int]struct{}, len(e.filters))
-	for i := range e.filters {
-		e.metaRecordsToUse[i] = struct{}{}
+		e.recordsByMetric[key] = map[recordId]struct{}{data.id: {}}
+		e.Unlock()
 	}
 }
 
-func (e *enricherWithUniqueMetaRecords) enrich(id schema.MKey, name string, tags []string) tagquery.Tags {
-	cachedRes, ok := e.enricher.cache.Get(id.Key)
-	if ok {
-		enrichmentCacheHits.Inc()
-		return cachedRes.(tagquery.Tags)
+func (e *metaTagEnricher) delMetaRecord(id recordId, keys []schema.Key) {
+	e.eventQueue <- enricherEvent{
+		eventType: delMetaRecord,
+		payload: struct {
+			id   recordId
+			keys []schema.Key
+		}{id: id, keys: keys},
 	}
-	enrichmentCacheMisses.Inc()
+}
 
-	var res tagquery.Tags
-	for i := range e.metaRecordsToUse {
-		if e.enricher.filters[i](id, name, tags) == tagquery.Pass {
-			res = append(res, e.enricher.tags[i]...)
-			delete(e.metaRecordsToUse, i)
+func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
+	data := payload.(struct {
+		id   recordId
+		keys []schema.Key
+	})
+
+	// before deleting the meta record from the e.filtersByRecord map we
+	// delete all references to it from the recordsByMetric map
+	for _, key := range data.keys {
+		e.Lock()
+		delete(e.recordsByMetric[key], data.id)
+		if len(e.recordsByMetric[key]) == 0 {
+			delete(e.recordsByMetric, key)
 		}
+		e.Unlock()
 	}
 
-	return res
+	e.Lock()
+	delete(e.filtersByRecord, data.id)
+	e.Unlock()
+}
+
+// enrich resolves a metric key into the associated set of record ids,
+// it is the most performance critical method of the enricher because
+// it is used inside the query processing
+func (e *metaTagEnricher) enrich(key schema.Key) map[recordId]struct{} {
+	e.RLock()
+	defer e.RUnlock()
+	return e.recordsByMetric[key]
+}
+
+// countMetricWithMetaTags returns the total number of known metrics which
+// have one or more meta tags associated
+func (e *metaTagEnricher) countMetricsWithMetaTags() int {
+	e.RLock()
+	defer e.RUnlock()
+	return len(e.recordsByMetric)
 }
 
 // index structure keyed by tag -> value -> list of meta record IDs
@@ -248,17 +381,19 @@ type metaTagValue map[string][]recordId
 type metaTagIndex map[string]metaTagValue
 
 func (m metaTagIndex) deleteRecord(keyValue tagquery.Tag, id recordId) {
-	if values, ok := m[keyValue.Key]; ok {
-		if ids, ok := values[keyValue.Value]; ok {
-			for i := 0; i < len(ids); i++ {
-				if ids[i] == id {
-					// no need to keep the order
-					ids[i] = ids[len(ids)-1]
-					values[keyValue.Value] = ids[:len(ids)-1]
-
-					// no id should ever be present more than once
-					return
-				}
+	if ids, ok := m[keyValue.Key][keyValue.Value]; ok {
+		for i := 0; i < len(ids); i++ {
+			if ids[i] == id {
+				// no need to keep the order
+				ids[i] = ids[len(ids)-1]
+				m[keyValue.Key][keyValue.Value] = ids[:len(ids)-1]
+				break
+			}
+		}
+		if len(m[keyValue.Key][keyValue.Value]) == 0 {
+			delete(m[keyValue.Key], keyValue.Value)
+			if len(m[keyValue.Key]) == 0 {
+				delete(m, keyValue.Key)
 			}
 		}
 	}
