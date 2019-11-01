@@ -18,6 +18,7 @@ type idSelector struct {
 	resCh    chan schema.MKey
 	workerWg sync.WaitGroup
 	stopCh   chan struct{}
+	concGate chan struct{}
 }
 
 // newIdSelector initializes an id selector based on the given arguments.
@@ -30,6 +31,7 @@ func newIdSelector(expr tagquery.Expression, ctx *TagQueryContext) *idSelector {
 		rawResCh: make(chan schema.MKey),
 		resCh:    make(chan schema.MKey),
 		stopCh:   make(chan struct{}),
+		concGate: make(chan struct{}, TagQueryWorkers), // gates concurrency
 	}
 }
 
@@ -53,7 +55,7 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 	// i.rawResCh and deduplicates its ids before inserting them into i.resCh.
 	// if meta tag support is not enabled, then this is not necessary and we don't
 	// need to start the deduplication routine.
-	if MetaTagSupport {
+	if MetaTagSupport && !i.ctx.subQuery {
 		go i.deduplicateRawResults()
 	}
 
@@ -70,7 +72,7 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 
 	// if meta tag support is enabled we return i.resCh because that channel has
 	// been deduplicated by i.deduplicateRawResults()
-	if MetaTagSupport {
+	if MetaTagSupport && !i.ctx.subQuery {
 		return i.resCh, i.stopCh
 	}
 
@@ -293,6 +295,7 @@ func (i *idSelector) evaluateMetaRecord(id recordId) {
 		return
 	}
 
+	i.concGate <- struct{}{}
 	i.workerWg.Add(1)
 	go i.runSubQuery(query)
 }
@@ -322,6 +325,6 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 // directly pushed into it
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
-
 	query.RunBlocking(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
+	<-i.concGate
 }
