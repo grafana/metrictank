@@ -50,6 +50,18 @@ type expressionCost struct {
 	expressionIdx int
 }
 
+// newerThanFrom takes a metric key, it returns true if the lastUpdate
+// property of the metric associated with that key is at least equal
+// to this queries' from timestamp.
+// if the key doesn't exist it returns false
+func (q *TagQueryContext) newerThanFrom(id schema.MKey) bool {
+	md, ok := q.byId[id]
+	if !ok {
+		return false
+	}
+	return atomic.LoadInt64(&md.LastUpdate) >= q.query.From
+}
+
 func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 	costs := make([]expressionCost, len(q.query.Expressions))
 
@@ -109,7 +121,9 @@ func (q *TagQueryContext) prepareExpressions() {
 	}
 
 	q.selector = newIdSelector(q.query.Expressions[q.startWith], q)
-	q.filter = newIdFilter(filterExpressions, q)
+	if len(filterExpressions) > 0 {
+		q.filter = newIdFilter(filterExpressions, q)
+	}
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -181,15 +195,32 @@ func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		return
 	}
 
-	idCh, _ := q.selector.getIds()
+	// if this query needs to filter down the initial result set, which is
+	// only the case if the number of expressions is >1, then we start filter
+	// workers to apply the filter functions
+	if q.filter != nil {
+		idCh := make(chan schema.MKey)
+		q.wg.Add(1)
+		go func() {
+			defer q.wg.Done()
+			q.selector.getIds(idCh, nil)
+			close(idCh)
+		}()
 
-	// start the tag query workers. they'll consume the ids on the idCh and
-	// evaluate for each of them whether it satisfies all the conditions
-	// defined in the query expressions. those that satisfy all conditions
-	// will be pushed into the resCh
-	q.wg.Add(TagQueryWorkers)
-	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterIdsFromChan(idCh, resCh)
+		// start the tag query workers. they'll consume the ids on the idCh and
+		// evaluate for each of them whether it satisfies all the conditions
+		// defined in the query expressions. those that satisfy all conditions
+		// will be pushed into the resCh
+		q.wg.Add(TagQueryWorkers)
+		for i := 0; i < TagQueryWorkers; i++ {
+			go q.filterIdsFromChan(idCh, resCh)
+		}
+	} else {
+		q.wg.Add(1)
+		go func() {
+			defer q.wg.Done()
+			q.selector.getIds(resCh, nil)
+		}()
 	}
 }
 
@@ -338,7 +369,14 @@ func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.A
 	q.wg.Add(1)
 	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
 
-	idCh, stopCh := q.selector.getIds()
+	idCh := make(chan schema.MKey)
+	stopCh := make(chan struct{})
+	q.wg.Add(1)
+	go func() {
+		defer q.wg.Done()
+		q.selector.getIds(idCh, stopCh)
+		close(idCh)
+	}()
 	tagCh := make(chan string)
 
 	// we know there can only be 1 tag filter, so if we detect that the given

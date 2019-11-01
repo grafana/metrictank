@@ -15,7 +15,6 @@ type idSelector struct {
 	ctx      *TagQueryContext
 	expr     tagquery.Expression
 	rawResCh chan schema.MKey
-	resCh    chan schema.MKey
 	workerWg sync.WaitGroup
 	stopCh   chan struct{}
 	concGate chan struct{}
@@ -28,8 +27,6 @@ func newIdSelector(expr tagquery.Expression, ctx *TagQueryContext) *idSelector {
 	return &idSelector{
 		ctx:      ctx,
 		expr:     expr,
-		rawResCh: make(chan schema.MKey),
-		resCh:    make(chan schema.MKey),
 		stopCh:   make(chan struct{}),
 		concGate: make(chan struct{}, TagQueryWorkers), // gates concurrency
 	}
@@ -41,7 +38,11 @@ func newIdSelector(expr tagquery.Expression, ctx *TagQueryContext) *idSelector {
 // a stop channel, which when closed, will cause the lookup jobs to be aborted
 // this is the only method of idSelector which shall ever be called by users,
 // all other methods of this type are only helpers of getIds
-func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
+func (i *idSelector) getIds(resCh chan schema.MKey, stopCh chan struct{}) {
+	if stopCh != nil {
+		i.stopCh = stopCh
+	}
+
 	// this wait group is used to wait for all id producing go routines to complete
 	// their respective jobs, once they're done we can close the id chan
 	// we initially set it to 2 because there will be at least 1 routine to look up
@@ -49,20 +50,19 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 	// from the meta tag index this waitgroup may temporarily get further increased
 	i.workerWg.Add(2)
 
-	// if meta tag support is enabled, then this id selection process might create
-	// sub queries to lookup ids from the meta tag index. in order to prevent
-	// duplicate ids in the result channel, we start a separate thread that reads
-	// i.rawResCh and deduplicates its ids before inserting them into i.resCh.
-	// if meta tag support is not enabled, then this is not necessary and we don't
-	// need to start the deduplication routine.
-	if MetaTagSupport && !i.ctx.subQuery {
-		go i.deduplicateRawResults()
-	}
+	// if meta tag support is enabled and we create subqueries out of looked up meta
+	// records, then its possible that we will end up with duplicate results. to
+	// prevent this we spawn a separate worker process which deduplicates them
+	deduplicateResults := MetaTagSupport && !i.ctx.subQuery
 
-	go func() {
-		i.workerWg.Wait()
-		close(i.rawResCh)
-	}()
+	var dedupWg sync.WaitGroup
+	if deduplicateResults {
+		i.rawResCh = make(chan schema.MKey)
+		dedupWg.Add(1)
+		go i.deduplicateRawResults(&dedupWg, resCh)
+	} else {
+		i.rawResCh = resCh
+	}
 
 	if i.expr.OperatesOnTag() {
 		i.byTag()
@@ -70,34 +70,32 @@ func (i *idSelector) getIds() (chan schema.MKey, chan struct{}) {
 		i.byTagValue()
 	}
 
-	// if meta tag support is enabled we return i.resCh because that channel has
-	// been deduplicated by i.deduplicateRawResults()
-	if MetaTagSupport && !i.ctx.subQuery {
-		return i.resCh, i.stopCh
-	}
-
-	// if meta tag support has not been enabled, then we can directly return the
-	// i.rawResCh because without meta tag supports its not possible that duplicate
-	// ids will end up in the raw result channel.
-	return i.rawResCh, i.stopCh
+	i.workerWg.Wait()
+	dedupWg.Wait()
 }
 
 // deduplicateRawResults reads the channel i.rawResCh and deduplicates all the ids
 // in it, then it inserts the unique ids into the channel i.resCh. This is only
 // necessary for queries involving meta tag looksup, without meta tag lookups its
 // not possible that duplicate ids will end up in i.rawResCh
-func (i *idSelector) deduplicateRawResults() {
+func (i *idSelector) deduplicateRawResults(dedupWg *sync.WaitGroup, resCh chan schema.MKey) {
+	// once all workers are finished we want to close the raw result chan
+	// to make this routine exit
+	go func() {
+		i.workerWg.Wait()
+		close(i.rawResCh)
+	}()
+
+	defer dedupWg.Done()
 	seen := make(map[schema.MKey]struct{})
 	for id := range i.rawResCh {
 		if _, ok := seen[id]; ok {
 			continue
 		}
 
-		i.resCh <- id
+		resCh <- id
 		seen[id] = struct{}{}
 	}
-
-	close(i.resCh)
 }
 
 // byTagValue looks up all ids matching the expression i.expr and pushes them into
@@ -128,6 +126,10 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 	// this is faster than having to call expr.Matches on each value
 	if i.expr.MatchesExactly() {
 		for id := range i.ctx.index[i.expr.GetKey()][i.expr.GetValue()] {
+			if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+				continue
+			}
+
 			select {
 			case <-i.stopCh:
 				return
@@ -147,6 +149,10 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 		}
 
 		for id := range ids {
+			if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+				continue
+			}
+
 			select {
 			case <-i.stopCh:
 				return
@@ -222,6 +228,10 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 	if i.expr.MatchesExactly() {
 		for _, ids := range i.ctx.index[i.expr.GetKey()] {
 			for id := range ids {
+				if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+					continue
+				}
+
 				select {
 				case <-i.stopCh:
 					break
@@ -240,6 +250,10 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 
 		for _, ids := range i.ctx.index[tag] {
 			for id := range ids {
+				if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+					continue
+				}
+
 				select {
 				case <-i.stopCh:
 					return
