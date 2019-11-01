@@ -1002,8 +1002,8 @@ func testAutoCompleteTagValuesWithQuery(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		autoCompleteTagValuesWithQueryAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.limit, tc.expRes)
+	for i, tc := range testCases {
+		autoCompleteTagValuesWithQueryAndCompare(t, i, tc.tag, tc.prefix, tc.expr, tc.limit, tc.expRes)
 	}
 }
 
@@ -1022,18 +1022,29 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
+	// since "direction" is a tag in the metric tag index, we don't
+	// include values of the meta tag index in the autocomplete results
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "direction", Value: "none"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
 	})
 
-	metaRecordExpression2, err := tagquery.ParseExpression("name!=")
+	metaRecordExpressions2, err := tagquery.ParseExpressions([]string{"direction=~.+"})
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expressions: %s", err)
+	}
+	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+		MetaTags:    tagquery.Tags{{Key: "has_direction", Value: "true"}, {Key: "has_direction", Value: "yes"}},
+		Expressions: metaRecordExpressions2,
+	})
+
+	metaRecordExpression3, err := tagquery.ParseExpression("name!=")
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
 	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
-		Expressions: tagquery.Expressions{metaRecordExpression2},
+		Expressions: tagquery.Expressions{metaRecordExpression3},
 	})
 
 	type testCase struct {
@@ -1056,7 +1067,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 			prefix: "",
 			expr:   []string{"host=~.+"},
 			limit:  100,
-			expRes: []string{"none", "read", "write"},
+			expRes: []string{"read", "write"},
 		}, {
 			tag:    "direction",
 			prefix: "wr",
@@ -1068,45 +1079,63 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 			prefix: "no",
 			expr:   []string{"host=~.+"},
 			limit:  100,
-			expRes: []string{"none"},
+			expRes: []string{},
 		}, {
 			tag:    "direction",
 			prefix: "",
 			expr:   []string{"host=~.+"},
-			limit:  2,
-			expRes: []string{"none", "read"},
+			limit:  1,
+			expRes: []string{"read"},
 		}, {
 			tag:    "all",
 			prefix: "",
 			expr:   []string{"__tag=name"},
 			limit:  100,
 			expRes: []string{"metrics"},
+		}, {
+			tag:    "has_direction",
+			prefix: "",
+			expr:   []string{"name=~.+"},
+			limit:  100,
+			expRes: []string{"true", "yes"},
+		}, {
+			tag:    "has_direction",
+			prefix: "tr",
+			expr:   []string{"name=~.+"},
+			limit:  100,
+			expRes: []string{"true"},
+		}, {
+			tag:    "has_direction",
+			prefix: "",
+			expr:   []string{"name=~.+"},
+			limit:  1,
+			expRes: []string{"true"},
 		},
 	}
 
-	for _, tc := range testCases {
-		autoCompleteTagValuesWithQueryAndCompare(t, tc.tag, tc.prefix, tc.expr, tc.limit, tc.expRes)
+	for i, tc := range testCases {
+		autoCompleteTagValuesWithQueryAndCompare(t, i, tc.tag, tc.prefix, tc.expr, tc.limit, tc.expRes)
 	}
 }
 
-func autoCompleteTagValuesWithQueryAndCompare(t testing.TB, tag, prefix string, expr []string, limit uint, expRes []string) {
+func autoCompleteTagValuesWithQueryAndCompare(t testing.TB, tc int, tag, prefix string, expr []string, limit uint, expRes []string) {
 	t.Helper()
 
 	query, err := tagquery.NewQueryFromStrings(expr, 0)
 	if err != nil {
-		t.Fatalf("Unexpected error when instantiating query: %s", err)
+		t.Fatalf("TC %d: Unexpected error when instantiating query: %s", tc, err)
 	}
 	res := ix.FindTagValuesWithQuery(1, tag, prefix, query, limit)
 
 	if len(res) != len(expRes) {
-		t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+		t.Fatalf("TC %d: Wrong result, Expected:\n%s\nGot:\n%s\n", tc, expRes, res)
 	}
 
 	sort.Strings(expRes)
 	sort.Strings(res)
 	for i := range res {
 		if expRes[i] != res[i] {
-			t.Fatalf("Wrong result, Expected:\n%s\nGot:\n%s\n", expRes, res)
+			t.Fatalf("TC %d: Wrong result, Expected:\n%s\nGot:\n%s\n", tc, expRes, res)
 		}
 	}
 }
