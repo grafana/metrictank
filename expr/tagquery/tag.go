@@ -81,6 +81,20 @@ func (t Tags) Sort() {
 	})
 }
 
+func (t Tags) Equal(other Tags) bool {
+	if len(t) != len(other) {
+		return false
+	}
+
+	for i := range t {
+		if t[i] != other[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
 // MarshalJSON satisfies the json.Marshaler interface
 // it is used by the api endpoint /metaTags to list the meta tag records
 func (t Tags) MarshalJSON() ([]byte, error) {

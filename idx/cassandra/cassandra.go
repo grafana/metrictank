@@ -387,19 +387,12 @@ func (c *CasIdx) rebuildIndex() {
 		}(partition)
 	}
 
-	if memory.MetaTagSupport {
-		wg.Add(1)
-		go func() {
-			gate <- struct{}{}
+	wg.Wait()
 
-			c.loadMetaRecords()
-
-			wg.Done()
-			<-gate
-		}()
+	if memory.TagSupport && memory.MetaTagSupport {
+		c.loadMetaRecords()
 	}
 
-	wg.Wait()
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 

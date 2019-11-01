@@ -59,6 +59,20 @@ func (e Expressions) Sort() {
 	})
 }
 
+func (e Expressions) Equal(other Expressions) bool {
+	if len(e) != len(other) {
+		return false
+	}
+
+	for i, expression := range e {
+		if !expression.Equals(other[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // MarshalJSON satisfies the json.Marshaler interface
 // it is used by the api endpoint /metaTags to list the meta tag records
 func (e Expressions) MarshalJSON() ([]byte, error) {

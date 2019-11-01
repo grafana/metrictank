@@ -1057,6 +1057,8 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
 	}
 
+	waitForMetaTagEnrichers(t, ix)
+
 	metaTagRecords := ix.MetaTagRecordList(1)
 	if len(metaTagRecords) != 2 {
 		t.Fatalf("Expected MetaTagRecordList to return 2 records for org 1, but it has:\n%+v\n", metaTagRecords)
@@ -1098,6 +1100,8 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
 	}
+
+	waitForMetaTagEnrichers(t, ix)
 
 	metaTagRecords = ix.MetaTagRecordList(1)
 	if len(metaTagRecords) != 2 {

@@ -1,12 +1,9 @@
 package memory
 
 import (
-	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
 )
 
@@ -315,57 +312,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 	}
 }
 
-func TestComparingMetaTagRecords(t *testing.T) {
-	reset := enableMetaTagSupport()
-	defer reset()
-
-	records := generateMetaRecords(t,
-		[][]string{{"meta1=tag1"}, {"meta2=tag2"}},
-		[][]string{{"expr1=value1"}, {"expr2=value2"}},
-	)
-
-	mtr1 := newMetaTagRecords()
-	mtr2 := newMetaTagRecords()
-
-	if mtr1.hashRecords() != mtr2.hashRecords() {
-		t.Fatalf("TC1: Expected meta tag records to be the same")
-	}
-
-	mtr1.upsert(records[0])
-
-	if mtr1.hashRecords() == mtr2.hashRecords() {
-		t.Fatalf("TC2: Expected meta tag records to be the different")
-	}
-
-	mtr2.upsert(records[0])
-
-	if mtr1.hashRecords() != mtr2.hashRecords() {
-		t.Fatalf("TC3: Expected meta tag records to be the same")
-	}
-
-	mtr1.upsert(records[1])
-
-	if mtr1.hashRecords() == mtr2.hashRecords() {
-		t.Fatalf("TC4: Expected meta tag records to be the different")
-	}
-
-	mtr2.upsert(records[1])
-
-	if mtr1.hashRecords() != mtr2.hashRecords() {
-		t.Fatalf("TC5: Expected meta tag records to be the same")
-	}
-
-	// create another instance of metaTagRecords and populate it in reverse order
-	mtr3 := newMetaTagRecords()
-	mtr3.upsert(records[1])
-	mtr3.upsert(records[0])
-
-	if mtr1.hashRecords() != mtr3.hashRecords() {
-		t.Fatalf("TC6: Expected meta tag records to be the same")
-	}
-}
-
-func getEnricherWithTestData(t *testing.T) ([]schema.MetricDefinition, *enricher) {
+/*func getEnricherWithTestData(t *testing.T) ([]schema.MetricDefinition, *enricher) {
 	mtr := newMetaTagRecords()
 
 	records := generateMetaRecords(t,
@@ -407,9 +354,9 @@ func getEnricherWithTestData(t *testing.T) ([]schema.MetricDefinition, *enricher
 	})
 
 	return testMetrics, enricher
-}
+}*/
 
-func TestEnricher(t *testing.T) {
+/*func TestEnricher(t *testing.T) {
 	testMetrics, enricher := getEnricherWithTestData(t)
 
 	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
@@ -482,22 +429,4 @@ func TestEnricherWithUniqueMetaTags(t *testing.T) {
 		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
 	}
 }
-
-func BenchmarkMetaTagRecordsHashing(b *testing.B) {
-	mtrCount := 10000
-	mtr := newMetaTagRecords()
-	for i := 0; i < mtrCount; i++ {
-		record, err := tagquery.ParseMetaTagRecord([]string{fmt.Sprintf("meta%d=tag%d", i, i)}, []string{fmt.Sprintf("expr%d=value%d", i, i)})
-		if err != nil {
-			b.Fatalf("Unexpected error when parsing meta tag record: %s", err)
-		}
-		mtr.upsert(record)
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
-		mtr.hashRecords()
-	}
-}
+*/
