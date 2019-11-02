@@ -1027,6 +1027,18 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	}
 	seriesNames := make([]string, 0, len(series))
 	for _, serie := range series {
+
+		// if there are meta tags present, we mix them into the tags that are part of the metric name
+		if len(serie.Series) > 0 && len(serie.Series[0].MetaTags) > 0 {
+			tags := strings.Split(serie.Pattern, ";")
+			metricName := tags[0]
+			tags = tags[1:]
+			tags = append(tags, serie.Series[0].MetaTags.Strings()...)
+			sort.Strings(tags)
+			seriesNames = append(seriesNames, strings.Join(append([]string{metricName}, tags...), ";"))
+			continue
+		}
+
 		seriesNames = append(seriesNames, serie.Pattern)
 	}
 	response.Write(ctx, response.NewJson(200, seriesNames, ""))
