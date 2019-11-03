@@ -450,6 +450,32 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 	}
 }
 
+func (m *UnpartitionedMemoryIdx) getMetaTagDataStructures(orgId uint32, create bool) (*metaTagRecords, metaTagIndex) {
+	return m.getMetaTagRecords(orgId, create), m.getMetaTagIndex(orgId, create)
+}
+
+func (m *UnpartitionedMemoryIdx) getMetaTagRecords(orgId uint32, create bool) *metaTagRecords {
+	if mtr, ok := m.metaTagRecords[orgId]; ok {
+		return mtr
+	} else if create {
+		mtr = newMetaTagRecords()
+		m.metaTagRecords[orgId] = mtr
+		return mtr
+	}
+	return nil
+}
+
+func (m *UnpartitionedMemoryIdx) getMetaTagIndex(orgId uint32, create bool) metaTagIndex {
+	if mti, ok := m.metaTagIndex[orgId]; ok {
+		return mti
+	} else if create {
+		mti = make(metaTagIndex)
+		m.metaTagIndex[orgId] = mti
+		return mti
+	}
+	return nil
+}
+
 // MetaTagRecordUpsert inserts or updates a meta record, depending on whether
 // it already exists or is new. The identity of a record is determined by its
 // queries, if the set of queries in the given record already exists in another
@@ -463,7 +489,6 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 
 	var mtr *metaTagRecords
 	var mti metaTagIndex
-	var ok bool
 
 	// expressions need to be sorted because the unique ID of a meta record is
 	// its sorted set of expressions
@@ -472,15 +497,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	m.Lock()
 	defer m.Unlock()
 
-	if mtr, ok = m.metaTagRecords[orgId]; !ok {
-		mtr = newMetaTagRecords()
-		m.metaTagRecords[orgId] = mtr
-	}
-
-	if mti, ok = m.metaTagIndex[orgId]; !ok {
-		mti = make(metaTagIndex)
-		m.metaTagIndex[orgId] = mti
-	}
+	mtr, mti = m.getMetaTagDataStructures(orgId, true)
 
 	id, record, oldId, oldRecord, err := mtr.upsert(upsertRecord)
 	if err != nil {
@@ -529,8 +546,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagqu
 	}
 
 	m.RLock()
-	oldMtr, ok := m.metaTagRecords[orgId]
-	if ok {
+	oldMtr := m.getMetaTagRecords(orgId, false)
+	if oldMtr != nil {
 		if oldMtr.hashRecords() == newMtr.hashRecords() {
 			// the old and the new records are the same, so there is no need to change anyting
 			m.RUnlock()
@@ -554,8 +571,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 	m.RLock()
 	defer m.RUnlock()
 
-	mtr, ok := m.metaTagRecords[orgId]
-	if !ok {
+	mtr := m.getMetaTagRecords(orgId, false)
+	if mtr == nil {
 		return res
 	}
 
@@ -837,8 +854,8 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 
 	var enricher *enricher
 	if MetaTagSupport {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
+		mtr := m.getMetaTagRecords(orgId, false)
+		if mtr != nil {
 			enricher = mtr.getEnricher(tagIndex.idHasTag)
 		}
 	}
@@ -920,8 +937,8 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		return res
 	}
 
-	mti, ok := m.metaTagIndex[orgId]
-	if !ok {
+	mti := m.getMetaTagIndex(orgId, false)
+	if mti == nil {
 		sort.Strings(res)
 		return res
 	}
@@ -966,15 +983,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		return res
 	}
 
-	mti, ok := m.metaTagIndex[orgId]
-	if !ok {
-		return res
-	}
-
-	mtr, ok := m.metaTagRecords[orgId]
-	if !ok {
-		return res
-	}
+	mtr, mti := m.getMetaTagDataStructures(orgId, false)
 
 	for value, recordIds := range mti[key] {
 		if filter != nil && !filter.MatchString(value) {
@@ -1038,11 +1047,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		return m.finalizeResult(res, limit, false)
 	}
 
-	mti, ok := m.metaTagIndex[orgId]
-	if !ok {
-		return m.finalizeResult(res, limit, false)
-	}
-
+	mti := m.getMetaTagIndex(orgId, false)
 	for tag := range mti {
 		// a tag gets appended to the result set if either the given prefix is
 		// empty or the tag has the given prefix
@@ -1079,8 +1084,8 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 
 	var enricher *enricherWithUniqueMetaRecords
 	if MetaTagSupport {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
+		mtr := m.getMetaTagRecords(orgId, false)
+		if mtr != nil {
 			enricher = mtr.getEnricher(tags.idHasTag).uniqueMetaRecords()
 		}
 	}
@@ -1165,7 +1170,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		return m.finalizeResult(res, limit, false)
 	}
 
-	metaTagValues := m.metaTagIndex[orgId][tag]
+	metaTagValues := m.getMetaTagIndex(orgId, false)[tag]
 	if len(metaTagValues) == 0 {
 		return m.finalizeResult(res, limit, false)
 	}
@@ -1205,8 +1210,8 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 	var enricher *enricherWithUniqueMetaRecords
 	if MetaTagSupport && !isMetricTag {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
+		mtr := m.getMetaTagRecords(orgId, false)
+		if mtr != nil {
 			enricher = mtr.getEnricher(tags.idHasTag).uniqueMetaRecords()
 		}
 	}
@@ -1277,7 +1282,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 		return resCh
 	}
 
-	query.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
+	query.RunNonBlocking(tags, m.defById, m.getMetaTagIndex(orgId, false), m.getMetaTagRecords(orgId, false), resCh)
 
 	return resCh
 }
