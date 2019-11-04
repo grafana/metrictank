@@ -13,8 +13,8 @@ import (
 
 // Schemas contains schema settings
 type Schemas struct {
-	raw           []Schema
-	index         []Schema
+	raw           []Schema // parsed from the config file
+	index         []Schema // the "expanded" structure (built from raw+DefaultSchema) that will actually be used.
 	DefaultSchema Schema
 }
 
@@ -39,7 +39,7 @@ func NewSchemas(schemas []Schema) Schemas {
 		DefaultSchema: Schema{
 			Name:       "default",
 			Pattern:    regexp.MustCompile(".*"),
-			Retentions: Retentions([]Retention{NewRetentionMT(1, 3600*24*1, 600, 2, 0)}), // 1s:1day:10mim:2:true
+			Retentions: MustParseRetentions("1s:1d:10m:2:true"),
 		},
 	}
 	s.BuildIndex()
@@ -53,22 +53,22 @@ func (s Schemas) List() ([]Schema, Schema) {
 func (s *Schemas) BuildIndex() {
 	s.index = make([]Schema, 0)
 	for _, schema := range s.raw {
-		for pos := range schema.Retentions {
+		for pos := range schema.Retentions.Rets {
 			s.index = append(s.index, Schema{
 				Name:          schema.Name,
 				Pattern:       schema.Pattern,
-				Retentions:    schema.Retentions[pos:],
+				Retentions:    schema.Retentions.Sub(pos),
 				Priority:      schema.Priority,
 				ReorderWindow: schema.ReorderWindow,
 			})
 		}
 	}
 	// add the default schema
-	for pos := range s.DefaultSchema.Retentions {
+	for pos := range s.DefaultSchema.Retentions.Rets {
 		s.index = append(s.index, Schema{
 			Name:       s.DefaultSchema.Name,
 			Pattern:    s.DefaultSchema.Pattern,
-			Retentions: s.DefaultSchema.Retentions[pos:],
+			Retentions: s.DefaultSchema.Retentions.Sub(pos),
 			Priority:   s.DefaultSchema.Priority,
 		})
 	}
@@ -182,7 +182,7 @@ func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 			// search through the retentions to find the first one where
 			// the metric interval is < SecondsPerPoint of the retention.
 			// The schema is then the previous retention.
-			for j, ret := range schema.Retentions {
+			for j, ret := range schema.Retentions.Rets {
 				if interval < ret.SecondsPerPoint {
 					// if there are no retentions with SecondsPerPoint <= interval (j==0)
 					// then we need to use the first retention. Otherwise, the retention
@@ -198,12 +198,12 @@ func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 			}
 			// no retentions found with SecondsPerPoint > interval. So lets just use the retention
 			// with the largest secondsPerPoint.
-			pos := i + len(schema.Retentions) - 1
+			pos := i + len(schema.Retentions.Rets) - 1
 			return uint16(pos), s.index[pos]
 		}
 		// the next len(schema.Retentions) schemas in the index all have the
 		// same schema pattern, so we can skip over them.
-		i = i + len(schema.Retentions)
+		i = i + len(schema.Retentions.Rets)
 	}
 
 	// as the DefaultSchema is in the schemas.index, this should typically never be reached.
@@ -223,11 +223,11 @@ func (s Schemas) Get(i uint16) Schema {
 func (schemas Schemas) TTLs() []uint32 {
 	ttls := make(map[uint32]struct{})
 	for _, s := range schemas.raw {
-		for _, r := range s.Retentions {
+		for _, r := range s.Retentions.Rets {
 			ttls[uint32(r.MaxRetention())] = struct{}{}
 		}
 	}
-	for _, r := range schemas.DefaultSchema.Retentions {
+	for _, r := range schemas.DefaultSchema.Retentions.Rets {
 		ttls[uint32(r.MaxRetention())] = struct{}{}
 	}
 	var ttlSlice []uint32
@@ -241,11 +241,11 @@ func (schemas Schemas) TTLs() []uint32 {
 func (schemas Schemas) MaxChunkSpan() uint32 {
 	max := uint32(0)
 	for _, s := range schemas.raw {
-		for _, r := range s.Retentions {
+		for _, r := range s.Retentions.Rets {
 			max = util.Max(max, r.ChunkSpan)
 		}
 	}
-	for _, r := range schemas.DefaultSchema.Retentions {
+	for _, r := range schemas.DefaultSchema.Retentions.Rets {
 		max = util.Max(max, r.ChunkSpan)
 	}
 	return max

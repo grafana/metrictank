@@ -30,5 +30,5 @@ func (i IndexIntervalGetter) GetInterval(name string) int {
 	// if it's the first time we're seeing this series, do the more expensive matching
 	// note that the index will also do this matching again first time it sees the metric
 	_, schema := mdata.MatchSchema(name, 0)
-	return schema.Retentions[0].SecondsPerPoint
+	return schema.Retentions.Rets[0].SecondsPerPoint
 }

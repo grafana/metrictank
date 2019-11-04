@@ -25,9 +25,9 @@ func MatchSchema(key string, interval int) (uint16, conf.Schema) {
 	return Schemas.Match(key, interval)
 }
 
-func SetSingleSchema(ret ...conf.Retention) {
+func SetSingleSchema(ret conf.Retentions) {
 	Schemas = conf.NewSchemas(nil)
-	Schemas.DefaultSchema.Retentions = conf.Retentions(ret)
+	Schemas.DefaultSchema.Retentions = ret
 	Schemas.BuildIndex()
 }
 

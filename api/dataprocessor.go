@@ -358,6 +358,7 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 				// rather than a runtime divide of 2 series
 				SchemaID:              req.SchemaId,
 				Archive:               req.Archive,
+				ArchInterval:          req.ArchInterval,
 				AggNumNorm:            req.AggNum,
 				ConsolidatorNormFetch: req.Consolidator,
 				Count:                 1,

@@ -1064,6 +1064,12 @@ func (z *SeriesMetaProperties) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "Archive")
 				return
 			}
+		case "ArchInterval":
+			z.ArchInterval, err = dc.ReadUint32()
+			if err != nil {
+				err = msgp.WrapError(err, "ArchInterval")
+				return
+			}
 		case "AggNumNorm":
 			z.AggNumNorm, err = dc.ReadUint32()
 			if err != nil {
@@ -1107,9 +1113,9 @@ func (z *SeriesMetaProperties) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *SeriesMetaProperties) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 7
+	// map header, size 8
 	// write "SchemaID"
-	err = en.Append(0x87, 0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x44)
+	err = en.Append(0x88, 0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x44)
 	if err != nil {
 		return
 	}
@@ -1126,6 +1132,16 @@ func (z *SeriesMetaProperties) EncodeMsg(en *msgp.Writer) (err error) {
 	err = en.WriteUint8(z.Archive)
 	if err != nil {
 		err = msgp.WrapError(err, "Archive")
+		return
+	}
+	// write "ArchInterval"
+	err = en.Append(0xac, 0x41, 0x72, 0x63, 0x68, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c)
+	if err != nil {
+		return
+	}
+	err = en.WriteUint32(z.ArchInterval)
+	if err != nil {
+		err = msgp.WrapError(err, "ArchInterval")
 		return
 	}
 	// write "AggNumNorm"
@@ -1184,13 +1200,16 @@ func (z *SeriesMetaProperties) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *SeriesMetaProperties) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 7
+	// map header, size 8
 	// string "SchemaID"
-	o = append(o, 0x87, 0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x44)
+	o = append(o, 0x88, 0xa8, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x49, 0x44)
 	o = msgp.AppendUint16(o, z.SchemaID)
 	// string "Archive"
 	o = append(o, 0xa7, 0x41, 0x72, 0x63, 0x68, 0x69, 0x76, 0x65)
 	o = msgp.AppendUint8(o, z.Archive)
+	// string "ArchInterval"
+	o = append(o, 0xac, 0x41, 0x72, 0x63, 0x68, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x61, 0x6c)
+	o = msgp.AppendUint32(o, z.ArchInterval)
 	// string "AggNumNorm"
 	o = append(o, 0xaa, 0x41, 0x67, 0x67, 0x4e, 0x75, 0x6d, 0x4e, 0x6f, 0x72, 0x6d)
 	o = msgp.AppendUint32(o, z.AggNumNorm)
@@ -1247,6 +1266,12 @@ func (z *SeriesMetaProperties) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "Archive")
 				return
 			}
+		case "ArchInterval":
+			z.ArchInterval, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "ArchInterval")
+				return
+			}
 		case "AggNumNorm":
 			z.AggNumNorm, bts, err = msgp.ReadUint32Bytes(bts)
 			if err != nil {
@@ -1291,6 +1316,6 @@ func (z *SeriesMetaProperties) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *SeriesMetaProperties) Msgsize() (s int) {
-	s = 1 + 9 + msgp.Uint16Size + 8 + msgp.Uint8Size + 11 + msgp.Uint32Size + 9 + msgp.Uint32Size + 22 + z.ConsolidatorNormFetch.Msgsize() + 15 + z.ConsolidatorRC.Msgsize() + 6 + msgp.Uint32Size
+	s = 1 + 9 + msgp.Uint16Size + 8 + msgp.Uint8Size + 13 + msgp.Uint32Size + 11 + msgp.Uint32Size + 9 + msgp.Uint32Size + 22 + z.ConsolidatorNormFetch.Msgsize() + 15 + z.ConsolidatorRC.Msgsize() + 6 + msgp.Uint32Size
 	return
 }

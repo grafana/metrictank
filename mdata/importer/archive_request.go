@@ -57,7 +57,7 @@ func NewArchiveRequest(w *whisper.Whisper, schemas conf.Schemas, file, name stri
 
 	_, selectedSchema := schemas.Match(res.MetricData.Name, int(w.Header.Archives[0].SecondsPerPoint))
 	converter := newConverter(w.Header.Archives, points, method, from, until)
-	for retIdx, retention := range selectedSchema.Retentions {
+	for retIdx, retention := range selectedSchema.Retentions.Rets {
 		convertedPoints := converter.getPoints(retIdx, uint32(retention.SecondsPerPoint), uint32(retention.NumberOfPoints))
 		for m, p := range convertedPoints {
 			if len(p) == 0 {
