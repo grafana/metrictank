@@ -58,6 +58,9 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(cache map[Req][]models.Series) ([]
 		serie.Tags = serie.CopyTagsWith("nPercentile", fmt.Sprintf("%g", s.n))
 
 		percentile := getPercentileValue(serie.Datapoints, s.n, sortedDatapointVals)
+		if math.IsNaN(percentile) {
+			continue
+		}
 
 		out := pointSlicePool.Get().([]schema.Point)
 		for _, p := range serie.Datapoints {
@@ -89,6 +92,10 @@ func getPercentileValue(datapoints []schema.Point, n float64, sortedDatapointVal
 		if !math.IsNaN(p.Val) {
 			sortedDatapointVals = append(sortedDatapointVals, p.Val)
 		}
+	}
+
+	if len(sortedDatapointVals) == 0 {
+		return math.NaN()
 	}
 
 	sort.Float64s(sortedDatapointVals)
