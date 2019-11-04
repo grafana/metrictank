@@ -1,11 +1,12 @@
 package expr
 
 import (
-	"errors"
 	"fmt"
 	"math"
+	"net/http"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -39,7 +40,7 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 		return nil, err
 	}
 	if len(divisors) != 1 {
-		return nil, errors.New(fmt.Sprintf("need 1 divisor series, not %d", len(divisors)))
+		return nil, response.Errorf(http.StatusBadRequest, "need 1 divisor series, not %d", len(divisors))
 	}
 	divisor := divisors[0]
 

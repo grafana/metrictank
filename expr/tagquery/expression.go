@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"regexp"
 	"sort"
 	"strings"
@@ -15,6 +16,10 @@ type InvalidExpressionError string
 
 func (i InvalidExpressionError) Error() string {
 	return fmt.Sprintf("Invalid expression: %s", string(i))
+}
+
+func (i InvalidExpressionError) Code() int {
+	return http.StatusBadRequest
 }
 
 type Expressions []Expression
@@ -222,7 +227,7 @@ FIND_OPERATOR:
 	resCommon.key = expr[:pos]
 	err := validateQueryExpressionTagKey(resCommon.key)
 	if err != nil {
-		return nil, fmt.Errorf("Error when validating key \"%s\" of expression \"%s\": %s", resCommon.key, expr, err)
+		return nil, fmt.Errorf("Error when validating key \"%s\" of expression \"%s\": %s", resCommon.key, expr, err.Error())
 	}
 
 	// shift over the !/^ characters

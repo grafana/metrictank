@@ -1,13 +1,14 @@
 package expr
 
 import (
-	"errors"
 	"math"
+	"net/http"
 	"sort"
 	"strconv"
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
 )
@@ -27,7 +28,7 @@ func TestNoTags(t *testing.T) {
 	in := []models.Series{
 		getModel("name1;tag1=val1", a),
 	}
-	expected := errors.New("No tags specified")
+	expected := response.NewError(http.StatusBadRequest, "No tags specified")
 
 	testGroupByTags("ErrNoTags", in, nil, "sum", []string{}, expected, t)
 }

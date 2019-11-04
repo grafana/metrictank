@@ -1,8 +1,9 @@
 package tagquery
 
 import (
-	"fmt"
+	"net/http"
 
+	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -31,11 +32,11 @@ func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord,
 	// upsert request should be considered invalid and should get rejected.
 	_, err = NewQuery(res.Expressions, 0)
 	if err != nil {
-		return res, fmt.Errorf("Failed to instantiate query from given expressions: %s", err)
+		return res, response.Errorf(http.StatusBadRequest, "Failed to instantiate query from given expressions: %s", err)
 	}
 
 	if len(res.Expressions) == 0 {
-		return res, fmt.Errorf("Meta Tag Record must have at least one query")
+		return res, response.Errorf(http.StatusBadRequest, "Meta Tag Record must have at least one query")
 	}
 
 	return res, nil
