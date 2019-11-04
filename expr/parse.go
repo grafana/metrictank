@@ -8,21 +8,21 @@ import (
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	ErrMissingArg          = response.NewError(http.StatusBadRequest, "argument missing")
-	ErrTooManyArg          = response.NewError(http.StatusBadRequest, "too many arguments")
-	ErrMissingTimeseries   = response.NewError(http.StatusBadRequest, "missing time series argument")
-	ErrWildcardNotAllowed  = response.NewError(http.StatusBadRequest, "found wildcard where series expected")
-	ErrMissingExpr         = response.NewError(http.StatusBadRequest, "missing expression")
-	ErrMissingComma        = response.NewError(http.StatusBadRequest, "missing comma")
-	ErrMissingQuote        = response.NewError(http.StatusBadRequest, "missing quote")
-	ErrUnexpectedCharacter = response.NewError(http.StatusBadRequest, "unexpected character")
-	ErrIllegalCharacter    = response.NewError(http.StatusBadRequest, "illegal character for function name")
+	ErrMissingArg          = errors.NewBadRequest("argument missing")
+	ErrTooManyArg          = errors.NewBadRequest("too many arguments")
+	ErrMissingTimeseries   = errors.NewBadRequest("missing time series argument")
+	ErrWildcardNotAllowed  = errors.NewBadRequest("found wildcard where series expected")
+	ErrMissingExpr         = errors.NewBadRequest("missing expression")
+	ErrMissingComma        = errors.NewBadRequest("missing comma")
+	ErrMissingQuote        = errors.NewBadRequest("missing quote")
+	ErrUnexpectedCharacter = errors.NewBadRequest("unexpected character")
+	ErrIllegalCharacter    = errors.NewBadRequest("illegal character for function name")
 )
 
 type ErrBadArgument struct {
@@ -115,7 +115,7 @@ func ParseMany(targets []string) ([]*expr, error) {
 			return nil, err
 		}
 		if leftover != "" {
-			return nil, response.Errorf(http.StatusBadRequest, "failed to parse %q fully. got leftover %q", target, leftover)
+			return nil, errors.NewBadRequestf("failed to parse %q fully. got leftover %q", target, leftover)
 		}
 		out = append(out, e)
 	}

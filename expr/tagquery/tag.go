@@ -3,11 +3,10 @@ package tagquery
 import (
 	"encoding/json"
 	"io"
-	"net/http"
 	"sort"
 	"strings"
 
-	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -35,7 +34,7 @@ func ParseTagsFromMetricName(name string) (Tags, error) {
 	nameValue := schema.SanitizeNameAsTagValue(elements[0])
 
 	if !schema.ValidateTagValue(nameValue) {
-		return nil, response.Errorf(http.StatusBadRequest, "Metric name is invalid as tag value \"%s\"", nameValue)
+		return nil, errors.NewBadRequestf("Metric name is invalid as tag value \"%s\"", nameValue)
 	}
 
 	if len(elements) < 2 {
@@ -114,17 +113,17 @@ func ParseTag(tag string) (Tag, error) {
 
 	equalPos := strings.Index(tag, "=")
 	if equalPos < 0 {
-		return res, response.Errorf(http.StatusBadRequest, "Missing equal sign in tag: %s", tag)
+		return res, errors.NewBadRequestf("Missing equal sign in tag: %s", tag)
 	}
 
 	res.Key = tag[:equalPos]
 	if !schema.ValidateTagKey(res.Key) {
-		return res, response.Errorf(http.StatusBadRequest, "Invalid tag key \"%s\"", res.Key)
+		return res, errors.NewBadRequestf("Invalid tag key \"%s\"", res.Key)
 	}
 
 	res.Value = tag[equalPos+1:]
 	if !schema.ValidateTagValue(res.Value) {
-		return res, response.Errorf(http.StatusBadRequest, "Invalid tag value \"%s\"", res.Value)
+		return res, errors.NewBadRequestf("Invalid tag value \"%s\"", res.Value)
 	}
 
 	return res, nil

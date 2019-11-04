@@ -3,10 +3,9 @@ package expr
 import (
 	"fmt"
 	"math"
-	"net/http"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -40,7 +39,7 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 		return nil, err
 	}
 	if len(divisors) != len(dividends) {
-		return nil, response.NewError(http.StatusBadRequest, "dividendSeriesList and divisorSeriesList argument must have equal length")
+		return nil, errors.NewBadRequest("dividendSeriesList and divisorSeriesList argument must have equal length")
 	}
 
 	var series []models.Series

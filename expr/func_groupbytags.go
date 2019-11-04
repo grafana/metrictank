@@ -2,11 +2,10 @@ package expr
 
 import (
 	"bytes"
-	"net/http"
 	"sort"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -43,7 +42,7 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	}
 
 	if len(s.tags) == 0 {
-		return nil, response.NewError(http.StatusBadRequest, "No tags specified")
+		return nil, errors.NewBadRequest("No tags specified")
 	}
 
 	type Group struct {

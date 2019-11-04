@@ -1,15 +1,13 @@
 package tagquery
 
 import (
-	"net/http"
-
-	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
 )
 
 var (
-	errInvalidQuery = response.NewError(http.StatusBadRequest, "invalid query")
+	errInvalidQuery = errors.NewBadRequest("invalid query")
 	MatchCacheSize  int
 	MetaTagSupport  bool
 
