@@ -61,6 +61,15 @@ var d = []schema.Point{
 	{Val: 250, Ts: 60},
 }
 
+var allNulls = []schema.Point{
+	{Val: math.NaN(), Ts: 10},
+	{Val: math.NaN(), Ts: 20},
+	{Val: math.NaN(), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: math.NaN(), Ts: 60},
+}
+
 var sumab = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64, Ts: 20},

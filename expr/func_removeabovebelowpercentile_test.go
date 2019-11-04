@@ -181,6 +181,59 @@ func TestRemoveBelowPercentileSingleAllNonNull(t *testing.T) {
 	)
 }
 
+// TestRemoveBelowPercentileWithNulls verifies that, just like Graphite, series with all nulls, are removed from the output
+func TestRemoveBelowPercentileWithNulls(t *testing.T) {
+	testRemoveAboveBelowPercentile(
+		"removeBelowPercentile",
+		false,
+		50,
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "abcd",
+				Target:     "a",
+				Datapoints: getCopy(a),
+			},
+			{
+				Interval:   10,
+				QueryPatt:  "abcd",
+				Target:     "b",
+				Datapoints: getCopy(allNulls),
+			},
+		},
+		[]models.Series{
+			{
+				Interval:  10,
+				QueryPatt: "removeBelowPercentile(a, 50)",
+				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 10},
+					{Val: math.NaN(), Ts: 20},
+					{Val: 5.5, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.NaN(), Ts: 50},
+					{Val: 1234567890, Ts: 60},
+				},
+			},
+		},
+		t,
+	)
+	testRemoveAboveBelowPercentile(
+		"removeBelowPercentile",
+		false,
+		50,
+		[]models.Series{
+			{
+				Interval:   10,
+				QueryPatt:  "abcd",
+				Target:     "b",
+				Datapoints: getCopy(allNulls),
+			},
+		},
+		[]models.Series{},
+		t,
+	)
+}
+
 func testRemoveAboveBelowPercentile(name string, above bool, n float64, in []models.Series, out []models.Series, t *testing.T) {
 	f := NewRemoveAboveBelowPercentileConstructor(above)()
 	f.(*FuncRemoveAboveBelowPercentile).in = NewMock(in)
