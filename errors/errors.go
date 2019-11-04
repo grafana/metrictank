@@ -1,11 +1,18 @@
 package errors
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 type Internal string
 
 func NewInternal(err string) Internal {
 	return Internal(err)
+}
+
+func NewInternalf(format string, a ...interface{}) Internal {
+	return Internal(fmt.Sprintf(format, a...))
 }
 
 func (i Internal) Code() int {
@@ -20,6 +27,10 @@ type BadRequest string
 
 func NewBadRequest(err string) BadRequest {
 	return BadRequest(err)
+}
+
+func NewBadRequestf(format string, a ...interface{}) BadRequest {
+	return BadRequest(fmt.Sprintf(format, a...))
 }
 
 func (b BadRequest) Code() int {
