@@ -76,13 +76,13 @@ func TestAggregator(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Avg, conf.Min, conf.Max, conf.Sum, conf.Lst},
 	}
 
-	agg := NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(0), ret, aggs, false, 0)
+	agg := NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(0), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	expected := []schema.Point{}
 	compare("simple-min-unfinished", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 0)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
@@ -92,7 +92,7 @@ func TestAggregator(t *testing.T) {
 	compare("simple-min-one-block", agg.minMetric, expected)
 
 	// points with a timestamp belonging to the previous aggregation are ignored
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 0)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(130, 130)
@@ -103,7 +103,7 @@ func TestAggregator(t *testing.T) {
 	compare("simple-min-ignore-back-in-time", agg.minMetric, expected)
 
 	// chunkspan is 120, ingestFrom = 140 means points before chunk starting at 240 are discarded
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 140)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret.String(), ret, aggs, false, 140)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	// this point is not flushed to agg.minMetric because no point after it with a timestamp
@@ -113,7 +113,7 @@ func TestAggregator(t *testing.T) {
 	compare("simple-min-ingest-from-all-before-next-chunk", agg.minMetric, expected)
 
 	// chunkspan is 120, ingestFrom = 115 means points before chunk starting at 120 are discarded
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 115)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret.String(), ret, aggs, false, 115)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	// this point is not flushed to agg.minMetric for the same reason as in the previous test
@@ -124,7 +124,7 @@ func TestAggregator(t *testing.T) {
 	compare("simple-min-ingest-from-one-in-next-chunk", agg.minMetric, expected)
 
 	// chunkspan is 120, ingestFrom = 120 means points before chunk starting at 120 are discarded
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 120)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret.String(), ret, aggs, false, 120)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	// this point is not flushed to agg.minMetric for the same reason as in the previous test
@@ -142,7 +142,7 @@ func TestAggregator(t *testing.T) {
 	// aggregated points:      120      180      240      300      360
 	// chunks by t0     :      120               240      300      360
 	// discarded chunk  :   xxxxxxxxxxxxxxxxxxxxx
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret, aggs, false, 170)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(1), ret.String(), ret, aggs, false, 170)
 	agg.Add(1, 1.1)
 	agg.Add(119, 119)
 	agg.Add(120, 120)
@@ -171,7 +171,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("multi-sum-ingest-from-one-in-next-chunk", agg.sumMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(2), ret, aggs, false, 0)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(2), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(120, 4)
@@ -180,7 +180,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-one-block-done-cause-last-point-just-right", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(3), ret, aggs, false, 0)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(3), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(150, 1.123)
@@ -191,7 +191,7 @@ func TestAggregator(t *testing.T) {
 	}
 	compare("simple-min-two-blocks-done-cause-last-point-just-right", agg.minMetric, expected)
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(4), ret, aggs, false, 0)
+	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(4), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(190, 2451.123)
