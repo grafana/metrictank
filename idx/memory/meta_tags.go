@@ -61,30 +61,41 @@ func (m *metaTagRecords) getMetaTagsByRecordIds(recordIds map[recordId]struct{})
 	return res
 }
 
-// recordExists takes a meta record and checks if it already exists
-// it returns 3 values:
-// 1) recordId of the given record, if it is present
-// 2) true if there is a record with the same query expressions (identity)
-// 3) true if 2) is true and that record also has the same meta tags
-func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, bool, bool) {
+// recordExists takes a meta record and checks if it exists
+// the identity of a record is determined by its set of query expressions, so if there is
+// any other record with the same query expressions this method returns the id, the record,
+// and true. if it doesn't exist the third return value is false. it is assumed that the
+// expressions of the given record are sorted.
+func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, bool) {
 	id := recordId(record.HashExpressions())
-	var checkingId recordId
 
 	// loop over existing records, starting from id, trying to find one that has
 	// the exact same queries as the one we're upserting
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		checkingId = id + recordId(i)
+		checkingId := id + recordId(i)
 		if existingRecord, ok := m.records[checkingId]; ok {
 			if record.Expressions.Equal(existingRecord.Expressions) {
-				if record.MetaTags.Equal(existingRecord.MetaTags) {
-					return checkingId, true, true
-				}
-				return checkingId, true, false
+				return checkingId, &existingRecord, true
 			}
 		}
 	}
 
-	return 0, false, false
+	return 0, nil, false
+}
+
+// recordExistsAndIsEqual checks if the given record exists
+// if it exists it also checks if the present record is equal to the given one (has the same meta tags).
+// it is assumed that the expressions of the given record are sorted.
+// - the first return value is the record id of the existing record, if there is one
+// - the second return value indicates whether the given record exists
+// - the third return value indicates whether the existing record is equal (has the same meta tags)
+func (m *metaTagRecords) recordExistsAndIsEqual(record tagquery.MetaTagRecord) (recordId, bool, bool) {
+	id, existingRecord, exists := m.recordExists(record)
+	if !exists {
+		return id, false, false
+	}
+
+	return id, true, record.MetaTags.Equal(existingRecord.MetaTags)
 }
 
 // upsert inserts or updates a meta tag record according to the given specifications
@@ -100,22 +111,9 @@ func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, 
 func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
 	record.Expressions.Sort()
 
-	id := recordId(record.HashExpressions())
-
-	var oldRecord *tagquery.MetaTagRecord
-	var oldId recordId
-
-	// loop over existing records, starting from id, trying to find one that has
-	// the exact same queries as the one we're upserting
-	for i := uint32(0); i < collisionAvoidanceWindow; i++ {
-		if existingRecord, ok := m.records[id+recordId(i)]; ok {
-			if record.Expressions.Equal(existingRecord.Expressions) {
-				oldRecord = &existingRecord
-				oldId = id + recordId(i)
-				delete(m.records, oldId)
-				break
-			}
-		}
+	oldId, oldRecord, exists := m.recordExists(record)
+	if exists {
+		delete(m.records, oldId)
 	}
 
 	if !record.HasMetaTags() {
@@ -123,6 +121,7 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	}
 
 	record.MetaTags.Sort()
+	id := recordId(record.HashExpressions())
 
 	// now find the best position to insert the new/updated record, starting from id
 	for i := uint32(0); i < collisionAvoidanceWindow; i++ {

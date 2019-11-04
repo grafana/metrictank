@@ -624,8 +624,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 		// check for each record whether it exists, those which exist and have
 		// the same meta tags get added to recordIdsToKeep because we don't
 		// want to modify them
-		existingRecordId, exists, sameMetaTags := mtr.recordExists(newRecords[i])
-		if exists && sameMetaTags {
+		existingRecordId, exists, equal := mtr.recordExistsAndIsEqual(newRecords[i])
+		if exists && equal {
 			recordIdsToKeep[existingRecordId] = struct{}{}
 			continue
 		}
@@ -654,8 +654,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 
 		// verify that nothing has changed between releasing the read lock
 		// and acquiring the write lock
-		existingRecordId, exists, sameMetaTags := mtr.recordExists(record)
-		if exists && sameMetaTags {
+		existingRecordId, exists, equal := mtr.recordExistsAndIsEqual(record)
+		if exists && equal {
 			// something changed since we released the read lock, no need
 			// to update this record anymore
 			recordIdsToKeep[existingRecordId] = struct{}{}
