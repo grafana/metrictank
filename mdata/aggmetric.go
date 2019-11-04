@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,8 +78,10 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		m.rob = NewReorderBuffer(reorderWindow, interval)
 	}
 
-	for _, ret := range retentions.Rets[1:] {
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, ret, *agg, dropFirstChunk, ingestFrom))
+	origSplits := strings.Split(retentions.Orig, ":")
+	for i, ret := range retentions.Rets[1:] {
+		retOrig := origSplits[i+1]
+		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, retOrig, ret, *agg, dropFirstChunk, ingestFrom))
 	}
 
 	return &m
