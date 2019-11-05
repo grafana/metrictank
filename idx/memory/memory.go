@@ -579,6 +579,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 		return errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
+	metaRecordSwapExecuting.Inc()
+
+	log.Infof("memory-idx: Initiaing Swap with %d records for org %d", len(newRecords), orgId)
 	m.RLock()
 	mtr, mti, enricher := m.getMetaTagDataStructures(orgId, false)
 	tags := m.tags[orgId]
@@ -635,10 +638,13 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 		recordsToUpsert = append(recordsToUpsert, newRecords[i])
 	}
 	m.RUnlock()
+	log.Infof("memory-idx: After diff against existing meta records for org %d, going to upsert %d, %d remain unchanged", orgId, len(recordsToUpsert), len(recordIdsToKeep))
+	recordsUnchanged := uint32(len(recordIdsToKeep))
 
 	var query tagquery.Query
 	var queryCtx TagQueryContext
 	var err error
+	var recordsModified, recordsAdded, recordsPruned uint32
 	for _, record := range recordsToUpsert {
 		query, err = tagquery.NewQuery(record.Expressions, 0)
 		if err != nil {
@@ -658,6 +664,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 		if exists && equal {
 			// something changed since we released the read lock, no need
 			// to update this record anymore
+			recordsUnchanged++
 			recordIdsToKeep[existingRecordId] = struct{}{}
 			m.Unlock()
 			continue
@@ -676,11 +683,14 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 			// associated, so we need to delete the references to the old
 			// recordId from the enricher and the mti because the id may
 			// change when we update it
-
+			recordsModified++
 			enricher.delMetaRecord(existingRecordId, metricKeys)
 			for _, tag := range record.MetaTags {
 				mti.deleteRecord(tag, existingRecordId)
 			}
+		} else {
+			// this record is new
+			recordsAdded++
 		}
 
 		newRecordId, newRecord, _, _, err := mtr.upsert(record)
@@ -712,6 +722,9 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 		var pruned map[recordId]tagquery.MetaTagRecord
 		toPrune := mtr.getPrunable(recordIdsToKeep)
 		if len(toPrune) > 0 {
+			log.Infof("memory-idx: Going to prune %d meta records for org %d", len(toPrune), orgId)
+			recordsPruned = uint32(len(toPrune))
+
 			m.Lock()
 			// we can assume that the toPrune list is still correct because we're
 			// holding the metaRecordLock
@@ -747,6 +760,11 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 	} else {
 		m.RUnlock()
 	}
+
+	metaRecordSwapUnchanged.AddUint32(recordsUnchanged)
+	metaRecordSwapAdded.AddUint32(recordsAdded)
+	metaRecordSwapModified.AddUint32(recordsModified)
+	metaRecordSwapPruned.AddUint32(recordsPruned)
 
 	return nil
 }

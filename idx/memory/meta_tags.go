@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -13,6 +14,36 @@ var (
 	// the collision avoidance window defines how many times we try to find a higher
 	// slot that's free if two record hashes collide
 	collisionAvoidanceWindow = uint32(1024)
+
+	// metric idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.accepted is a counter of metrics getting accepted by meta record filters
+	enricherMetricsFilteredByMetaRecordAccepted = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.accepted")
+
+	// metric idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.rejected is a counter of metrics getting rejected by meta record filters
+	enricherMetricsFilteredByMetaRecordRejected = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.rejected")
+
+	// metrics idx.memory.meta-tags.enricher.ops.metrics-added-by-query is a counter of metrics that get added to the enricher by executing tag queries
+	enricherMetricsAddedByQuery = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-added-by-query")
+
+	// metric idx.memory.meta-tags.enricher.ops.known-meta-records is a counter of meta records known to the enricher
+	enricherKnownMetaRecords = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.known-meta-records")
+
+	// metric idx.memory.meta-tags.enricher.ops.metrics-with-meta-records is a counter of metrics with at least one associated meta record
+	enricherMetricsWithMetaRecords = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-with-meta-records")
+
+	// metric idx.memory.meta-tags.swap.ops.executing counts the number of swap calls, each call means that the backend store has detected a change in the meta records
+	metaRecordSwapExecuting = stats.NewCounter32("idx.memory.meta-tags.swap.ops.executing")
+
+	// metric idx.memory.meta-tags.swap.ops.meta-records-unchanged counts the number of meta records that have not changed at all
+	metaRecordSwapUnchanged = stats.NewCounter32("idx.memory.meta-tags.swap.ops.meta-records-unchanged")
+
+	// metric idx.memory.meta-tags.swap.ops.meta-records-added counts the number of meta records that have been added
+	metaRecordSwapAdded = stats.NewCounter32("idx.memory.meta-tags.swap.ops.meta-records-added")
+
+	// metric idx.memory.meta-tags.swap.ops.meta-records-modified counts the number of meta records that have already existed, but had different meta tags
+	metaRecordSwapModified = stats.NewCounter32("idx.memory.meta-tags.swap.ops.meta-records-modified")
+
+	// metric idx.memory.meta-tags.swap.ops.meta-records-pruned counts the number of meta records that have been pruned from the index because in the latest swap they were not present
+	metaRecordSwapPruned = stats.NewCounter32("idx.memory.meta-tags.swap.ops.meta-records-pruned")
 )
 
 type recordId uint32
@@ -259,19 +290,28 @@ func (e *metaTagEnricher) _addMetric(payload interface{}) {
 	if data.lock != nil {
 		data.lock.RLock()
 	}
+
+	var accepted, rejected uint32
 	for record, filter := range e.filtersByRecord {
 		if filter(data.md.Id, data.md.Name, data.md.Tags) == tagquery.Pass {
 			recordIds[record] = struct{}{}
+			accepted++
+		} else {
+			rejected++
 		}
 	}
 	if data.lock != nil {
 		data.lock.RUnlock()
 	}
 
+	enricherMetricsFilteredByMetaRecordAccepted.AddUint32(accepted)
+	enricherMetricsFilteredByMetaRecordRejected.AddUint32(rejected)
+
 	if len(recordIds) > 0 {
 		e.Lock()
 		e.recordsByMetric[data.md.Id.Key] = recordIds
 		e.Unlock()
+		enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 	}
 }
 
@@ -287,6 +327,7 @@ func (e *metaTagEnricher) _delMetric(payload interface{}) {
 	e.Lock()
 	delete(e.recordsByMetric, md.Id.Key)
 	e.Unlock()
+	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 }
 
 func (e *metaTagEnricher) addMetaRecord(id recordId, filter tagquery.MetricDefinitionFilter, keys []schema.Key) {
@@ -310,6 +351,7 @@ func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	e.Lock()
 	e.filtersByRecord[data.id] = data.filter
 	e.Unlock()
+	enricherKnownMetaRecords.SetUint32(uint32(len(e.filtersByRecord)))
 
 	for _, key := range data.keys {
 		// we acquire one write lock per iteration, instead of one for the whole loop,
@@ -324,6 +366,9 @@ func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 		e.recordsByMetric[key] = map[recordId]struct{}{data.id: {}}
 		e.Unlock()
 	}
+
+	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
+	enricherMetricsAddedByQuery.Add(len(data.keys))
 }
 
 func (e *metaTagEnricher) delMetaRecord(id recordId, keys []schema.Key) {
@@ -352,10 +397,12 @@ func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 		}
 		e.Unlock()
 	}
+	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 
 	e.Lock()
 	delete(e.filtersByRecord, data.id)
 	e.Unlock()
+	enricherKnownMetaRecords.SetUint32(uint32(len(e.filtersByRecord)))
 }
 
 // enrich resolves a metric key into the associated set of record ids,

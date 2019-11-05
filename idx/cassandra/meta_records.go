@@ -129,6 +129,7 @@ func (c *CasIdx) loadMetaRecords() {
 	}
 
 	for orgId, batchId := range toLoad {
+		log.Infof("cassandra-idx: Loading meta record batch %s of org %d", batchId.String(), orgId)
 		var expressions, metatags string
 		q = fmt.Sprintf("SELECT expressions, metatags FROM %s WHERE batchid=? AND orgid=?", c.Config.MetaRecordTable)
 		iter = c.Session.Query(q, batchId, orgId).RetryPolicy(&metaRecordRetryPolicy).Iter()

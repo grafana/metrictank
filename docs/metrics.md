@@ -202,6 +202,14 @@ a counter of findCache misses
 the duration of a get of one metric in the memory idx
 * `idx.memory.list`:  
 the duration of memory idx listings
+* `idx.memory.meta-tags.enricher.ops.known-meta-records`:  
+a counter of meta records known to the enricher
+* `idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.accepted`:  
+a counter of metrics getting accepted by meta record filters
+* `idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.rejected`:  
+a counter of metrics getting rejected by meta record filters
+* `idx.memory.meta-tags.enricher.ops.metrics-with-meta-records`:  
+a counter of metrics with at least one associated meta record
 * `idx.memory.ops.add`:  
 the number of additions to the memory idx
 * `idx.memory.ops.update`:  
