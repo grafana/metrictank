@@ -1,27 +1,28 @@
 package expr
 
 import (
-	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
-	ErrMissingArg          = errors.New("argument missing")
-	ErrTooManyArg          = errors.New("too many arguments")
-	ErrMissingTimeseries   = errors.New("missing time series argument")
-	ErrWildcardNotAllowed  = errors.New("found wildcard where series expected")
-	ErrMissingExpr         = errors.New("missing expression")
-	ErrMissingComma        = errors.New("missing comma")
-	ErrMissingQuote        = errors.New("missing quote")
-	ErrUnexpectedCharacter = errors.New("unexpected character")
-	ErrIllegalCharacter    = errors.New("illegal character for function name")
+	ErrMissingArg          = errors.NewBadRequest("argument missing")
+	ErrTooManyArg          = errors.NewBadRequest("too many arguments")
+	ErrMissingTimeseries   = errors.NewBadRequest("missing time series argument")
+	ErrWildcardNotAllowed  = errors.NewBadRequest("found wildcard where series expected")
+	ErrMissingExpr         = errors.NewBadRequest("missing expression")
+	ErrMissingComma        = errors.NewBadRequest("missing comma")
+	ErrMissingQuote        = errors.NewBadRequest("missing quote")
+	ErrUnexpectedCharacter = errors.NewBadRequest("unexpected character")
+	ErrIllegalCharacter    = errors.NewBadRequest("illegal character for function name")
 )
 
 type ErrBadArgument struct {
@@ -33,6 +34,10 @@ func (e ErrBadArgument) Error() string {
 	return fmt.Sprintf("argument bad type. expected %s - got %s", e.exp, e.got)
 }
 
+func (e ErrBadArgument) Code() int {
+	return http.StatusBadRequest
+}
+
 type ErrBadArgumentStr struct {
 	exp string
 	got string
@@ -42,10 +47,18 @@ func (e ErrBadArgumentStr) Error() string {
 	return fmt.Sprintf("argument bad type. expected %s - got %s", e.exp, e.got)
 }
 
+func (e ErrBadArgumentStr) Code() int {
+	return http.StatusBadRequest
+}
+
 type ErrUnknownFunction string
 
 func (e ErrUnknownFunction) Error() string {
 	return fmt.Sprintf("unknown function %q", string(e))
+}
+
+func (e ErrUnknownFunction) Code() int {
+	return http.StatusBadRequest
 }
 
 type ErrUnknownKwarg struct {
@@ -54,6 +67,10 @@ type ErrUnknownKwarg struct {
 
 func (e ErrUnknownKwarg) Error() string {
 	return fmt.Sprintf("unknown keyword argument %q", e.key)
+}
+
+func (e ErrUnknownKwarg) Code() int {
+	return http.StatusBadRequest
 }
 
 type ErrBadKwarg struct {
@@ -66,12 +83,20 @@ func (e ErrBadKwarg) Error() string {
 	return fmt.Sprintf("keyword argument %q bad type. expected %T - got %s", e.key, e.exp, e.got)
 }
 
+func (e ErrBadKwarg) Code() int {
+	return http.StatusBadRequest
+}
+
 type ErrKwargSpecifiedTwice struct {
 	key string
 }
 
 func (e ErrKwargSpecifiedTwice) Error() string {
 	return fmt.Sprintf("keyword argument %q specified twice", e.key)
+}
+
+func (e ErrKwargSpecifiedTwice) Code() int {
+	return http.StatusBadRequest
 }
 
 type MetricRequest struct {
@@ -90,7 +115,7 @@ func ParseMany(targets []string) ([]*expr, error) {
 			return nil, err
 		}
 		if leftover != "" {
-			return nil, fmt.Errorf("failed to parse %q fully. got leftover %q", target, leftover)
+			return nil, errors.NewBadRequestf("failed to parse %q fully. got leftover %q", target, leftover)
 		}
 		out = append(out, e)
 	}

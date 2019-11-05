@@ -1,12 +1,12 @@
 package expr
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/errors"
 )
 
 // Req represents a request for one/more series
@@ -91,7 +91,7 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 // newplan adds requests as needed for the given expr, resolving function calls as needed
 func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, []Req, error) {
 	if e.etype != etFunc && e.etype != etName {
-		return nil, nil, errors.New("request must be a function call or metric pattern")
+		return nil, nil, errors.NewBadRequest("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
 		req := NewReq(e.str, context.from, context.to, context.consol)

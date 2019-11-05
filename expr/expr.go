@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/grafana/metrictank/errors"
 )
 
 //go:generate stringer -type=exprType
@@ -203,7 +205,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		*v.val = got.str
 	default:
-		return 0, fmt.Errorf("unsupported type %T for consumeBasicArg", exp)
+		return 0, errors.NewBadRequestf("unsupported type %T for consumeBasicArg", exp)
 	}
 	pos++
 	return pos, nil
@@ -213,7 +215,7 @@ func generateValidatorError(key string, err error) error {
 	if len(key) == 0 {
 		return err
 	}
-	return fmt.Errorf("%s: %s", key, err.Error())
+	return errors.NewBadRequestf("%s: %s", key, err.Error())
 }
 
 // consumeSeriesArg verifies that the argument at given pos matches the expected arg
@@ -292,7 +294,7 @@ Switch:
 			*v.val = append(*v.val, fn)
 		}
 	default:
-		return 0, nil, fmt.Errorf("unsupported type %T for consumeSeriesArg", exp)
+		return 0, nil, errors.NewBadRequestf("unsupported type %T for consumeSeriesArg", exp)
 	}
 	pos++
 	return pos, reqs, nil
@@ -372,7 +374,7 @@ func (e expr) consumeKwarg(key string, optArgs []Arg) error {
 		}
 		*v.val = got.str
 	default:
-		return fmt.Errorf("unsupported type %T for consumeKwarg", exp)
+		return errors.NewBadRequestf("unsupported type %T for consumeKwarg", exp)
 	}
 	return nil
 }

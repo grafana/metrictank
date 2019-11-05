@@ -1,11 +1,11 @@
 package expr
 
 import (
-	"errors"
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/errors"
 )
 
 type FuncFilterSeries struct {
@@ -75,7 +75,7 @@ func getOperatorFunc(operator string) (func(float64, float64) bool, error) {
 			return math.IsNaN(val) || val <= threshold
 		}, nil
 	}
-	return func(v1, v2 float64) bool { return false }, errors.New("Unsupported operator: " + operator)
+	return func(v1, v2 float64) bool { return false }, errors.NewBadRequest("Unsupported operator: " + operator)
 }
 
 func (s *FuncFilterSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {

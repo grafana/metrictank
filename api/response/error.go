@@ -2,6 +2,7 @@ package response
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"runtime/debug"
 
@@ -66,6 +67,13 @@ func NewError(code int, err string) *ErrorResp {
 	return &ErrorResp{
 		code: code,
 		err:  err,
+	}
+}
+
+func Errorf(code int, format string, a ...interface{}) *ErrorResp {
+	return &ErrorResp{
+		code: code,
+		err:  fmt.Sprintf(format, a...),
 	}
 }
 

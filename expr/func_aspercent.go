@@ -1,13 +1,13 @@
 package expr
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -58,12 +58,12 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 	if s.nodes != nil {
 		if !math.IsNaN(s.totalFloat) {
-			return nil, errors.New("total must be None or a seriesList")
+			return nil, errors.NewBadRequest("total must be None or a seriesList")
 		}
 		outSeries, err = s.execWithNodes(series, totals, cache)
 	} else {
 		if totals != nil && len(totals) != 1 && len(totals) != len(series) {
-			return nil, errors.New("asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
+			return nil, errors.NewBadRequest("asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 		}
 		outSeries, err = s.execWithoutNodes(series, totals, cache)
 	}

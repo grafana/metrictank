@@ -1,15 +1,14 @@
 package expr
 
 import (
-	"errors"
-
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/errors"
 	"github.com/raintank/dur"
 )
 
-var ErrIntPositive = errors.New("integer must be positive")
-var ErrInvalidAggFunc = errors.New("Invalid aggregation func")
-var ErrNonNegativePercent = errors.New("The requested percent is required to be greater than 0")
+var ErrIntPositive = errors.NewBadRequest("integer must be positive")
+var ErrInvalidAggFunc = errors.NewBadRequest("Invalid aggregation func")
+var ErrNonNegativePercent = errors.NewBadRequest("The requested percent is required to be greater than 0")
 
 // Validator is a function to validate an input
 type Validator func(e *expr) error
@@ -43,7 +42,7 @@ func IsOperator(e *expr) error {
 	case "=", "!=", ">", ">=", "<", "<=":
 		return nil
 	}
-	return errors.New("Unsupported operator: " + e.str)
+	return errors.NewBadRequest("Unsupported operator: " + e.str)
 }
 
 func NonNegativePercent(e *expr) error {

@@ -1358,7 +1358,7 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 
 	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Expressions)
 	if err != nil {
-		response.Write(ctx, response.WrapError(err))
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
 	}
 
@@ -1382,7 +1382,7 @@ func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.M
 	for i, rawRecord := range swapRequest.Records {
 		metaTagRecords[i], err = tagquery.ParseMetaTagRecord(rawRecord.MetaTags, rawRecord.Expressions)
 		if err != nil {
-			response.Write(ctx, response.WrapError(fmt.Errorf("Error when parsing record %d: %s", i, err)))
+			response.Write(ctx, response.Errorf(http.StatusBadRequest, "Error when parsing record %d: %s", i, err))
 			return
 		}
 	}

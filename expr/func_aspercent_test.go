@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 	"math"
+	"net/http"
 	"sort"
 	"strconv"
 	"testing"
@@ -19,6 +20,10 @@ type errAsPercentNumSeriesMismatch struct {
 
 func (e errAsPercentNumSeriesMismatch) Error() string {
 	return fmt.Sprintf("asPercent got %d input series but %d total series (should  be same amount or 1)", e.numIn, e.numTotal)
+}
+
+func (e errAsPercentNumSeriesMismatch) Code() int {
+	return http.StatusBadRequest
 }
 
 var a1 = []schema.Point{
