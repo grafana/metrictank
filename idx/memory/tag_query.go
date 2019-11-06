@@ -1,9 +1,7 @@
 package memory
 
 import (
-	"math"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -48,6 +46,18 @@ type expressionCost struct {
 	operatorCost  uint32
 	cardinality   uint32
 	expressionIdx int
+}
+
+// newerThanFrom takes a metric key, it returns true if the lastUpdate
+// property of the metric associated with that key is at least equal
+// to this queries' from timestamp.
+// if the key doesn't exist it returns false
+func (q *TagQueryContext) newerThanFrom(id schema.MKey) bool {
+	md, ok := q.byId[id]
+	if !ok {
+		return false
+	}
+	return atomic.LoadInt64(&md.LastUpdate) >= q.query.From
 }
 
 func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
@@ -109,7 +119,9 @@ func (q *TagQueryContext) prepareExpressions() {
 	}
 
 	q.selector = newIdSelector(q.query.Expressions[q.startWith], q)
-	q.filter = newIdFilter(filterExpressions, q)
+	if len(filterExpressions) > 0 {
+		q.filter = newIdFilter(filterExpressions, q)
+	}
 }
 
 // testByFrom filters a given metric by its LastUpdate time
@@ -181,200 +193,31 @@ func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		return
 	}
 
-	idCh, _ := q.selector.getIds()
+	// if this query needs to filter down the initial result set, which is
+	// only the case if the number of expressions is >1, then we start filter
+	// workers to apply the filter functions
+	if q.filter != nil {
+		idCh := make(chan schema.MKey)
+		q.wg.Add(1)
+		go func() {
+			defer q.wg.Done()
+			q.selector.getIds(idCh, nil)
+			close(idCh)
+		}()
 
-	// start the tag query workers. they'll consume the ids on the idCh and
-	// evaluate for each of them whether it satisfies all the conditions
-	// defined in the query expressions. those that satisfy all conditions
-	// will be pushed into the resCh
-	q.wg.Add(TagQueryWorkers)
-	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterIdsFromChan(idCh, resCh)
-	}
-}
-
-// getMaxTagCount calculates the maximum number of results (cardinality) a
-// tag query could possibly return
-// this is useful because when running a tag query we can abort it as soon as
-// we know that there can't be more tags discovered and added to the result set
-func (q *TagQueryContext) getMaxTagCount() int {
-	defer q.wg.Done()
-
-	tagClause := q.query.GetTagClause()
-	if tagClause == nil {
-		return len(q.index)
-	}
-
-	var maxTagCount int
-	for tag := range q.index {
-		if tagClause.Matches(tag) {
-			maxTagCount++
+		// start the tag query workers. they'll consume the ids on the idCh and
+		// evaluate for each of them whether it satisfies all the conditions
+		// defined in the query expressions. those that satisfy all conditions
+		// will be pushed into the resCh
+		q.wg.Add(TagQueryWorkers)
+		for i := 0; i < TagQueryWorkers; i++ {
+			go q.filterIdsFromChan(idCh, resCh)
 		}
+	} else {
+		q.wg.Add(1)
+		go func() {
+			defer q.wg.Done()
+			q.selector.getIds(resCh, nil)
+		}()
 	}
-
-	return maxTagCount
-}
-
-// filterTagsFromChan takes a channel of metric IDs and evaluates each of them
-// according to the criteria associated with this query
-// those that pass all the tests will have their relevant tags extracted, which
-// are then pushed into the given tag channel
-func (q *TagQueryContext) filterTagsFromChan(idCh chan schema.MKey, tagCh chan string, stopCh chan struct{}, omitTagFilters bool) {
-	// used to prevent that this worker thread will push the same result into
-	// the chan twice
-	resultsCache := make(map[string]struct{})
-	tagClause := q.query.GetTagClause()
-
-IDS:
-	for id := range idCh {
-		var def *idx.Archive
-		var ok bool
-
-		if def, ok = q.byId[id]; !ok {
-			// should never happen because every ID in the tag index
-			// must be present in the byId lookup table
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: ID %q is in tag index but not in the byId lookup table", id)
-			continue
-		}
-
-		// generate a set of all tags of the current metric that satisfy the
-		// tag filter condition
-		metricTags := make(map[string]struct{}, 0)
-		for _, tag := range def.Tags {
-			equal := strings.Index(tag, "=")
-			if equal < 0 {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: ID %q has tag %q in index without '=' sign", id, tag)
-				continue
-			}
-
-			key := tag[:equal]
-			// this tag has already been pushed into tagCh, so we can stop evaluating
-			if _, ok := resultsCache[key]; ok {
-				continue
-			}
-
-			if tagClause != nil && !tagClause.Matches(key) {
-				continue
-			}
-
-			metricTags[key] = struct{}{}
-		}
-
-		// if we don't filter tags, then we can assume that "name" should always be part of the result set
-		if omitTagFilters {
-			if _, ok := resultsCache["name"]; !ok {
-				metricTags["name"] = struct{}{}
-			}
-		}
-
-		// if some tags satisfy the current tag filter condition then we run
-		// the metric through all tag expression tests in order to decide
-		// whether those tags should be part of the final result set
-		if len(metricTags) > 0 {
-			if q.testByFrom(def) && q.filter.matches(id, schema.SanitizeNameAsTagValue(def.Name), def.Tags) {
-				for key := range metricTags {
-					select {
-					case tagCh <- key:
-					case <-stopCh:
-						// if execution of query has stopped because the max tag
-						// count has been reached then tagCh <- might block
-						// because that channel will not be consumed anymore. in
-						// that case the stop channel will have been closed so
-						// we so we exit here
-						break IDS
-					}
-					resultsCache[key] = struct{}{}
-				}
-			} else {
-				// check if we need to stop
-				select {
-				case <-stopCh:
-					break IDS
-				default:
-				}
-			}
-		}
-	}
-
-	q.wg.Done()
-}
-
-// determines whether the given tag prefix/tag match will match the special
-// tag "name". if it does, then we can omit some filtering because we know
-// that every metric has a name
-func (q *TagQueryContext) tagFilterMatchesName() bool {
-	tagClause := q.query.GetTagClause()
-
-	// some tag queries might have no prefix specified yet, in this case
-	// we do not need to filter by the name
-	// f.e. we know that every metric has a name, and we know that the
-	// prefix "" matches the string "name", so we know that every metric
-	// will pass the tag prefix test. hence we can omit the entire test.
-	if tagClause == nil {
-		return true
-	}
-
-	return tagClause.Matches("name")
-}
-
-// RunGetTags executes the tag query and returns all the tags of the
-// resulting metrics
-func (q *TagQueryContext) RunGetTags(index TagIndex, byId map[schema.MKey]*idx.Archive, mti metaTagIndex, mtr *metaTagRecords) map[string]struct{} {
-	q.index = index
-	q.byId = byId
-	q.metaTagIndex = mti
-	q.metaTagRecords = mtr
-	q.prepareExpressions()
-
-	maxTagCount := int32(math.MaxInt32)
-
-	// start a thread to calculate the maximum possible number of tags.
-	// this might not always complete before the query execution, but in most
-	// cases it likely will. when it does end before the execution of the query,
-	// the value of maxTagCount will be used to abort the query execution once
-	// the max number of possible tags has been reached
-	q.wg.Add(1)
-	go atomic.StoreInt32(&maxTagCount, int32(q.getMaxTagCount()))
-
-	idCh, stopCh := q.selector.getIds()
-	tagCh := make(chan string)
-
-	// we know there can only be 1 tag filter, so if we detect that the given
-	// tag condition matches the special tag "name", we can omit the filtering
-	// because every metric has a name.
-	matchName := q.tagFilterMatchesName()
-
-	// start the tag query workers. they'll consume the ids on the idCh and
-	// evaluate for each of them whether it satisfies all the conditions
-	// defined in the query expressions. then they will extract the tags of
-	// those that satisfy all conditions and push them into tagCh.
-	q.wg.Add(TagQueryWorkers)
-	for i := 0; i < TagQueryWorkers; i++ {
-		go q.filterTagsFromChan(idCh, tagCh, stopCh, matchName)
-	}
-
-	go func() {
-		q.wg.Wait()
-		close(tagCh)
-	}()
-
-	result := make(map[string]struct{})
-
-	for tag := range tagCh {
-		result[tag] = struct{}{}
-
-		// if we know that there can't be more results than what we have
-		// abort the query execution
-		if int32(len(result)) >= atomic.LoadInt32(&maxTagCount) {
-			break
-		}
-	}
-
-	// abort query execution and wait for all workers to end
-	close(stopCh)
-
-	q.wg.Wait()
-	return result
 }

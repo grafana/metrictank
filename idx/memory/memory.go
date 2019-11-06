@@ -74,7 +74,7 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
-	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 50, "number of workers to spin up to evaluate tag queries")
+	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 5, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")

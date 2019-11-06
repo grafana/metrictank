@@ -73,16 +73,6 @@ func getTestIndex() (TagIndex, map[schema.MKey]*idx.Archive) {
 	return tagIdx, byId
 }
 
-func queryAndCompareTagResults(t *testing.T, q TagQueryContext, expectedData map[string]struct{}) {
-	t.Helper()
-	tagIdx, byId := getTestIndex()
-
-	res := q.RunGetTags(tagIdx, byId, nil, nil)
-	if !reflect.DeepEqual(expectedData, res) {
-		t.Fatalf("Expected: %+v\nGot: %+v", expectedData, res)
-	}
-}
-
 func queryAndCompareResults(t *testing.T, q TagQueryContext, expectedData IdSet) {
 	t.Helper()
 	tagIdx, byId := getTestIndex()
@@ -211,51 +201,6 @@ func TestQueryByTagNameRegex(t *testing.T) {
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
-}
-
-func TestQueryByTagFilterByTagMatch(t *testing.T) {
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~a{1}"}, 0)
-	expectTags := make(map[string]struct{})
-	expectTags["abc"] = struct{}{}
-	expectTags["aaa"] = struct{}{}
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{2}"}, 0)
-	delete(expectTags, "abc")
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{3}"}, 0)
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{4}"}, 0)
-	delete(expectTags, "aaa")
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-}
-
-func TestQueryByTagFilterByTagPrefix(t *testing.T) {
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=a"}, 0)
-	expectTags := make(map[string]struct{})
-	expectTags["abc"] = struct{}{}
-	expectTags["aaa"] = struct{}{}
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aa"}, 0)
-	delete(expectTags, "abc")
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaa"}, 0)
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaaa"}, 0)
-	delete(expectTags, "aaa")
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
-}
-
-func TestQueryByTagFilterByTagPrefixSpecialCaseName(t *testing.T) {
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "__tag^=na"}, 0)
-	expectTags := make(map[string]struct{})
-	expectTags["name"] = struct{}{}
-	queryAndCompareTagResults(t, NewTagQueryContext(q), expectTags)
 }
 
 func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) {

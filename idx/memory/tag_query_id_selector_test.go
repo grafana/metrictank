@@ -52,7 +52,11 @@ func selectAndCompareResults(t *testing.T, expression tagquery.Expression, metaR
 		metaTagRecords: index.metaTagRecords[1],
 	}
 
-	resCh, _ := newIdSelector(expression, ctx).getIds()
+	resCh := make(chan schema.MKey)
+	go func() {
+		newIdSelector(expression, ctx).getIds(resCh, nil)
+		close(resCh)
+	}()
 	res := make(IdSet)
 	for id := range resCh {
 		res[id] = struct{}{}
