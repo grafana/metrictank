@@ -823,18 +823,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	m.defByTagSet.add(def)
 
 	if MetaTagSupport {
-		enricher := m.getMetaTagEnricher(def.OrgId, true)
-		// need to temporarily release the write lock when calling into enricher's
-		// addMetric. even though the addMetric operation gets executed async via
-		// a queue, the queue size is limited, if that queue is full and blocking
-		// on insert then the consumer needs to be able to consume it, otherwise
-		// we end up in a dead lock situation where the queue consumer is waiting
-		// for the index lock while this thread holds the write lock and is waiting
-		// for the queue consumer to consume the queue because otherwise it cannot
-		// push into it.
-		m.Unlock()
-		enricher.addMetric(*def)
-		m.Lock()
+		m.getMetaTagEnricher(def.OrgId, true).addMetric(*def)
 	}
 }
 
