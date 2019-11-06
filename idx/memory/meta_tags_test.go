@@ -333,7 +333,7 @@ func TestAddingMetricsToEmptyEnricher(t *testing.T) {
 	}
 	for i := range mds {
 		mds[i].SetId()
-		enricher.addMetric(&mds[i], nil)
+		enricher.addMetric(mds[i])
 	}
 
 	// stop waits for the queue to be consumed
@@ -347,17 +347,18 @@ func TestAddingMetricsToEmptyEnricher(t *testing.T) {
 
 func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	enricher := newEnricher()
-	i := 0
-	acceptEverySecond := func(schema.MKey, string, []string) tagquery.FilterDecision {
-		res := tagquery.Fail
-		if i%2 == 0 {
-			res = tagquery.Pass
-		}
-		i++
-		return res
+	acceptEverySecond, err := tagquery.NewQueryFromStrings([]string{"name=~.*[135]$"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
 	}
-	acceptAll := func(schema.MKey, string, []string) tagquery.FilterDecision { return tagquery.Pass }
-	acceptNone := func(schema.MKey, string, []string) tagquery.FilterDecision { return tagquery.Fail }
+	acceptAll, err := tagquery.NewQueryFromStrings([]string{"name=~.+"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
+	}
+	acceptNone, err := tagquery.NewQueryFromStrings([]string{"name=nonexistent"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
+	}
 	enricher.addMetaRecord(recordId(1), acceptEverySecond, nil)
 	enricher.addMetaRecord(recordId(2), acceptAll, nil)
 	enricher.addMetaRecord(recordId(3), acceptNone, nil)
@@ -374,7 +375,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	for i := range testMetrics {
 		testMetrics[i].SetId()
 		allKeys[i] = testMetrics[i].Id.Key
-		enricher.addMetric(&testMetrics[i], nil)
+		enricher.addMetric(testMetrics[i])
 	}
 
 	flushEnricherQueue := func() {

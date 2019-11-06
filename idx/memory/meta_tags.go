@@ -1,10 +1,16 @@
 package memory
 
 import (
+	"context"
+	"strings"
 	"sync"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
@@ -14,12 +20,6 @@ var (
 	// the collision avoidance window defines how many times we try to find a higher
 	// slot that's free if two record hashes collide
 	collisionAvoidanceWindow = uint32(1024)
-
-	// metric idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.accepted is a counter of metrics getting accepted by meta record filters
-	enricherMetricsFilteredByMetaRecordAccepted = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.accepted")
-
-	// metric idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.rejected is a counter of metrics getting rejected by meta record filters
-	enricherMetricsFilteredByMetaRecordRejected = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-filtered-by-meta-record.rejected")
 
 	// metrics idx.memory.meta-tags.enricher.ops.metrics-added-by-query is a counter of metrics that get added to the enricher by executing tag queries
 	enricherMetricsAddedByQuery = stats.NewCounter32("idx.memory.meta-tags.enricher.ops.metrics-added-by-query")
@@ -185,16 +185,18 @@ type metaTagEnricher struct {
 	sync.RWMutex
 	// wait group to wait for the worker on shutdown
 	wg sync.WaitGroup
-	// filters to check whether a metric definition matches the requirements of a meta record,
-	// keyed by the according meta record id
-	filtersByRecord map[recordId]tagquery.MetricDefinitionFilter
 	// mapping from metric key to list of meta record ids, used to do the enrichment
 	recordsByMetric map[schema.Key]map[recordId]struct{}
-	// lookup table from event types to event handlers used by the event queue consumer routine
-	eventHandlers map[enricherEventType]func(interface{})
 	// the event queue, all state changing operations get pushed through this queue
 	eventQueue chan enricherEvent
+
+	queriesByRecord map[recordId]tagquery.Query
+	addMetricBuffer []schema.MetricDefinition
+	archivePool     sync.Pool
 }
+
+const enricherAddMetricBufferSize = 1000
+const enricherAddMetricBufferTimeout = time.Second * 5
 
 type enricherEventType uint8
 
@@ -203,6 +205,7 @@ const (
 	delMetric
 	addMetaRecord
 	delMetaRecord
+	shutdown
 )
 
 type enricherEvent struct {
@@ -213,16 +216,11 @@ type enricherEvent struct {
 
 func newEnricher() *metaTagEnricher {
 	res := &metaTagEnricher{
-		filtersByRecord: make(map[recordId]tagquery.MetricDefinitionFilter),
+		queriesByRecord: make(map[recordId]tagquery.Query),
 		recordsByMetric: make(map[schema.Key]map[recordId]struct{}),
-	}
-
-	// eventHandlers gets instantiated as a struct member so it can be modified for testability
-	res.eventHandlers = map[enricherEventType]func(interface{}){
-		addMetric:     res._addMetric,
-		delMetric:     res._delMetric,
-		addMetaRecord: res._addMetaRecord,
-		delMetaRecord: res._delMetaRecord,
+		archivePool: sync.Pool{
+			New: func() interface{} { return &idx.Archive{} },
+		},
 	}
 
 	res.start()
@@ -237,81 +235,148 @@ func (e *metaTagEnricher) start() {
 	go func() {
 		defer e.wg.Done()
 
-		var handler func(interface{})
-		var ok bool
+		var event enricherEvent
+		timer := time.NewTimer(enricherAddMetricBufferTimeout)
 
-		for event := range e.eventQueue {
-			handler, ok = e.eventHandlers[event.eventType]
-			if !ok {
-				log.Errorf("metaTagEnricher received unknown event type: %d", event.eventType)
-				continue
+		for {
+			select {
+			case <-timer.C:
+				timer.Reset(enricherAddMetricBufferTimeout)
+				e._flushAddMetricBuffer()
+			case event = <-e.eventQueue:
+				if event.eventType != addMetric && len(e.addMetricBuffer) > 0 {
+					e._flushAddMetricBuffer()
+				}
+
+				switch event.eventType {
+				case addMetric:
+					e._bufferAddMetric(event.payload)
+
+					if len(e.addMetricBuffer) >= enricherAddMetricBufferSize {
+						e._flushAddMetricBuffer()
+					}
+
+					// reset timer to only trigger after add metric buffer timeout because
+					// if we're in a situation where new metrics keep getting added we want
+					// to first fill the buffer before processing the whole bunch
+					if !timer.Stop() {
+						<-timer.C
+					}
+					timer.Reset(enricherAddMetricBufferTimeout)
+				case delMetric:
+					e._delMetric(event.payload)
+				case addMetaRecord:
+					e._addMetaRecord(event.payload)
+				case delMetaRecord:
+					e._delMetaRecord(event.payload)
+				case shutdown:
+					return
+				}
 			}
-
-			// handlers are responsible for type casting the payload
-			handler(event.payload)
 		}
 	}()
 }
 
+func (e *metaTagEnricher) _flushAddMetricBuffer() {
+	if len(e.addMetricBuffer) == 0 {
+		return
+	}
+
+	tags := make(TagIndex)
+	defById := make(map[schema.MKey]*idx.Archive, len(e.addMetricBuffer))
+
+	defer func() {
+		for _, archive := range defById {
+			e.archivePool.Put(archive)
+		}
+		e.addMetricBuffer = e.addMetricBuffer[:0]
+	}()
+
+	for _, md := range e.addMetricBuffer {
+		for _, tag := range md.Tags {
+			tagSplits := strings.SplitN(tag, "=", 2)
+			if len(tagSplits) < 2 {
+				// should never happen because every tag in the index
+				// must have a valid format
+				invalidTag.Inc()
+				log.Errorf("memory-idx: Tag %q of id %q has an invalid format", tag, md.Id)
+				continue
+			}
+			tags.addTagId(tagSplits[0], tagSplits[1], md.Id)
+		}
+		tags.addTagId("name", md.NameSanitizedAsTagValue(), md.Id)
+
+		archive := e.archivePool.Get().(*idx.Archive)
+		archive.MetricDefinition = md
+		defById[md.Id] = archive
+	}
+
+	recordCh := make(chan recordId, len(e.queriesByRecord))
+	resultCh := make(chan struct {
+		record recordId
+		keys   []schema.Key
+	}, len(e.queriesByRecord))
+	group, _ := errgroup.WithContext(context.Background())
+	for i := 0; i < TagQueryWorkers; i++ {
+		group.Go(func() error {
+			var queryCtx TagQueryContext
+			for record := range recordCh {
+				result := struct {
+					record recordId
+					keys   []schema.Key
+				}{record: record}
+				queryCtx = NewTagQueryContext(e.queriesByRecord[record])
+				idCh := make(chan schema.MKey, 100)
+				queryCtx.RunNonBlocking(tags, defById, nil, nil, idCh)
+				for id := range idCh {
+					result.keys = append(result.keys, id.Key)
+				}
+				if len(result.keys) > 0 {
+					resultCh <- result
+				}
+			}
+			return nil
+		})
+	}
+
+	go func() {
+		group.Wait()
+		close(resultCh)
+	}()
+
+	for record := range e.queriesByRecord {
+		recordCh <- record
+	}
+	close(recordCh)
+
+	e.Lock()
+	defer e.Unlock()
+
+	for result := range resultCh {
+		for _, key := range result.keys {
+			if _, ok := e.recordsByMetric[key]; !ok {
+				e.recordsByMetric[key] = make(map[recordId]struct{})
+			}
+			e.recordsByMetric[key][result.record] = struct{}{}
+		}
+	}
+
+	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
+}
+
+func (e *metaTagEnricher) _bufferAddMetric(payload interface{}) {
+	e.addMetricBuffer = append(e.addMetricBuffer, payload.(schema.MetricDefinition))
+}
+
 func (e *metaTagEnricher) stop() {
-	close(e.eventQueue)
+	e.eventQueue <- enricherEvent{eventType: shutdown}
 	e.wg.Wait()
 }
 
-func (e *metaTagEnricher) addMetric(md *schema.MetricDefinition, indexLock *sync.RWMutex) {
+func (e *metaTagEnricher) addMetric(md schema.MetricDefinition) {
 	e.eventQueue <- enricherEvent{
 		eventType: addMetric,
-		payload: struct {
-			md   *schema.MetricDefinition
-			lock *sync.RWMutex
-		}{md: md, lock: indexLock},
-	}
-}
-
-// _addMetric is used by the event queue consumer to add metrics to the enricher.
-// this operation requires the metric definition to get passed through each of the
-// filter functions generated from the defined meta records to determine which meta
-// records shall get assigned to added metric.
-// this operation can be relatively expensive compared to all other operations of
-// the enricher, so it is important that it only gets called asynchronously via the
-// event queue.
-func (e *metaTagEnricher) _addMetric(payload interface{}) {
-	data := payload.(struct {
-		md   *schema.MetricDefinition
-		lock *sync.RWMutex
-	})
-	recordIds := make(map[recordId]struct{})
-
-	// enricher read lock is not necessary here because the event queue processor is
-	// single threaded and there are no state-modifying operations which do not go
-	// through the event queue.
-	// however, the main index read lock is necessary because the filter functions
-	// may do lookups on the index.
-	if data.lock != nil {
-		data.lock.RLock()
-	}
-
-	var accepted, rejected uint32
-	for record, filter := range e.filtersByRecord {
-		if filter(data.md.Id, data.md.Name, data.md.Tags) == tagquery.Pass {
-			recordIds[record] = struct{}{}
-			accepted++
-		} else {
-			rejected++
-		}
-	}
-	if data.lock != nil {
-		data.lock.RUnlock()
-	}
-
-	enricherMetricsFilteredByMetaRecordAccepted.AddUint32(accepted)
-	enricherMetricsFilteredByMetaRecordRejected.AddUint32(rejected)
-
-	if len(recordIds) > 0 {
-		e.Lock()
-		e.recordsByMetric[data.md.Id.Key] = recordIds
-		e.Unlock()
-		enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
+		payload:   md,
 	}
 }
 
@@ -330,28 +395,28 @@ func (e *metaTagEnricher) _delMetric(payload interface{}) {
 	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 }
 
-func (e *metaTagEnricher) addMetaRecord(id recordId, filter tagquery.MetricDefinitionFilter, keys []schema.Key) {
+func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query, keys []schema.Key) {
 	e.eventQueue <- enricherEvent{
 		eventType: addMetaRecord,
 		payload: struct {
-			id     recordId
-			filter tagquery.MetricDefinitionFilter
-			keys   []schema.Key
-		}{id: id, filter: filter, keys: keys},
+			id    recordId
+			query tagquery.Query
+			keys  []schema.Key
+		}{id: id, query: query, keys: keys},
 	}
 }
 
 func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		id     recordId
-		filter tagquery.MetricDefinitionFilter
-		keys   []schema.Key
+		id    recordId
+		query tagquery.Query
+		keys  []schema.Key
 	})
 
 	e.Lock()
-	e.filtersByRecord[data.id] = data.filter
+	e.queriesByRecord[data.id] = data.query
 	e.Unlock()
-	enricherKnownMetaRecords.SetUint32(uint32(len(e.filtersByRecord)))
+	enricherKnownMetaRecords.SetUint32(uint32(len(e.queriesByRecord)))
 
 	for _, key := range data.keys {
 		// we acquire one write lock per iteration, instead of one for the whole loop,
@@ -387,7 +452,7 @@ func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 		keys []schema.Key
 	})
 
-	// before deleting the meta record from the e.filtersByRecord map we
+	// before deleting the meta record from the e.queriesByRecord map we
 	// delete all references to it from the recordsByMetric map
 	for _, key := range data.keys {
 		e.Lock()
@@ -400,9 +465,9 @@ func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 
 	e.Lock()
-	delete(e.filtersByRecord, data.id)
+	delete(e.queriesByRecord, data.id)
 	e.Unlock()
-	enricherKnownMetaRecords.SetUint32(uint32(len(e.filtersByRecord)))
+	enricherKnownMetaRecords.SetUint32(uint32(len(e.queriesByRecord)))
 }
 
 // enrich resolves a metric key into the associated set of record ids,
