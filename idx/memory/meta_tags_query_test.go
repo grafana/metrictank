@@ -435,8 +435,6 @@ func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount int) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	enricherQueueSize = indexSize
-
 	metaTagSets := [][]string{
 		{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"},
 		{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"},

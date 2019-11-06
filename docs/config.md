@@ -526,8 +526,12 @@ meta-tag-support = false
 tag-query-workers = 5
 # size of regular expression cache in tag query evaluation
 match-cache-size = 1000
-# queue size for jobs that modify enricher state
-enricher-queue-size = 10000
+# size of event queue in the meta tag enricher
+meta-tag-enricher-queue-size = 100
+# size of add metric event buffer in enricher
+meta-tag-enricher-buffer-size = 10000
+# how long to buffer enricher events before they must be processed
+meta-tag-enricher-buffer-time = 5s
 # path to index-rules.conf file
 rules-file = /etc/metrictank/index-rules.conf
 # maximum duration each second a prune job can lock the index.
