@@ -565,7 +565,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 
 	// add the newly inserted meta record into the enricher and the
 	// meta tag index
-	enricher.addMetaRecord(id, record.GetMetricDefinitionFilter(tags.idHasTag), metricKeys)
+	enricher.addMetaRecord(id, query, metricKeys)
 	for _, keyValue := range record.MetaTags {
 		mti.insertRecord(keyValue, id)
 	}
@@ -648,7 +648,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 	for _, record := range recordsToUpsert {
 		query, err = tagquery.NewQuery(record.Expressions, 0)
 		if err != nil {
-			log.Errorf("Invalid record with expressions/meta tags: %q/%q", record.Expressions.Strings(), record.MetaTags.Strings())
+			log.Errorf("Invalid record (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err)
 			continue
 		}
 		queryCtx = NewTagQueryContext(query)
@@ -695,12 +695,12 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 
 		newRecordId, newRecord, _, _, err := mtr.upsert(record)
 		if err != nil {
-			log.Errorf("Error when upserting meta record with expressions/meta tags (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err.Error())
+			log.Errorf("Error when upserting meta record (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err.Error())
 			m.Unlock()
 			continue
 		}
 
-		enricher.addMetaRecord(newRecordId, newRecord.GetMetricDefinitionFilter(tags.idHasTag), metricKeys)
+		enricher.addMetaRecord(newRecordId, query, metricKeys)
 		for _, tag := range newRecord.MetaTags {
 			mti.insertRecord(tag, newRecordId)
 		}
@@ -829,7 +829,7 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 		// for the queue consumer to consume the queue because otherwise it cannot
 		// push into it.
 		m.Unlock()
-		enricher.addMetric(def, &m.RWMutex)
+		enricher.addMetric(*def)
 		m.Lock()
 	}
 }
