@@ -187,16 +187,16 @@ type metaTagEnricher struct {
 	wg sync.WaitGroup
 	// mapping from metric key to list of meta record ids, used to do the enrichment
 	recordsByMetric map[schema.Key]map[recordId]struct{}
+	// mapping from record ids to tag queries associated with given record
+	queriesByRecord map[recordId]tagquery.Query
 	// the event queue, all state changing operations get pushed through this queue
 	eventQueue chan enricherEvent
-
-	queriesByRecord map[recordId]tagquery.Query
+	// buffer that's used to buffer addMetric events, because executing them in bunches
+	// is more efficient (faster) than executing them one-by-one
 	addMetricBuffer []schema.MetricDefinition
-	archivePool     sync.Pool
+	// pool of idx.Archive structs that we use when processing add metric events
+	archivePool sync.Pool
 }
-
-const enricherAddMetricBufferSize = 1000
-const enricherAddMetricBufferTimeout = time.Second * 5
 
 type enricherEventType uint8
 
@@ -229,19 +229,19 @@ func newEnricher() *metaTagEnricher {
 
 // start creates the go routine which consumes the event queue and processes received events
 func (e *metaTagEnricher) start() {
-	e.eventQueue = make(chan enricherEvent, 1000)
+	e.eventQueue = make(chan enricherEvent, metaTagEnricherQueueSize)
 
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
 
 		var event enricherEvent
-		timer := time.NewTimer(enricherAddMetricBufferTimeout)
+		timer := time.NewTimer(metaTagEnricherBufferTime)
 
 		for {
 			select {
 			case <-timer.C:
-				timer.Reset(enricherAddMetricBufferTimeout)
+				timer.Reset(metaTagEnricherBufferTime)
 				e._flushAddMetricBuffer()
 			case event = <-e.eventQueue:
 				if event.eventType != addMetric && len(e.addMetricBuffer) > 0 {
@@ -250,7 +250,7 @@ func (e *metaTagEnricher) start() {
 
 				switch event.eventType {
 				case addMetric:
-					if len(e.addMetricBuffer) >= enricherAddMetricBufferSize {
+					if len(e.addMetricBuffer) >= metaTagEnricherBufferSize {
 						e._flushAddMetricBuffer()
 					}
 
@@ -259,7 +259,7 @@ func (e *metaTagEnricher) start() {
 					if !timer.Stop() {
 						<-timer.C
 					}
-					timer.Reset(enricherAddMetricBufferTimeout)
+					timer.Reset(metaTagEnricherBufferTime)
 				case delMetric:
 					e._delMetric(event.payload)
 				case addMetaRecord:
@@ -277,6 +277,7 @@ func (e *metaTagEnricher) start() {
 
 func (e *metaTagEnricher) _flushAddMetricBuffer() {
 	if len(e.addMetricBuffer) == 0 {
+		// buffer is empty, nothing to do
 		return
 	}
 
@@ -290,6 +291,8 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 		e.addMetricBuffer = e.addMetricBuffer[:0]
 	}()
 
+	// build a small tag index with all the metrics in the buffer
+	// we later use that index to run the meta record queries on it
 	for _, md := range e.addMetricBuffer {
 		for _, tag := range md.Tags {
 			tagSplits := strings.SplitN(tag, "=", 2)
@@ -315,6 +318,10 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 		keys   []schema.Key
 	}, len(e.queriesByRecord))
 	group, _ := errgroup.WithContext(context.Background())
+
+	// execute all the meta record queries on the small index we built above
+	// and collect their results in the resultCh
+	// the queries run concurrently in a group of workers
 	for i := 0; i < TagQueryWorkers; i++ {
 		group.Go(func() error {
 			var queryCtx TagQueryContext
@@ -342,11 +349,16 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 		close(resultCh)
 	}()
 
+	// feed all records ids for which we have a query into recordCh
+	// to make the query workers execute them
 	for record := range e.queriesByRecord {
 		recordCh <- record
 	}
 	close(recordCh)
 
+	// collect all results before applying them to the enricher to
+	// keep the time during which we need to hold the write lock as
+	// short as possible
 	results := make(map[recordId][]schema.Key)
 	for result := range resultCh {
 		results[result.record] = result.keys

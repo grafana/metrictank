@@ -53,6 +53,9 @@ var (
 	maxPruneLockTimeStr          string
 	TagSupport                   bool
 	TagQueryWorkers              int // number of workers to spin up when evaluation tag expressions
+	metaTagEnricherQueueSize     = 100
+	metaTagEnricherBufferSize    = 10000
+	metaTagEnricherBufferTime    = 5 * time.Second
 	indexRulesFile               string
 	IndexRules                   conf.IndexRules
 	Partitioned                  bool
@@ -65,7 +68,6 @@ var (
 	writeQueueDelay              = 30 * time.Second
 	writeMaxBatchSize            = 5000
 	matchCacheSize               = 1000
-	enricherQueueSize            = 10000
 	MetaTagSupport               = false
 )
 
@@ -75,6 +77,9 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 5, "number of workers to spin up to evaluate tag queries")
+	memoryIdx.IntVar(&metaTagEnricherQueueSize, "meta-tag-enricher-queue-size", 100, "size of event queue in the meta tag enricher")
+	memoryIdx.IntVar(&metaTagEnricherBufferSize, "meta-tag-enricher-buffer-size", 10000, "size of add metric event buffer in enricher")
+	memoryIdx.DurationVar(&metaTagEnricherBufferTime, "meta-tag-enricher-buffer-time", time.Second*5, "how long to buffer enricher events before they must be processed")
 	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
@@ -86,7 +91,6 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.IntVar(&enricherQueueSize, "enricher-queue-size", 10000, "queue size for jobs that modify enricher state")
 	memoryIdx.BoolVar(&MetaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 	return memoryIdx
