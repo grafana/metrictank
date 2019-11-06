@@ -514,6 +514,7 @@ func benchmarkAddingMetricToEnricher(b *testing.B, metaRecordCount int) {
 	}
 
 	enricher := index.getMetaTagEnricher(1, true)
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		index.AddOrUpdate(mkeys[i], &mds[i], 0)
