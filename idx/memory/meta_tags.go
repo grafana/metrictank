@@ -349,15 +349,20 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 	}
 	close(recordCh)
 
+	results := make(map[recordId][]schema.Key)
+	for result := range resultCh {
+		results[result.record] = result.keys
+	}
+
 	e.Lock()
 	defer e.Unlock()
 
-	for result := range resultCh {
-		for _, key := range result.keys {
+	for record, keys := range results {
+		for _, key := range keys {
 			if _, ok := e.recordsByMetric[key]; !ok {
 				e.recordsByMetric[key] = make(map[recordId]struct{})
 			}
-			e.recordsByMetric[key][result.record] = struct{}{}
+			e.recordsByMetric[key][record] = struct{}{}
 		}
 	}
 
