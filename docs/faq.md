@@ -17,7 +17,7 @@ Metrictank will automatically combine the data together like so:
 * when a response contains a series for which there is data of multiple resolutions, the higher resolution data will be consolidated down to match the lower resolution.
 * when a response contains multiple series of different resolutions, the higher resolution data will be consolidated to the "lowest common denominator" resolution, so the output has a consistent interval.
 * when a response contains multiple series of different resolutions, of which at least one series has data of different resolutions, the two mechanisms above work together.
-* once a request can be fully satistfied by data with the new resolution, that's the resolution the response will be in.
+* once a request can be fully satisfied by data with the new resolution, that's the resolution the response will be in.
 
 ## Tag support
 
