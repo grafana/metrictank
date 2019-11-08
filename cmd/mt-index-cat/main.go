@@ -57,8 +57,8 @@ func main() {
 	globalFlags.StringVar(&regexStr, "regex", "", "only show metrics that match this regex")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
-	globalFlags.StringVar(&maxStale, "max-stale", "6h30min", "exclude series that have not been seen for this much time.  use 0 to disable")
-	globalFlags.StringVar(&minStale, "min-stale", "0", "exclude series that have been seen in this much time.  use 0 to disable")
+	globalFlags.StringVar(&maxStale, "max-stale", "6h30min", "exclude series that have not been seen for this much time (compared against LastUpdate).  use 0 to disable")
+	globalFlags.StringVar(&minStale, "min-stale", "0", "exclude series that have been seen in this much time (compared against LastUpdate).  use 0 to disable")
 	globalFlags.IntVar(&limit, "limit", 0, "only show this many metrics.  use 0 to disable")
 	globalFlags.BoolVar(&verbose, "verbose", false, "print stats to stderr")
 

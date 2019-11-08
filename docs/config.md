@@ -571,7 +571,7 @@ write-max-flush-size = 10000
 write-concurrency = 5
 # synchronize index changes to bigtable. not all your nodes need to do this.
 update-bigtable-index = true
-# frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates
+# frequency at which we should update the metricdefinition in bigtable, use 0s for instant updates
 update-interval = 3h
 # Interval at which the index should be checked for stale series.
 prune-interval = 3h
@@ -588,7 +588,7 @@ create-cf = true
 # * Patterns are regexes matched on the metric name (including tags) and tried from top to bottom. First match wins.
 # * Anything not matched or resolving to max-stale=0 will not be pruned
 # * Patterns are unanchored regular expressions; add '^' or '$' to match the beginning or end of a pattern
-# * max-stale is a duration like 7d. if no new data has been seen for a metric during this time, it will be pruned
+# * max-stale is a duration like 7d. if no data has been seen for this time window, it will be pruned. (compared against LastUpdate)
 # * Valid units are s/sec/secs/second/seconds, m/min/mins/minute/minutes, h/hour/hours, d/day/days, w/week/weeks, mon/month/months, y/year/years
 
 [default]
