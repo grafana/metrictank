@@ -400,6 +400,22 @@ Flags:
 ```
 
 
+## mt-keygen
+
+```
+mt-keygen
+
+mt-keygen gives you the MKey for a specific MetricDefinition
+It fills a temp file with a template MetricDefinition
+It launches vim
+You fill in the important details - name / interval / tags /...
+It prints the MKey
+
+  -version
+    	print version string
+```
+
+
 ## mt-schemas-explain
 
 ```
