@@ -2,9 +2,10 @@
 
 Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
-Currently there are 2 index options. Only 1 index option can be enabled at a time.
+Currently there are 3 index options. Only 1 index option can be enabled at a time.
 * Memory-Idx
 * Cassandra-Idx
+* Bigtable-Idx
 
 ### Memory-Idx
 
@@ -21,8 +22,6 @@ enabled = true
 ```
 
 ### Cassandra-Idx
-
-This is the recommended option because it persists.
 
 * type: Memory-Idx for search queries, backed by Cassandra for persistence
 * persistence:  persists new metricDefinitions as they are seen and every update-interval.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
@@ -54,6 +53,11 @@ num-conns = 10
 # Max number of metricDefs allowed to be unwritten to cassandra
 write-queue-size = 100000
 ```
+
+### Bigtable-Idx
+
+Similar to the cassandra idx, but uses bigtable.
+
 
 
 ## The anatomy of a metricdef

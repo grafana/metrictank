@@ -31,7 +31,7 @@ type Archive struct {
 	SchemaId uint16 // index in mdata.schemas (not persisted)
 	AggId    uint16 // index in mdata.aggregations (not persisted)
 	IrId     uint16 // index in mdata.indexrules (not persisted)
-	LastSave uint32 // last time the metricDefinition was saved to a backend store (cassandra)
+	LastSave uint32 // last time the metricDefinition was saved to a persistent index
 }
 
 // used primarily by tests, for convenience
