@@ -415,6 +415,7 @@ also get persisted into the Cassandra index, from where they can be loaded by ot
     ]
   }
 ]
+```
 
 ## Misc
 
