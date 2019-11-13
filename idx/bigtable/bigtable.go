@@ -308,6 +308,17 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 	return archive
 }
 
+func (b *BigtableIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+	// The lastUpdate timestamp does not get updated in the bigtable index every time when
+	// a data point is received, there can be a delay of up to b.cfg.updateInterval32. To
+	// avoid falsely excluding a metric based on its lastUpdate timestamp we offset the
+	// from time by updateInterval32, this way we err on the "too inclusive" side
+	if from > int64(b.cfg.updateInterval32) {
+		from -= int64(b.cfg.updateInterval32)
+	}
+	return b.MemoryIndex.Find(orgId, pattern, from)
+}
+
 func (b *BigtableIdx) rebuildIndex() {
 	log.Info("bigtable-idx: Rebuilding Memory Index from metricDefinitions in bigtable")
 	pre := time.Now()
