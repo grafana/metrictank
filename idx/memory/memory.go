@@ -585,7 +585,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 
 	metaRecordSwapExecuting.Inc()
 
-	log.Infof("memory-idx: Initiaing Swap with %d records for org %d", len(newRecords), orgId)
+	log.Infof("memory-idx: Initiating Swap with %d records for org %d", len(newRecords), orgId)
 	m.RLock()
 	mtr, mti, enricher := m.getMetaTagDataStructures(orgId, false)
 	tags := m.tags[orgId]
