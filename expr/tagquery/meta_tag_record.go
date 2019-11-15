@@ -54,7 +54,7 @@ func (m *MetaTagRecord) Equals(other *MetaTagRecord) bool {
 		}
 	}
 
-	return m.EqualExpressions(other)
+	return m.Expressions.Equal(other.Expressions)
 }
 
 // HashExpressions returns a hash of all expressions in this meta tag record
@@ -90,24 +90,6 @@ func (m *MetaTagRecord) HashRecord() uint64 {
 	metaTagHash := m.HashMetaTags()
 
 	return uint64(expressionsHash) | uint64(metaTagHash)<<32
-}
-
-// EqualExpressions compares another meta tag record's expressions to
-// this one's expressions
-// Returns true if they are equal, otherwise false
-// It is assumed that all the expressions are already sorted
-func (m *MetaTagRecord) EqualExpressions(other *MetaTagRecord) bool {
-	if len(m.Expressions) != len(other.Expressions) {
-		return false
-	}
-
-	for i, expression := range m.Expressions {
-		if !expression.Equals(other.Expressions[i]) {
-			return false
-		}
-	}
-
-	return true
 }
 
 // HasMetaTags returns true if the meta tag record has one or more

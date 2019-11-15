@@ -53,6 +53,9 @@ var (
 	maxPruneLockTimeStr          string
 	TagSupport                   bool
 	TagQueryWorkers              int // number of workers to spin up when evaluation tag expressions
+	metaTagEnricherQueueSize     = 100
+	metaTagEnricherBufferSize    = 10000
+	metaTagEnricherBufferTime    = 5 * time.Second
 	indexRulesFile               string
 	IndexRules                   conf.IndexRules
 	Partitioned                  bool
@@ -65,7 +68,6 @@ var (
 	writeQueueDelay              = 30 * time.Second
 	writeMaxBatchSize            = 5000
 	matchCacheSize               = 1000
-	enrichmentCacheSize          = 10000
 	MetaTagSupport               = false
 )
 
@@ -75,6 +77,9 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 5, "number of workers to spin up to evaluate tag queries")
+	memoryIdx.IntVar(&metaTagEnricherQueueSize, "meta-tag-enricher-queue-size", 100, "size of event queue in the meta tag enricher")
+	memoryIdx.IntVar(&metaTagEnricherBufferSize, "meta-tag-enricher-buffer-size", 10000, "size of add metric event buffer in enricher")
+	memoryIdx.DurationVar(&metaTagEnricherBufferTime, "meta-tag-enricher-buffer-time", time.Second*5, "how long to buffer enricher events before they must be processed")
 	memoryIdx.IntVar(&findCacheSize, "find-cache-size", 1000, "number of find expressions to cache (per org). 0 disables cache")
 	memoryIdx.IntVar(&findCacheInvalidateQueueSize, "find-cache-invalidate-queue-size", 200, "size of queue for invalidating findCache entries")
 	memoryIdx.IntVar(&findCacheInvalidateMaxSize, "find-cache-invalidate-max-size", 100, "max amount of invalidations to queue up in one batch")
@@ -86,7 +91,6 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.StringVar(&indexRulesFile, "rules-file", "/etc/metrictank/index-rules.conf", "path to index-rules.conf file")
 	memoryIdx.StringVar(&maxPruneLockTimeStr, "max-prune-lock-time", "100ms", "Maximum duration each second a prune job can lock the index.")
 	memoryIdx.IntVar(&matchCacheSize, "match-cache-size", 1000, "size of regular expression cache in tag query evaluation")
-	memoryIdx.IntVar(&enrichmentCacheSize, "enrichment-cache-size", 10000, "size of the meta tag enrichment cache")
 	memoryIdx.BoolVar(&MetaTagSupport, "meta-tag-support", false, "enables/disables querying based on meta tags which get defined via meta tag rules")
 	globalconf.Register("memory-idx", memoryIdx, flag.ExitOnError)
 	return memoryIdx
@@ -267,10 +271,11 @@ type UnpartitionedMemoryIdx struct {
 	tree map[uint32]*Tree // by orgId
 
 	// used by tag index
-	defByTagSet    defByTagSet
-	tags           map[uint32]TagIndex        // by orgId
-	metaTagIndex   map[uint32]metaTagIndex    // by orgId
-	metaTagRecords map[uint32]*metaTagRecords // by orgId
+	defByTagSet     defByTagSet
+	tags            map[uint32]TagIndex         // by orgId
+	metaTagIndex    map[uint32]metaTagIndex     // by orgId
+	metaTagRecords  map[uint32]*metaTagRecords  // by orgId
+	metaTagEnricher map[uint32]*metaTagEnricher // by orgId
 
 	findCache *FindCache
 
@@ -279,12 +284,13 @@ type UnpartitionedMemoryIdx struct {
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 	m := &UnpartitionedMemoryIdx{
-		defById:        make(map[schema.MKey]*idx.Archive),
-		defByTagSet:    make(defByTagSet),
-		tree:           make(map[uint32]*Tree),
-		tags:           make(map[uint32]TagIndex),
-		metaTagIndex:   make(map[uint32]metaTagIndex),
-		metaTagRecords: make(map[uint32]*metaTagRecords),
+		defById:         make(map[schema.MKey]*idx.Archive),
+		defByTagSet:     make(defByTagSet),
+		tree:            make(map[uint32]*Tree),
+		tags:            make(map[uint32]TagIndex),
+		metaTagIndex:    make(map[uint32]metaTagIndex),
+		metaTagRecords:  make(map[uint32]*metaTagRecords),
+		metaTagEnricher: make(map[uint32]*metaTagEnricher),
 	}
 	return m
 }
@@ -308,6 +314,15 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 	if m.writeQueue != nil {
 		m.writeQueue.Stop()
 		m.writeQueue = nil
+	}
+
+	if MetaTagSupport {
+		m.Lock()
+		for orgId := range m.metaTagEnricher {
+			m.metaTagEnricher[orgId].stop()
+			delete(m.metaTagEnricher, orgId)
+		}
+		m.Unlock()
 	}
 	return
 }
@@ -450,6 +465,43 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 	}
 }
 
+func (m *UnpartitionedMemoryIdx) getMetaTagDataStructures(orgId uint32, create bool) (*metaTagRecords, metaTagIndex, *metaTagEnricher) {
+	return m.getMetaTagRecords(orgId, create), m.getMetaTagIndex(orgId, create), m.getMetaTagEnricher(orgId, create)
+}
+
+func (m *UnpartitionedMemoryIdx) getMetaTagRecords(orgId uint32, create bool) *metaTagRecords {
+	if mtr, ok := m.metaTagRecords[orgId]; ok {
+		return mtr
+	} else if create {
+		mtr = newMetaTagRecords()
+		m.metaTagRecords[orgId] = mtr
+		return mtr
+	}
+	return nil
+}
+
+func (m *UnpartitionedMemoryIdx) getMetaTagIndex(orgId uint32, create bool) metaTagIndex {
+	if mti, ok := m.metaTagIndex[orgId]; ok {
+		return mti
+	} else if create {
+		mti = make(metaTagIndex)
+		m.metaTagIndex[orgId] = mti
+		return mti
+	}
+	return nil
+}
+
+func (m *UnpartitionedMemoryIdx) getMetaTagEnricher(orgId uint32, create bool) *metaTagEnricher {
+	if enricher, ok := m.metaTagEnricher[orgId]; ok {
+		return enricher
+	} else if create {
+		enricher = newEnricher()
+		m.metaTagEnricher[orgId] = enricher
+		return enricher
+	}
+	return nil
+}
+
 // MetaTagRecordUpsert inserts or updates a meta record, depending on whether
 // it already exists or is new. The identity of a record is determined by its
 // queries, if the set of queries in the given record already exists in another
@@ -463,44 +515,61 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 
 	var mtr *metaTagRecords
 	var mti metaTagIndex
-	var ok bool
+	var enricher *metaTagEnricher
 
 	// expressions need to be sorted because the unique ID of a meta record is
 	// its sorted set of expressions
 	upsertRecord.Expressions.Sort()
 
+	// initialize query in preparation to execute it once we have the look
+	// doing struct instantiations before acquiring lock to keep lock time short
+	query, err := tagquery.NewQuery(upsertRecord.Expressions, 0)
+	if err != nil {
+		return fmt.Errorf("Invalid record with expressions/meta tags: %q/%q", upsertRecord.Expressions, upsertRecord.MetaTags)
+	}
+	queryCtx := NewTagQueryContext(query)
+
 	m.Lock()
 	defer m.Unlock()
 
-	if mtr, ok = m.metaTagRecords[orgId]; !ok {
-		mtr = newMetaTagRecords()
-		m.metaTagRecords[orgId] = mtr
+	// need to acquire write lock before getting the meta tag data structures
+	// because if they have not yet been initialized then this call will do so
+	mtr, mti, enricher = m.getMetaTagDataStructures(orgId, true)
+	tags := m.tags[orgId]
+	if tags == nil {
+		tags = make(TagIndex)
+		m.tags[orgId] = tags
 	}
 
-	if mti, ok = m.metaTagIndex[orgId]; !ok {
-		mti = make(metaTagIndex)
-		m.metaTagIndex[orgId] = mti
-	}
+	// acquiring meta record lock because we're going to modify
+	// meta records and the meta tag index
+	mtr.metaRecordLock.Lock()
+	defer mtr.metaRecordLock.Unlock()
 
 	id, record, oldId, oldRecord, err := mtr.upsert(upsertRecord)
 	if err != nil {
 		return err
 	}
 
-	// if this upsert has updated a previously existing record, then we remove its entries
-	// from the metaTagIndex before inserting the new ones
-	if oldRecord != nil {
+	var metricKeys []schema.Key
+	idCh := m.idsByTagQuery(orgId, queryCtx)
+	for metricId := range idCh {
+		metricKeys = append(metricKeys, metricId.Key)
+	}
+
+	// check if the upsert has replaced a previously existing record
+	if oldId > 0 && oldRecord != nil {
+		// if so we remove all references to it from the enricher
+		// and from the meta tag index
+		enricher.delMetaRecord(oldId, metricKeys)
 		for _, keyValue := range oldRecord.MetaTags {
 			mti.deleteRecord(keyValue, oldId)
 		}
-
-		for _, keyValue := range record.MetaTags {
-			mti.insertRecord(keyValue, id)
-		}
-
-		return nil
 	}
 
+	// add the newly inserted meta record into the enricher and the
+	// meta tag index
+	enricher.addMetaRecord(id, query, metricKeys)
 	for _, keyValue := range record.MetaTags {
 		mti.insertRecord(keyValue, id)
 	}
@@ -508,42 +577,198 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	return nil
 }
 
-func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error {
+func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaTagRecord) error {
 	if !TagSupport || !MetaTagSupport {
 		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
 		return errors.NewBadRequest("Tag/Meta-Tag support is disabled")
 	}
 
-	newMtr := newMetaTagRecords()
-	newMti := make(metaTagIndex)
+	metaRecordSwapExecuting.Inc()
 
-	for _, record := range records {
-		recordId, _, _, _, err := newMtr.upsert(record)
+	log.Infof("memory-idx: Initiating Swap with %d records for org %d", len(newRecords), orgId)
+	m.RLock()
+	mtr, mti, enricher := m.getMetaTagDataStructures(orgId, false)
+	tags := m.tags[orgId]
+	m.RUnlock()
+
+	if mtr == nil || mti == nil || enricher == nil {
+		// if one of the meta tag data structs has not been initialized yet we
+		// acquire the write lock and do so by calling with `true` as 2nd arg
+		m.Lock()
+		mtr, mti, enricher = m.getMetaTagDataStructures(orgId, true)
+		m.Unlock()
+	}
+
+	if tags == nil {
+		m.Lock()
+		tags = make(TagIndex)
+		m.tags[orgId] = tags
+		m.Unlock()
+	}
+
+	// recordIdsToKeep contains the records that should not be modified
+	recordIdsToKeep := make(map[recordId]struct{}, len(newRecords))
+
+	// recordsToUpsert contains the records which we're either going to
+	// either insert or update
+	var recordsToUpsert []tagquery.MetaTagRecord
+
+	// acquiring meta record lock because we're going to modify the meta tag
+	// index and the meta records
+	mtr.metaRecordLock.Lock()
+	defer mtr.metaRecordLock.Unlock()
+
+	// iterate over each of the new records to build a list of those that need to
+	// either be updated or inserted by comparing them to the currently existing
+	// records.
+	// all the existing ones that should not be modified get added to the set
+	// recordIdsToKeep.
+	m.RLock()
+	for i := range newRecords {
+		newRecords[i].Expressions.Sort()
+		newRecords[i].MetaTags.Sort()
+
+		// check for each record whether it exists, those which exist and have
+		// the same meta tags get added to recordIdsToKeep because we don't
+		// want to modify them
+		existingRecordId, exists, equal := mtr.recordExistsAndIsEqual(newRecords[i])
+		if exists && equal {
+			recordIdsToKeep[existingRecordId] = struct{}{}
+			continue
+		}
+
+		// the ones which either don't exist or do not have the same meta tags
+		// get added to recordsToUpsert
+		recordsToUpsert = append(recordsToUpsert, newRecords[i])
+	}
+	m.RUnlock()
+	log.Infof("memory-idx: After diff against existing meta records for org %d, going to upsert %d, %d remain unchanged", orgId, len(recordsToUpsert), len(recordIdsToKeep))
+	recordsUnchanged := uint32(len(recordIdsToKeep))
+
+	var query tagquery.Query
+	var queryCtx TagQueryContext
+	var err error
+	var recordsModified, recordsAdded, recordsPruned uint32
+	for _, record := range recordsToUpsert {
+		query, err = tagquery.NewQuery(record.Expressions, 0)
 		if err != nil {
-			return err
+			log.Errorf("Invalid record (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err)
+			continue
+		}
+		queryCtx = NewTagQueryContext(query)
+
+		// acquiring the write lock once per iteration, instead of acquiring it
+		// for the whole loop, because the speed of swap operations is not as
+		// important as keeping the query response times low
+		m.Lock()
+
+		// verify that nothing has changed between releasing the read lock
+		// and acquiring the write lock
+		existingRecordId, exists, equal := mtr.recordExistsAndIsEqual(record)
+		if exists && equal {
+			// something changed since we released the read lock, no need
+			// to update this record anymore
+			recordsUnchanged++
+			recordIdsToKeep[existingRecordId] = struct{}{}
+			m.Unlock()
+			continue
 		}
 
-		for _, keyValue := range record.MetaTags {
-			newMti.insertRecord(keyValue, recordId)
+		idCh := m.idsByTagQuery(orgId, queryCtx)
+		// not reusing metricKeys because it will be passed into the enricher
+		// which processes it asynchronously
+		var metricKeys []schema.Key
+		for metricId := range idCh {
+			metricKeys = append(metricKeys, metricId.Key)
 		}
+
+		if exists {
+			// the record already exists, but it has different meta tags
+			// associated, so we need to delete the references to the old
+			// recordId from the enricher and the mti because the id may
+			// change when we update it
+			recordsModified++
+			enricher.delMetaRecord(existingRecordId, metricKeys)
+			for _, tag := range record.MetaTags {
+				mti.deleteRecord(tag, existingRecordId)
+			}
+		} else {
+			// this record is new
+			recordsAdded++
+		}
+
+		newRecordId, newRecord, _, _, err := mtr.upsert(record)
+		if err != nil {
+			log.Errorf("Error when upserting meta record (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err.Error())
+			m.Unlock()
+			continue
+		}
+
+		enricher.addMetaRecord(newRecordId, query, metricKeys)
+		for _, tag := range newRecord.MetaTags {
+			mti.insertRecord(tag, newRecordId)
+		}
+
+		m.Unlock()
+
+		// adding the new record id to recordIdsToKeep to prevent that
+		// it gets pruned further down
+		recordIdsToKeep[newRecordId] = struct{}{}
 	}
 
 	m.RLock()
-	oldMtr, ok := m.metaTagRecords[orgId]
-	if ok {
-		if oldMtr.hashRecords() == newMtr.hashRecords() {
-			// the old and the new records are the same, so there is no need to change anyting
-			m.RUnlock()
-			return nil
+
+	// if the number of meta tag records is equal to the number of record
+	// ids to keep, and we've already ensured that the meta tag records are
+	// all up2date, then there's nothing to prune
+	if mtr.length() != len(recordIdsToKeep) {
+		m.RUnlock()
+		var pruned map[recordId]tagquery.MetaTagRecord
+		toPrune := mtr.getPrunable(recordIdsToKeep)
+		if len(toPrune) > 0 {
+			log.Infof("memory-idx: Going to prune %d meta records for org %d", len(toPrune), orgId)
+			recordsPruned = uint32(len(toPrune))
+
+			m.Lock()
+			// we can assume that the toPrune list is still correct because we're
+			// holding the metaRecordLock
+			pruned = make(map[recordId]tagquery.MetaTagRecord, len(toPrune))
+			mtr.prune(toPrune, pruned)
+			m.Unlock()
 		}
+
+		// remove all references to the pruned meta records from the meta
+		// tag index and the enricher
+		for recordId, record := range pruned {
+			query, err = tagquery.NewQuery(record.Expressions, 0)
+			if err != nil {
+				log.Errorf("Invalid meta record with id %d and expressions/meta tags: %q/%q", recordId, record.Expressions.Strings(), record.MetaTags.Strings())
+				continue
+			}
+			queryCtx = NewTagQueryContext(query)
+
+			// keeping the lock time as short as possible because pruning
+			// performance is not important compared to query response times
+			m.Lock()
+			for _, tag := range record.MetaTags {
+				mti.deleteRecord(tag, recordId)
+			}
+			idCh := m.idsByTagQuery(orgId, queryCtx)
+			var metricKeys []schema.Key
+			for metricId := range idCh {
+				metricKeys = append(metricKeys, metricId.Key)
+			}
+			enricher.delMetaRecord(recordId, metricKeys)
+			m.Unlock()
+		}
+	} else {
+		m.RUnlock()
 	}
-	m.RUnlock()
 
-	m.Lock()
-	defer m.Unlock()
-
-	m.metaTagRecords[orgId] = newMtr
-	m.metaTagIndex[orgId] = newMti
+	metaRecordSwapUnchanged.AddUint32(recordsUnchanged)
+	metaRecordSwapAdded.AddUint32(recordsAdded)
+	metaRecordSwapModified.AddUint32(recordsModified)
+	metaRecordSwapPruned.AddUint32(recordsPruned)
 
 	return nil
 }
@@ -554,8 +779,8 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.Meta
 	m.RLock()
 	defer m.RUnlock()
 
-	mtr, ok := m.metaTagRecords[orgId]
-	if !ok {
+	mtr := m.getMetaTagRecords(orgId, false)
+	if mtr == nil {
 		return res
 	}
 
@@ -596,6 +821,10 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	tags.addTagId("name", def.NameSanitizedAsTagValue(), def.Id)
 
 	m.defByTagSet.add(def)
+
+	if MetaTagSupport {
+		m.getMetaTagEnricher(def.OrgId, true).addMetric(*def)
+	}
 }
 
 // deindexTags takes a given metric definition and removes all references
@@ -622,6 +851,10 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 	tags.delTagId("name", def.NameSanitizedAsTagValue(), def.Id)
 
 	m.defByTagSet.del(def)
+
+	if MetaTagSupport {
+		m.getMetaTagEnricher(def.OrgId, true).delMetric(def)
+	}
 
 	return true
 }
@@ -829,17 +1062,13 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	m.RLock()
 	defer m.RUnlock()
 
-	tagIndex, ok := m.tags[orgId]
-	if !ok {
-		// if there is no tag index, we don't need to run the tag query
-		return nil
-	}
-
-	var enricher *enricher
+	var enricher *metaTagEnricher
+	var mtr *metaTagRecords
 	if MetaTagSupport {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
-			enricher = mtr.getEnricher(tagIndex.idHasTag)
+		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
+		if enricher.countMetricsWithMetaTags() == 0 {
+			// if the enricher is empty we set it back to nil so it doesn't even get called
+			enricher = nil
 		}
 	}
 
@@ -863,16 +1092,12 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
 			}
-			if enricher != nil {
-				byPath[nameWithTags].MetaTags = enricher.enrich(def.Id, def.Name, def.Tags)
+			if enricher != nil && mtr != nil {
+				byPath[nameWithTags].MetaTags = mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
 			}
 		} else {
 			existing.Defs = append(existing.Defs, CloneArchive(def))
 		}
-	}
-
-	if enricher != nil {
-		enricher.reportStats()
 	}
 
 	results := make([]idx.Node, len(byPath))
@@ -920,8 +1145,8 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		return res
 	}
 
-	mti, ok := m.metaTagIndex[orgId]
-	if !ok {
+	mti := m.getMetaTagIndex(orgId, false)
+	if mti == nil {
 		sort.Strings(res)
 		return res
 	}
@@ -966,15 +1191,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		return res
 	}
 
-	mti, ok := m.metaTagIndex[orgId]
-	if !ok {
-		return res
-	}
-
-	mtr, ok := m.metaTagRecords[orgId]
-	if !ok {
-		return res
-	}
+	mtr, mti, _ := m.getMetaTagDataStructures(orgId, false)
 
 	for value, recordIds := range mti[key] {
 		if filter != nil && !filter.MatchString(value) {
@@ -1038,11 +1255,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		return m.finalizeResult(res, limit, false)
 	}
 
-	mti, ok := m.metaTagIndex[orgId]
-	if !ok {
-		return m.finalizeResult(res, limit, false)
-	}
-
+	mti := m.getMetaTagIndex(orgId, false)
 	for tag := range mti {
 		// a tag gets appended to the result set if either the given prefix is
 		// empty or the tag has the given prefix
@@ -1070,18 +1283,15 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	m.RLock()
 	defer m.RUnlock()
 
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil
-	}
-
 	resMap := make(map[string]struct{})
 
-	var enricher *enricherWithUniqueMetaRecords
+	var enricher *metaTagEnricher
+	var mtr *metaTagRecords
 	if MetaTagSupport {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
-			enricher = mtr.getEnricher(tags.idHasTag).uniqueMetaRecords()
+		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
+		if enricher.countMetricsWithMetaTags() == 0 {
+			// if the enricher is empty we set it back to nil so it doesn't even get called
+			enricher = nil
 		}
 	}
 
@@ -1108,18 +1318,14 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 			}
 		}
 
-		if enricher != nil {
-			metaTags := enricher.enrich(def.Id, def.Name, def.Tags)
+		if enricher != nil && mtr != nil {
+			metaTags := mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
 			for _, tag := range metaTags {
 				if len(prefix) == 0 || strings.HasPrefix(tag.Key, prefix) {
 					resMap[tag.Key] = struct{}{}
 				}
 			}
 		}
-	}
-
-	if enricher != nil {
-		enricher.reportStats()
 	}
 
 	// handle special case of the name tag
@@ -1165,7 +1371,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		return m.finalizeResult(res, limit, false)
 	}
 
-	metaTagValues := m.metaTagIndex[orgId][tag]
+	metaTagValues := m.getMetaTagIndex(orgId, false)[tag]
 	if len(metaTagValues) == 0 {
 		return m.finalizeResult(res, limit, false)
 	}
@@ -1203,11 +1409,13 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 	resMap := make(map[string]struct{})
 
-	var enricher *enricherWithUniqueMetaRecords
+	var enricher *metaTagEnricher
+	var mtr *metaTagRecords
 	if MetaTagSupport && !isMetricTag {
-		mtr, ok := m.metaTagRecords[orgId]
-		if ok {
-			enricher = mtr.getEnricher(tags.idHasTag).uniqueMetaRecords()
+		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
+		if enricher.countMetricsWithMetaTags() == 0 {
+			// if the enricher is empty we set it back to nil so it doesn't even get called
+			enricher = nil
 		}
 	}
 
@@ -1243,8 +1451,8 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 				resMap[tagValue[1]] = struct{}{}
 			}
 
-			if enricher != nil {
-				metaTags := enricher.enrich(def.Id, def.Name, def.Tags)
+			if enricher != nil && mtr != nil {
+				metaTags := mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
 				for _, metaTag := range metaTags {
 					if metaTag.Key == tag && strings.HasPrefix(metaTag.Value, prefix) {
 						resMap[metaTag.Value] = struct{}{}
@@ -1252,10 +1460,6 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 				}
 			}
 		}
-	}
-
-	if enricher != nil {
-		enricher.reportStats()
 	}
 
 	res := make([]string, len(resMap))
@@ -1277,7 +1481,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query TagQueryConte
 		return resCh
 	}
 
-	query.RunNonBlocking(tags, m.defById, m.metaTagIndex[orgId], m.metaTagRecords[orgId], resCh)
+	query.RunNonBlocking(tags, m.defById, m.getMetaTagIndex(orgId, false), m.getMetaTagRecords(orgId, false), resCh)
 
 	return resCh
 }

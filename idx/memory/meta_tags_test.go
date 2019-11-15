@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -315,189 +314,163 @@ func TestDeletingMetaRecord(t *testing.T) {
 	}
 }
 
-func TestComparingMetaTagRecords(t *testing.T) {
-	reset := enableMetaTagSupport()
-	defer reset()
+func TestAddingMetricsToEmptyEnricher(t *testing.T) {
+	enricher := newEnricher()
 
-	records := generateMetaRecords(t,
-		[][]string{{"meta1=tag1"}, {"meta2=tag2"}},
-		[][]string{{"expr1=value1"}, {"expr2=value2"}},
-	)
-
-	mtr1 := newMetaTagRecords()
-	mtr2 := newMetaTagRecords()
-
-	if mtr1.hashRecords() != mtr2.hashRecords() {
-		t.Fatalf("TC1: Expected meta tag records to be the same")
-	}
-
-	mtr1.upsert(records[0])
-
-	if mtr1.hashRecords() == mtr2.hashRecords() {
-		t.Fatalf("TC2: Expected meta tag records to be the different")
-	}
-
-	mtr2.upsert(records[0])
-
-	if mtr1.hashRecords() != mtr2.hashRecords() {
-		t.Fatalf("TC3: Expected meta tag records to be the same")
-	}
-
-	mtr1.upsert(records[1])
-
-	if mtr1.hashRecords() == mtr2.hashRecords() {
-		t.Fatalf("TC4: Expected meta tag records to be the different")
-	}
-
-	mtr2.upsert(records[1])
-
-	if mtr1.hashRecords() != mtr2.hashRecords() {
-		t.Fatalf("TC5: Expected meta tag records to be the same")
-	}
-
-	// create another instance of metaTagRecords and populate it in reverse order
-	mtr3 := newMetaTagRecords()
-	mtr3.upsert(records[1])
-	mtr3.upsert(records[0])
-
-	if mtr1.hashRecords() != mtr3.hashRecords() {
-		t.Fatalf("TC6: Expected meta tag records to be the same")
-	}
-}
-
-func getEnricherWithTestData(t *testing.T) ([]schema.MetricDefinition, *enricher) {
-	mtr := newMetaTagRecords()
-
-	records := generateMetaRecords(t,
-		[][]string{{"meta1=tag1"}, {"meta2=tag2"}},
-		[][]string{{"expr1=value1"}, {"expr2=value2"}},
-	)
-	for _, record := range records {
-		mtr.upsert(record)
-	}
-
-	testMetrics := []schema.MetricDefinition{
+	mds := []schema.MetricDefinition{
 		{
-			Name: "metric1",
-			Tags: []string{"expr1=value1"},
+			Name: "one",
+			Tags: []string{"a=b", "c=d"},
 		}, {
-			Name: "metric2",
-			Tags: []string{"expr2=value2"},
+			Name: "two",
 		}, {
-			Name: "metric3",
-			Tags: []string{"expr1=value1", "expr2=value2"},
+			Name: "three",
+			Tags: []string{},
+		}, {
+			Name: "four",
+			Tags: []string{"c=d", "e=f"},
 		},
 	}
+	for i := range mds {
+		mds[i].SetId()
+		enricher.addMetric(mds[i])
+	}
+
+	// stop waits for the queue to be consumed
+	enricher.stop()
+	enricher.start()
+
+	if enricher.countMetricsWithMetaTags() != 0 {
+		t.Fatalf("Expected that there are no metrics with meta tags, but there were %d", enricher.countMetricsWithMetaTags())
+	}
+}
+
+func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
+	enricher := newEnricher()
+	acceptEverySecond, err := tagquery.NewQueryFromStrings([]string{"name=~.*[135]$"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
+	}
+	acceptAll, err := tagquery.NewQueryFromStrings([]string{"name=~.+"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
+	}
+	acceptNone, err := tagquery.NewQueryFromStrings([]string{"name=nonexistent"}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
+	}
+	enricher.addMetaRecord(recordId(1), acceptEverySecond, nil)
+	enricher.addMetaRecord(recordId(2), acceptAll, nil)
+	enricher.addMetaRecord(recordId(3), acceptNone, nil)
+
+	testMetrics := []schema.MetricDefinition{
+		{Name: "1"},
+		{Name: "2"},
+		{Name: "3"},
+		{Name: "4"},
+		{Name: "5"},
+	}
+
+	allKeys := make([]schema.Key, len(testMetrics))
 	for i := range testMetrics {
 		testMetrics[i].SetId()
+		allKeys[i] = testMetrics[i].Id.Key
+		enricher.addMetric(testMetrics[i])
 	}
 
-	enricher := mtr.getEnricher(func(id schema.MKey, tag, value string) bool {
-		for _, metric := range testMetrics {
-			if metric.Id == id {
-				searchTag := tag + "=" + value
-				for _, haveTag := range metric.Tags {
-					if searchTag == haveTag {
-						return true
-					}
-				}
+	flushEnricherQueue := func() {
+		// stop and start to process the event queue
+		enricher.stop()
+		enricher.start()
+	}
+
+	// helper to verify returned result
+	compareResultToExpected := func(expected []map[recordId]struct{}) {
+		flushEnricherQueue()
+
+		for i, metric := range testMetrics {
+			records := enricher.enrich(metric.Id.Key)
+			if !reflect.DeepEqual(records, expected[i]) {
+				t.Fatalf("Unexpected result returned from enrich:\nExpected: %+v\nGot: %+v\n", expected[i], records)
 			}
 		}
-		return false
-	})
-
-	return testMetrics, enricher
-}
-
-func TestEnricher(t *testing.T) {
-	testMetrics, enricher := getEnricherWithTestData(t)
-
-	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
-	expectedTags := tagquery.Tags{{Key: "meta1", Value: "tag1"}}
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
 	}
 
-	tags = enricher.enrich(testMetrics[1].Id, testMetrics[1].Name, testMetrics[1].Tags)
-	expectedTags = tagquery.Tags{{Key: "meta2", Value: "tag2"}}
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
-	}
+	compareExpectedMetricCount := func(expected int) {
+		flushEnricherQueue()
 
-	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
-	tags.Sort()
-	expectedTags = tagquery.Tags{{Key: "meta1", Value: "tag1"}, {Key: "meta2", Value: "tag2"}}
-	expectedTags.Sort()
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
-	}
-}
-
-func TestEnricherWithUniqueMetaTags(t *testing.T) {
-	testMetrics, e := getEnricherWithTestData(t)
-	enricher := e.uniqueMetaRecords()
-
-	tags := enricher.enrich(testMetrics[0].Id, testMetrics[0].Name, testMetrics[0].Tags)
-	expectedTags := tagquery.Tags{{Key: "meta1", Value: "tag1"}}
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
-	}
-
-	tags = enricher.enrich(testMetrics[1].Id, testMetrics[1].Name, testMetrics[1].Tags)
-	expectedTags = tagquery.Tags{{Key: "meta2", Value: "tag2"}}
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set did not contain expected tag. Expected: %q Got: %q", expectedTags, tags)
-	}
-
-	// we expect no tags to be enriched, because both present meta records have already been used once
-	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
-	if len(tags) == 0 {
-		tags = nil
-	}
-
-	expectedTags = nil
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
-	}
-
-	// when we re-initialize the enricher with unique meta tags and run the same query one more time
-	// then there should be results, but only once
-	enricher = e.uniqueMetaRecords()
-
-	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
-	tags.Sort()
-	expectedTags = tagquery.Tags{{Key: "meta1", Value: "tag1"}, {Key: "meta2", Value: "tag2"}}
-	expectedTags.Sort()
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
-	}
-
-	tags = enricher.enrich(testMetrics[2].Id, testMetrics[2].Name, testMetrics[2].Tags)
-	if len(tags) == 0 {
-		tags = nil
-	}
-
-	expectedTags = nil
-	if !reflect.DeepEqual(tags, expectedTags) {
-		t.Fatalf("Returned result set was not as expected. Expected: %q Got: %q", expectedTags, tags)
-	}
-}
-
-func BenchmarkMetaTagRecordsHashing(b *testing.B) {
-	mtrCount := 10000
-	mtr := newMetaTagRecords()
-	for i := 0; i < mtrCount; i++ {
-		record, err := tagquery.ParseMetaTagRecord([]string{fmt.Sprintf("meta%d=tag%d", i, i)}, []string{fmt.Sprintf("expr%d=value%d", i, i)})
-		if err != nil {
-			b.Fatalf("Unexpected error when parsing meta tag record: %s", err)
+		result := enricher.countMetricsWithMetaTags()
+		if result != expected {
+			t.Fatalf("Unexpected count of metrics with meta tags. Expected %d, got %d", expected, result)
 		}
-		mtr.upsert(record)
 	}
 
-	b.ReportAllocs()
-	b.ResetTimer()
+	compareResultToExpected([]map[recordId]struct{}{
+		{recordId(1): {}, recordId(2): {}},
+		{recordId(2): {}},
+		{recordId(1): {}, recordId(2): {}},
+		{recordId(2): {}},
+		{recordId(1): {}, recordId(2): {}},
+	})
+	compareExpectedMetricCount(5)
 
-	for i := 0; i < b.N; i++ {
-		mtr.hashRecords()
+	record4Keys := []schema.Key{testMetrics[1].Id.Key, testMetrics[3].Id.Key}
+	enricher.addMetaRecord(recordId(4), acceptAll, record4Keys)
+
+	compareResultToExpected([]map[recordId]struct{}{
+		{recordId(1): {}, recordId(2): {}},
+		{recordId(2): {}, recordId(4): {}},
+		{recordId(1): {}, recordId(2): {}},
+		{recordId(2): {}, recordId(4): {}},
+		{recordId(1): {}, recordId(2): {}},
+	})
+	compareExpectedMetricCount(5)
+
+	enricher.delMetaRecord(recordId(2), allKeys)
+	enricher.delMetaRecord(recordId(4), record4Keys)
+
+	compareResultToExpected([]map[recordId]struct{}{
+		{recordId(1): {}},
+		nil,
+		{recordId(1): {}},
+		nil,
+		{recordId(1): {}},
+	})
+	compareExpectedMetricCount(3)
+
+	enricher.delMetric(&testMetrics[4])
+
+	compareResultToExpected([]map[recordId]struct{}{
+		{recordId(1): {}},
+		nil,
+		{recordId(1): {}},
+		nil,
+		nil,
+	})
+	compareExpectedMetricCount(2)
+
+	enricher.delMetaRecord(recordId(1), []schema.Key{testMetrics[0].Id.Key, testMetrics[2].Id.Key, testMetrics[4].Id.Key})
+	enricher.delMetaRecord(recordId(3), nil)
+
+	compareResultToExpected([]map[recordId]struct{}{
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	})
+	compareExpectedMetricCount(0)
+
+	for i := range testMetrics {
+		enricher.delMetric(&testMetrics[i])
 	}
+
+	compareResultToExpected([]map[recordId]struct{}{
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	})
+	compareExpectedMetricCount(0)
 }

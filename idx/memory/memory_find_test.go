@@ -292,6 +292,42 @@ func InitLargeIndex() {
 	//orgId 2 has 168,000 mertics
 }
 
+func getMetaTagEnrichers(t testing.TB, ix MemoryIndex) map[uint32][]*metaTagEnricher {
+	t.Helper()
+
+	res := make(map[uint32][]*metaTagEnricher)
+	switch concrete := ix.(type) {
+	case *PartitionedMemoryIdx:
+		for _, unpartitionedIdx := range concrete.Partition {
+			for orgId, enricher := range unpartitionedIdx.metaTagEnricher {
+				res[orgId] = append(res[orgId], enricher)
+			}
+		}
+	case *UnpartitionedMemoryIdx:
+		for orgId, enricher := range concrete.metaTagEnricher {
+			res[orgId] = append(res[orgId], enricher)
+		}
+	default:
+		t.Fatalf("Invalid index object")
+	}
+
+	return res
+}
+
+// waitForMetaTagEnrichers obtains all enrichers in existence, across all orgs, and uses
+// their .wait() function to wait for each of them. this function blocks until the whole
+// enricher queue has been processed up to the point when it was called
+func waitForMetaTagEnrichers(t testing.TB, ix MemoryIndex) {
+	enrichersByOrg := getMetaTagEnrichers(t, ix)
+	for _, enrichers := range enrichersByOrg {
+		for _, enricher := range enrichers {
+			// stop waits until the queue has been fully consumed
+			enricher.stop()
+			enricher.start()
+		}
+	}
+}
+
 func queryAndCompareTagValues(t *testing.T, key, filter string, expected map[string]uint64) {
 	t.Helper()
 
@@ -370,6 +406,8 @@ func testTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
 
+	waitForMetaTagEnrichers(t, ix)
+
 	expected := make(map[string]uint64)
 	expected["all"] = 168000
 	expected["dc0"] = 33600
@@ -400,6 +438,8 @@ func testTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "dc5"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
+
+	waitForMetaTagEnrichers(t, ix)
 
 	expected := make(map[string]uint64)
 	expected["dc3"] = 33600
@@ -473,14 +513,16 @@ func testTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
 
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
-		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "directionMeta", Value: "read"}},
+	orgId := uint32(1)
+	ix.MetaTagRecordUpsert(orgId, tagquery.MetaTagRecord{
+		MetaTags: tagquery.Tags{
+			{Key: "directionMeta", Value: "read"},
+			{Key: "directionMeta2", Value: "read"},
+		},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
-		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "directionMeta2", Value: "read"}},
-		Expressions: tagquery.Expressions{metaRecordExpression},
-	})
+
+	waitForMetaTagEnrichers(t, ix)
 
 	expected := []string{"dc", "device", "disk", "direction", "directionMeta", "directionMeta2"}
 	queryAndCompareTagKeys(t, "d", expected)
@@ -509,6 +551,8 @@ func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
+
+	waitForMetaTagEnrichers(t, ix)
 
 	expected := []string{"all", "dc", "host", "device", "cpu", "metric", "direction", "disk", "name"}
 	queryAndCompareTagKeys(t, "", expected)
@@ -649,6 +693,8 @@ func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
 		Expressions: tagquery.Expressions{metaRecordExpression2},
 	})
 
+	waitForMetaTagEnrichers(t, ix)
+
 	type testCase struct {
 		prefix string
 		limit  uint
@@ -768,6 +814,8 @@ func testAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "another", Value: "tag"}, tagquery.Tag{Key: "meta", Value: "tag"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
+
+	waitForMetaTagEnrichers(t, ix)
 
 	type testCase struct {
 		prefix string
@@ -897,6 +945,8 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "meta1", Value: "all_metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression3},
 	})
+
+	waitForMetaTagEnrichers(t, ix)
 
 	type testCase struct {
 		tag    string
@@ -1046,6 +1096,8 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression3},
 	})
+
+	waitForMetaTagEnrichers(t, ix)
 
 	type testCase struct {
 		tag    string

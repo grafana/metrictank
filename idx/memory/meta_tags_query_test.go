@@ -37,9 +37,9 @@ func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, c
 		mkeys[i] = mkey
 	}
 
-	for i := range metaTags {
-		idx.MetaTagRecordUpsert(1, metaTags[i])
-	}
+	idx.MetaTagRecordSwap(1, metaTags)
+
+	waitForMetaTagEnrichers(t, idx)
 
 	return idx, mkeys
 }
@@ -326,19 +326,6 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 		}
 	}
 
-	queries := make([]tagquery.Query, 1000)
-	for i := 0; i < 1000; i++ {
-		expression, err := tagquery.ParseExpression(fmt.Sprintf("metatag=value%d", i))
-		if err != nil {
-			b.Fatalf("Error when parsing expressions: %s", err)
-		}
-
-		queries[i], err = tagquery.NewQuery(tagquery.Expressions{expression}, 0)
-		if err != nil {
-			b.Fatalf("Unexpected error when instantiating query from expression %q: %s", expression, err)
-		}
-	}
-
 	allMetaTagRecords := make([]tagquery.MetaTagRecord, len(metaTagRecords1)+len(metaTagRecords2)+len(metaTagRecords3))
 	cursor := 0
 	for i := 0; i < len(metaTagRecords1); i++ {
@@ -365,12 +352,13 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 
 	var def *idx.Archive
 	resToCompare := make(map[tagquery.Tag]struct{})
+	mtr, _, enricher := memoryIdx.getMetaTagDataStructures(1, true)
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		def = &defs[i%1000]
-		metaTags := memoryIdx.metaTagRecords[1].getEnricher(memoryIdx.tags[1].idHasTag).enrich(def.Id, def.Name, def.Tags)
+		metaTags := mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
 		if len(metaTags) != 3 {
 			b.Fatalf("Expected result to have length 3, but it had %d", len(metaTags))
 		}
@@ -447,11 +435,6 @@ func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount int) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	// reset enrichmentCacheSize back to original value when we're done
-	_enrichmentCacheSize := enrichmentCacheSize
-	defer func() { enrichmentCacheSize = _enrichmentCacheSize }()
-	enrichmentCacheSize = indexSize
-
 	metaTagSets := [][]string{
 		{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"},
 		{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"},
@@ -485,4 +468,54 @@ func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount int) {
 			b.Fatalf("Unexpected number of meta tags in result. Expected %d, got %d", expectedMetaTagsPerDef, len(res[0].MetaTags))
 		}
 	}
+}
+
+func BenchmarkAddingMetricsToEnricher1kMetaRecords(b *testing.B) {
+	benchmarkAddingMetricToEnricher(b, 1000)
+}
+
+func BenchmarkAddingMetricsToEnricher10kMetaRecords(b *testing.B) {
+	benchmarkAddingMetricToEnricher(b, 10000)
+}
+
+func benchmarkAddingMetricToEnricher(b *testing.B, metaRecordCount int) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
+	metaTagSets := [][]string{
+		{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"},
+		{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"},
+	}
+	tagGen := func(id uint32) string {
+		return fmt.Sprintf("host=hostname%d", id%uint32(metaRecordCount))
+	}
+	metaRecords := getMetaRecordsForMetaTagQueryBenchmark(b, metaRecordCount, metaTagSets, tagGen)
+	index, _ := getTestIndexWithMetaTags(b, metaRecords, 0, tagGen)
+
+	var err error
+	mkeys := make([]schema.MKey, b.N)
+	mds := make([]schema.MetricData, b.N)
+	for i := range mds {
+		mds[i].Name = "test.name"
+		mds[i].OrgId = 1
+		mds[i].Interval = 1
+		mds[i].Value = 1
+		mds[i].Time = 1
+		mds[i].Tags = []string{fmt.Sprintf("tag1=iterator%d", i), fmt.Sprintf("tag2=%d", i+1)}
+		mds[i].Tags = append(mds[i].Tags, tagGen(uint32(i)))
+		mds[i].SetId()
+
+		mkeys[i], err = schema.MKeyFromString(mds[i].Id)
+		if err != nil {
+			b.Fatalf("Error when parsing id string: %s", mds[i].Id)
+		}
+	}
+
+	enricher := index.getMetaTagEnricher(1, true)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		index.AddOrUpdate(mkeys[i], &mds[i], 0)
+	}
+	enricher.stop()
 }

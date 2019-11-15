@@ -2,6 +2,10 @@
 
 ## breaking changes
 
+* as of v0.13.0-160-gd2703083 the default setting for `memory-idx.tag-query-workers` is `5` instead of `50`.
+  If a user still has the value `50` in their config file we recommend decreasing that, because due to how
+  meta tag queries get processed MT may now create multiple pools of workers concurrently to process a single
+  query, where each pool consists of `tag-query-workers` threads.
 * as of v0.13.0-75-geaac736a Metrictank requires two new Cassandra tables if the meta tag feature is enabled and the Cassandra index is used. It only creates them automatically if `cassandra-idx-create-keyspace` is set to true.
 * as of v0.12.0-404-gc7715cb2 we clean up poorly formatted graphite metrics better. To the extent that they have previously worked, queries may need some adjusting
   #1435
