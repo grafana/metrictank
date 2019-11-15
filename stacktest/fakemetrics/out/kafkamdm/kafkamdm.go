@@ -88,7 +88,7 @@ func New(topic string, brokers []string, codec string, timeout time.Duration, st
 	} else {
 		part, err = p.NewKafka(partitionScheme)
 		if err != nil {
-			return nil, fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
+			return nil, fmt.Errorf("partitionscheme must be one of 'byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv|lastNum'. got %s", partitionScheme)
 		}
 	}
 
