@@ -1411,7 +1411,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 
 	var enricher *metaTagEnricher
 	var mtr *metaTagRecords
-	if MetaTagSupport {
+	if MetaTagSupport && !isMetricTag {
 		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
 		if enricher.countMetricsWithMetaTags() == 0 {
 			// if the enricher is empty we set it back to nil so it doesn't even get called
@@ -1451,7 +1451,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 				resMap[tagValue[1]] = struct{}{}
 			}
 
-			if enricher != nil && mtr != nil && !isMetricTag {
+			if enricher != nil && mtr != nil {
 				metaTags := mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
 				for _, metaTag := range metaTags {
 					if metaTag.Key == tag && strings.HasPrefix(metaTag.Value, prefix) {
