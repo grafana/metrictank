@@ -65,9 +65,9 @@ global config flags:
   -limit int
     	only show this many metrics.  use 0 to disable
   -max-stale string
-    	exclude series that have not been seen for this much time.  use 0 to disable (default "6h30min")
+    	exclude series that have not been seen for this much time (compared against LastUpdate).  use 0 to disable (default "6h30min")
   -min-stale string
-    	exclude series that have been seen in this much time.  use 0 to disable (default "0")
+    	exclude series that have been seen in this much time (compared against LastUpdate).  use 0 to disable (default "0")
   -partitions string
     	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
