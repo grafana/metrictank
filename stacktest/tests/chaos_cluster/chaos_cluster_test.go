@@ -120,7 +120,7 @@ func TestClusterBaseIngestWorkload(t *testing.T) {
 
 	// generate exactly numPartitions metrics, numbered 0..numPartitions where each metric goes to the partition of the same number
 	// each partition is consumed by 2 instances, and each instance consumes 4 partitions thus 4 metrics/s on average.
-	fm = fakemetrics.NewKafka(numPartitions)
+	fm = fakemetrics.NewKafka(numPartitions, 5*time.Second)
 
 	req := graphite.RequestForLocalTestingGraphite("perSecond(metrictank.stats.docker-cluster.*.input.kafka-mdm.metricdata.received.counter32)", "-8s")
 

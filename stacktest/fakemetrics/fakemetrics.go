@@ -59,9 +59,9 @@ func NewFakeMetrics(metrics []*schema.MetricData, o out.Out, stats met.Backend) 
 	return fm
 }
 
-func NewKafka(num int) *FakeMetrics {
+func NewKafka(num int, timeout time.Duration) *FakeMetrics {
 	stats, _ := helper.New(false, "", "standard", "", "")
-	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", stats, "lastNum")
+	out, err := kafkamdm.New("mdm", []string{"localhost:9092"}, "none", timeout, stats, "lastNum")
 	if err != nil {
 		log.Fatalf("failed to create kafka-mdm output. %s", err.Error())
 	}
