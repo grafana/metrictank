@@ -24,7 +24,7 @@ func (e *expressionPrefix) GetOperator() ExpressionOperator {
 }
 
 func (e *expressionPrefix) GetOperatorCost() uint32 {
-	return 2
+	return 3
 }
 
 func (e *expressionPrefix) RequiresNonEmptyValue() bool {

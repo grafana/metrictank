@@ -584,3 +584,41 @@ func testGetByTag(t *testing.T) {
 		}
 	}
 }
+
+// TestExpressionSortingByCost instantiates a query with various different expressions,
+// some of which involve meta tags, then it sorts them by cost and verifies that the
+// resulting order is as expected.
+func TestExpressionSortingByCost(t *testing.T) {
+	query, err := tagquery.NewQueryFromStrings([]string{
+		"a=~b", // meta tag             expected to be 6.
+		"c!=d", // metric tag           expected to be 2.
+		"e!=f", // meta tag             expected to be 5.
+		"g=h",  // metric tag           expected to be 1.
+		"i=~j", // metric tag           expected to be 3.
+		"k=l",  // metric and meta tag  expected to be 4.
+	}, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when instantiating query: %s", err)
+	}
+
+	queryCtx := NewTagQueryContext(query)
+	queryCtx.index = TagIndex{
+		"c": {"d": {}},
+		"g": {"f": {}},
+		"i": {"j": {}},
+		"k": {"l": {}},
+	}
+	queryCtx.metaTagIndex = metaTagIndex{
+		"a": {"b": {}},
+		"e": {"f": {}},
+		"k": {"l": {}},
+	}
+
+	costs := queryCtx.evaluateExpressionCosts()
+	expectedIdxPositions := []int{3, 1, 4, 5, 2, 0}
+	for i, expectedIdxPosition := range expectedIdxPositions {
+		if costs[i].expressionIdx != expectedIdxPosition {
+			t.Fatalf("Order of expressions is not as expected\nExpected:\n%+v\nGot:\n%+v\n", expectedIdxPositions, costs)
+		}
+	}
+}
