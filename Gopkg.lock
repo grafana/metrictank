@@ -256,7 +256,7 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "1:bd03a3047d3a622c410ad5eb8725d06abb241982d2efbe08c55934f43520514a"
+  digest = "1:5da5f3b5aaf6dc6818a3f603fff1a21c978f980c7604d1930578df7b0df69914"
   name = "github.com/gocql/gocql"
   packages = [
     ".",
@@ -265,7 +265,7 @@
     "internal/streams",
   ]
   pruneopts = "NUT"
-  revision = "d9815cdf0ff24e2efa9b8062f4f94a6dd347ae51"
+  revision = "e163eff7a8c6863df050dae7d3daa4bf98474d8e"
 
 [[projects]]
   digest = "1:1ba798075c507fb2513d955f8c04314acdb233b269671224a602ed4dc550eb64"
