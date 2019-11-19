@@ -51,6 +51,43 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 	}
 }
 
+func TestSliceContainsElements(t *testing.T) {
+	slice := []string{"a", "c", "e", "g", "i"}
+	if sliceContainsElements([]string{"a", "b", "c"}, slice) {
+		t.Fatalf("Failed at TC 1")
+	}
+	if sliceContainsElements([]string{"b", "c", "e"}, slice) {
+		t.Fatalf("Failed at TC 2")
+	}
+	if sliceContainsElements([]string{"a", "c", "e", "f"}, slice) {
+		t.Fatalf("Failed at TC 3")
+	}
+	if !sliceContainsElements([]string{"a", "c", "e"}, slice) {
+		t.Fatalf("Failed at TC 4")
+	}
+	if !sliceContainsElements([]string{"c", "e", "g"}, slice) {
+		t.Fatalf("Failed at TC 5")
+	}
+	if !sliceContainsElements([]string{"e", "g", "i"}, slice) {
+		t.Fatalf("Failed at TC 6")
+	}
+	if !sliceContainsElements(slice, slice) {
+		t.Fatalf("Failed at TC 7")
+	}
+	if !sliceContainsElements(nil, slice) {
+		t.Fatalf("Failed at TC 8")
+	}
+	if !sliceContainsElements(nil, nil) {
+		t.Fatalf("Failed at TC 9")
+	}
+	if !sliceContainsElements([]string{"i"}, slice) {
+		t.Fatalf("Failed at TC 10")
+	}
+	if !sliceContainsElements([]string{"a"}, slice) {
+		t.Fatalf("Failed at TC 11")
+	}
+}
+
 func TestFilterByMetricTag(t *testing.T) {
 	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetricTag))(t)
 }

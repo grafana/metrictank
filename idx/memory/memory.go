@@ -925,6 +925,8 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	path := def.NameWithTags()
 
 	if TagSupport {
+		sort.Strings(def.Tags)
+
 		// Even if there are no tags, index at least "name". It's important to use the definition
 		// in the archive pointer that we add to defById, because the pointers must reference the
 		// same underlying object in m.defById and m.defByTagSet

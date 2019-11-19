@@ -1,6 +1,9 @@
 package memory
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
@@ -79,7 +82,10 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		}
 
 		var metaRecordFilters []tagquery.MetricDefinitionFilter
-		for _, id := range metaRecordIds {
+		onlyEqualOperators := !invertSetOfMetaRecords
+		singleEqualExprPerRecord := true
+		records := make([]tagquery.MetaTagRecord, len(metaRecordIds))
+		for i, id := range metaRecordIds {
 			record, ok := ctx.metaTagRecords.records[id]
 			if !ok {
 				corruptIndex.Inc()
@@ -87,17 +93,130 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 				continue
 			}
 
+			if onlyEqualOperators {
+				for exprIdx := range record.Expressions {
+					if record.Expressions[exprIdx].GetOperator() != tagquery.EQUAL {
+						onlyEqualOperators = false
+						break
+					}
+				}
+				records[i] = record
+				if len(record.Expressions) > 1 {
+					singleEqualExprPerRecord = false
+				}
+			}
+
 			metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
 		}
 
-		if invertSetOfMetaRecords {
-			res.filters[i].testByMetaTags = metaRecordFilterInverted(metaRecordFilters, res.filters[i].defaultDecision)
+		if onlyEqualOperators {
+			if singleEqualExprPerRecord {
+				res.filters[i].testByMetaTags = metaRecordFilterBySetOfValidValues(records)
+			} else {
+				res.filters[i].testByMetaTags = metaRecordFilterBySetOfValidValueSets(records)
+			}
 		} else {
-			res.filters[i].testByMetaTags = metaRecordFilterNormal(metaRecordFilters, res.filters[i].defaultDecision)
+			if invertSetOfMetaRecords {
+				res.filters[i].testByMetaTags = metaRecordFilterInverted(metaRecordFilters, res.filters[i].defaultDecision)
+			} else {
+				res.filters[i].testByMetaTags = metaRecordFilterNormal(metaRecordFilters, res.filters[i].defaultDecision)
+			}
 		}
 	}
 
 	return &res
+}
+
+func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord) tagquery.MetricDefinitionFilter {
+	validValues := make(map[string]struct{})
+	validNames := make(map[string]struct{})
+	var builder strings.Builder
+	for i := range records {
+		if records[i].Expressions[0].GetKey() == "name" {
+			validNames[records[i].Expressions[0].GetValue()] = struct{}{}
+		} else {
+			records[i].Expressions[0].StringIntoWriter(&builder)
+			validValues[builder.String()] = struct{}{}
+			builder.Reset()
+		}
+	}
+
+	return func(_ schema.MKey, name string, tags []string) tagquery.FilterDecision {
+		for i := range tags {
+			if _, ok := validValues[tags[i]]; ok {
+				return tagquery.Pass
+			}
+		}
+		if _, ok := validNames[name]; ok {
+			return tagquery.Pass
+		}
+		return tagquery.None
+	}
+}
+
+func metaRecordFilterBySetOfValidValueSets(records []tagquery.MetaTagRecord) tagquery.MetricDefinitionFilter {
+	validValueSets := make([]struct {
+		name string
+		tags []string
+	}, len(records))
+
+	var builder strings.Builder
+	for i := range records {
+		validValueSets[i].tags = make([]string, 0, len(records[i].Expressions))
+		for j := range records[i].Expressions {
+			if records[i].Expressions[j].GetKey() == "name" {
+				validValueSets[i].name = records[i].Expressions[j].GetValue()
+			} else {
+				records[i].Expressions[j].StringIntoWriter(&builder)
+				validValueSets[i].tags = append(validValueSets[i].tags, builder.String())
+				builder.Reset()
+			}
+		}
+		sort.Strings(validValueSets[i].tags)
+	}
+
+	return func(_ schema.MKey, name string, tags []string) tagquery.FilterDecision {
+		for _, validValueSet := range validValueSets {
+			if len(validValueSet.name) > 0 {
+				if name != validValueSet.name {
+					continue
+				}
+			}
+
+			if sliceContainsElements(validValueSet.tags, tags) {
+				return tagquery.Pass
+			}
+		}
+
+		return tagquery.None
+	}
+}
+
+// sliceContainsElements returns true if the elements in the slice "find"
+// are all present int the slice "in". It requires both slices to be sorted
+func sliceContainsElements(find, in []string) bool {
+	var findIdx, inIdx int
+	for {
+		if findIdx == len(find) {
+			return true
+		}
+
+		if inIdx == len(in) {
+			return false
+		}
+
+		if find[findIdx] == in[inIdx] {
+			findIdx++
+			inIdx++
+			continue
+		}
+
+		if find[findIdx] < in[inIdx] {
+			return false
+		}
+
+		inIdx++
+	}
 }
 
 func metaRecordFilterInverted(metaRecordFilters []tagquery.MetricDefinitionFilter, defaultDecision tagquery.FilterDecision) tagquery.MetricDefinitionFilter {
