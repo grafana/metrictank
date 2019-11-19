@@ -10,13 +10,13 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
-func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, count uint32, idGen func(uint32) string) (*UnpartitionedMemoryIdx, []schema.MKey) {
+func getTestIndexWithMetaTags(t testing.TB, metaRecords []tagquery.MetaTagRecord, count uint32, tagGen func(int) []string) (*UnpartitionedMemoryIdx, []schema.MKey) {
 	t.Helper()
 	idx := NewUnpartitionedMemoryIdx()
 
 	var md schema.MetricData
 	mkeys := make([]schema.MKey, count)
-	for i := uint32(0); i < count; i++ {
+	for i := 0; i < int(count); i++ {
 		md.Name = "test.name"
 		md.OrgId = 1
 		md.Interval = 1
@@ -25,8 +25,8 @@ func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, c
 		md.Tags = []string{fmt.Sprintf("tag1=iterator%d", i), fmt.Sprintf("tag2=%d", i+1)}
 		md.SetId()
 
-		if idGen != nil {
-			md.Tags = append(md.Tags, idGen(i))
+		if tagGen != nil {
+			md.Tags = append(md.Tags, tagGen(i)...)
 		}
 
 		mkey, err := schema.MKeyFromString(md.Id)
@@ -37,7 +37,7 @@ func getTestIndexWithMetaTags(t testing.TB, metaTags []tagquery.MetaTagRecord, c
 		mkeys[i] = mkey
 	}
 
-	idx.MetaTagRecordSwap(1, metaTags)
+	idx.MetaTagRecordSwap(1, metaRecords)
 
 	waitForMetaTagEnrichers(t, idx)
 
@@ -388,27 +388,125 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 }
 
 func BenchmarkFindByMetaTagIndexSize100kMetaRecordCount200(b *testing.B) {
-	benchmarkFindByMetaTag(b, 100000, 200)
+	metaRecordCnt := 200
+	metricCnt := 100000
+	expectedResCount := metricCnt / 2
+	expectedTagsPerDef := 3
+	expectedMetaTagsPerDef := 3
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId%2 == 0 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		return []string{fmt.Sprintf("host=hostname%d", id%metaRecordCnt)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("dc=datacenter%d", id%uint32(metaRecordCnt)+1)}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
 }
 
 func BenchmarkFindByMetaTagIndexSize1mMetaRecordCount1000(b *testing.B) {
-	benchmarkFindByMetaTag(b, 1000000, 1000)
+	metaRecordCnt := 1000
+	metricCnt := 1000000
+	expectedResCount := metricCnt / 2
+	expectedTagsPerDef := 3
+	expectedMetaTagsPerDef := 3
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId%2 == 0 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		return []string{fmt.Sprintf("host=hostname%d", id%metaRecordCnt)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("dc=datacenter%d", id%uint32(metaRecordCnt)+1)}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
 }
 
 func BenchmarkFindByMetaTagIndexSize1mMetaRecordCount10000(b *testing.B) {
-	benchmarkFindByMetaTag(b, 1000000, 10000)
+	metaRecordCnt := 10000
+	metricCnt := 1000000
+	expectedResCount := metricCnt / 2
+	expectedTagsPerDef := 3
+	expectedMetaTagsPerDef := 3
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId%2 == 0 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		return []string{fmt.Sprintf("host=hostname%d", id%metaRecordCnt)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("dc=datacenter%d", id%uint32(metaRecordCnt)+1)}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
 }
 
-// getMetaRecordsForMetaTagQueryBenchmark generates the given number of meta records it assumes that
-// the index they get applied to has at least <count> host=hostname? tags
-func getMetaRecordsForMetaTagQueryBenchmark(b *testing.B, count int, metaTags [][]string, tagGen func(uint32) string) []tagquery.MetaTagRecord {
-	metaRecords := make([]tagquery.MetaTagRecord, count)
+func getMetaRecordsForMetaTagQueryBenchmark(b *testing.B, metaRecordCount int, metaRecordGen func(metaRecordId int) struct {
+	expressions []string
+	metaTags    []string
+}) []tagquery.MetaTagRecord {
+	metaRecords := make([]tagquery.MetaTagRecord, metaRecordCount)
 	cursor := 0
 	var err error
 	for i := range metaRecords {
+		specs := metaRecordGen(i)
 		metaRecords[i], err = tagquery.ParseMetaTagRecord(
-			metaTags[cursor%len(metaTags)],
-			[]string{tagGen(uint32(i))},
+			specs.metaTags,
+			specs.expressions,
 		)
 		cursor++
 		if err != nil {
@@ -431,29 +529,18 @@ func getQueriesForMetaTagQueryBenchmark(b *testing.B, count int, queryGen func(u
 	return queries
 }
 
-func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount int) {
+func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef int, queryGen func(id uint32) []string, tagGen func(id int) []string, metaRecordGen func(metaRecordId int) struct {
+	expressions []string
+	metaTags    []string
+}) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	metaTagSets := [][]string{
-		{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"},
-		{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"},
-	}
-	tagGen := func(id uint32) string {
-		return fmt.Sprintf("host=hostname%d", id%uint32(metaRecordCount))
-	}
-	metaRecords := getMetaRecordsForMetaTagQueryBenchmark(b, metaRecordCount, metaTagSets, tagGen)
+	metaRecords := getMetaRecordsForMetaTagQueryBenchmark(b, metaRecordCount, metaRecordGen)
 	index, _ := getTestIndexWithMetaTags(b, metaRecords, uint32(indexSize), tagGen)
-
-	queryGen := func(id uint32) []string {
-		return []string{fmt.Sprintf("dc=datacenter%d", (id%uint32(len(metaRecords)))+1)}
-	}
 	queries := getQueriesForMetaTagQueryBenchmark(b, 2, queryGen)
 
 	var res []idx.Node
-	expectedResCount := indexSize / len(metaTagSets)
-	expectedTagsPerDef := 3
-	expectedMetaTagsPerDef := 3
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -482,14 +569,28 @@ func benchmarkAddingMetricToEnricher(b *testing.B, metaRecordCount int) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	metaTagSets := [][]string{
-		{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"},
-		{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"},
+	tagGen := func(id int) []string {
+		return []string{fmt.Sprintf("host=hostname%d", id%metaRecordCount)}
 	}
-	tagGen := func(id uint32) string {
-		return fmt.Sprintf("host=hostname%d", id%uint32(metaRecordCount))
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId%2 == 0 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
 	}
-	metaRecords := getMetaRecordsForMetaTagQueryBenchmark(b, metaRecordCount, metaTagSets, tagGen)
+
+	metaRecords := getMetaRecordsForMetaTagQueryBenchmark(b, metaRecordCount, metaRecordGen)
 	index, _ := getTestIndexWithMetaTags(b, metaRecords, 0, tagGen)
 
 	var err error
@@ -502,7 +603,7 @@ func benchmarkAddingMetricToEnricher(b *testing.B, metaRecordCount int) {
 		mds[i].Value = 1
 		mds[i].Time = 1
 		mds[i].Tags = []string{fmt.Sprintf("tag1=iterator%d", i), fmt.Sprintf("tag2=%d", i+1)}
-		mds[i].Tags = append(mds[i].Tags, tagGen(uint32(i)))
+		mds[i].Tags = append(mds[i].Tags, tagGen(i)...)
 		mds[i].SetId()
 
 		mkeys[i], err = schema.MKeyFromString(mds[i].Id)
