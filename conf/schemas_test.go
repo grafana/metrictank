@@ -1,9 +1,11 @@
 package conf
 
 import (
-	. "github.com/smartystreets/goconvey/convey"
+	"reflect"
 	"regexp"
 	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func schemasForTest() Schemas {
@@ -163,4 +165,137 @@ func TestMaxChunkSpan(t *testing.T) {
 		max := schemas.MaxChunkSpan()
 		So(max, ShouldEqual, 60*60*6)
 	})
+}
+
+func TestReadSchemas(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    string
+		want    Schemas
+		wantErr bool
+	}{
+		{
+			name:    "empty_file",
+			file:    "schemas_test_files/empty.schemas",
+			want:    NewSchemas(nil),
+			wantErr: false,
+		},
+		{
+			name:    "no_pattern",
+			file:    "schemas_test_files/no_pattern.schemas",
+			want:    Schemas{},
+			wantErr: true,
+		},
+		{
+			name:    "bad_pattern",
+			file:    "schemas_test_files/bad_pattern.schemas",
+			want:    Schemas{},
+			wantErr: true,
+		},
+		{
+			name:    "bad_retention",
+			file:    "schemas_test_files/bad_retention.schemas",
+			want:    Schemas{},
+			wantErr: true,
+		},
+		{
+			name: "simple",
+			file: "schemas_test_files/simple.schemas",
+			want: NewSchemas([]Schema{
+				{
+					Name:    "default",
+					Pattern: regexp.MustCompile(".*"),
+					Retentions: Retentions{
+						Orig: "1s:8d:10min:2,1m:35d:2h:2,10m:120d:6h:2,1h:2y:6h:2",
+						Rets: []Retention{
+							NewRetentionMT(1, 8*24*60*60, 10*60, 2, 0),
+							NewRetentionMT(1*60, 35*24*60*60, 2*60*60, 2, 0),
+							NewRetentionMT(10*60, 120*24*60*60, 6*60*60, 2, 0),
+							NewRetentionMT(1*60*60, 2*365*24*60*60, 6*60*60, 2, 0),
+						},
+					},
+					Priority: -1,
+				},
+			}),
+			wantErr: false,
+		},
+		{
+			name: "reorder_buffer",
+			file: "schemas_test_files/reorder_buffer.schemas",
+			want: NewSchemas([]Schema{
+				{
+					Name:    "default",
+					Pattern: regexp.MustCompile(".*"),
+					Retentions: Retentions{
+						Orig: "1s:8d:10min:2,1m:35d:2h:2,10m:120d:6h:2,1h:2y:6h:2",
+						Rets: []Retention{
+							NewRetentionMT(1, 8*24*60*60, 10*60, 2, 0),
+							NewRetentionMT(1*60, 35*24*60*60, 2*60*60, 2, 0),
+							NewRetentionMT(10*60, 120*24*60*60, 6*60*60, 2, 0),
+							NewRetentionMT(1*60*60, 2*365*24*60*60, 6*60*60, 2, 0),
+						},
+					},
+					Priority:      -1,
+					ReorderWindow: 20,
+				},
+			}),
+			wantErr: false,
+		},
+		{
+			name: "multiple",
+			file: "schemas_test_files/multiple.schemas",
+			want: NewSchemas([]Schema{
+				{
+					Name:    "raw",
+					Pattern: regexp.MustCompile("fakemetrics.raw"),
+					Retentions: Retentions{
+						Orig: "1s:6h:2min:2",
+						Rets: []Retention{
+							NewRetentionMT(1, 6*60*60, 2*60, 2, 0),
+						},
+					},
+					Priority: -1,
+				},
+				{
+					Name:    "default",
+					Pattern: regexp.MustCompile(".*"),
+					Retentions: Retentions{
+						Orig: "1s:8d:10min:2,1m:35d:2h:2,10m:120d:6h:2,1h:2y:6h:2",
+						Rets: []Retention{
+							NewRetentionMT(1, 8*24*60*60, 10*60, 2, 0),
+							NewRetentionMT(1*60, 35*24*60*60, 2*60*60, 2, 0),
+							NewRetentionMT(10*60, 120*24*60*60, 6*60*60, 2, 0),
+							NewRetentionMT(1*60*60, 2*365*24*60*60, 6*60*60, 2, 0),
+						},
+					},
+					Priority: -2,
+				},
+				{
+					Name:    "wpUsageMetrics",
+					Pattern: regexp.MustCompile("^wp-usage"),
+					Retentions: Retentions{
+						Orig: "1h:35d:6h:2,2h:2y:6h:2",
+						Rets: []Retention{
+							NewRetentionMT(1*60*60, 35*24*60*60, 6*60*60, 2, 0),
+							NewRetentionMT(2*60*60, 2*365*24*60*60, 6*60*60, 2, 0),
+						},
+					},
+					Priority: -3,
+				},
+			}),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadSchemas(tt.file)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadSchemas() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadSchemas() =\n %v\n want\n %v", got, tt.want)
+			}
+		})
+	}
 }

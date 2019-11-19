@@ -1,0 +1,11 @@
+[raw]
+pattern = fakemetrics.raw
+retentions = 1s:6h:2min:2
+
+[default]
+pattern = .*
+retentions = 1s:8d:10min:2,1m:35d:2h:2,10m:120d:6h:2,1h:2y:6h:2
+
+[wpUsageMetrics]
+pattern = ^wp-usage
+retentions = 1h:35d:6h:2,2h:2y:6h:2
