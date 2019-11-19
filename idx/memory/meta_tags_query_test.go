@@ -3,6 +3,7 @@ package memory
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -23,11 +24,13 @@ func getTestIndexWithMetaTags(t testing.TB, metaRecords []tagquery.MetaTagRecord
 		md.Value = 1
 		md.Time = 1
 		md.Tags = []string{fmt.Sprintf("tag1=iterator%d", i), fmt.Sprintf("tag2=%d", i+1)}
-		md.SetId()
 
 		if tagGen != nil {
 			md.Tags = append(md.Tags, tagGen(i)...)
 		}
+		sort.Strings(md.Tags)
+
+		md.SetId()
 
 		mkey, err := schema.MKeyFromString(md.Id)
 		if err != nil {
@@ -490,6 +493,121 @@ func BenchmarkFindByMetaTagIndexSize1mMetaRecordCount10000(b *testing.B) {
 
 	queryGen := func(id uint32) []string {
 		return []string{fmt.Sprintf("dc=datacenter%d", id%uint32(metaRecordCnt)+1)}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
+}
+
+func BenchmarkFilter100kByMetaTagWithIndexSize1mAnd50kMetaRecords(b *testing.B) {
+	metaRecordCnt := 50000
+	metricCnt := 1000000
+	expectedResCount := 50000
+	expectedTagsPerDef := 4
+	expectedMetaTagsPerDef := 3
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId < metaRecordCnt/2 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		// each hostname will match 1M/50k = 20 metrics
+		// each cluster will match 1M/10 = 100k metrics
+		return []string{fmt.Sprintf("host=hostname%d", id%metaRecordCnt), fmt.Sprintf("cluster=cluster%d", id%10)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("cluster=cluster%d", id%10), fmt.Sprintf("dc=datacenter%d", (id%2)+1)}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
+}
+
+func BenchmarkFilter10kByMetaTagWithIndexSize1mAnd10kMetaRecords(b *testing.B) {
+	metaRecordCnt := 10000
+	metricCnt := 1000000
+	expectedResCount := 5000
+	expectedTagsPerDef := 4
+	expectedMetaTagsPerDef := 3
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId < metaRecordCnt/2 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		// each hostname will match 1M/50k = 20 metrics
+		// each cluster will match 1M/100 = 10k metrics
+		return []string{fmt.Sprintf("host=hostname%d", id%metaRecordCnt), fmt.Sprintf("cluster=cluster%d", id%100)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("cluster=cluster%d", id%100), fmt.Sprintf("dc=datacenter%d", (id%2)+1)}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
+}
+
+func BenchmarkFilter100kByMetaTagWithIndexSize1mAnd50kMetaRecordsWithMultipleExpressions(b *testing.B) {
+	metaRecordCnt := 50000
+	metricCnt := 1000000
+	expectedResCount := 50000
+	expectedTagsPerDef := 5
+	expectedMetaTagsPerDef := 3
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId < metaRecordCnt/2 {
+			res.metaTags = []string{"dc=datacenter1", "operatingSystem=ubuntu", "stage=prod"}
+		} else {
+			res.metaTags = []string{"dc=datacenter2", "operatingSystem=ubuntu", "stage=prod"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId), fmt.Sprintf("other=property%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		metaRecordId := id % metaRecordCnt
+		// each hostname & other tag will match 1M/50k = 20 metrics
+		// each cluster will match 1M/10 = 100k metrics
+		return []string{fmt.Sprintf("host=hostname%d", metaRecordId), fmt.Sprintf("other=property%d", metaRecordId), fmt.Sprintf("cluster=cluster%d", id%10)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("cluster=cluster%d", id%10), fmt.Sprintf("dc=datacenter%d", (id%2)+1)}
 	}
 
 	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)

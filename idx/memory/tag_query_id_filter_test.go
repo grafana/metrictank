@@ -210,6 +210,80 @@ func testFilterByMetaTagWithEqualAndWithHasTag(t *testing.T) {
 	filterAndCompareResults(t, tagquery.Expressions{notEqualExpr}, metaRecords, expectedMatch, expectedFail)
 }
 
+func TestFilterByMetaTagWithSingleUnderlyingEqualExpression(t *testing.T) {
+	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithSingleUnderlyingEqualExpression))(t)
+}
+
+func testFilterByMetaTagWithSingleUnderlyingEqualExpression(t *testing.T) {
+	metaRecord, err := tagquery.ParseMetaTagRecord([]string{"meta1=value1"}, []string{"tag1=value4"})
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing meta record: %s", err)
+	}
+
+	_, mds := getTestArchives(10)
+
+	notEqualExpr, err := tagquery.ParseExpression("meta1=value1")
+	if err != nil {
+		t.Fatalf("Failed to parse expression: %s", err)
+	}
+
+	notHasTagExpr, err := tagquery.ParseExpression("meta1!=")
+	if err != nil {
+		t.Fatalf("Failed to parse expression: %s", err)
+	}
+
+	var expectedMatch []schema.MetricDefinition
+	var expectedFail []schema.MetricDefinition
+
+	if MetaTagSupport {
+		expectedMatch = []schema.MetricDefinition{mds[4]}
+		expectedFail = append(mds[:4], mds[5:]...)
+	} else {
+		expectedMatch = nil
+		expectedFail = mds
+	}
+
+	filterAndCompareResults(t, tagquery.Expressions{notHasTagExpr}, []tagquery.MetaTagRecord{metaRecord}, expectedMatch, expectedFail)
+	filterAndCompareResults(t, tagquery.Expressions{notEqualExpr}, []tagquery.MetaTagRecord{metaRecord}, expectedMatch, expectedFail)
+}
+
+func TestFilterByMetaTagWithMultipleUnderlyingEqualExpression(t *testing.T) {
+	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithMultipleUnderlyingEqualExpression))(t)
+}
+
+func testFilterByMetaTagWithMultipleUnderlyingEqualExpression(t *testing.T) {
+	metaRecord, err := tagquery.ParseMetaTagRecord([]string{"meta1=value1"}, []string{"tag1=value2", "tag2=other"})
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing meta record: %s", err)
+	}
+
+	_, mds := getTestArchives(10)
+
+	notEqualExpr, err := tagquery.ParseExpression("meta1=value1")
+	if err != nil {
+		t.Fatalf("Failed to parse expression: %s", err)
+	}
+
+	notHasTagExpr, err := tagquery.ParseExpression("meta1!=")
+	if err != nil {
+		t.Fatalf("Failed to parse expression: %s", err)
+	}
+
+	var expectedMatch []schema.MetricDefinition
+	var expectedFail []schema.MetricDefinition
+
+	if MetaTagSupport {
+		expectedMatch = []schema.MetricDefinition{mds[2]}
+		expectedFail = append(mds[:2], mds[3:]...)
+	} else {
+		expectedMatch = nil
+		expectedFail = mds
+	}
+
+	filterAndCompareResults(t, tagquery.Expressions{notHasTagExpr}, []tagquery.MetaTagRecord{metaRecord}, expectedMatch, expectedFail)
+	filterAndCompareResults(t, tagquery.Expressions{notEqualExpr}, []tagquery.MetaTagRecord{metaRecord}, expectedMatch, expectedFail)
+}
+
 func TestFilterByMetaTagWithPatternMatching(t *testing.T) {
 	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithPatternMatching))(t)
 }
