@@ -1066,7 +1066,7 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	var mtr *metaTagRecords
 	if MetaTagSupport {
 		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
-		if enricher.countMetricsWithMetaTags() == 0 {
+		if enricher != nil && enricher.countMetricsWithMetaTags() == 0 {
 			// if the enricher is empty we set it back to nil so it doesn't even get called
 			enricher = nil
 		}
@@ -1289,7 +1289,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	var mtr *metaTagRecords
 	if MetaTagSupport {
 		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
-		if enricher.countMetricsWithMetaTags() == 0 {
+		if enricher != nil && enricher.countMetricsWithMetaTags() == 0 {
 			// if the enricher is empty we set it back to nil so it doesn't even get called
 			enricher = nil
 		}
@@ -1413,7 +1413,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	var mtr *metaTagRecords
 	if MetaTagSupport && !isMetricTag {
 		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
-		if enricher.countMetricsWithMetaTags() == 0 {
+		if enricher != nil && enricher.countMetricsWithMetaTags() == 0 {
 			// if the enricher is empty we set it back to nil so it doesn't even get called
 			enricher = nil
 		}
