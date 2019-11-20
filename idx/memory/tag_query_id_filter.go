@@ -81,9 +81,16 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			continue
 		}
 
+		// if we don't use an inverted set of meta records, then we want to check if
+		// all meta records involved in a meta tag filter use the "=" operator.
+		// if this is the case then it is cheaper to build a set of acceptable tags
+		// based on the meta record expressions and just check whether they are present
+		// in a metric that gets filtered, compared to doing a full tag index lookup
+		// to check whether a metric has one of the necessary meta tags associated
+		// with it.
+		optimizeForOnlyEqualOperators := !invertSetOfMetaRecords
 		var metaRecordFilters []tagquery.MetricDefinitionFilter
-		onlyEqualOperators := !invertSetOfMetaRecords
-		singleEqualExprPerRecord := true
+		singleExprPerRecord := true
 		records := make([]tagquery.MetaTagRecord, len(metaRecordIds))
 		for i, id := range metaRecordIds {
 			record, ok := ctx.metaTagRecords.records[id]
@@ -93,24 +100,31 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 				continue
 			}
 
-			if onlyEqualOperators {
+			if optimizeForOnlyEqualOperators {
 				for exprIdx := range record.Expressions {
 					if record.Expressions[exprIdx].GetOperator() != tagquery.EQUAL {
-						onlyEqualOperators = false
+						optimizeForOnlyEqualOperators = false
 						break
 					}
 				}
-				records[i] = record
-				if len(record.Expressions) > 1 {
-					singleEqualExprPerRecord = false
+				if optimizeForOnlyEqualOperators {
+					records[i] = record
+					if len(record.Expressions) > 1 {
+						singleExprPerRecord = false
+					}
 				}
 			}
 
 			metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
 		}
 
-		if onlyEqualOperators {
-			if singleEqualExprPerRecord {
+		if optimizeForOnlyEqualOperators {
+			// there are two different ways how we optimize for the case where all expressions
+			// of all involved meta records are using the "=" operator. the first and fastest
+			// way can only be used if each involved meta record only has one single expression,
+			// otherwise we use the second way which is a bit more expensive but it also works
+			// if some of the involved meta records have multiple expressions.
+			if singleExprPerRecord {
 				res.filters[i].testByMetaTags = metaRecordFilterBySetOfValidValues(records)
 			} else {
 				res.filters[i].testByMetaTags = metaRecordFilterBySetOfValidValueSets(records)
@@ -127,7 +141,16 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 	return &res
 }
 
+// metaRecordFilterBySetOfValidValues creates a filter function to filter by a meta tag
+// which only involves meta records of which each only has exactly one expression and that
+// expression is using the "=" operator. this is quite a narrow scenario, but since it is
+// a very common use case it makes sense to optimize for it.
 func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord) tagquery.MetricDefinitionFilter {
+	// we first build a set of valid tags and names.
+	// since we know that each of the involved meta records uses exactly one expression
+	// which is using the "=" operator we know that if a given metric's name matches a
+	// value in validNames or if one of its tags matches a value in validValues then this
+	// is sufficient to let it pass the filter.
 	validValues := make(map[string]struct{})
 	validNames := make(map[string]struct{})
 	var builder strings.Builder
@@ -154,12 +177,17 @@ func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord) tagque
 	}
 }
 
+// metaRecordFilterBySetOfValidValueSets creates a filter function to filter by a meta tag
+// which only involves meta records of which all expressions are only using the "=" operator,
+// it is ok if one meta record uses multiple such expressions.
 func metaRecordFilterBySetOfValidValueSets(records []tagquery.MetaTagRecord) tagquery.MetricDefinitionFilter {
+	// we first build a set of tag and name value combinations of which each is sufficient
+	// to pass the generated filter when a metric contains all values of one of these
+	// combinations
 	validValueSets := make([]struct {
 		name string
 		tags []string
 	}, len(records))
-
 	var builder strings.Builder
 	for i := range records {
 		validValueSets[i].tags = make([]string, 0, len(records[i].Expressions))
@@ -172,10 +200,13 @@ func metaRecordFilterBySetOfValidValueSets(records []tagquery.MetaTagRecord) tag
 				builder.Reset()
 			}
 		}
+
+		// the tags must be sorted because that's a requirement for sliceContainsElements()
 		sort.Strings(validValueSets[i].tags)
 	}
 
 	return func(_ schema.MKey, name string, tags []string) tagquery.FilterDecision {
+		// iterate over the acceptable value combinations and check if one matches this metric
 		for _, validValueSet := range validValueSets {
 			if len(validValueSet.name) > 0 {
 				if name != validValueSet.name {
