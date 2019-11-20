@@ -63,6 +63,8 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/gocql/gocql"
+  # we want that version at least to be able to use token aware batches
+  # ref.: https://github.com/gocql/gocql/pull/1313
   revision = "e163eff7a8c6863df050dae7d3daa4bf98474d8e"
 
 [[constraint]]
