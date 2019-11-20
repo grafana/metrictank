@@ -39,7 +39,7 @@ func (p murmur3Partitioner) Name() string {
 
 func (p murmur3Partitioner) Hash(partitionKey []byte) token {
 	h1 := murmur.Murmur3H1(partitionKey)
-	return murmur3Token(h1)
+	return murmur3Token(int64(h1))
 }
 
 // murmur3 little-endian, 128-bit hash, but returns only h1
@@ -58,7 +58,7 @@ func (m murmur3Token) Less(token token) bool {
 
 // order preserving partitioner and token
 type orderedPartitioner struct{}
-type orderedToken string
+type orderedToken []byte
 
 func (p orderedPartitioner) Name() string {
 	return "OrderedPartitioner"
@@ -70,15 +70,15 @@ func (p orderedPartitioner) Hash(partitionKey []byte) token {
 }
 
 func (p orderedPartitioner) ParseString(str string) token {
-	return orderedToken(str)
+	return orderedToken([]byte(str))
 }
 
 func (o orderedToken) String() string {
-	return string(o)
+	return string([]byte(o))
 }
 
 func (o orderedToken) Less(token token) bool {
-	return o < token.(orderedToken)
+	return -1 == bytes.Compare(o, token.(orderedToken))
 }
 
 // random partitioner and token
@@ -118,23 +118,18 @@ func (r *randomToken) Less(token token) bool {
 	return -1 == (*big.Int)(r).Cmp((*big.Int)(token.(*randomToken)))
 }
 
-type hostToken struct {
-	token token
-	host  *HostInfo
-}
-
-func (ht hostToken) String() string {
-	return fmt.Sprintf("{token=%v host=%v}", ht.token, ht.host.HostID())
-}
-
 // a data structure for organizing the relationship between tokens and hosts
 type tokenRing struct {
 	partitioner partitioner
-	tokens      []hostToken
+	tokens      []token
+	hosts       []*HostInfo
 }
 
 func newTokenRing(partitioner string, hosts []*HostInfo) (*tokenRing, error) {
-	tokenRing := &tokenRing{}
+	tokenRing := &tokenRing{
+		tokens: []token{},
+		hosts:  []*HostInfo{},
+	}
 
 	if strings.HasSuffix(partitioner, "Murmur3Partitioner") {
 		tokenRing.partitioner = murmur3Partitioner{}
@@ -149,7 +144,8 @@ func newTokenRing(partitioner string, hosts []*HostInfo) (*tokenRing, error) {
 	for _, host := range hosts {
 		for _, strToken := range host.Tokens() {
 			token := tokenRing.partitioner.ParseString(strToken)
-			tokenRing.tokens = append(tokenRing.tokens, hostToken{token, host})
+			tokenRing.tokens = append(tokenRing.tokens, token)
+			tokenRing.hosts = append(tokenRing.hosts, host)
 		}
 	}
 
@@ -163,14 +159,16 @@ func (t *tokenRing) Len() int {
 }
 
 func (t *tokenRing) Less(i, j int) bool {
-	return t.tokens[i].token.Less(t.tokens[j].token)
+	return t.tokens[i].Less(t.tokens[j])
 }
 
 func (t *tokenRing) Swap(i, j int) {
-	t.tokens[i], t.tokens[j] = t.tokens[j], t.tokens[i]
+	t.tokens[i], t.hosts[i], t.tokens[j], t.hosts[j] =
+		t.tokens[j], t.hosts[j], t.tokens[i], t.hosts[i]
 }
 
 func (t *tokenRing) String() string {
+
 	buf := &bytes.Buffer{}
 	buf.WriteString("TokenRing(")
 	if t.partitioner != nil {
@@ -178,43 +176,52 @@ func (t *tokenRing) String() string {
 	}
 	buf.WriteString("){")
 	sep := ""
-	for i, th := range t.tokens {
+	for i := range t.tokens {
 		buf.WriteString(sep)
 		sep = ","
 		buf.WriteString("\n\t[")
 		buf.WriteString(strconv.Itoa(i))
 		buf.WriteString("]")
-		buf.WriteString(th.token.String())
+		buf.WriteString(t.tokens[i].String())
 		buf.WriteString(":")
-		buf.WriteString(th.host.ConnectAddress().String())
+		buf.WriteString(t.hosts[i].ConnectAddress().String())
 	}
 	buf.WriteString("\n}")
 	return string(buf.Bytes())
 }
 
-func (t *tokenRing) GetHostForPartitionKey(partitionKey []byte) (host *HostInfo, endToken token) {
+func (t *tokenRing) GetHostForPartitionKey(partitionKey []byte) *HostInfo {
 	if t == nil {
-		return nil, nil
+		return nil
 	}
 
-	return t.GetHostForToken(t.partitioner.Hash(partitionKey))
+	token := t.partitioner.Hash(partitionKey)
+	return t.GetHostForToken(token)
 }
 
-func (t *tokenRing) GetHostForToken(token token) (host *HostInfo, endToken token) {
-	if t == nil || len(t.tokens) == 0 {
-		return nil, nil
+func (t *tokenRing) GetHostForToken(token token) *HostInfo {
+	if t == nil {
+		return nil
+	}
+
+	l := len(t.tokens)
+	// no host tokens, no available hosts
+	if l == 0 {
+		return nil
 	}
 
 	// find the primary replica
-	ringIndex := sort.Search(len(t.tokens), func(i int) bool {
-		return !t.tokens[i].token.Less(token)
-	})
+	ringIndex := sort.Search(
+		l,
+		func(i int) bool {
+			return !t.tokens[i].Less(token)
+		},
+	)
 
-	if ringIndex == len(t.tokens) {
+	if ringIndex == l {
 		// wrap around to the first in the ring
 		ringIndex = 0
 	}
-
-	v := t.tokens[ringIndex]
-	return v.host, v.token
+	host := t.hosts[ringIndex]
+	return host
 }
