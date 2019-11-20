@@ -1,0 +1,3 @@
+[default]
+pattern = ****
+retentions = 1s:8d:10min:2

@@ -1,0 +1,4 @@
+[default]
+pattern = .*
+retentions = 1s:8d:10min:2,1m:35d:2h:2,10m:120d:6h:2,1h:2y:6h:2
+reorderBuffer = 20
