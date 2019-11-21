@@ -116,12 +116,12 @@ func hostInfo(addr string, defaultPort int) ([]*HostInfo, error) {
 
 	// Check if host is a literal IP address
 	if ip := net.ParseIP(host); ip != nil {
-		hosts = append(hosts, &HostInfo{hostname: host, connectAddress: ip, port: port})
+		hosts = append(hosts, &HostInfo{connectAddress: ip, port: port})
 		return hosts, nil
 	}
 
 	// Look up host in DNS
-	ips, err := LookupIP(host)
+	ips, err := net.LookupIP(host)
 	if err != nil {
 		return nil, err
 	} else if len(ips) == 0 {
@@ -142,7 +142,7 @@ func hostInfo(addr string, defaultPort int) ([]*HostInfo, error) {
 	}
 
 	for _, ip := range ips {
-		hosts = append(hosts, &HostInfo{hostname: host, connectAddress: ip, port: port})
+		hosts = append(hosts, &HostInfo{connectAddress: ip, port: port})
 	}
 
 	return hosts, nil
@@ -166,13 +166,10 @@ func (c *controlConn) shuffleDial(endpoints []*HostInfo) (*Conn, error) {
 	// node.
 	shuffled := shuffleHosts(endpoints)
 
-	cfg := *c.session.connCfg
-	cfg.disableCoalesce = true
-
 	var err error
 	for _, host := range shuffled {
 		var conn *Conn
-		conn, err = c.session.dial(host, &cfg, c)
+		conn, err = c.session.connect(host, c)
 		if err == nil {
 			return conn, nil
 		}
@@ -221,7 +218,7 @@ func (c *controlConn) discoverProtocol(hosts []*HostInfo) (int, error) {
 	var err error
 	for _, host := range hosts {
 		var conn *Conn
-		conn, err = c.session.dial(host, &connCfg, handler)
+		conn, err = c.session.dial(host.ConnectAddress(), host.Port(), &connCfg, handler)
 		if conn != nil {
 			conn.Close()
 		}
@@ -274,7 +271,7 @@ func (c *controlConn) setupConn(conn *Conn) error {
 
 	// TODO(zariel): do we need to fetch host info everytime
 	// the control conn connects? Surely we have it cached?
-	host, err := conn.localHostInfo(context.TODO())
+	host, err := conn.localHostInfo()
 	if err != nil {
 		return err
 	}
@@ -347,9 +344,7 @@ func (c *controlConn) reconnect(refreshring bool) {
 		if err != nil {
 			// host is dead
 			// TODO: this is replicated in a few places
-			if c.session.cfg.ConvictionPolicy.AddFailure(err, host) {
-				c.session.handleNodeDown(host.ConnectAddress(), host.Port())
-			}
+			c.session.handleNodeDown(host.ConnectAddress(), host.Port())
 		} else {
 			newConn = conn
 		}
@@ -389,10 +384,7 @@ func (c *controlConn) HandleError(conn *Conn, err error, closed bool) {
 	}
 
 	oldConn := c.getConn()
-
-	// If connection has long gone, and not been attempted for awhile,
-	// it's possible to have oldConn as nil here (#1297).
-	if oldConn != nil && oldConn.conn != conn {
+	if oldConn.conn != conn {
 		return
 	}
 
@@ -452,14 +444,14 @@ func (c *controlConn) query(statement string, values ...interface{}) (iter *Iter
 
 	for {
 		iter = c.withConn(func(conn *Conn) *Iter {
-			return conn.executeQuery(context.TODO(), q)
+			return conn.executeQuery(q)
 		})
 
 		if gocqlDebug && iter.err != nil {
 			Logger.Printf("control: error executing %q: %v\n", statement, iter.err)
 		}
 
-		q.AddAttempts(1, c.getConn().host)
+		q.attempts++
 		if iter.err == nil || !c.retry.Attempt(q) {
 			break
 		}
@@ -470,7 +462,7 @@ func (c *controlConn) query(statement string, values ...interface{}) (iter *Iter
 
 func (c *controlConn) awaitSchemaAgreement() error {
 	return c.withConn(func(conn *Conn) *Iter {
-		return &Iter{err: conn.awaitSchemaAgreement(context.TODO())}
+		return &Iter{err: conn.awaitSchemaAgreement()}
 	}).err
 }
 

@@ -1,7 +1,6 @@
 package gocql
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -74,23 +73,14 @@ func (c *cassVersion) unmarshal(data []byte) error {
 }
 
 func (c cassVersion) Before(major, minor, patch int) bool {
-	// We're comparing us (cassVersion) with the provided version (major, minor, patch)
-	// We return true if our version is lower (comes before) than the provided one.
-	if c.Major < major {
+	if c.Major > major {
 		return true
-	} else if c.Major == major {
-		if c.Minor < minor {
-			return true
-		} else if c.Minor == minor && c.Patch < patch {
-			return true
-		}
-
+	} else if c.Minor > minor {
+		return true
+	} else if c.Patch > patch {
+		return true
 	}
 	return false
-}
-
-func (c cassVersion) AtLeast(major, minor, patch int) bool {
-	return !c.Before(major, minor, patch)
 }
 
 func (c cassVersion) String() string {
@@ -110,7 +100,6 @@ type HostInfo struct {
 	// TODO(zariel): reduce locking maybe, not all values will change, but to ensure
 	// that we are thread safe use a mutex to access all fields.
 	mu               sync.RWMutex
-	hostname 		 string
 	peer             net.IP
 	broadcastAddress net.IP
 	listenAddress    net.IP
@@ -128,7 +117,6 @@ type HostInfo struct {
 	clusterName      string
 	version          cassVersion
 	state            nodeState
-	schemaVersion	 string
 	tokens           []string
 }
 
@@ -413,22 +401,15 @@ func (h *HostInfo) IsUp() bool {
 	return h != nil && h.State() == NodeUp
 }
 
-func (h *HostInfo) HostnameAndPort() string {
-	if h.hostname == "" {
-		h.hostname = h.ConnectAddress().String()
-	}
-	return net.JoinHostPort(h.hostname, strconv.Itoa(h.port))
-}
-
 func (h *HostInfo) String() string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	connectAddr, source := h.connectAddressLocked()
-	return fmt.Sprintf("[HostInfo hostname=%q connectAddress=%q peer=%q rpc_address=%q broadcast_address=%q "+
+	return fmt.Sprintf("[HostInfo connectAddress=%q peer=%q rpc_address=%q broadcast_address=%q "+
 		"preferred_ip=%q connect_addr=%q connect_addr_source=%q "+
 		"port=%d data_centre=%q rack=%q host_id=%q version=%q state=%s num_tokens=%d]",
-		h.hostname, h.connectAddress, h.peer, h.rpcAddress, h.broadcastAddress, h.preferredIP,
+		h.connectAddress, h.peer, h.rpcAddress, h.broadcastAddress, h.preferredIP,
 		connectAddr, source,
 		h.port, h.dataCenter, h.rack, h.hostId, h.version, h.state, len(h.tokens))
 }
@@ -459,11 +440,15 @@ func checkSystemSchema(control *controlConn) (bool, error) {
 
 // Given a map that represents a row from either system.local or system.peers
 // return as much information as we can in *HostInfo
-func (s *Session) hostInfoFromMap(row map[string]interface{}, host *HostInfo) (*HostInfo, error) {
+func (s *Session) hostInfoFromMap(row map[string]interface{}, port int) (*HostInfo, error) {
 	const assertErrorMsg = "Assertion failed for %s"
 	var ok bool
 
 	// Default to our connected port if the cluster doesn't have port information
+	host := HostInfo{
+		port: port,
+	}
+
 	for key, value := range row {
 		switch key {
 		case "data_center":
@@ -548,12 +533,6 @@ func (s *Session) hostInfoFromMap(row map[string]interface{}, host *HostInfo) (*
 			if !ok {
 				return nil, fmt.Errorf(assertErrorMsg, "dse_version")
 			}
-		case "schema_version":
-			schemaVersion, ok := value.(UUID)
-			if !ok {
-				return nil, fmt.Errorf(assertErrorMsg, "schema_version")
-			}
-			host.schemaVersion = schemaVersion.String()
 		}
 		// TODO(thrawn01): Add 'port'? once CASSANDRA-7544 is complete
 		// Not sure what the port field will be called until the JIRA issue is complete
@@ -563,7 +542,7 @@ func (s *Session) hostInfoFromMap(row map[string]interface{}, host *HostInfo) (*
 	host.connectAddress = ip
 	host.port = port
 
-	return host, nil
+	return &host, nil
 }
 
 // Ask the control node for host info on all it's known peers
@@ -571,7 +550,7 @@ func (r *ringDescriber) getClusterPeerInfo() ([]*HostInfo, error) {
 	var hosts []*HostInfo
 	iter := r.session.control.withConnHost(func(ch *connHost) *Iter {
 		hosts = append(hosts, ch.host)
-		return ch.conn.query(context.TODO(), "SELECT * FROM system.peers")
+		return ch.conn.query("SELECT * FROM system.peers")
 	})
 
 	if iter == nil {
@@ -586,7 +565,7 @@ func (r *ringDescriber) getClusterPeerInfo() ([]*HostInfo, error) {
 
 	for _, row := range rows {
 		// extract all available info about the peer
-		host, err := r.session.hostInfoFromMap(row, &HostInfo{port: r.session.cfg.Port})
+		host, err := r.session.hostInfoFromMap(row, r.session.cfg.Port)
 		if err != nil {
 			return nil, err
 		} else if !isValidPeer(host) {
@@ -638,7 +617,7 @@ func (r *ringDescriber) getHostInfo(ip net.IP, port int) (*HostInfo, error) {
 			return nil
 		}
 
-		return ch.conn.query(context.TODO(), "SELECT * FROM system.peers")
+		return ch.conn.query("SELECT * FROM system.peers")
 	})
 
 	if iter != nil {
@@ -648,7 +627,7 @@ func (r *ringDescriber) getHostInfo(ip net.IP, port int) (*HostInfo, error) {
 		}
 
 		for _, row := range rows {
-			h, err := r.session.hostInfoFromMap(row, &HostInfo{connectAddress: ip, port: port})
+			h, err := r.session.hostInfoFromMap(row, port)
 			if err != nil {
 				return nil, err
 			}

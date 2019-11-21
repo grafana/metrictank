@@ -80,6 +80,9 @@ func (e *eventDebouncer) debounce(frame frame) {
 }
 
 func (s *Session) handleEvent(framer *framer) {
+	// TODO(zariel): need to debounce events frames, and possible also events
+	defer framerPool.Put(framer)
+
 	frame, err := framer.parseFrame()
 	if err != nil {
 		// TODO: logger
@@ -91,10 +94,9 @@ func (s *Session) handleEvent(framer *framer) {
 		Logger.Printf("gocql: handling frame: %v\n", frame)
 	}
 
+	// TODO: handle medatadata events
 	switch f := frame.(type) {
-	case *schemaChangeKeyspace, *schemaChangeFunction,
-		*schemaChangeTable, *schemaChangeAggregate, *schemaChangeType:
-
+	case *schemaChangeKeyspace, *schemaChangeFunction, *schemaChangeTable:
 		s.schemaEvents.debounce(frame)
 	case *topologyChangeEventFrame, *statusChangeEventFrame:
 		s.nodeEvents.debounce(frame)
@@ -104,27 +106,20 @@ func (s *Session) handleEvent(framer *framer) {
 }
 
 func (s *Session) handleSchemaEvent(frames []frame) {
-	// TODO: debounce events
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.schemaDescriber == nil {
+		return
+	}
 	for _, frame := range frames {
 		switch f := frame.(type) {
 		case *schemaChangeKeyspace:
 			s.schemaDescriber.clearSchema(f.keyspace)
-			s.handleKeyspaceChange(f.keyspace, f.change)
 		case *schemaChangeTable:
-			s.schemaDescriber.clearSchema(f.keyspace)
-		case *schemaChangeAggregate:
-			s.schemaDescriber.clearSchema(f.keyspace)
-		case *schemaChangeFunction:
-			s.schemaDescriber.clearSchema(f.keyspace)
-		case *schemaChangeType:
 			s.schemaDescriber.clearSchema(f.keyspace)
 		}
 	}
-}
-
-func (s *Session) handleKeyspaceChange(keyspace, change string) {
-	s.control.awaitSchemaAgreement()
-	s.policy.KeyspaceChanged(KeyspaceUpdateEvent{Keyspace: keyspace, Change: change})
 }
 
 func (s *Session) handleNodeEvent(frames []frame) {
