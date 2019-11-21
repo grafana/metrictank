@@ -25,15 +25,22 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 		index.MetaTagRecordUpsert(1, metaRecords[i])
 	}
 
-	enricher := index.getMetaTagEnricher(1, true)
-	enricher.stop()
-	enricher.start()
+	waitForMetaTagEnrichers(t, index)
+	var ctx *TagQueryContext
+	if index.metaTagIdx != nil {
+		metaTagIdx := index.getOrgMetaTagIndex(1)
 
-	ctx := &TagQueryContext{
-		index:          index.tags[1],
-		byId:           index.defById,
-		metaTagIndex:   index.metaTagIndex[1],
-		metaTagRecords: index.metaTagRecords[1],
+		ctx = &TagQueryContext{
+			index:          index.tags[1],
+			byId:           index.defById,
+			metaTagIndex:   metaTagIdx.tags,
+			metaTagRecords: metaTagIdx.records,
+		}
+	} else {
+		ctx = &TagQueryContext{
+			index: index.tags[1],
+			byId:  index.defById,
+		}
 	}
 
 	filter := newIdFilter(expressions, ctx)

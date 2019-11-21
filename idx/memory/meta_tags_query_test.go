@@ -321,7 +321,9 @@ func TestMetaTagRecordSwap(t *testing.T) {
 	record2 := mustParseMetaTagRecord(t, []string{"meta2=value2"}, []string{"tag1=~iterator?"})
 
 	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{record1, record2}, 3, nil)
-	mtr, mti, _ := idx.getMetaTagDataStructures(1, false)
+	orgIdx := idx.getOrgMetaTagIndex(1)
+	mtr := orgIdx.records
+	mti := orgIdx.tags
 
 	record1Id, exists, equal := mtr.recordExistsAndIsEqual(record1)
 	if !(exists && equal) {
@@ -342,16 +344,16 @@ func TestMetaTagRecordSwap(t *testing.T) {
 		t.Fatalf("mti.getByTag returned unexpected record ids for meta tag %q of record 2. Got %+v, Expected %+v", record2.MetaTags[0], gotRecord2Ids, []recordId{record2Id})
 	}
 
-	if len(mti) != 2 {
-		t.Fatalf("Expected metaTagIndex to have 2 keys, but it had %d", len(mti))
+	if len(mti.tags) != 2 {
+		t.Fatalf("Expected metaTagIndex to have 2 keys, but it had %d", len(mti.tags))
 	}
 
-	if len(mti["meta1"]) != 1 {
-		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti["meta1"]))
+	if len(mti.tags["meta1"]) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti.tags["meta1"]))
 	}
 
-	if len(mti["meta2"]) != 1 {
-		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta2\", but id had %d", len(mti["meta2"]))
+	if len(mti.tags["meta2"]) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta2\", but id had %d", len(mti.tags["meta2"]))
 	}
 
 	record3 := mustParseMetaTagRecord(t, []string{"meta1=newvalue"}, []string{"tag1=iterator0"})
@@ -370,12 +372,12 @@ func TestMetaTagRecordSwap(t *testing.T) {
 		t.Fatalf("mti.getByTag returned unexpected record ids for meta tag %q of record 3. Got %+v, Expected %+v", record3.MetaTags[0], gotRecord3Ids, []recordId{record3Id})
 	}
 
-	if len(mti) != 1 {
-		t.Fatalf("Expected metaTagIndex to have 1 keys, but it had %d", len(mti))
+	if len(mti.tags) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 keys, but it had %d", len(mti.tags))
 	}
 
-	if len(mti["meta1"]) != 1 {
-		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti["meta1"]))
+	if len(mti.tags["meta1"]) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti.tags["meta1"]))
 	}
 }
 
@@ -383,38 +385,31 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	var err error
 	metaTagRecords1 := make([]tagquery.MetaTagRecord, 1000)
 	for i := 0; i < 1000; i++ {
-		metaTagRecords1[i], err = tagquery.ParseMetaTagRecord(
+		metaTagRecords1[i] = parseMetaTagRecordMustCompile(
+			b,
 			[]string{fmt.Sprintf("metatag1=value%d", i)},
 			[]string{fmt.Sprintf("tag1=~.*or%d$", i)},
 		)
-		if err != nil {
-			b.Fatalf("Error when parsing meta tag record: %s", err)
-		}
 	}
 
 	metaTagRecords2 := make([]tagquery.MetaTagRecord, 1000)
 	for i := 0; i < 1000; i++ {
-		metaTagRecords2[i], err = tagquery.ParseMetaTagRecord(
+		metaTagRecords2[i] = parseMetaTagRecordMustCompile(
+			b,
 			[]string{fmt.Sprintf("metatag2=value%d", i)},
 			[]string{fmt.Sprintf("tag1=iterator%d", i)},
 		)
-		if err != nil {
-			b.Fatalf("Error when parsing meta tag record: %s", err)
-		}
 	}
 
 	metaTagRecords3 := make([]tagquery.MetaTagRecord, 1000)
 	for i := 0; i < 1000; i++ {
-		metaTagRecords3[i], err = tagquery.ParseMetaTagRecord(
+		metaTagRecords3[i] = parseMetaTagRecordMustCompile(
+			b,
 			[]string{fmt.Sprintf("metatag3=value%d", i)},
 			[]string{"name=test.name", fmt.Sprintf("tag2=%d", i+1)},
 		)
-		if err != nil {
-			b.Fatalf("Error when parsing meta tag record: %s", err)
-		}
 	}
 
 	allMetaTagRecords := make([]tagquery.MetaTagRecord, len(metaTagRecords1)+len(metaTagRecords2)+len(metaTagRecords3))
@@ -443,13 +438,13 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 
 	var def *idx.Archive
 	resToCompare := make(map[tagquery.Tag]struct{})
-	mtr, _, enricher := memoryIdx.getMetaTagDataStructures(1, true)
+	metaTagIdx := memoryIdx.getOrgMetaTagIndex(1)
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		def = &defs[i%1000]
-		metaTags := mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
+		metaTags := metaTagIdx.getMetaTagsById(def.Id.Key)
 		if len(metaTags) != 3 {
 			b.Fatalf("Expected result to have length 3, but it had %d", len(metaTags))
 		}
@@ -819,7 +814,7 @@ func benchmarkAddingMetricToEnricher(b *testing.B, metaRecordCount int) {
 		}
 	}
 
-	enricher := index.getMetaTagEnricher(1, true)
+	enricher := index.getOrgMetaTagIndex(1).enricher
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

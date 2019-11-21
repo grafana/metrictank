@@ -57,6 +57,14 @@ func generateMetaRecords(t *testing.T, metaTags, tags [][]string) []tagquery.Met
 	return res
 }
 
+func parseMetaTagRecordMustCompile(t testing.TB, metaTags, expressions []string) tagquery.MetaTagRecord {
+	record, err := tagquery.ParseMetaTagRecord(metaTags, expressions)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
+	}
+	return record
+}
+
 func TestInsertSimpleMetaTagRecord(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
@@ -64,30 +72,23 @@ func TestInsertSimpleMetaTagRecord(t *testing.T) {
 	metaTagRecords := newMetaTagRecords()
 	recordToInsert := generateMetaRecords(t, [][]string{{"metaTag1=abc", "anotherTag=theValue"}}, [][]string{{"metricTag!=a", "match=~this"}})[0]
 
-	_, record, oldId, oldRecord, err := metaTagRecords.upsert(recordToInsert)
+	_, oldId, oldRecord, err := metaTagRecords.upsert(recordToInsert)
 	if err != nil {
 		t.Fatalf("Unexpected error on meta tag record upsert: %q", err)
-	}
-	if record == nil {
-		t.Fatalf("Record was expected to not be nil, but it was")
 	}
 	if oldId != 0 {
 		t.Fatalf("Old id was expected to be 0, but it was %d", oldId)
 	}
-	if oldRecord != nil {
-		t.Fatalf("OldRecord was expected to be nil, but it was %+v", oldRecord)
+	if !oldRecord.Equals(&tagquery.MetaTagRecord{}) {
+		t.Fatalf("OldRecord was expected to be empty, but it was %+v", oldRecord)
 	}
 	if len(metaTagRecords.records) != 1 {
 		t.Fatalf("metaTagRecords was expected to have 1 entry, but it had %d", len(metaTagRecords.records))
 	}
 
-	_, ok := metaTagRecords.records[recordId(record.HashExpressions())]
+	_, ok := metaTagRecords.records[recordId(recordToInsert.HashExpressions())]
 	if !ok {
 		t.Fatalf("We expected the record to be found at the index of its hash, but it wasn't")
-	}
-
-	if !recordToInsert.Equals(record) {
-		t.Fatalf("Inserted meta tag record has unexpectedly been modified")
 	}
 }
 
@@ -124,12 +125,9 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 		t.Fatalf("Expected both meta tag records to be found, but at least one wasn't: %t / %t", found1, found2)
 	}
 
-	id, record, oldId, oldRecord, err := metaTagRecords.upsert(records[2])
+	id, oldId, oldRecord, err := metaTagRecords.upsert(records[2])
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
-	}
-	if record == nil {
-		t.Fatalf("Expected record to not be nil, but it was")
 	}
 	if recordIdToUpdate != id {
 		t.Fatalf("Expected the new id after updating to be %d (the id that got returned when creating the record), but it was %d", recordIdToUpdate, id)
@@ -137,8 +135,8 @@ func TestUpdateExistingMetaTagRecord(t *testing.T) {
 	if oldId != id {
 		t.Fatalf("Expected the new id after updating to be %d (same as the old id), but it was %d", oldId, id)
 	}
-	if oldRecord == nil || !oldRecord.Equals(&records[0]) {
-		t.Fatalf("Expected the old record to not be nil, but it was")
+	if oldRecord.Equals(&tagquery.MetaTagRecord{}) {
+		t.Fatalf("Expected the old record to not be empty, but it was")
 	}
 	if len(metaTagRecords.records) != 2 {
 		t.Fatalf("Expected that there to be 2 meta tag records, but there were %d", len(metaTagRecords.records))
@@ -226,28 +224,25 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 	}
 
 	// adding a 4th record with the same hash but different queries
-	id, returnedRecord, oldId, oldRecord, err := metaTagRecords.upsert(records[3])
+	id, oldId, oldRecord, err := metaTagRecords.upsert(records[3])
 	if err == nil {
 		t.Fatalf("Expected an error to be returned, but there was none")
 	}
 	if id != 0 {
 		t.Fatalf("Expected the returned id to be 0, but it was %d", id)
 	}
-	if returnedRecord != nil {
-		t.Fatalf("Expected returned record point to be nil, but it wasn't")
-	}
 	if oldId != 0 {
 		t.Fatalf("Expected oldId to be 0, but it was %d", oldId)
 	}
-	if oldRecord != nil {
-		t.Fatalf("Expected oldRecord to be nil, but it wasn't")
+	if !oldRecord.Equals(&tagquery.MetaTagRecord{}) {
+		t.Fatalf("Expected oldRecord to be empty, but it wasn't")
 	}
 	if len(metaTagRecords.records) != 3 {
 		t.Fatalf("Expected 3 metatag records to be present, but there were %d", len(metaTagRecords.records))
 	}
 
 	// updating the third record with the same hash and equal queries, but different meta tags
-	id, returnedRecord, oldId, oldRecord, err = metaTagRecords.upsert(records[4])
+	id, oldId, oldRecord, err = metaTagRecords.upsert(records[4])
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
 	}
@@ -255,10 +250,6 @@ func TestHashCollisionsOnInsert(t *testing.T) {
 		t.Fatalf("Expected the returned id to be 3, but it was %d", id)
 	}
 
-	// check if the returned new record looks as expected
-	if !returnedRecord.Equals(&records[4]) {
-		t.Fatalf("New record looked different than expected:\nExpected:\n%+v\nGot:\n%+v\n", &records[4], returnedRecord)
-	}
 	if oldId != 3 {
 		t.Fatalf("Expected oldId to be 3, but it was %d", oldId)
 	}
@@ -284,7 +275,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 	)
 
 	metaTagRecords.upsert(records[0])
-	idOfRecord2, _, _, _, _ := metaTagRecords.upsert(records[1])
+	idOfRecord2, _, _, _ := metaTagRecords.upsert(records[1])
 
 	if len(metaTagRecords.records) != 2 {
 		t.Fatalf("Expected that 2 meta tag records exist, but there were %d", len(metaTagRecords.records))
@@ -292,15 +283,9 @@ func TestDeletingMetaRecord(t *testing.T) {
 
 	// then we delete one record again
 	// upserting a meta tag record with one that has no meta tags results in deletion
-	id, returnedRecord, oldId, _, err := metaTagRecords.upsert(records[2])
+	id, oldId, _, err := metaTagRecords.upsert(records[2])
 	if err != nil {
 		t.Fatalf("Expected no error, but there was one: %q", err)
-	}
-	if len(returnedRecord.MetaTags) != 0 {
-		t.Fatalf("Expected returned meta tag record to have 0 meta tags, but it had %d", len(returnedRecord.MetaTags))
-	}
-	if !returnedRecord.Equals(&records[2]) {
-		t.Fatalf("Queries of returned record don't match what we expected:\nExpected:\n%+v\nGot:\n%+v\n", records[2].Expressions, returnedRecord.Expressions)
 	}
 	if oldId != idOfRecord2 {
 		t.Fatalf("Expected the oldId to be the id of record2 (%d), but it was %d", idOfRecord2, oldId)
@@ -308,14 +293,15 @@ func TestDeletingMetaRecord(t *testing.T) {
 	if len(metaTagRecords.records) != 1 {
 		t.Fatalf("Expected that there is 1 meta tag record, but there were %d", len(metaTagRecords.records))
 	}
-	_, ok := metaTagRecords.records[id]
+	_, ok := metaTagRecords.getMetaRecordById(id)
 	if ok {
 		t.Fatalf("Expected returned record id to not be present, but it was")
 	}
 }
 
 func TestAddingMetricsToEmptyEnricher(t *testing.T) {
-	enricher := newEnricher()
+	var mockLookup func(tagquery.Query, func(chan schema.MKey))
+	enricher := newEnricher(mockLookup)
 
 	mds := []schema.MetricDefinition{
 		{
@@ -346,23 +332,6 @@ func TestAddingMetricsToEmptyEnricher(t *testing.T) {
 }
 
 func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
-	enricher := newEnricher()
-	acceptEverySecond, err := tagquery.NewQueryFromStrings([]string{"name=~.*[135]$"}, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
-	}
-	acceptAll, err := tagquery.NewQueryFromStrings([]string{"name=~.+"}, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
-	}
-	acceptNone, err := tagquery.NewQueryFromStrings([]string{"name=nonexistent"}, 0)
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing query: %s", err.Error())
-	}
-	enricher.addMetaRecord(recordId(1), acceptEverySecond, nil)
-	enricher.addMetaRecord(recordId(2), acceptAll, nil)
-	enricher.addMetaRecord(recordId(3), acceptNone, nil)
-
 	testMetrics := []schema.MetricDefinition{
 		{Name: "1"},
 		{Name: "2"},
@@ -375,8 +344,49 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	for i := range testMetrics {
 		testMetrics[i].SetId()
 		allKeys[i] = testMetrics[i].Id.Key
+	}
+
+	// mocks a lookup function which would execute the given query on the tag index
+	// and then call the callback to pass it a channel of resulting metric ids
+	mockLookup := func(query tagquery.Query, callback func(chan schema.MKey)) {
+		resCh := make(chan schema.MKey)
+		callback(resCh)
+
+		switch query.Expressions[0].GetValue() {
+		case "everyEven":
+			for i := range testMetrics {
+				if i%2 == 0 {
+					resCh <- testMetrics[i].Id
+				}
+			}
+		case "everyOdd":
+			for i := range testMetrics {
+				if i%2 == 1 {
+					resCh <- testMetrics[i].Id
+				}
+			}
+		case "all":
+			for i := range testMetrics {
+				resCh <- testMetrics[i].Id
+			}
+		case "none":
+		}
+
+		close(resCh)
+	}
+
+	enricher := newEnricher(mockLookup)
+	for i := range testMetrics {
 		enricher.addMetric(testMetrics[i])
 	}
+
+	acceptEveryEven := parseQueryMustCompile(t, []string{"accept=everyEven"})
+	acceptAll := parseQueryMustCompile(t, []string{"accept=all"})
+	acceptNone := parseQueryMustCompile(t, []string{"accept=none"})
+	acceptEveryOdd := parseQueryMustCompile(t, []string{"accept=everyOdd"})
+	enricher.addMetaRecord(recordId(1), acceptEveryEven)
+	enricher.addMetaRecord(recordId(2), acceptAll)
+	enricher.addMetaRecord(recordId(3), acceptNone)
 
 	flushEnricherQueue := func() {
 		// stop and start to process the event queue
@@ -385,7 +395,8 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	}
 
 	// helper to verify returned result
-	compareResultToExpected := func(expected []map[recordId]struct{}) {
+	compareResultToExpected := func(t *testing.T, expected []map[recordId]struct{}) {
+		t.Helper()
 		flushEnricherQueue()
 
 		for i, metric := range testMetrics {
@@ -405,7 +416,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 		}
 	}
 
-	compareResultToExpected([]map[recordId]struct{}{
+	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}, recordId(2): {}},
 		{recordId(2): {}},
 		{recordId(1): {}, recordId(2): {}},
@@ -414,10 +425,9 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(5)
 
-	record4Keys := []schema.Key{testMetrics[1].Id.Key, testMetrics[3].Id.Key}
-	enricher.addMetaRecord(recordId(4), acceptAll, record4Keys)
+	enricher.addMetaRecord(recordId(4), acceptEveryOdd)
 
-	compareResultToExpected([]map[recordId]struct{}{
+	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}, recordId(2): {}},
 		{recordId(2): {}, recordId(4): {}},
 		{recordId(1): {}, recordId(2): {}},
@@ -426,10 +436,10 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(5)
 
-	enricher.delMetaRecord(recordId(2), allKeys)
-	enricher.delMetaRecord(recordId(4), record4Keys)
+	enricher.delMetaRecord(recordId(2))
+	enricher.delMetaRecord(recordId(4))
 
-	compareResultToExpected([]map[recordId]struct{}{
+	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}},
 		nil,
 		{recordId(1): {}},
@@ -440,7 +450,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 
 	enricher.delMetric(&testMetrics[4])
 
-	compareResultToExpected([]map[recordId]struct{}{
+	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}},
 		nil,
 		{recordId(1): {}},
@@ -449,10 +459,10 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(2)
 
-	enricher.delMetaRecord(recordId(1), []schema.Key{testMetrics[0].Id.Key, testMetrics[2].Id.Key, testMetrics[4].Id.Key})
-	enricher.delMetaRecord(recordId(3), nil)
+	enricher.delMetaRecord(recordId(1))
+	enricher.delMetaRecord(recordId(3))
 
-	compareResultToExpected([]map[recordId]struct{}{
+	compareResultToExpected(t, []map[recordId]struct{}{
 		nil,
 		nil,
 		nil,
@@ -465,7 +475,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 		enricher.delMetric(&testMetrics[i])
 	}
 
-	compareResultToExpected([]map[recordId]struct{}{
+	compareResultToExpected(t, []map[recordId]struct{}{
 		nil,
 		nil,
 		nil,

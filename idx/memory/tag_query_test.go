@@ -608,10 +608,12 @@ func TestExpressionSortingByCost(t *testing.T) {
 		"i": {"j": {}},
 		"k": {"l": {}},
 	}
-	queryCtx.metaTagIndex = metaTagHierarchy{
-		"a": {"b": {}},
-		"e": {"f": {}},
-		"k": {"l": {}},
+	queryCtx.metaTagIndex = &metaTagHierarchy{
+		tags: metaTagKeys{
+			"a": metaTagValue{"b": {}},
+			"e": metaTagValue{"f": {}},
+			"k": metaTagValue{"l": {}},
+		},
 	}
 
 	costs := queryCtx.evaluateExpressionCosts()
