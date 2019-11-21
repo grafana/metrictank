@@ -279,7 +279,7 @@ type UnpartitionedMemoryIdx struct {
 	// used by tag index
 	defByTagSet     defByTagSet
 	tags            map[uint32]TagIndex         // by orgId
-	metaTagIndex    map[uint32]metaTagIndex     // by orgId
+	metaTagIndex    map[uint32]metaTagHierarchy // by orgId
 	metaTagRecords  map[uint32]*metaTagRecords  // by orgId
 	metaTagEnricher map[uint32]*metaTagEnricher // by orgId
 
@@ -294,7 +294,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet:     make(defByTagSet),
 		tree:            make(map[uint32]*Tree),
 		tags:            make(map[uint32]TagIndex),
-		metaTagIndex:    make(map[uint32]metaTagIndex),
+		metaTagIndex:    make(map[uint32]metaTagHierarchy),
 		metaTagRecords:  make(map[uint32]*metaTagRecords),
 		metaTagEnricher: make(map[uint32]*metaTagEnricher),
 	}
@@ -467,7 +467,7 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 	}
 }
 
-func (m *UnpartitionedMemoryIdx) getMetaTagDataStructures(orgId uint32, create bool) (*metaTagRecords, metaTagIndex, *metaTagEnricher) {
+func (m *UnpartitionedMemoryIdx) getMetaTagDataStructures(orgId uint32, create bool) (*metaTagRecords, metaTagHierarchy, *metaTagEnricher) {
 	return m.getMetaTagRecords(orgId, create), m.getMetaTagIndex(orgId, create), m.getMetaTagEnricher(orgId, create)
 }
 
@@ -482,11 +482,11 @@ func (m *UnpartitionedMemoryIdx) getMetaTagRecords(orgId uint32, create bool) *m
 	return nil
 }
 
-func (m *UnpartitionedMemoryIdx) getMetaTagIndex(orgId uint32, create bool) metaTagIndex {
+func (m *UnpartitionedMemoryIdx) getMetaTagIndex(orgId uint32, create bool) metaTagHierarchy {
 	if mti, ok := m.metaTagIndex[orgId]; ok {
 		return mti
 	} else if create {
-		mti = make(metaTagIndex)
+		mti = make(metaTagHierarchy)
 		m.metaTagIndex[orgId] = mti
 		return mti
 	}
@@ -516,7 +516,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord 
 	}
 
 	var mtr *metaTagRecords
-	var mti metaTagIndex
+	var mti metaTagHierarchy
 	var enricher *metaTagEnricher
 
 	// expressions need to be sorted because the unique ID of a meta record is

@@ -510,9 +510,9 @@ func (e *metaTagEnricher) countMetricsWithMetaTags() int {
 
 // index structure keyed by tag -> value -> list of meta record IDs
 type metaTagValue map[string][]recordId
-type metaTagIndex map[string]metaTagValue
+type metaTagHierarchy map[string]metaTagValue
 
-func (m metaTagIndex) deleteRecord(keyValue tagquery.Tag, id recordId) {
+func (m metaTagHierarchy) deleteRecord(keyValue tagquery.Tag, id recordId) {
 	if ids, ok := m[keyValue.Key][keyValue.Value]; ok {
 		for i := 0; i < len(ids); i++ {
 			if ids[i] == id {
@@ -531,7 +531,7 @@ func (m metaTagIndex) deleteRecord(keyValue tagquery.Tag, id recordId) {
 	}
 }
 
-func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
+func (m metaTagHierarchy) insertRecord(keyValue tagquery.Tag, id recordId) {
 	var values metaTagValue
 	var ok bool
 
@@ -550,14 +550,14 @@ func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 // because less meta records will need to be checked against a given MetricDefinition.
 // The caller, after receiving the result set, needs to be aware of whether the result set
 // is inverted and interpret it accordingly.
-func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+func (m metaTagHierarchy) getMetaRecordIdsByExpression(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	if expr.OperatesOnTag() {
 		return m.getByTag(expr, invertSetOfMetaRecords)
 	}
 	return m.getByTagValue(expr, invertSetOfMetaRecords)
 }
 
-func (m metaTagIndex) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+func (m metaTagHierarchy) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	var res []recordId
 
 	for key := range m {
@@ -580,7 +580,7 @@ func (m metaTagIndex) getByTag(expr tagquery.Expression, invertSetOfMetaRecords 
 	return res
 }
 
-func (m metaTagIndex) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+func (m metaTagHierarchy) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	if expr.MatchesExactly() {
 		return m[expr.GetKey()][expr.GetValue()]
 	}
