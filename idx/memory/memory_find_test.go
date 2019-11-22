@@ -299,13 +299,17 @@ func getMetaTagEnrichers(t testing.TB, ix MemoryIndex) map[uint32][]*metaTagEnri
 	switch concrete := ix.(type) {
 	case *PartitionedMemoryIdx:
 		for _, unpartitionedIdx := range concrete.Partition {
-			for orgId, enricher := range unpartitionedIdx.metaTagEnricher {
-				res[orgId] = append(res[orgId], enricher)
+			if unpartitionedIdx.metaTagIdx != nil {
+				for orgId, metaTagIdx := range unpartitionedIdx.metaTagIdx.byOrg {
+					res[orgId] = append(res[orgId], metaTagIdx.enricher)
+				}
 			}
 		}
 	case *UnpartitionedMemoryIdx:
-		for orgId, enricher := range concrete.metaTagEnricher {
-			res[orgId] = append(res[orgId], enricher)
+		if concrete.metaTagIdx != nil {
+			for orgId, metaTagIdx := range concrete.metaTagIdx.byOrg {
+				res[orgId] = append(res[orgId], metaTagIdx.enricher)
+			}
 		}
 	default:
 		t.Fatalf("Invalid index object")
@@ -314,9 +318,8 @@ func getMetaTagEnrichers(t testing.TB, ix MemoryIndex) map[uint32][]*metaTagEnri
 	return res
 }
 
-// waitForMetaTagEnrichers obtains all enrichers in existence, across all orgs, and uses
-// their .wait() function to wait for each of them. this function blocks until the whole
-// enricher queue has been processed up to the point when it was called
+// waitForMetaTagEnrichers obtains all enrichers in existence, across all orgs.
+// it stops and starts them to make sure their whole event queue is processed.
 func waitForMetaTagEnrichers(t testing.TB, ix MemoryIndex) {
 	enrichersByOrg := getMetaTagEnrichers(t, ix)
 	for _, enrichers := range enrichersByOrg {
@@ -558,11 +561,11 @@ func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
 	queryAndCompareTagKeys(t, "", expected)
 }
 
-func TestTagSorting(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagSorting)(t)
+func TestTagSortingInFindByTag(t *testing.T) {
+	withAndWithoutPartitonedIndex(testTagSortingInFindByTag)(t)
 }
 
-func testTagSorting(t *testing.T) {
+func testTagSortingInFindByTag(t *testing.T) {
 	index := New()
 	defer index.Stop()
 	index.Init()
