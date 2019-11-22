@@ -316,12 +316,12 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 		m.writeQueue = nil
 	}
 
-	if MetaTagSupport {
+	if MetaTagSupport && m.metaTagIdx != nil {
 		m.Lock()
 		m.metaTagIdx.stop()
-		m.metaTagIdx = nil
 		m.Unlock()
 	}
+
 	return
 }
 

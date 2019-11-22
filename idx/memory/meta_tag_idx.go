@@ -55,7 +55,12 @@ func newMetaTagIndex(idLookup func(uint32, tagquery.Query, func(chan schema.MKey
 }
 
 func (m *metaTagIdx) stop() {
-
+	m.Lock()
+	for _, idx := range m.byOrg {
+		idx.enricher.stop()
+	}
+	m.byOrg = make(map[uint32]*orgMetaTagIdx)
+	m.Unlock()
 }
 
 func (m *metaTagIdx) getOrgMetaTagIndex(orgId uint32) *orgMetaTagIdx {
