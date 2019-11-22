@@ -894,7 +894,7 @@ func (m *metaTagHierarchy) getMetaRecordIdsByExpression(expr tagquery.Expression
 }
 
 func (m *metaTagHierarchy) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
-	var res []recordId
+	recordSet := make(map[recordId]struct{})
 
 	m.RLock()
 	defer m.RUnlock()
@@ -902,32 +902,43 @@ func (m *metaTagHierarchy) getByTag(expr tagquery.Expression, invertSetOfMetaRec
 	// optimization for simple "=" expressions
 	if !invertSetOfMetaRecords && expr.MatchesExactly() {
 		for _, records := range m.tags[expr.GetKey()] {
-			res = append(res, records...)
+			for _, record := range records {
+				recordSet[record] = struct{}{}
+			}
 		}
+	} else {
+		for key := range m.tags {
+			if invertSetOfMetaRecords {
+				if expr.Matches(key) {
+					continue
+				}
+			} else {
+				if !expr.Matches(key) {
+					continue
+				}
+			}
 
-		return res
+			for _, records := range m.tags[key] {
+				for _, record := range records {
+					recordSet[record] = struct{}{}
+				}
+			}
+		}
 	}
 
-	for key := range m.tags {
-		if invertSetOfMetaRecords {
-			if expr.Matches(key) {
-				continue
-			}
-		} else {
-			if !expr.Matches(key) {
-				continue
-			}
-		}
-
-		for _, ids := range m.tags[key] {
-			res = append(res, ids...)
-		}
+	res := make([]recordId, len(recordSet))
+	i := 0
+	for record := range recordSet {
+		res[i] = record
+		i++
 	}
 
 	return res
 }
 
-func (m metaTagHierarchy) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+func (m *metaTagHierarchy) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+	recordSet := make(map[recordId]struct{})
+
 	m.RLock()
 	defer m.RUnlock()
 
@@ -936,8 +947,7 @@ func (m metaTagHierarchy) getByTagValue(expr tagquery.Expression, invertSetOfMet
 		return m.tags[expr.GetKey()][expr.GetValue()]
 	}
 
-	var res []recordId
-	for value, ids := range m.tags[expr.GetKey()] {
+	for value, records := range m.tags[expr.GetKey()] {
 		passes := expr.Matches(value)
 
 		if invertSetOfMetaRecords {
@@ -948,12 +958,20 @@ func (m metaTagHierarchy) getByTagValue(expr tagquery.Expression, invertSetOfMet
 			continue
 		}
 
-		res = append(res, ids...)
+		for _, record := range records {
+			recordSet[record] = struct{}{}
+		}
+	}
+
+	res := make([]recordId, len(recordSet))
+	i := 0
+	for record := range recordSet {
+		res[i] = record
+		i++
 	}
 
 	return res
 }
-
 func (m *metaTagHierarchy) getTagValuesByRegex(key string, filter *regexp.Regexp) map[string][]recordId {
 	res := make(map[string][]recordId)
 
