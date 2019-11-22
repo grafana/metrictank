@@ -292,38 +292,31 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	var err error
 	metaTagRecords1 := make([]tagquery.MetaTagRecord, 1000)
 	for i := 0; i < 1000; i++ {
-		metaTagRecords1[i], err = tagquery.ParseMetaTagRecord(
+		metaTagRecords1[i] = parseMetaTagRecordMustCompile(
+			b,
 			[]string{fmt.Sprintf("metatag1=value%d", i)},
 			[]string{fmt.Sprintf("tag1=~.*or%d$", i)},
 		)
-		if err != nil {
-			b.Fatalf("Error when parsing meta tag record: %s", err)
-		}
 	}
 
 	metaTagRecords2 := make([]tagquery.MetaTagRecord, 1000)
 	for i := 0; i < 1000; i++ {
-		metaTagRecords2[i], err = tagquery.ParseMetaTagRecord(
+		metaTagRecords2[i] = parseMetaTagRecordMustCompile(
+			b,
 			[]string{fmt.Sprintf("metatag2=value%d", i)},
 			[]string{fmt.Sprintf("tag1=iterator%d", i)},
 		)
-		if err != nil {
-			b.Fatalf("Error when parsing meta tag record: %s", err)
-		}
 	}
 
 	metaTagRecords3 := make([]tagquery.MetaTagRecord, 1000)
 	for i := 0; i < 1000; i++ {
-		metaTagRecords3[i], err = tagquery.ParseMetaTagRecord(
+		metaTagRecords3[i] = parseMetaTagRecordMustCompile(
+			b,
 			[]string{fmt.Sprintf("metatag3=value%d", i)},
 			[]string{"name=test.name", fmt.Sprintf("tag2=%d", i+1)},
 		)
-		if err != nil {
-			b.Fatalf("Error when parsing meta tag record: %s", err)
-		}
 	}
 
 	allMetaTagRecords := make([]tagquery.MetaTagRecord, len(metaTagRecords1)+len(metaTagRecords2)+len(metaTagRecords3))
@@ -352,13 +345,13 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 
 	var def *idx.Archive
 	resToCompare := make(map[tagquery.Tag]struct{})
-	mtr, _, enricher := memoryIdx.getMetaTagDataStructures(1, true)
+	metaTagIdx := memoryIdx.getOrgMetaTagIndex(1)
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		def = &defs[i%1000]
-		metaTags := mtr.getMetaTagsByRecordIds(enricher.enrich(def.Id.Key))
+		metaTags := metaTagIdx.getMetaTagsById(def.Id.Key)
 		if len(metaTags) != 3 {
 			b.Fatalf("Expected result to have length 3, but it had %d", len(metaTags))
 		}
@@ -511,7 +504,7 @@ func benchmarkAddingMetricToEnricher(b *testing.B, metaRecordCount int) {
 		}
 	}
 
-	enricher := index.getMetaTagEnricher(1, true)
+	enricher := index.getOrgMetaTagIndex(1).enricher
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

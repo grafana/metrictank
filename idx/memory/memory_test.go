@@ -31,6 +31,22 @@ func init() {
 	partitionCount = 2
 }
 
+func parseExpressionsMustCompile(t testing.TB, expressions []string) tagquery.Expressions {
+	res, err := tagquery.ParseExpressions(expressions)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expressions %+v: %s", expressions, err)
+	}
+	return res
+}
+
+func parseQueryMustCompile(t testing.TB, expressions []string) tagquery.Query {
+	query, err := tagquery.NewQueryFromStrings(expressions, 0)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing query expressions: %s", err)
+	}
+	return query
+}
+
 func getPartition(md *schema.MetricData) int32 {
 	return getPartitionFromName(md.Name)
 }
@@ -1028,26 +1044,18 @@ func testSingleNodeMetric(t *testing.T) {
 	}
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 }
+
 func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
 	ix := NewUnpartitionedMemoryIdx()
 
-	record1, err := tagquery.ParseMetaTagRecord([]string{"a=b", "c=d"}, []string{"name=~a.+", "__tag^=a"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
-	record2, err := tagquery.ParseMetaTagRecord([]string{"e=f", "g=h"}, []string{"other=queries", "some!=value"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
-	record3, err := tagquery.ParseMetaTagRecord([]string{"i=j", "k=l"}, []string{"other=queries", "some!=value"})
-	if err != nil {
-		t.Fatalf("Unexpected error when parsing meta tag record: %q", err)
-	}
+	record1 := parseMetaTagRecordMustCompile(t, []string{"a=b", "c=d"}, []string{"name=~a.+", "__tag^=a"})
+	record2 := parseMetaTagRecordMustCompile(t, []string{"e=f", "g=h"}, []string{"other=queries", "some!=value"})
+	record3 := parseMetaTagRecordMustCompile(t, []string{"i=j", "k=l"}, []string{"other=queries", "some!=value"})
 
-	err = ix.MetaTagRecordUpsert(1, record1)
+	err := ix.MetaTagRecordUpsert(1, record1)
 	if err != nil {
 		t.Fatalf("Unexpected error when upserting meta tag record: %q", err)
 	}
@@ -1082,18 +1090,17 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Expected MetaTagRecordList to return no records for org 2, but it has:\n%+v\n", metaTagRecords)
 	}
 
-	if len(ix.metaTagIndex[1]["a"]["b"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag a=b, but there were %d", len(ix.metaTagIndex[1]["a"]["b"]))
+	compareRecordCount := func(expression string, expectedRecordCount int) {
+		recordCount := len(ix.metaTagIdx.getOrgMetaTagIndex(1).tags.getByTagValue(parseExpressionsMustCompile(t, []string{expression})[0], false))
+		if recordCount != expectedRecordCount {
+			t.Fatalf("Expected that there are %d record(s) associated with expression %s, but there were %d", expectedRecordCount, expression, recordCount)
+		}
 	}
-	if len(ix.metaTagIndex[1]["c"]["d"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag c=d, but there were %d", len(ix.metaTagIndex[1]["c"]["d"]))
-	}
-	if len(ix.metaTagIndex[1]["e"]["f"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag e=f, but there were %d", len(ix.metaTagIndex[1]["e"]["f"]))
-	}
-	if len(ix.metaTagIndex[1]["g"]["h"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag g=h, but there were %d", len(ix.metaTagIndex[1]["g"]["h"]))
-	}
+
+	compareRecordCount("a=b", 1)
+	compareRecordCount("c=d", 1)
+	compareRecordCount("e=f", 1)
+	compareRecordCount("g=h", 1)
 
 	// record3 has the same queries as record2, so it should completely replace it
 	err = ix.MetaTagRecordUpsert(1, record3)
@@ -1108,24 +1115,12 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 		t.Fatalf("Expected MetaTagRecordList to return 2 records for org 1, but it has:\n%+v\n", metaTagRecords)
 	}
 
-	if len(ix.metaTagIndex[1]["a"]["b"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag a=b, but there were %d", len(ix.metaTagIndex[1]["a"]["b"]))
-	}
-	if len(ix.metaTagIndex[1]["c"]["d"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag c=d, but there were %d", len(ix.metaTagIndex[1]["c"]["d"]))
-	}
-	if len(ix.metaTagIndex[1]["e"]["f"]) != 0 {
-		t.Fatalf("Expected that there is 0 record associated with tag e=f, but there were %d", len(ix.metaTagIndex[1]["e"]["f"]))
-	}
-	if len(ix.metaTagIndex[1]["g"]["h"]) != 0 {
-		t.Fatalf("Expected that there is 0 record associated with tag g=h, but there were %d", len(ix.metaTagIndex[1]["g"]["h"]))
-	}
-	if len(ix.metaTagIndex[1]["i"]["j"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag i=j, but there were %d", len(ix.metaTagIndex[1]["i"]["j"]))
-	}
-	if len(ix.metaTagIndex[1]["k"]["l"]) != 1 {
-		t.Fatalf("Expected that there is 1 record associated with tag k=l, but there were %d", len(ix.metaTagIndex[1]["k"]["l"]))
-	}
+	compareRecordCount("a=b", 1)
+	compareRecordCount("c=d", 1)
+	compareRecordCount("e=f", 0)
+	compareRecordCount("g=h", 0)
+	compareRecordCount("i=j", 1)
+	compareRecordCount("k=l", 1)
 }
 
 func TestMetricNameStartingWithTilde(t *testing.T) {
