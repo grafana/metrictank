@@ -300,7 +300,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 }
 
 func TestAddingMetricsToEmptyEnricher(t *testing.T) {
-	var mockLookup func(tagquery.Query, func(chan schema.MKey))
+	var mockLookup func(tagquery.Query, chan schema.MKey, bool)
 	enricher := newEnricher(mockLookup)
 
 	mds := []schema.MetricDefinition{
@@ -348,9 +348,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 
 	// mocks a lookup function which would execute the given query on the tag index
 	// and then call the callback to pass it a channel of resulting metric ids
-	mockLookup := func(query tagquery.Query, callback func(chan schema.MKey)) {
-		resCh := make(chan schema.MKey)
-		callback(resCh)
+	mockLookup := func(query tagquery.Query, resCh chan schema.MKey, _ bool) {
 
 		switch query.Expressions[0].GetValue() {
 		case "everyEven":

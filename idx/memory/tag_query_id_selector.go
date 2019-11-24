@@ -53,7 +53,7 @@ func (i *idSelector) getIds(resCh chan schema.MKey, stopCh chan struct{}) {
 	// if meta tag support is enabled and we create subqueries out of looked up meta
 	// records, then its possible that we will end up with duplicate results. to
 	// prevent this we spawn a separate worker process which deduplicates them
-	deduplicateResults := i.useMetaTagIndex()
+	deduplicateResults := i.ctx.useMetaTagIndex()
 
 	var dedupWg sync.WaitGroup
 	if deduplicateResults {
@@ -72,13 +72,6 @@ func (i *idSelector) getIds(resCh chan schema.MKey, stopCh chan struct{}) {
 
 	i.workerWg.Wait()
 	dedupWg.Wait()
-}
-
-func (i *idSelector) useMetaTagIndex() bool {
-	// if this is a sub query we want to ignore the meta tag index,
-	// otherwise we'd risk to create a loop of sub queries creating
-	// each other
-	return MetaTagSupport && !i.ctx.subQuery && i.ctx.metaTagIndex != nil && i.ctx.metaTagRecords != nil
 }
 
 // deduplicateRawResults reads the channel i.rawResCh and deduplicates all the ids
@@ -111,7 +104,7 @@ func (i *idSelector) deduplicateRawResults(dedupWg *sync.WaitGroup, resCh chan s
 func (i *idSelector) byTagValue() {
 	go i.byTagValueFromMetricTagIndex()
 
-	if !i.useMetaTagIndex() {
+	if !i.ctx.useMetaTagIndex() {
 		i.workerWg.Done()
 		return
 	}
@@ -189,7 +182,7 @@ func (i *idSelector) byTagValueFromMetaTagIndex() {
 func (i *idSelector) byTag() {
 	go i.byTagFromMetricTagIndex()
 
-	if !i.useMetaTagIndex() {
+	if !i.ctx.useMetaTagIndex() {
 		i.workerWg.Done()
 		return
 	}
@@ -304,6 +297,6 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 // directly pushed into it
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
-	query.RunBlocking(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
+	query.Run(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
 	<-i.concGate
 }

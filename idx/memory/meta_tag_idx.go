@@ -44,10 +44,10 @@ var (
 type metaTagIdx struct {
 	sync.RWMutex
 	byOrg    map[uint32]*orgMetaTagIdx
-	idLookup func(uint32, tagquery.Query, func(chan schema.MKey))
+	idLookup func(uint32, tagquery.Query, chan schema.MKey, bool)
 }
 
-func newMetaTagIndex(idLookup func(uint32, tagquery.Query, func(chan schema.MKey))) *metaTagIdx {
+func newMetaTagIndex(idLookup func(uint32, tagquery.Query, chan schema.MKey, bool)) *metaTagIdx {
 	return &metaTagIdx{
 		byOrg:    make(map[uint32]*orgMetaTagIdx),
 		idLookup: idLookup,
@@ -79,8 +79,8 @@ func (m *metaTagIdx) getOrgMetaTagIndex(orgId uint32) *orgMetaTagIdx {
 		return idx
 	}
 
-	idLookup := func(query tagquery.Query, callback func(chan schema.MKey)) {
-		m.idLookup(orgId, query, callback)
+	idLookup := func(query tagquery.Query, idCh chan schema.MKey, useMeta bool) {
+		m.idLookup(orgId, query, idCh, useMeta)
 	}
 	idx = newOrgMetaTagIndex(idLookup)
 
@@ -98,7 +98,7 @@ type orgMetaTagIdx struct {
 	enricher *metaTagEnricher
 }
 
-type idLookup func(tagquery.Query, func(chan schema.MKey))
+type idLookup func(tagquery.Query, chan schema.MKey, bool)
 
 func newOrgMetaTagIndex(idLookup idLookup) *orgMetaTagIdx {
 	return &orgMetaTagIdx{
