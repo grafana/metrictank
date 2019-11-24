@@ -49,8 +49,6 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		filters: make([]expressionFilter, len(expressions)),
 	}
 
-	useMetaTags := MetaTagSupport && ctx.metaTagIndex != nil && ctx.metaTagRecords != nil
-
 	for i, expr := range expressions {
 		res.filters[i] = expressionFilter{
 			expr:             expr,
@@ -58,7 +56,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			defaultDecision:  expr.GetDefaultDecision(),
 		}
 
-		if !useMetaTags {
+		if !ctx.useMetaTagIndex() {
 			continue
 		}
 

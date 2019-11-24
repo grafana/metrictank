@@ -78,7 +78,10 @@ func queryAndCompareResults(t *testing.T, q TagQueryContext, expectedData IdSet)
 	tagIdx, byId := getTestIndex()
 
 	resCh := make(chan schema.MKey, 100)
-	q.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	go func() {
+		q.Run(tagIdx, byId, nil, nil, resCh)
+		close(resCh)
+	}()
 	res := make(IdSet)
 	for id := range resCh {
 		res[id] = struct{}{}
@@ -280,7 +283,10 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1"}, 4)
 	qCtx := NewTagQueryContext(q)
 	resCh := make(chan schema.MKey, 100)
-	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	go func() {
+		qCtx.Run(tagIdx, byId, nil, nil, resCh)
+		close(resCh)
+	}()
 	res := make(IdSet)
 	for id := range resCh {
 		res[id] = struct{}{}
@@ -293,7 +299,10 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 3)
 	qCtx = NewTagQueryContext(q)
 	resCh = make(chan schema.MKey, 100)
-	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	go func() {
+		qCtx.Run(tagIdx, byId, nil, nil, resCh)
+		close(resCh)
+	}()
 	res = make(IdSet)
 	for id := range resCh {
 		res[id] = struct{}{}
@@ -305,7 +314,10 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 2)
 	qCtx = NewTagQueryContext(q)
 	resCh = make(chan schema.MKey, 100)
-	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	go func() {
+		qCtx.Run(tagIdx, byId, nil, nil, resCh)
+		close(resCh)
+	}()
 	res = make(IdSet)
 	for id := range resCh {
 		res[id] = struct{}{}
@@ -317,7 +329,10 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 1)
 	qCtx = NewTagQueryContext(q)
 	resCh = make(chan schema.MKey, 100)
-	qCtx.RunNonBlocking(tagIdx, byId, nil, nil, resCh)
+	go func() {
+		qCtx.Run(tagIdx, byId, nil, nil, resCh)
+		close(resCh)
+	}()
 	res = make(IdSet)
 	for id := range resCh {
 		res[id] = struct{}{}
@@ -559,28 +574,24 @@ func testGetByTag(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}
-		resCh := ix.idsByTagQuery(1, NewTagQueryContext(q))
-		res := make(IdSet)
-		for id := range resCh {
-			res[id] = struct{}{}
+		nodes := ix.FindByTag(1, q)
+
+		if len(tc.expectation) != len(nodes) {
+			t.Fatalf("Result does not match expectation for expressions %+v\nExpected:\n%+v\nGot:\n%+v\n", tc.expressions, tc.expectation, nodes)
 		}
 
-		if len(tc.expectation) != len(res) {
-			t.Fatalf("Result does not match expectation for expressions %+v\nExpected:\n%+v\nGot:\n%+v\n", tc.expressions, tc.expectation, res)
-		}
-
-		resPaths := make([]string, 0, len(res))
-		for id := range res {
-			def, ok := ix.Get(id)
+		resPaths := make([]string, 0, len(nodes))
+		for _, node := range nodes {
+			def, ok := ix.Get(node.Defs[0].Id)
 			if !ok {
-				t.Fatalf("Tag query returned ID that did not exist in DefByID: %s", id)
+				t.Fatalf("Tag query returned node that did not exist in DefByID: %+v", node)
 			}
 			resPaths = append(resPaths, def.NameWithTags())
 		}
 		sort.Strings(tc.expectation)
 		sort.Strings(resPaths)
 		if !reflect.DeepEqual(resPaths, tc.expectation) {
-			t.Fatalf("Result does not match expectation\nGot:\n%+v\nExpected:\n%+v\n", res, tc.expectation)
+			t.Fatalf("Result does not match expectation\nGot:\n%+v\nExpected:\n%+v\n", nodes, tc.expectation)
 		}
 	}
 }
@@ -616,11 +627,19 @@ func TestExpressionSortingByCost(t *testing.T) {
 		},
 	}
 
+	// need to define meta tag records, because if this property is nil then the
+	// query evaluation will ignore the meta tag index completely
+	queryCtx.metaTagRecords = newMetaTagRecords()
+
+	_MetaTagSupport := MetaTagSupport
+	defer func() { MetaTagSupport = _MetaTagSupport }()
+	MetaTagSupport = true
+
 	costs := queryCtx.evaluateExpressionCosts()
 	expectedIdxPositions := []int{3, 1, 4, 5, 2, 0}
 	for i, expectedIdxPosition := range expectedIdxPositions {
 		if costs[i].expressionIdx != expectedIdxPosition {
-			t.Fatalf("Order of expressions is not as expected\nExpected:\n%+v\nGot:\n%+v\n", expectedIdxPositions, costs)
+			t.Fatalf("Order of expressions is not as expected\nExpected:\n%+v\nGot:\n%+v\n", expectedIdxPositions, costs[i].expressionIdx)
 		}
 	}
 }

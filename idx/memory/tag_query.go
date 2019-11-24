@@ -61,44 +61,35 @@ func (q *TagQueryContext) newerThanFrom(id schema.MKey) bool {
 	return atomic.LoadInt64(&md.LastUpdate) >= q.query.From
 }
 
+func (q *TagQueryContext) useMetaTagIndex() bool {
+	// if this is a sub query we want to ignore the meta tag index,
+	// otherwise we'd risk to create a loop of sub queries creating
+	// each other
+	return MetaTagSupport && !q.subQuery && q.metaTagIndex != nil && q.metaTagRecords != nil
+}
+
 func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 	costs := make([]expressionCost, len(q.query.Expressions))
+	useMetaTagIndex := q.useMetaTagIndex()
 
 	for i, expr := range q.query.Expressions {
 		costs[i].expressionIdx = i
+		costs[i].operatorCost = expr.GetOperatorCost()
+		if useMetaTagIndex {
+			costs[i].metaTag = q.metaTagIndex.hasMatchesByExpression(expr)
+		}
 
 		if expr.OperatesOnTag() {
 			if expr.MatchesExactly() {
-				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
-				if q.metaTagIndex != nil {
-					_, costs[i].metaTag = q.metaTagIndex.tags[expr.GetKey()]
-				}
 			} else {
-				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index))
-
-				if q.metaTagIndex != nil {
-					for tag := range q.metaTagIndex.tags {
-						if expr.Matches(tag) {
-							costs[i].metaTag = true
-						}
-					}
-				}
 			}
 		} else {
 			if expr.MatchesExactly() {
-				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index[expr.GetKey()][expr.GetValue()]))
-				if q.metaTagIndex != nil {
-					_, costs[i].metaTag = q.metaTagIndex.tags[expr.GetKey()][expr.GetValue()]
-				}
 			} else {
-				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
-				if q.metaTagIndex != nil {
-					_, costs[i].metaTag = q.metaTagIndex.tags[expr.GetKey()]
-				}
 			}
 		}
 	}
@@ -181,34 +172,9 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 	q.wg.Done()
 }
 
-// RunNonBlocking executes the tag query on the given index and returns a list of ids
-// It takes the following arguments:
-// index:	    the tag index to operate on
-// byId:        a map keyed by schema.MKey referring to *idx.Archive
-// mti:         the meta tag index
-// mtr:         the meta tag records
-// resCh:       a chan of schema.MKey into which the result set will be pushed
-//              this channel gets closed when the query execution is complete
-func (q *TagQueryContext) RunNonBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti *metaTagHierarchy, mtr *metaTagRecords, resCh chan schema.MKey) {
-	q.run(index, byId, mti, mtr, resCh)
-
-	go func() {
-		q.wg.Wait()
-		close(resCh)
-	}()
-}
-
-// RunBlocking is very similar to RunNonBlocking, but there are two notable differences:
-// 1) It only returns once the query execution is complete
-// 2) It does not close the resCh which has been passed to it on completion
-func (q *TagQueryContext) RunBlocking(index TagIndex, byId map[schema.MKey]*idx.Archive, mti *metaTagHierarchy, mtr *metaTagRecords, resCh chan schema.MKey) {
-	q.run(index, byId, mti, mtr, resCh)
-
-	q.wg.Wait()
-}
-
-// run implements the common parts of RunNonBlocking and RunBlocking
-func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti *metaTagHierarchy, mtr *metaTagRecords, resCh chan schema.MKey) {
+// Run executes this query on the given indexes and passes the results into the given result channel.
+// It blocks until query execution is finished, but it does not close the result channel.
+func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti *metaTagHierarchy, mtr *metaTagRecords, resCh chan schema.MKey) {
 	q.index = index
 	q.byId = byId
 	q.metaTagIndex = mti
@@ -247,4 +213,6 @@ func (q *TagQueryContext) run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 			q.selector.getIds(resCh, nil)
 		}()
 	}
+
+	q.wg.Wait()
 }
