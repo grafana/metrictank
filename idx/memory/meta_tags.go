@@ -51,10 +51,10 @@ var (
 type metaTagIdx struct {
 	sync.RWMutex
 	byOrg    map[uint32]*orgMetaTagIdx
-	idLookup func(uint32, tagquery.Query, func(chan schema.MKey))
+	idLookup func(uint32, tagquery.Query, chan schema.MKey, bool)
 }
 
-func newMetaTagIndex(idLookup func(uint32, tagquery.Query, func(chan schema.MKey))) *metaTagIdx {
+func newMetaTagIndex(idLookup func(uint32, tagquery.Query, chan schema.MKey, bool)) *metaTagIdx {
 	return &metaTagIdx{
 		byOrg:    make(map[uint32]*orgMetaTagIdx),
 		idLookup: idLookup,
@@ -86,8 +86,8 @@ func (m *metaTagIdx) getOrgMetaTagIndex(orgId uint32) *orgMetaTagIdx {
 		return idx
 	}
 
-	idLookup := func(query tagquery.Query, callback func(chan schema.MKey)) {
-		m.idLookup(orgId, query, callback)
+	idLookup := func(query tagquery.Query, idCh chan schema.MKey, useMeta bool) {
+		m.idLookup(orgId, query, idCh, useMeta)
 	}
 	idx = newOrgMetaTagIndex(idLookup)
 
@@ -105,7 +105,7 @@ type orgMetaTagIdx struct {
 	enricher *metaTagEnricher
 }
 
-type idLookup func(tagquery.Query, func(chan schema.MKey))
+type idLookup func(tagquery.Query, chan schema.MKey, bool)
 
 func newOrgMetaTagIndex(idLookup idLookup) *orgMetaTagIdx {
 	return &orgMetaTagIdx{
@@ -651,7 +651,10 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 				}{record: record}
 				queryCtx = NewTagQueryContext(e.queriesByRecord[record])
 				idCh := make(chan schema.MKey, 100)
-				queryCtx.RunNonBlocking(tags, defById, nil, nil, idCh)
+				go func() {
+					queryCtx.Run(tags, defById, nil, nil, idCh)
+					close(idCh)
+				}()
 				for id := range idCh {
 					result.keys = append(result.keys, id.Key)
 				}
@@ -730,18 +733,18 @@ func (e *metaTagEnricher) _delMetric(payload interface{}) {
 }
 
 func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query) {
-	handleResultCh := func(idCh chan schema.MKey) {
-		e.eventQueue <- enricherEvent{
-			eventType: addMetaRecord,
-			payload: struct {
-				recordId recordId
-				query    tagquery.Query
-				idCh     chan schema.MKey
-			}{recordId: id, query: query, idCh: idCh},
-		}
+	idCh := make(chan schema.MKey)
+
+	e.eventQueue <- enricherEvent{
+		eventType: addMetaRecord,
+		payload: struct {
+			recordId recordId
+			query    tagquery.Query
+			idCh     chan schema.MKey
+		}{recordId: id, query: query, idCh: idCh},
 	}
 
-	e.idLookup(query, handleResultCh)
+	e.idLookup(query, idCh, false)
 }
 
 func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
@@ -776,17 +779,17 @@ func (e *metaTagEnricher) delMetaRecord(id recordId) {
 	query := e.queriesByRecord[id]
 	e.RUnlock()
 
-	handleResultCh := func(idCh chan schema.MKey) {
-		e.eventQueue <- enricherEvent{
-			eventType: delMetaRecord,
-			payload: struct {
-				recordId recordId
-				idCh     chan schema.MKey
-			}{recordId: id, idCh: idCh},
-		}
+	idCh := make(chan schema.MKey)
+
+	e.eventQueue <- enricherEvent{
+		eventType: delMetaRecord,
+		payload: struct {
+			recordId recordId
+			idCh     chan schema.MKey
+		}{recordId: id, idCh: idCh},
 	}
 
-	e.idLookup(query, handleResultCh)
+	e.idLookup(query, idCh, false)
 }
 
 func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
