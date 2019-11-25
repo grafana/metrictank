@@ -93,7 +93,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		singleExprPerRecord := true
 		records := make([]tagquery.MetaTagRecord, 0, len(metaRecordIds))
 		for _, id := range metaRecordIds {
-			record, ok := ctx.metaTagRecords.records[id]
+			record, ok := ctx.metaTagRecords.getMetaRecordById(id)
 			if !ok {
 				corruptIndex.Inc()
 				log.Errorf("TagQueryContext: Tried to lookup a meta tag record id that does not exist, index is corrupted")
