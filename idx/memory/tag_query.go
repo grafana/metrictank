@@ -28,7 +28,6 @@ type TagQueryContext struct {
 	metaTagIndex   *metaTagHierarchy            // the meta tag index
 	metaTagRecords *metaTagRecords              // meta tag records keyed by their recordID
 	startWith      int                          // the expression index to start with
-	subQuery       bool                         // true if this is a subquery created from the expressions of a meta tag record
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -64,7 +63,7 @@ func (q *TagQueryContext) useMetaTagIndex() bool {
 	// if this is a sub query we want to ignore the meta tag index,
 	// otherwise we'd risk to create a loop of sub queries creating
 	// each other
-	return MetaTagSupport && !q.subQuery && q.metaTagIndex != nil && q.metaTagRecords != nil
+	return MetaTagSupport && q.metaTagIndex != nil && q.metaTagRecords != nil
 }
 
 func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {

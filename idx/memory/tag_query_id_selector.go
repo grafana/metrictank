@@ -287,7 +287,6 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 	}
 
 	queryCtx = NewTagQueryContext(query)
-	queryCtx.subQuery = true
 
 	return queryCtx, nil
 }
@@ -297,6 +296,6 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 // directly pushed into it
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
-	query.Run(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
+	query.Run(i.ctx.index, i.ctx.byId, nil, nil, i.rawResCh)
 	<-i.concGate
 }
