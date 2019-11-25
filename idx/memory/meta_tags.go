@@ -652,7 +652,7 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 				queryCtx = NewTagQueryContext(e.queriesByRecord[record])
 				idCh := make(chan schema.MKey, 100)
 				go func() {
-					queryCtx.Run(tags, defById, nil, nil, idCh)
+					queryCtx.Run(tags, defById, nil, idCh)
 					close(idCh)
 				}()
 				for id := range idCh {

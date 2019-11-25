@@ -1139,9 +1139,9 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query tagquery.Quer
 	go func() {
 		if useMeta && MetaTagSupport {
 			metaTagIdx := m.getOrgMetaTagIndex(orgId)
-			queryCtx.Run(tags, m.defById, metaTagIdx.tags, metaTagIdx.records, idCh)
+			queryCtx.Run(tags, m.defById, metaTagIdx, idCh)
 		} else {
-			queryCtx.Run(tags, m.defById, nil, nil, idCh)
+			queryCtx.Run(tags, m.defById, nil, idCh)
 		}
 		m.RUnlock()
 		close(idCh)
