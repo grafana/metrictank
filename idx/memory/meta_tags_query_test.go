@@ -749,6 +749,7 @@ func benchmarkFindByMetaTag(b *testing.B, indexSize, metaRecordCount, expectedRe
 	var res []idx.Node
 
 	b.ResetTimer()
+	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		res = index.FindByTag(1, queries[i%len(queries)])
 		if len(res) != expectedResCount {
