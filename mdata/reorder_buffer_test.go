@@ -8,9 +8,9 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
-func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded uint32, expectedErrors []error, expectReordered uint32) []schema.Point {
+func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []schema.Point, expectAdded uint32, expectedErrors []error, expectReordered uint32, allowUpdate bool) []schema.Point {
 	var flushed []schema.Point
-	b := NewReorderBuffer(reorderWindow, 1)
+	b := NewReorderBuffer(reorderWindow, 1, allowUpdate)
 	metricsReordered.SetUint32(0)
 	addedCount := uint32(0)
 	for i, point := range testData {
@@ -104,7 +104,7 @@ func TestROBAddAndGetInOrder(t *testing.T) {
 		{Ts: 1002, Val: 200},
 		{Ts: 1003, Val: 300},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 3, nil, 0)
+	testAddAndGet(t, 600, testData, expectedData, 3, nil, 0, false)
 }
 
 func TestROBAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
@@ -121,7 +121,7 @@ func TestROBAddAndGetInReverseOrderOutOfWindow(t *testing.T) {
 		errors.ErrMetricTooOld,
 		errors.ErrMetricTooOld,
 	}
-	testAddAndGet(t, 1, testData, expectedData, 1, expectedErrors, 0)
+	testAddAndGet(t, 1, testData, expectedData, 1, expectedErrors, 0, false)
 }
 
 func TestROBAddAndGetOutOfOrderInsideWindow(t *testing.T) {
@@ -147,7 +147,7 @@ func TestROBAddAndGetOutOfOrderInsideWindow(t *testing.T) {
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 9, nil, 2)
+	testAddAndGet(t, 600, testData, expectedData, 9, nil, 2, false)
 }
 
 func TestROBAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
@@ -173,10 +173,10 @@ func TestROBAddAndGetOutOfOrderInsideWindowAsFirstPoint(t *testing.T) {
 		{Ts: 1008, Val: 800},
 		{Ts: 1009, Val: 900},
 	}
-	testAddAndGet(t, 600, testData, expectedData, 9, nil, 3)
+	testAddAndGet(t, 600, testData, expectedData, 9, nil, 3, false)
 }
 
-func TestROBAddAndGetDuplicate(t *testing.T) {
+func TestROBAddAndGetDuplicateDisallowUpdate(t *testing.T) {
 	testData := []schema.Point{
 		{Ts: 1001, Val: 100},
 		{Ts: 1001, Val: 200},
@@ -195,11 +195,33 @@ func TestROBAddAndGetDuplicate(t *testing.T) {
 		errors.ErrMetricNewValueForTimestamp,
 		errors.ErrMetricNewValueForTimestamp,
 	}
-	testAddAndGet(t, 600, testData, expectedData, 2, expectedErrors, 0)
+	testAddAndGet(t, 600, testData, expectedData, 2, expectedErrors, 0, false)
+}
+
+func TestROBAddAndGetDuplicateAllowUpdate(t *testing.T) {
+	testData := []schema.Point{
+		{Ts: 1001, Val: 100},
+		{Ts: 1001, Val: 200},
+		{Ts: 1003, Val: 300},
+		{Ts: 1003, Val: 0},
+		{Ts: 1001, Val: 0},
+	}
+	expectedData := []schema.Point{
+		{Ts: 1001, Val: 0},
+		{Ts: 1003, Val: 0},
+	}
+	expectedErrors := []error{
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	}
+	testAddAndGet(t, 600, testData, expectedData, 5, expectedErrors, 0, true)
 }
 
 func TestROBOmitFlushIfNotEnoughData(t *testing.T) {
-	b := NewReorderBuffer(9, 1)
+	b := NewReorderBuffer(9, 1, false)
 	for i := uint32(1); i < 10; i++ {
 		flushed, _ := b.Add(i, float64(i*100))
 		if len(flushed) > 0 {
@@ -244,7 +266,7 @@ func TestROBAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 		nil,
 		errors.ErrMetricTooOld,
 	}
-	flushedData := testAddAndGet(t, 5, testData, expectedData, 8, expectedErrors, 2)
+	flushedData := testAddAndGet(t, 5, testData, expectedData, 8, expectedErrors, 2, false)
 	if !reflect.DeepEqual(flushedData, expectedFlushedData) {
 		t.Fatalf("Flushed data does not match expected flushed data:\n%+v\n%+v", flushedData, expectedFlushedData)
 	}
@@ -252,7 +274,7 @@ func TestROBAddAndGetOutOfOrderOutOfWindow(t *testing.T) {
 
 func TestROBFlushSortedData(t *testing.T) {
 	var results []schema.Point
-	buf := NewReorderBuffer(600, 1)
+	buf := NewReorderBuffer(600, 1, false)
 	for i := 1100; i < 2100; i++ {
 		flushed, err := buf.Add(uint32(i), float64(i))
 		if err != nil {
@@ -270,7 +292,7 @@ func TestROBFlushSortedData(t *testing.T) {
 
 func TestROBFlushUnsortedData1(t *testing.T) {
 	var results []schema.Point
-	buf := NewReorderBuffer(3, 1)
+	buf := NewReorderBuffer(3, 1, false)
 	data := []schema.Point{
 		{10, 10},
 		{11, 11},
@@ -309,7 +331,7 @@ func TestROBFlushUnsortedData1(t *testing.T) {
 
 func TestROBFlushUnsortedData2(t *testing.T) {
 	var results []schema.Point
-	buf := NewReorderBuffer(600, 1)
+	buf := NewReorderBuffer(600, 1, false)
 	data := make([]schema.Point, 1000)
 	for i := 0; i < 1000; i++ {
 		data[i] = schema.Point{Ts: uint32(i + 1000), Val: float64(i + 1000)}
@@ -327,7 +349,7 @@ func TestROBFlushUnsortedData2(t *testing.T) {
 }
 
 func TestROBFlushAndIsEmpty(t *testing.T) {
-	buf := NewReorderBuffer(10, 1)
+	buf := NewReorderBuffer(10, 1, false)
 
 	if !buf.IsEmpty() {
 		t.Fatalf("Expected IsEmpty() to be true")
@@ -344,61 +366,109 @@ func TestROBFlushAndIsEmpty(t *testing.T) {
 	}
 }
 
-func BenchmarkROB10Add(b *testing.B) {
-	benchmarkROBAdd(b, 10, 0)
+func BenchmarkROB10AddDisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 0, false)
 }
 
-func BenchmarkROB120Add(b *testing.B) {
-	benchmarkROBAdd(b, 120, 0)
+func BenchmarkROB120AddDisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 0, false)
 }
 
-func BenchmarkROB600Add(b *testing.B) {
-	benchmarkROBAdd(b, 600, 0)
+func BenchmarkROB600AddDisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 0, false)
 }
 
-func BenchmarkROB10AddShuffled5(b *testing.B) {
-	benchmarkROBAdd(b, 10, 5)
+func BenchmarkROB10AddShuffled5DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 5, false)
 }
 
-func BenchmarkROB120AddShuffled5(b *testing.B) {
-	benchmarkROBAdd(b, 120, 5)
+func BenchmarkROB120AddShuffled5DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 5, false)
 }
 
-func BenchmarkROB600AddShuffled5(b *testing.B) {
-	benchmarkROBAdd(b, 600, 5)
+func BenchmarkROB600AddShuffled5DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 5, false)
 }
 
-func BenchmarkROB10AddShuffled50(b *testing.B) {
-	benchmarkROBAdd(b, 10, 50)
+func BenchmarkROB10AddShuffled50DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 50, false)
 }
 
-func BenchmarkROB120AddShuffled50(b *testing.B) {
-	benchmarkROBAdd(b, 120, 50)
+func BenchmarkROB120AddShuffled50DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 50, false)
 }
 
-func BenchmarkROB600AddShuffled50(b *testing.B) {
-	benchmarkROBAdd(b, 600, 50)
+func BenchmarkROB600AddShuffled50DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 50, false)
 }
 
-func BenchmarkROB10AddShuffled500(b *testing.B) {
-	benchmarkROBAdd(b, 10, 500)
+func BenchmarkROB10AddShuffled500DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 500, false)
 }
 
-func BenchmarkROB120AddShuffled500(b *testing.B) {
-	benchmarkROBAdd(b, 120, 500)
+func BenchmarkROB120AddShuffled500DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 500, false)
 }
 
-func BenchmarkROB600AddShuffled500(b *testing.B) {
-	benchmarkROBAdd(b, 600, 500)
+func BenchmarkROB600AddShuffled500DisallowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 500, false)
 }
 
-func benchmarkROBAdd(b *testing.B, window, shufgroup int) {
+func BenchmarkROB10AddAllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 0, true)
+}
+
+func BenchmarkROB120AddAllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 0, true)
+}
+
+func BenchmarkROB600AddAllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 0, true)
+}
+
+func BenchmarkROB10AddShuffled5AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 5, true)
+}
+
+func BenchmarkROB120AddShuffled5AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 5, true)
+}
+
+func BenchmarkROB600AddShuffled5AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 5, true)
+}
+
+func BenchmarkROB10AddShuffled50AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 50, true)
+}
+
+func BenchmarkROB120AddShuffled50AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 50, true)
+}
+
+func BenchmarkROB600AddShuffled50AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 50, true)
+}
+
+func BenchmarkROB10AddShuffled500AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 10, 500, true)
+}
+
+func BenchmarkROB120AddShuffled500AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 120, 500, true)
+}
+
+func BenchmarkROB600AddShuffled500AllowUpdate(b *testing.B) {
+	benchmarkROBAdd(b, 600, 500, true)
+}
+
+func benchmarkROBAdd(b *testing.B, window, shufgroup int, allowUpdate bool) {
 	data := NewInputData(b.N)
 	if shufgroup > 1 {
 		data = unsort(data, shufgroup)
 	}
 
-	rob := NewReorderBuffer(uint32(window), 1)
+	rob := NewReorderBuffer(uint32(window), 1, allowUpdate)
 	var out []schema.Point
 	b.ResetTimer()
 
