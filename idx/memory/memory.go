@@ -261,6 +261,15 @@ func (n *Node) String() string {
 
 type UnpartitionedMemoryIdx struct {
 	sync.RWMutex
+
+	// the addDelMutex is used to ensure that there is never more than one add/del
+	// running concurrently. this is not the same as the index write lock, the write
+	// lock is used to ensure that nothing reads the index data structures while they
+	// get modified but it may be released during certain sections of add/del while
+	// they prepare the modifications they are going to apply
+	addDelMutex sync.Mutex
+	addPlanner  addPlanner
+
 	*metaTagIdx
 
 	// used for both hierarchy and tag index, so includes all MDs, with
@@ -277,6 +286,28 @@ type UnpartitionedMemoryIdx struct {
 	findCache *FindCache
 
 	writeQueue *WriteQueue
+}
+
+type addPlanner struct {
+	createTree    bool
+	addToRoot     bool
+	addOperations []addOperation
+}
+
+type addOperation struct {
+	branch string
+	child  string
+	node   *Node
+}
+
+func (a *addPlanner) reset() {
+	a.addOperations = a.addOperations[:0]
+	a.createTree = false
+	a.addToRoot = false
+}
+
+func (a *addPlanner) addOperation(op addOperation) {
+	a.addOperations = append(a.addOperations, op)
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
@@ -416,10 +447,8 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 	def.Partition = partition
 	archive := createArchive(def)
 	if m.writeQueue == nil {
-		// writeQueue not enabled, so acquire a wlock and immediately add to the index.
-		m.Lock()
+		// writeQueue not enabled, so immediately add to the index.
 		m.add(archive)
-		m.Unlock()
 		statAddDuration.Value(time.Since(pre))
 	} else {
 		// push the new archive into the writeQueue.  If there is already an archive in the
@@ -547,14 +576,17 @@ func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.Me
 
 // Used to rebuild the index from an existing set of metricDefinitions.
 func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
-	m.Lock()
-	defer m.Unlock()
 	var pre time.Time
 	var num int
 	for i := range defs {
 		def := &defs[i]
 		pre = time.Now()
-		if _, ok := m.defById[def.Id]; ok {
+
+		m.RLock()
+		_, ok := m.defById[def.Id]
+		m.RUnlock()
+
+		if ok {
 			continue
 		}
 
@@ -565,7 +597,10 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 		// but it will be close enough and it will always be true that the lastSave was at
 		// or after this time.  For metrics that are sent at or close to real time (the typical
 		// use case), then the value will be within a couple of seconds of the true lastSave.
+		m.Lock()
 		m.defById[def.Id].LastSave = uint32(def.LastUpdate)
+		m.Unlock()
+
 		num++
 		statAddDuration.Value(time.Since(pre))
 	}
@@ -587,6 +622,11 @@ func createArchive(def *schema.MetricDefinition) *idx.Archive {
 }
 
 func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
+	m.addDelMutex.Lock()
+	defer m.addDelMutex.Unlock()
+	defer m.addPlanner.reset()
+	m.RLock()
+
 	// there is a race condition that can lead to an archive being added
 	// to the writeQueue just after a queued copy of the archive was flushed.
 	// If that happens, we just do an update lastUpdate instead
@@ -596,6 +636,8 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		// If the partition has changed, then the next datapoint will update
 		// the partition and notify the caller of the change.
 		bumpLastUpdate(&existing.LastUpdate, archive.LastUpdate)
+
+		m.RUnlock()
 		return
 	}
 
@@ -605,6 +647,9 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	path := def.NameWithTags()
 
 	if TagSupport {
+		m.RUnlock()
+		m.Lock()
+
 		// Even if there are no tags, index at least "name". It's important to use the definition
 		// in the archive pointer that we add to defById, because the pointers must reference the
 		// same underlying object in m.defById and m.defByTagSet
@@ -616,8 +661,12 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 				statAdd.Inc()
 				log.Debugf("memory-idx: adding %s to DefById", path)
 			}
+			m.Unlock()
 			return
 		}
+
+		m.Unlock()
+		m.RLock()
 	}
 
 	if m.findCache != nil {
@@ -626,27 +675,28 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		}()
 	}
 
-	//first check to see if a tree has been created for this OrgId
+	var op addOperation
+	var node *Node
+
+	// first check to see if a tree has been created for this OrgId
 	tree, ok := m.tree[def.OrgId]
 	if !ok || len(tree.Items) == 0 {
 		log.Debugf("memory-idx: first metricDef seen for orgId %d", def.OrgId)
-		root := &Node{
-			Path:     "",
-			Children: make([]string, 0),
-			Defs:     make([]schema.MKey, 0),
-		}
-		m.tree[def.OrgId] = &Tree{
-			Items: map[string]*Node{"": root},
-		}
-		tree = m.tree[def.OrgId]
+		m.addPlanner.createTree = true
 	} else {
 		// now see if there is an existing branch or leaf with the same path.
 		// An existing leaf is possible if there are multiple metricDefs for the same path due
-		// to different tags or interval
-		if node, ok := tree.Items[path]; ok {
+		// to different tags or intervals
+		if node, ok = tree.Items[path]; ok {
+			m.RUnlock()
+
 			log.Debugf("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
+
+			m.Lock()
 			node.Defs = append(node.Defs, def.Id)
 			m.defById[def.Id] = archive
+			m.Unlock()
+
 			statAdd.Inc()
 			return
 		}
@@ -660,39 +710,95 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	for pos != -1 {
 		branch := path[:pos]
 		prevNode := path[pos+1 : prevPos]
-		if n, ok := tree.Items[branch]; ok {
-			log.Debugf("memory-idx: adding %s as child of %s", prevNode, n.Path)
-			n.Children = append(n.Children, prevNode)
-			break
+
+		// if we're going to create a new tree then there's no
+		// need to check whether branch already exists
+		if !m.addPlanner.createTree {
+			if node, ok = tree.Items[branch]; ok {
+				m.addPlanner.addOperation(addOperation{
+					branch: branch,
+					child:  prevNode,
+					node:   node,
+				})
+
+				break
+			}
 		}
 
-		log.Debugf("memory-idx: creating branch %s with child %s", branch, prevNode)
-		tree.Items[branch] = &Node{
-			Path:     branch,
-			Children: []string{prevNode},
-			Defs:     make([]schema.MKey, 0),
-		}
+		m.addPlanner.addOperation(addOperation{
+			branch: branch,
+			child:  prevNode,
+		})
 
 		prevPos = pos
 		pos = strings.LastIndex(branch, ".")
 	}
 
 	if pos == -1 {
-		// need to add to the root node.
-		branch := path[:prevPos]
-		log.Debugf("memory-idx: no existing branches found for %s.  Adding to the root node.", branch)
-		n := tree.Items[""]
-		n.Children = append(n.Children, branch)
+		m.addPlanner.addToRoot = true
+	}
+
+	m.RUnlock()
+
+	// only call log.Debugf in locked section when debug logging
+	// is enabled, because it is slow
+	debugLogs := log.IsLevelEnabled(log.DebugLevel)
+
+	if m.addPlanner.createTree {
+		tree = &Tree{
+			Items: map[string]*Node{
+				"": {
+					Path: "",
+				},
+			},
+		}
+
+		m.Lock()
+		m.tree[def.OrgId] = tree
+	} else {
+		m.Lock()
+	}
+
+	for _, op = range m.addPlanner.addOperations {
+		if op.node == nil {
+			// if node doesn't exist yet, we create it
+			if debugLogs {
+				log.Debugf("memory-idx: creating branch %s with child %s", op.branch, op.child)
+			}
+
+			tree.Items[op.branch] = &Node{
+				Path:     op.branch,
+				Children: []string{op.child},
+			}
+		} else {
+			// if node exists we just append to its children
+			if debugLogs {
+				log.Debugf("memory-idx: adding %s as child of %s", op.child, op.branch)
+			}
+
+			op.node.Children = append(op.node.Children, op.child)
+		}
+	}
+
+	if m.addPlanner.addToRoot {
+		node = tree.Items[""]
+		node.Children = append(node.Children, op.branch)
 	}
 
 	// Add leaf node
-	log.Debugf("memory-idx: creating leaf %s", path)
-	tree.Items[path] = &Node{
-		Path:     path,
-		Children: []string{},
-		Defs:     []schema.MKey{def.Id},
+	if debugLogs {
+		log.Debugf("memory-idx: creating leaf %s", path)
 	}
+
+	tree.Items[path] = &Node{
+		Path: path,
+		Defs: []schema.MKey{def.Id},
+	}
+
 	m.defById[def.Id] = archive
+
+	m.Unlock()
+
 	statAdd.Inc()
 
 	return

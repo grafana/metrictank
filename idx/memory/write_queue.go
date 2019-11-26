@@ -71,11 +71,9 @@ func (wq *WriteQueue) flush() {
 		}
 		return
 	}
-	wq.idx.Lock()
 	for _, archive := range wq.archives {
 		wq.idx.add(archive)
 	}
-	wq.idx.Unlock()
 	wq.archives = make(map[schema.MKey]*idx.Archive)
 	wq.flushed <- struct{}{}
 }

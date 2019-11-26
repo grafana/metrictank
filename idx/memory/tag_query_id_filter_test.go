@@ -15,11 +15,9 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 	index.Init()
 
 	archives, _ := getTestArchives(10)
-	index.Lock()
 	for i := range archives {
 		index.add(archives[i])
 	}
-	index.Unlock()
 
 	for i := range metaRecords {
 		index.MetaTagRecordUpsert(1, metaRecords[i])
