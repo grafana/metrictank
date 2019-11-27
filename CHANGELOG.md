@@ -1,3 +1,8 @@
+# master
+
+## reorder buffer
+* version v0.13.0-188-g6cd12d6 introduces storage-schemas.conf option 'reorderBufferAllowUpdate' to allow for some data to arrive out of order. #1531
+
 # v0.13.0: Meta tags beta, sharding by tags, new importer (bigtable!), response stats, memory-idx write queue and many fixes. Sept 17, 2019.
 
 ## breaking changes
@@ -90,6 +95,7 @@ see #1243, #1292, #1295
 * since v0.11.0-252-ga1e41192, remove log-min-dur flag, it was no longer used. #1275
 
 * Since v0.11.0-285-g4c862d8c, duplicate points are now always rejected, even with the reorder buffer enabled.
+  Note from the future: this was undone in v0.13.0-188-g6cd12d6, see future notes about reorderBufferAllowUpdate
 
 ## index
 
