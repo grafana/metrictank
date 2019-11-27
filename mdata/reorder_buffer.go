@@ -14,15 +14,17 @@ import (
 // in particular newest.Ts == 0 means the buffer is empty
 // the buffer is evenly spaced (points are `interval` apart) and may be sparsely populated
 type ReorderBuffer struct {
-	newest   uint32         // index of newest buffer entry
-	interval uint32         // metric interval
-	buf      []schema.Point // the actual buffer holding the data
+	newest      uint32         // index of newest buffer entry
+	interval    uint32         // metric interval
+	buf         []schema.Point // the actual buffer holding the data
+	allowUpdate bool           // whether or not to allow overwriting data points with same timestamps
 }
 
-func NewReorderBuffer(reorderWindow, interval uint32) *ReorderBuffer {
+func NewReorderBuffer(reorderWindow, interval uint32, allowUpdate bool) *ReorderBuffer {
 	return &ReorderBuffer{
-		interval: interval,
-		buf:      make([]schema.Point, reorderWindow),
+		interval:    interval,
+		buf:         make([]schema.Point, reorderWindow),
+		allowUpdate: allowUpdate,
 	}
 }
 
@@ -40,7 +42,12 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 	oldest := (rob.newest + 1) % uint32(cap(rob.buf))
 	index := (ts / rob.interval) % uint32(cap(rob.buf))
 	if ts == rob.buf[index].Ts {
-		return nil, errors.ErrMetricNewValueForTimestamp
+		if rob.allowUpdate {
+			rob.buf[index].Ts = ts
+			rob.buf[index].Val = val
+		} else {
+			return nil, errors.ErrMetricNewValueForTimestamp
+		}
 	} else if ts > rob.buf[rob.newest].Ts {
 		flushCount := (ts - rob.buf[rob.newest].Ts) / rob.interval
 		if flushCount > uint32(cap(rob.buf)) {

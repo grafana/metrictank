@@ -165,7 +165,7 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 		return m
 	}
 	ingestFrom := ms.ingestFrom[key.Org]
-	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, ms.dropFirstChunk, ingestFrom)
+	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, confSchema.ReorderAllowUpdate, ms.dropFirstChunk, ingestFrom)
 	ms.Metrics[key.Org][key.Key] = m
 	active := len(ms.Metrics[key.Org])
 	ms.Unlock()

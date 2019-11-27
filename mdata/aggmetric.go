@@ -52,7 +52,9 @@ type AggMetric struct {
 // it optionally also creates aggregations with the given settings
 // the 0th retention is the native archive of this metric. if there's several others, we create aggregators, using agg.
 // it's the callers responsibility to make sure agg is not nil in that case!
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, dropFirstChunk bool, ingestFrom int64) *AggMetric {
+// If reorderWindow is greater than 0, a reorder buffer is enabled. In that case data points with duplicate timestamps
+// the behavior is defined by reorderAllowUpdate
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions.Rets[0]
@@ -75,7 +77,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		m.ingestFromT0 = AggBoundary(uint32(ingestFrom), ret.ChunkSpan)
 	}
 	if reorderWindow != 0 {
-		m.rob = NewReorderBuffer(reorderWindow, interval)
+		m.rob = NewReorderBuffer(reorderWindow, interval, reorderAllowUpdate)
 	}
 
 	origSplits := strings.Split(retentions.Orig, ":")

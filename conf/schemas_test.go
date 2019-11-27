@@ -242,6 +242,29 @@ func TestReadSchemas(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "reorder_buffer_allow_update",
+			file: "schemas_test_files/reorder_buffer_allow_update.schemas",
+			want: NewSchemas([]Schema{
+				{
+					Name:    "default",
+					Pattern: regexp.MustCompile(".*"),
+					Retentions: Retentions{
+						Orig: "1s:8d:10min:2,1m:35d:2h:2,10m:120d:6h:2,1h:2y:6h:2",
+						Rets: []Retention{
+							NewRetentionMT(1, 8*24*60*60, 10*60, 2, 0),
+							NewRetentionMT(1*60, 35*24*60*60, 2*60*60, 2, 0),
+							NewRetentionMT(10*60, 120*24*60*60, 6*60*60, 2, 0),
+							NewRetentionMT(1*60*60, 2*365*24*60*60, 6*60*60, 2, 0),
+						},
+					},
+					Priority:           -1,
+					ReorderWindow:      20,
+					ReorderAllowUpdate: true,
+				},
+			}),
+			wantErr: false,
+		},
+		{
 			name: "multiple",
 			file: "schemas_test_files/multiple.schemas",
 			want: NewSchemas([]Schema{

@@ -26,11 +26,12 @@ func (s SchemaSlice) Less(i, j int) bool { return s[i].Priority >= s[j].Priority
 
 // Schema represents one schema setting
 type Schema struct {
-	Name          string
-	Pattern       *regexp.Regexp
-	Retentions    Retentions
-	Priority      int64
-	ReorderWindow uint32
+	Name               string
+	Pattern            *regexp.Regexp
+	Retentions         Retentions
+	Priority           int64
+	ReorderWindow      uint32
+	ReorderAllowUpdate bool
 }
 
 func NewSchemas(schemas []Schema) Schemas {
@@ -55,21 +56,24 @@ func (s *Schemas) BuildIndex() {
 	for _, schema := range s.raw {
 		for pos := range schema.Retentions.Rets {
 			s.index = append(s.index, Schema{
-				Name:          schema.Name,
-				Pattern:       schema.Pattern,
-				Retentions:    schema.Retentions.Sub(pos),
-				Priority:      schema.Priority,
-				ReorderWindow: schema.ReorderWindow,
+				Name:               schema.Name,
+				Pattern:            schema.Pattern,
+				Retentions:         schema.Retentions.Sub(pos),
+				Priority:           schema.Priority,
+				ReorderWindow:      schema.ReorderWindow,
+				ReorderAllowUpdate: schema.ReorderAllowUpdate,
 			})
 		}
 	}
 	// add the default schema
 	for pos := range s.DefaultSchema.Retentions.Rets {
 		s.index = append(s.index, Schema{
-			Name:       s.DefaultSchema.Name,
-			Pattern:    s.DefaultSchema.Pattern,
-			Retentions: s.DefaultSchema.Retentions.Sub(pos),
-			Priority:   s.DefaultSchema.Priority,
+			Name:               s.DefaultSchema.Name,
+			Pattern:            s.DefaultSchema.Pattern,
+			Retentions:         s.DefaultSchema.Retentions.Sub(pos),
+			Priority:           s.DefaultSchema.Priority,
+			ReorderWindow:      s.DefaultSchema.ReorderWindow,
+			ReorderAllowUpdate: s.DefaultSchema.ReorderAllowUpdate,
 		})
 	}
 }
@@ -128,6 +132,13 @@ func ReadSchemas(file string) (Schemas, error) {
 			// if reorderWindow == 0 we just disable the buffer
 			if reorderWindow > 0 {
 				schema.ReorderWindow = uint32(reorderWindow)
+			}
+		}
+
+		if sec.ValueOf("reorderBufferAllowUpdate") != "" {
+			schema.ReorderAllowUpdate, err = strconv.ParseBool(sec.ValueOf("reorderBufferAllowUpdate"))
+			if err != nil {
+				return Schemas{}, fmt.Errorf("Failed to parse reorderBufferAllowUpdate %q for [%s]: %s", sec.ValueOf("reorderBufferAllowUpdate"), schema.Name, err)
 			}
 		}
 
