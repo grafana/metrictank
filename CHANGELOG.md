@@ -73,10 +73,6 @@
 
 # v0.12.0: Query nodes, find cache and various performance tweaks. May 14, 2019
 
-## breaking changes
-
-* Since v0.11.0-285-g4c862d8c, duplicate points are now always rejected, even with the reorder buffer enabled
-
 ## Important changes that require your attention:
 
 * This release includes the "query layer" functionality.
@@ -99,6 +95,7 @@ see #1243, #1292, #1295
 * since v0.11.0-252-ga1e41192, remove log-min-dur flag, it was no longer used. #1275
 
 * Since v0.11.0-285-g4c862d8c, duplicate points are now always rejected, even with the reorder buffer enabled.
+  Note from the future: this was undone in v0.13.0-188-g6cd12d6, see future notes about reorderBufferAllowUpdate
 
 ## index
 
