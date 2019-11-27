@@ -67,6 +67,35 @@ max-stale = 7d
 				},
 			},
 		},
+		{
+			in: `[longterm]
+pattern = ^long
+max-stale = 1y6mon
+
+[default]
+pattern = foobar
+max-stale = 7d`,
+			expErr: false,
+			expRules: IndexRules{
+				Rules: []IndexRule{
+					{
+						Name:     "longterm",
+						Pattern:  regexp.MustCompile("^long"),
+						MaxStale: time.Duration(365+6*30) * 24 * time.Hour,
+					},
+					{
+						Name:     "default",
+						Pattern:  regexp.MustCompile("foobar"),
+						MaxStale: time.Duration(24*7) * time.Hour,
+					},
+				},
+				Default: IndexRule{
+					Name:     "default",
+					Pattern:  regexp.MustCompile(""),
+					MaxStale: 0,
+				},
+			},
+		},
 	}
 	for i, c := range cases {
 		tmpfile, err := ioutil.TempFile("", "indexrules-test-readindexrules")
