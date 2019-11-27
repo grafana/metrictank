@@ -306,10 +306,6 @@ func (a *addPlanner) reset() {
 	a.addToRoot = false
 }
 
-func (a *addPlanner) addOperation(op addOperation) {
-	a.addOperations = append(a.addOperations, op)
-}
-
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 	m := &UnpartitionedMemoryIdx{
 		defById:     make(map[schema.MKey]*idx.Archive),
@@ -715,7 +711,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		// need to check whether branch already exists
 		if !m.addPlanner.createTree {
 			if node, ok = tree.Items[branch]; ok {
-				m.addPlanner.addOperation(addOperation{
+				m.addPlanner.addOperations = append(m.addPlanner.addOperations, addOperation{
 					branch: branch,
 					child:  prevNode,
 					node:   node,
@@ -725,7 +721,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 			}
 		}
 
-		m.addPlanner.addOperation(addOperation{
+		m.addPlanner.addOperations = append(m.addPlanner.addOperations, addOperation{
 			branch: branch,
 			child:  prevNode,
 		})
@@ -734,11 +730,11 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		pos = strings.LastIndex(branch, ".")
 	}
 
+	m.RUnlock()
+
 	if pos == -1 {
 		m.addPlanner.addToRoot = true
 	}
-
-	m.RUnlock()
 
 	// only call log.Debugf in locked section when debug logging
 	// is enabled, because it is slow
