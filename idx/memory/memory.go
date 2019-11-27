@@ -269,6 +269,7 @@ type UnpartitionedMemoryIdx struct {
 	// they prepare the modifications they are going to apply
 	addDelMutex sync.Mutex
 	addPlanner  addPlanner
+	delPlanner  delPlanner
 
 	*metaTagIdx
 
@@ -304,6 +305,54 @@ func (a *addPlanner) reset() {
 	a.addOperations = a.addOperations[:0]
 	a.createTree = false
 	a.addToRoot = false
+}
+
+type delPlanner struct {
+	replaceChildren []delOpReplaceChildren
+	delMetricDefs   []delOpDeleteMetricDefs
+	delNode         []delOpDeleteNode
+}
+
+type delOpReplaceChildren struct {
+	node     *Node
+	children []string
+}
+
+type delOpDeleteMetricDefs struct {
+	ids      []schema.MKey
+	archives []idx.Archive
+}
+
+type delOpDeleteNode struct {
+	path string
+}
+
+func (d *delPlanner) reset() {
+	d.replaceChildren = d.replaceChildren[:0]
+	d.delMetricDefs = d.delMetricDefs[:0]
+	d.delNode = d.delNode[:0]
+}
+
+func (d *delPlanner) execute(tree *Tree, defById map[schema.MKey]*idx.Archive) {
+	for _, op := range d.replaceChildren {
+		op.node.Children = op.children
+	}
+	for _, op := range d.delMetricDefs {
+		for _, id := range op.ids {
+			delete(defById, id)
+		}
+	}
+	for _, op := range d.delNode {
+		delete(tree.Items, op.path)
+	}
+}
+
+func (d *delPlanner) getDeletedArchives() []idx.Archive {
+	var res []idx.Archive
+	for _, op := range d.delMetricDefs {
+		res = append(res, op.archives...)
+	}
+	return res
 }
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
@@ -1526,9 +1575,9 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	var deletedDefs []idx.Archive
 	pre := time.Now()
-	m.Lock()
+	m.RLock()
+
 	defer func() {
-		m.Unlock()
 		if len(deletedDefs) == 0 {
 			return
 		}
@@ -1545,6 +1594,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 			}
 		}
 	}()
+
 	tree, ok := m.tree[orgId]
 	if !ok {
 		return nil, nil
@@ -1554,8 +1604,9 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 		return nil, err
 	}
 
+	m.RUnlock()
 	for _, f := range found {
-		deleted := m.delete(orgId, f, true, true)
+		deleted := m.delete(orgId, f.Path, true, true)
 		deletedDefs = append(deletedDefs, deleted...)
 	}
 
@@ -1565,11 +1616,36 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	return deletedDefs, nil
 }
 
-func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParents, deleteChildren bool) []idx.Archive {
-	tree := m.tree[orgId]
-	deletedDefs := make([]idx.Archive, 0)
+func (m *UnpartitionedMemoryIdx) delete(orgId uint32, path string, deleteEmptyParents, deleteChildren bool) []idx.Archive {
+	m.addDelMutex.Lock()
+	defer m.addDelMutex.Unlock()
+	defer m.delPlanner.reset()
+
+	m.RLock()
+	tree, ok := m.tree[orgId]
+	if !ok {
+		m.RUnlock()
+		return nil
+	}
+
+	n, ok := tree.Items[path]
+	if !ok {
+		m.RUnlock()
+		return nil
+	}
+
+	m.planDeletion(tree, n, deleteEmptyParents, deleteChildren)
+	m.RUnlock()
+
+	m.Lock()
+	m.delPlanner.execute(tree, m.defById)
+	m.Unlock()
+
+	return m.delPlanner.getDeletedArchives()
+}
+
+func (m *UnpartitionedMemoryIdx) planDeletion(tree *Tree, n *Node, deleteEmptyParents, deleteChildren bool) {
 	if deleteChildren && n.HasChildren() {
-		log.Debugf("memory-idx: deleting branch %s", n.Path)
 		// walk up the tree to find all leaf nodes and delete them.
 		for _, child := range n.Children {
 			node, ok := tree.Items[n.Path+"."+child]
@@ -1578,37 +1654,35 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 				log.Errorf("memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
 				continue
 			}
-			log.Debugf("memory-idx: deleting child %s from branch %s", node.Path, n.Path)
-			deleted := m.delete(orgId, node, false, true)
-			deletedDefs = append(deletedDefs, deleted...)
+			m.planDeletion(tree, node, false, true)
 		}
-		n.Children = nil
 	}
 
-	// delete the metricDefs
+	op := delOpDeleteMetricDefs{
+		archives: make([]idx.Archive, 0, len(n.Defs)),
+		ids:      make([]schema.MKey, 0, len(n.Defs)),
+	}
 	for _, id := range n.Defs {
-		log.Debugf("memory-idx: deleting %s from index", id)
 		archivePointer, ok := m.defById[id]
 		if archivePointer == nil {
 			corruptIndex.Inc()
 			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() Index is corrupt. nil, %t := defById[%s]. path=%s ", ok, id.String(), n.Path)
 			continue
 		}
-		deletedDefs = append(deletedDefs, CloneArchive(archivePointer))
-		delete(m.defById, id)
+		op.archives = append(op.archives, CloneArchive(archivePointer))
+		op.ids = append(op.ids, id)
 	}
+	m.delPlanner.delMetricDefs = append(m.delPlanner.delMetricDefs, op)
 
-	n.Defs = nil
-
-	if n.HasChildren() {
-		return deletedDefs
+	if n.HasChildren() && !deleteChildren {
+		return
 	}
-
-	// delete the node.
-	delete(tree.Items, n.Path)
 
 	if !deleteEmptyParents {
-		return deletedDefs
+		m.delPlanner.delNode = append(m.delPlanner.delNode, delOpDeleteNode{
+			path: n.Path,
+		})
+		return
 	}
 
 	// delete node from the branches
@@ -1619,7 +1693,6 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 	nodes := strings.Split(n.Path, ".")
 	for i := len(nodes) - 1; i >= 0; i-- {
 		branch := strings.Join(nodes[:i], ".")
-		log.Debugf("memory-idx: removing %s from branch %s", nodes[i], branch)
 		bNode, ok := tree.Items[branch]
 		if !ok {
 			corruptIndex.Inc()
@@ -1627,16 +1700,17 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 			continue
 		}
 		if len(bNode.Children) > 1 {
-			newChildren := make([]string, 0, len(bNode.Children)-1)
+			op := delOpReplaceChildren{
+				node:     bNode,
+				children: make([]string, 0, len(bNode.Children)-1),
+			}
 			for _, child := range bNode.Children {
 				if child != nodes[i] {
-					newChildren = append(newChildren, child)
-				} else {
-					log.Debugf("memory-idx: %s removed from children list of branch %s", child, bNode.Path)
+					op.children = append(op.children, child)
 				}
 			}
-			bNode.Children = newChildren
-			log.Debugf("memory-idx: branch %s has other children. Leaving it in place", bNode.Path)
+			m.delPlanner.replaceChildren = append(m.delPlanner.replaceChildren, op)
+
 			// no need to delete any parents as they are needed by this node and its
 			// remaining children
 			break
@@ -1653,16 +1727,17 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 			log.Errorf("memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
 			break
 		}
-		bNode.Children = nil
+
 		if bNode.Leaf() {
 			log.Debugf("memory-idx: branch %s is also a leaf node, keeping it.", branch)
+			m.delPlanner.replaceChildren = append(m.delPlanner.replaceChildren, delOpReplaceChildren{node: bNode})
 			break
 		}
-		log.Debugf("memory-idx: branch %s has no children and is not a leaf node, deleting it.", branch)
-		delete(tree.Items, branch)
-	}
 
-	return deletedDefs
+		m.delPlanner.delNode = append(m.delPlanner.delNode, delOpDeleteNode{
+			path: branch,
+		})
+	}
 }
 
 // Prune prunes series from the index if they have become stale per their index-rule
@@ -1764,7 +1839,6 @@ DEFS:
 	// so we can subtract it later on before we decrement the active metrics stat
 	totalDeletedByTag := len(pruned)
 
-ORGS:
 	for org, paths := range toPruneUntagged {
 		if len(paths) == 0 {
 			continue
@@ -1773,30 +1847,11 @@ ORGS:
 		for path := range paths {
 			tl.Wait()
 			lockStart := time.Now()
-			m.Lock()
-			tree, ok := m.tree[org]
-
-			if !ok {
-				m.Unlock()
-				tl.Add(time.Since(lockStart))
-				continue ORGS
-			}
-
-			n, ok := tree.Items[path]
-
-			if !ok {
-				m.Unlock()
-				tl.Add(time.Since(lockStart))
-				log.Debugf("memory-idx: series %s for orgId:%d was identified for pruning but cannot be found.", path, org)
-				continue
-			}
-
-			log.Debugf("memory-idx: series %s for orgId:%d is stale. pruning it.", n.Path, org)
-			defs := m.delete(org, n, true, false)
-			m.Unlock()
+			defs := m.delete(org, path, true, false)
 			tl.Add(time.Since(lockStart))
 			pruned = append(pruned, defs...)
 		}
+
 		if m.findCache != nil {
 			if len(paths) > findCacheInvalidateQueueSize {
 				m.findCache.Purge(org)
