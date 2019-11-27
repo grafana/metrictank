@@ -9,7 +9,9 @@ import (
 	"github.com/Shopify/sarama"
 	p "github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/schema/msg"
 	"github.com/grafana/metrictank/stacktest/fakemetrics/out"
+	"github.com/grafana/metrictank/stacktest/fakemetrics/out/kafkamdm/keycache"
 	"github.com/raintank/met"
 	log "github.com/sirupsen/logrus"
 )
@@ -22,6 +24,8 @@ type KafkaMdm struct {
 	client        sarama.SyncProducer
 	part          p.Partitioner
 	numPartitions int32
+	v2            bool
+	keyCache      *keycache.KeyCache
 }
 
 // map the last number in the metricname to the partition
@@ -41,7 +45,7 @@ func (p *LastNumPartitioner) Partition(m schema.PartitionedMetric, numPartitions
 	return int32(part), nil
 }
 
-func New(topic string, brokers []string, codec string, stats met.Backend, partitionScheme string) (*KafkaMdm, error) {
+func New(topic string, brokers []string, codec string, timeout time.Duration, stats met.Backend, partitionScheme string, v2 bool) (*KafkaMdm, error) {
 	// We are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
@@ -52,12 +56,9 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	config.Producer.Compression = out.GetCompression(codec)
 	config.Producer.Partitioner = sarama.NewManualPartitioner
 
-	// set all timeouts a bit more aggressive so we can bail out quicker.
-	// useful for our unit tests, which operate in the orders of seconds anyway
-	// the defaults of 30s is too long for many of our tests.
-	config.Net.DialTimeout = 5 * time.Second
-	config.Net.ReadTimeout = 5 * time.Second
-	config.Net.WriteTimeout = 5 * time.Second
+	config.Net.DialTimeout = timeout
+	config.Net.ReadTimeout = timeout
+	config.Net.WriteTimeout = timeout
 	err := config.Validate()
 	if err != nil {
 		return nil, err
@@ -87,11 +88,11 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 	} else {
 		part, err = p.NewKafka(partitionScheme)
 		if err != nil {
-			return nil, fmt.Errorf("partitionScheme must be one of 'byOrg|bySeries|bySeriesWithTags|lastNum'. got %s", partitionScheme)
+			return nil, fmt.Errorf("partitionscheme must be one of 'byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv|lastNum'. got %s", partitionScheme)
 		}
 	}
 
-	return &KafkaMdm{
+	k := &KafkaMdm{
 		OutStats:      out.NewStats(stats, "kafka-mdm"),
 		topic:         topic,
 		brokers:       brokers,
@@ -99,7 +100,12 @@ func New(topic string, brokers []string, codec string, stats met.Backend, partit
 		client:        producer,
 		part:          part,
 		numPartitions: int32(len(partitions)),
-	}, nil
+		v2:            v2,
+	}
+	if v2 {
+		k.keyCache = keycache.NewKeyCache(20*time.Minute, time.Duration(10)*time.Minute)
+	}
+	return k, nil
 }
 
 func (k *KafkaMdm) Close() error {
@@ -114,12 +120,37 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 	preFlush := time.Now()
 
 	k.MessageMetrics.Value(1)
-	var data []byte
 
 	payload := make([]*sarama.ProducerMessage, len(metrics))
+	var notOk int
 
 	for i, metric := range metrics {
-		data, err := metric.MarshalMsg(data[:])
+		var data []byte
+		var err error
+		if k.v2 {
+			var mkey schema.MKey
+			mkey, err = schema.MKeyFromString(metric.Id)
+			if err != nil {
+				return err
+			}
+			ok := k.keyCache.Touch(mkey, preFlush)
+			// we've seen this key recently. we can use the optimized format
+			if ok {
+				mp := schema.MetricPoint{
+					MKey:  mkey,
+					Value: metric.Value,
+					Time:  uint32(metric.Time),
+				}
+				data = []byte{byte(msg.FormatMetricPoint)}
+				data, err = mp.Marshal(data)
+
+			} else {
+				notOk++
+				data, err = metric.MarshalMsg(data[:])
+			}
+		} else {
+			data, err = metric.MarshalMsg(data[:])
+		}
 		if err != nil {
 			return err
 		}
@@ -137,6 +168,9 @@ func (k *KafkaMdm) Flush(metrics []*schema.MetricData) error {
 			Value:     sarama.ByteEncoder(data),
 		}
 
+	}
+	if notOk > 0 {
+		log.Info(notOk, "metrics could not be sent as v2 MetricPoint")
 	}
 	prePub := time.Now()
 	err := k.client.SendMessages(payload)
