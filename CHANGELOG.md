@@ -1,7 +1,54 @@
-# master
+# v0.13.1: Meta tag and http api improvements, lineage metadata, per partition metrics and more. Nov 28, 2019.
+
+## meta tags
+
+* correctly clear enrichment cache on upsert #1472
+* meta tag records must be optional in meta tag upsert requests #1473
+* Persist meta records to Cassandra index #1471
+* monitor efficiency of enrichment cache #1511
+* Remove hashing in enricher #1512
+* skip meta tag enrichment when we can #1515
+* Optimize autocomplete queries #1514
+* Performance optimizations for meta tag queries #1517
+* Rewrite enricher to use map lookup #1523
 
 ## reorder buffer
+
 * version v0.13.0-188-g6cd12d6 introduces storage-schemas.conf option 'reorderBufferAllowUpdate' to allow for some data to arrive out of order. #1531
+
+## http api
+
+* Added "ArgQuotelessString" argument for interpreting strings in the request that don't have quotes around tem (e.g. keepLastValue INF)
+* Fix /find empty response resulting in "null" #1464
+* patch and update macaron/binding middleware to support content-length header for GET requests #1466
+* Fix removeAboveBelowPercentile panic #1518
+* rollup indicator (lineage information in response metadata) #1481, #1508
+* return proper errors upon bad request from user #1520
+* correct for delayed lastUpdate updates #1532
+
+## monitoring
+
+* report the priority and readiness per partition as a metric #1504, #1507
+* dashboard fix: maxSeries not a valid groupByNodes callback. #1491
+* MemoryReporter: make call to runtime.ReadMemStats time bound to avoid lost metrics #1494
+
+## tools
+
+* remove deprecated cli argument ttls from mt-whisper-importer-writer
+* add tool to calculate the id of metrics: mt-keygen #1526
+
+## misc
+
+* Don't validate MaxChunkSpan if BigTable store is disabled #1470
+* lower default max chunk cache size to 512MB #1476
+* add initial hosted metrics graphite documentation #1501, #1502
+* Add 'benchmark' target to Makefile that runs all benchmarks #1498
+* in cluster calls, set user agent #1469
+
+## docker stack
+
+* cleanup docker img versions #1479 
+* remove metrictank bits from graphite-storage-schemas.conf files #1553
 
 # v0.13.0: Meta tags beta, sharding by tags, new importer (bigtable!), response stats, memory-idx write queue and many fixes. Sept 17, 2019.
 
