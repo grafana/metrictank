@@ -269,7 +269,7 @@ type UnpartitionedMemoryIdx struct {
 	// they prepare the modifications they are going to apply
 	addDelMutex    sync.Mutex
 	addPlannerPool sync.Pool
-	delPlanner     delPlanner
+	delPlannerPool sync.Pool
 
 	*metaTagIdx
 
@@ -460,15 +460,113 @@ func (d *delPlanner) reset() {
 	d.delNode = d.delNode[:0]
 }
 
+func (d *delPlanner) prepareModifications(tree *Tree, defById map[schema.MKey]*idx.Archive, n *Node, deleteEmptyParents, deleteChildren bool) {
+	if deleteChildren && n.HasChildren() {
+		// walk up the tree to find all leaf nodes and delete them.
+		for _, child := range n.Children {
+			node, ok := tree.Items[n.Path+"."+child]
+			if !ok {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
+				continue
+			}
+			d.prepareModifications(tree, defById, node, false, true)
+		}
+	}
+
+	op := delOpDeleteMetricDefs{
+		archives: make([]idx.Archive, 0, len(n.Defs)),
+		ids:      make([]schema.MKey, 0, len(n.Defs)),
+	}
+	for _, id := range n.Defs {
+		archivePointer, ok := defById[id]
+		if archivePointer == nil {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() Index is corrupt. nil, %t := defById[%s]. path=%s ", ok, id.String(), n.Path)
+			continue
+		}
+		op.archives = append(op.archives, CloneArchive(archivePointer))
+		op.ids = append(op.ids, id)
+	}
+	d.delMetricDefs = append(d.delMetricDefs, op)
+
+	if n.HasChildren() && !deleteChildren {
+		return
+	}
+
+	if !deleteEmptyParents {
+		d.delNode = append(d.delNode, delOpDeleteNode{
+			path: n.Path,
+		})
+		return
+	}
+
+	// delete node from the branches
+	// e.g. for foo.bar.baz
+	// branch "foo.bar" -> node "baz"
+	// branch "foo"     -> node "bar"
+	// branch ""        -> node "foo"
+	nodes := strings.Split(n.Path, ".")
+	for i := len(nodes) - 1; i >= 0; i-- {
+		branch := strings.Join(nodes[:i], ".")
+		bNode, ok := tree.Items[branch]
+		if !ok {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: node %s missing. Index is corrupt.", branch)
+			continue
+		}
+		if len(bNode.Children) > 1 {
+			op := delOpReplaceChildren{
+				node:     bNode,
+				children: make([]string, 0, len(bNode.Children)-1),
+			}
+			for _, child := range bNode.Children {
+				if child != nodes[i] {
+					op.children = append(op.children, child)
+				}
+			}
+			d.replaceChildren = append(d.replaceChildren, op)
+
+			// no need to delete any parents as they are needed by this node and its
+			// remaining children
+			break
+		}
+
+		if len(bNode.Children) == 0 {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
+			break
+		}
+
+		if bNode.Children[0] != nodes[i] {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
+			break
+		}
+
+		if bNode.Leaf() {
+			log.Debugf("memory-idx: branch %s is also a leaf node, keeping it.", branch)
+			d.replaceChildren = append(d.replaceChildren, delOpReplaceChildren{node: bNode})
+			break
+		}
+
+		d.delNode = append(d.delNode, delOpDeleteNode{
+			path: branch,
+		})
+	}
+}
+
 func (d *delPlanner) execute(tree *Tree, defById map[schema.MKey]*idx.Archive) {
 	for _, op := range d.replaceChildren {
 		op.node.Children = op.children
 	}
+
 	for _, op := range d.delMetricDefs {
 		for _, id := range op.ids {
 			delete(defById, id)
 		}
 	}
+
 	for _, op := range d.delNode {
 		delete(tree.Items, op.path)
 	}
@@ -491,6 +589,11 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		addPlannerPool: sync.Pool{
 			New: func() interface{} {
 				return &addPlanner{}
+			},
+		},
+		delPlannerPool: sync.Pool{
+			New: func() interface{} {
+				return &delPlanner{}
 			},
 		},
 	}
@@ -1639,126 +1742,37 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 
 func (m *UnpartitionedMemoryIdx) delete(orgId uint32, path string, deleteEmptyParents, deleteChildren bool) []idx.Archive {
 	m.addDelMutex.Lock()
-	defer m.addDelMutex.Unlock()
-	defer m.delPlanner.reset()
+	delPlanner := m.delPlannerPool.Get().(*delPlanner)
 
 	m.RLock()
 	tree, ok := m.tree[orgId]
 	if !ok {
 		m.RUnlock()
+		m.addDelMutex.Unlock()
 		return nil
 	}
 
 	n, ok := tree.Items[path]
 	if !ok {
 		m.RUnlock()
+		m.addDelMutex.Unlock()
 		return nil
 	}
 
-	m.planDeletion(tree, n, deleteEmptyParents, deleteChildren)
+	delPlanner.prepareModifications(tree, m.defById, n, deleteEmptyParents, deleteChildren)
 	m.RUnlock()
 
 	m.Lock()
-	m.delPlanner.execute(tree, m.defById)
+	delPlanner.execute(tree, m.defById)
 	m.Unlock()
 
-	return m.delPlanner.getDeletedArchives()
-}
+	m.addDelMutex.Unlock()
 
-func (m *UnpartitionedMemoryIdx) planDeletion(tree *Tree, n *Node, deleteEmptyParents, deleteChildren bool) {
-	if deleteChildren && n.HasChildren() {
-		// walk up the tree to find all leaf nodes and delete them.
-		for _, child := range n.Children {
-			node, ok := tree.Items[n.Path+"."+child]
-			if !ok {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
-				continue
-			}
-			m.planDeletion(tree, node, false, true)
-		}
-	}
+	deletedArchives := delPlanner.getDeletedArchives()
+	delPlanner.reset()
+	m.delPlannerPool.Put(delPlanner)
 
-	op := delOpDeleteMetricDefs{
-		archives: make([]idx.Archive, 0, len(n.Defs)),
-		ids:      make([]schema.MKey, 0, len(n.Defs)),
-	}
-	for _, id := range n.Defs {
-		archivePointer, ok := m.defById[id]
-		if archivePointer == nil {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() Index is corrupt. nil, %t := defById[%s]. path=%s ", ok, id.String(), n.Path)
-			continue
-		}
-		op.archives = append(op.archives, CloneArchive(archivePointer))
-		op.ids = append(op.ids, id)
-	}
-	m.delPlanner.delMetricDefs = append(m.delPlanner.delMetricDefs, op)
-
-	if n.HasChildren() && !deleteChildren {
-		return
-	}
-
-	if !deleteEmptyParents {
-		m.delPlanner.delNode = append(m.delPlanner.delNode, delOpDeleteNode{
-			path: n.Path,
-		})
-		return
-	}
-
-	// delete node from the branches
-	// e.g. for foo.bar.baz
-	// branch "foo.bar" -> node "baz"
-	// branch "foo"     -> node "bar"
-	// branch ""        -> node "foo"
-	nodes := strings.Split(n.Path, ".")
-	for i := len(nodes) - 1; i >= 0; i-- {
-		branch := strings.Join(nodes[:i], ".")
-		bNode, ok := tree.Items[branch]
-		if !ok {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: node %s missing. Index is corrupt.", branch)
-			continue
-		}
-		if len(bNode.Children) > 1 {
-			op := delOpReplaceChildren{
-				node:     bNode,
-				children: make([]string, 0, len(bNode.Children)-1),
-			}
-			for _, child := range bNode.Children {
-				if child != nodes[i] {
-					op.children = append(op.children, child)
-				}
-			}
-			m.delPlanner.replaceChildren = append(m.delPlanner.replaceChildren, op)
-
-			// no need to delete any parents as they are needed by this node and its
-			// remaining children
-			break
-		}
-
-		if len(bNode.Children) == 0 {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: branch %s has no children while trying to delete %s. Index is corrupt", branch, nodes[i])
-			break
-		}
-
-		if bNode.Children[0] != nodes[i] {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: %s not in children list for branch %s. Index is corrupt", nodes[i], branch)
-			break
-		}
-
-		if bNode.Leaf() {
-			log.Debugf("memory-idx: branch %s is also a leaf node, keeping it.", branch)
-			m.delPlanner.replaceChildren = append(m.delPlanner.replaceChildren, delOpReplaceChildren{node: bNode})
-			break
-		}
-
-		m.delPlanner.delNode = append(m.delPlanner.delNode, delOpDeleteNode{
-			path: branch,
-		})
-	}
+	return deletedArchives
 }
 
 // Prune prunes series from the index if they have become stale per their index-rule
