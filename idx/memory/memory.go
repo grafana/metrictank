@@ -267,9 +267,9 @@ type UnpartitionedMemoryIdx struct {
 	// lock is used to ensure that nothing reads the index data structures while they
 	// get modified but it may be released during certain sections of add/del while
 	// they prepare the modifications they are going to apply
-	addDelMutex sync.Mutex
-	addPlanner  addPlanner
-	delPlanner  delPlanner
+	addDelMutex    sync.Mutex
+	addPlannerPool sync.Pool
+	delPlanner     delPlanner
 
 	*metaTagIdx
 
@@ -488,6 +488,11 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
+		addPlannerPool: sync.Pool{
+			New: func() interface{} {
+				return &addPlanner{}
+			},
+		},
 	}
 
 	if MetaTagSupport {
@@ -797,10 +802,6 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	def := &archive.MetricDefinition
 	path := def.NameWithTags()
 
-	m.addDelMutex.Lock()
-	defer m.addDelMutex.Unlock()
-	defer m.addPlanner.reset()
-
 	m.RLock()
 
 	// there is a race condition that can lead to an archive being added
@@ -817,10 +818,12 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		return
 	}
 
+	m.RUnlock()
+
 	statMetricsActive.Inc()
+	m.addDelMutex.Lock()
 
 	if TagSupport {
-		m.RUnlock()
 		m.Lock()
 
 		// Even if there are no tags, index at least "name". It's important to use the definition
@@ -835,11 +838,11 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 				log.Debugf("memory-idx: adding %s to DefById", path)
 			}
 			m.Unlock()
+			m.addDelMutex.Unlock()
 			return
 		}
 
 		m.Unlock()
-		m.RLock()
 	}
 
 	if m.findCache != nil {
@@ -848,15 +851,21 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		}()
 	}
 
-	m.addPlanner.prepareModifications(archive, path, m.tree[def.OrgId])
+	addPlanner := m.addPlannerPool.Get().(*addPlanner)
 
+	m.RLock()
+	addPlanner.prepareModifications(archive, path, m.tree[def.OrgId])
 	m.RUnlock()
 
 	m.Lock()
-	m.tree[def.OrgId] = m.addPlanner.execute(m.tree[def.OrgId], m.defById, log.IsLevelEnabled(log.DebugLevel))
+	m.tree[def.OrgId] = addPlanner.execute(m.tree[def.OrgId], m.defById, log.IsLevelEnabled(log.DebugLevel))
 	m.Unlock()
 
+	m.addDelMutex.Unlock()
+
 	statAdd.Inc()
+	addPlanner.reset()
+	m.addPlannerPool.Put(addPlanner)
 
 	return
 }
