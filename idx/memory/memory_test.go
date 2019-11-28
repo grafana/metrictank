@@ -1252,6 +1252,19 @@ func benchWithAndWithoutPartitonedIndex(f func(*testing.B)) func(*testing.B) {
 	}
 }
 
+func benchWithAndWithoutTagSupport(f func(*testing.B)) func(*testing.B) {
+	return func(b *testing.B) {
+		b.Helper()
+		_tagSupport := TagSupport
+		defer func() { TagSupport = _tagSupport }()
+
+		TagSupport = true
+		b.Run("withTagSupport", f)
+		TagSupport = false
+		b.Run("withoutTagSupport", f)
+	}
+}
+
 func benchWithAndWithoutMetaTagSupport(f func(*testing.B)) func(*testing.B) {
 	return func(b *testing.B) {
 		b.Helper()
@@ -1265,7 +1278,7 @@ func benchWithAndWithoutMetaTagSupport(f func(*testing.B)) func(*testing.B) {
 }
 
 func BenchmarkIndexing(b *testing.B) {
-	benchWithAndWithoutPartitonedIndex(benchmarkIndexing)(b)
+	benchWithAndWithoutTagSupport(benchWithAndWithoutPartitonedIndex(benchmarkIndexing))(b)
 }
 
 func benchmarkIndexing(b *testing.B) {
