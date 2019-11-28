@@ -290,21 +290,148 @@ type UnpartitionedMemoryIdx struct {
 }
 
 type addPlanner struct {
-	createTree    bool
-	addToRoot     bool
-	addOperations []addOperation
+	archiveToAdd        *idx.Archive
+	newTree             *Tree
+	addNode             []addOpAddNode
+	replaceNodeChildren []addOpReplaceNodeChildren
+	replaceNodeDefs     []addOpReplaceNodeDefs
 }
 
-type addOperation struct {
+type addOpAddNode struct {
 	branch string
-	child  string
 	node   *Node
 }
 
+type addOpReplaceNodeChildren struct {
+	node     *Node
+	children []string
+}
+
+type addOpReplaceNodeDefs struct {
+	node *Node
+	defs []schema.MKey
+}
+
 func (a *addPlanner) reset() {
-	a.addOperations = a.addOperations[:0]
-	a.createTree = false
-	a.addToRoot = false
+	a.archiveToAdd = nil
+	a.newTree = nil
+	a.addNode = a.addNode[:0]
+	a.replaceNodeChildren = a.replaceNodeChildren[:0]
+	a.replaceNodeDefs = a.replaceNodeDefs[:0]
+}
+
+func (a *addPlanner) prepareModifications(archive *idx.Archive, path string, tree *Tree) {
+	var node *Node
+	a.archiveToAdd = archive
+
+	// first check to see if a tree exists
+	if tree == nil || len(tree.Items) == 0 {
+		log.Debugf("memory-idx: first metricDef seen for orgId %d", archive.MetricDefinition.OrgId)
+		tree = &Tree{
+			Items: map[string]*Node{
+				"": {
+					Path: "",
+				},
+			},
+		}
+		a.newTree = tree
+	} else {
+		// now see if there is an existing branch or leaf with the same path.
+		// An existing leaf is possible if there are multiple metricDefs for the same path due
+		// to different tags or intervals
+		if node = tree.Items[path]; node != nil {
+			a.replaceNodeDefs = append(a.replaceNodeDefs, addOpReplaceNodeDefs{
+				node: node,
+				defs: append(node.Defs, archive.MetricDefinition.Id),
+			})
+			return
+		}
+	}
+
+	// now walk backwards through the node path to find the first branch which exists that
+	// this path extends.
+	prevPos := len(path)
+	pos := strings.LastIndex(path, ".")
+	for pos != -1 {
+		branch := path[:pos]
+		prevNode := path[pos+1 : prevPos]
+
+		// if we're going to create a new tree then there's no
+		// need to check whether branch already exists
+		if a.newTree == nil {
+			if node = tree.Items[branch]; node != nil {
+				a.replaceNodeChildren = append(a.replaceNodeChildren, addOpReplaceNodeChildren{
+					node:     node,
+					children: append(node.Children, prevNode),
+				})
+
+				break
+			}
+		}
+
+		a.addNode = append(a.addNode, addOpAddNode{
+			branch: branch,
+			node: &Node{
+				Path:     branch,
+				Children: []string{prevNode},
+			},
+		})
+
+		prevPos = pos
+		pos = strings.LastIndex(branch, ".")
+	}
+
+	if pos == -1 {
+		if node := tree.Items[""]; node != nil {
+			a.replaceNodeChildren = append(a.replaceNodeChildren, addOpReplaceNodeChildren{
+				node:     node,
+				children: append(node.Children, path[:prevPos]),
+			})
+		} else {
+			log.Errorf("memory-idx: encountered corrupt index missing root node")
+			corruptIndex.Inc()
+
+			a.addNode = append(a.addNode, addOpAddNode{
+				branch: "",
+				node: &Node{
+					Path:     "",
+					Children: []string{path[:prevPos]},
+				},
+			})
+		}
+	}
+
+	a.addNode = append(a.addNode, addOpAddNode{
+		branch: path,
+		node: &Node{
+			Path: path,
+			Defs: []schema.MKey{archive.MetricDefinition.Id},
+		},
+	})
+}
+
+func (a *addPlanner) execute(tree *Tree, defById map[schema.MKey]*idx.Archive, debugLogs bool) *Tree {
+	var i int
+
+	if a.newTree != nil {
+		tree = a.newTree
+	}
+
+	for i = range a.addNode {
+		tree.Items[a.addNode[i].branch] = a.addNode[i].node
+	}
+
+	for i = range a.replaceNodeChildren {
+		a.replaceNodeChildren[i].node.Children = a.replaceNodeChildren[i].children
+	}
+
+	for i = range a.replaceNodeDefs {
+		a.replaceNodeDefs[i].node.Defs = a.replaceNodeDefs[i].defs
+	}
+
+	defById[a.archiveToAdd.MetricDefinition.Id] = a.archiveToAdd
+
+	return tree
 }
 
 type delPlanner struct {
@@ -667,9 +794,13 @@ func createArchive(def *schema.MetricDefinition) *idx.Archive {
 }
 
 func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
+	def := &archive.MetricDefinition
+	path := def.NameWithTags()
+
 	m.addDelMutex.Lock()
 	defer m.addDelMutex.Unlock()
 	defer m.addPlanner.reset()
+
 	m.RLock()
 
 	// there is a race condition that can lead to an archive being added
@@ -687,9 +818,6 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	}
 
 	statMetricsActive.Inc()
-
-	def := &archive.MetricDefinition
-	path := def.NameWithTags()
 
 	if TagSupport {
 		m.RUnlock()
@@ -720,128 +848,12 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		}()
 	}
 
-	var op addOperation
-	var node *Node
-
-	// first check to see if a tree has been created for this OrgId
-	tree, ok := m.tree[def.OrgId]
-	if !ok || len(tree.Items) == 0 {
-		log.Debugf("memory-idx: first metricDef seen for orgId %d", def.OrgId)
-		m.addPlanner.createTree = true
-	} else {
-		// now see if there is an existing branch or leaf with the same path.
-		// An existing leaf is possible if there are multiple metricDefs for the same path due
-		// to different tags or intervals
-		if node, ok = tree.Items[path]; ok {
-			m.RUnlock()
-
-			log.Debugf("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
-
-			m.Lock()
-			node.Defs = append(node.Defs, def.Id)
-			m.defById[def.Id] = archive
-			m.Unlock()
-
-			statAdd.Inc()
-			return
-		}
-	}
-
-	pos := strings.LastIndex(path, ".")
-
-	// now walk backwards through the node path to find the first branch which exists that
-	// this path extends.
-	prevPos := len(path)
-	for pos != -1 {
-		branch := path[:pos]
-		prevNode := path[pos+1 : prevPos]
-
-		// if we're going to create a new tree then there's no
-		// need to check whether branch already exists
-		if !m.addPlanner.createTree {
-			if node, ok = tree.Items[branch]; ok {
-				m.addPlanner.addOperations = append(m.addPlanner.addOperations, addOperation{
-					branch: branch,
-					child:  prevNode,
-					node:   node,
-				})
-
-				break
-			}
-		}
-
-		m.addPlanner.addOperations = append(m.addPlanner.addOperations, addOperation{
-			branch: branch,
-			child:  prevNode,
-		})
-
-		prevPos = pos
-		pos = strings.LastIndex(branch, ".")
-	}
+	m.addPlanner.prepareModifications(archive, path, m.tree[def.OrgId])
 
 	m.RUnlock()
 
-	if pos == -1 {
-		m.addPlanner.addToRoot = true
-	}
-
-	// only call log.Debugf in locked section when debug logging
-	// is enabled, because it is slow
-	debugLogs := log.IsLevelEnabled(log.DebugLevel)
-
-	if m.addPlanner.createTree {
-		tree = &Tree{
-			Items: map[string]*Node{
-				"": {
-					Path: "",
-				},
-			},
-		}
-
-		m.Lock()
-		m.tree[def.OrgId] = tree
-	} else {
-		m.Lock()
-	}
-
-	for _, op = range m.addPlanner.addOperations {
-		if op.node == nil {
-			// if node doesn't exist yet, we create it
-			if debugLogs {
-				log.Debugf("memory-idx: creating branch %s with child %s", op.branch, op.child)
-			}
-
-			tree.Items[op.branch] = &Node{
-				Path:     op.branch,
-				Children: []string{op.child},
-			}
-		} else {
-			// if node exists we just append to its children
-			if debugLogs {
-				log.Debugf("memory-idx: adding %s as child of %s", op.child, op.branch)
-			}
-
-			op.node.Children = append(op.node.Children, op.child)
-		}
-	}
-
-	if m.addPlanner.addToRoot {
-		node = tree.Items[""]
-		node.Children = append(node.Children, op.branch)
-	}
-
-	// Add leaf node
-	if debugLogs {
-		log.Debugf("memory-idx: creating leaf %s", path)
-	}
-
-	tree.Items[path] = &Node{
-		Path: path,
-		Defs: []schema.MKey{def.Id},
-	}
-
-	m.defById[def.Id] = archive
-
+	m.Lock()
+	m.tree[def.OrgId] = m.addPlanner.execute(m.tree[def.OrgId], m.defById, log.IsLevelEnabled(log.DebugLevel))
 	m.Unlock()
 
 	statAdd.Inc()
