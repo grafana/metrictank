@@ -5,7 +5,6 @@
 * correctly clear enrichment cache on upsert #1472
 * meta tag records must be optional in meta tag upsert requests #1473
 * Persist meta records to Cassandra index #1471
-* monitor efficiency of enrichment cache #1511
 * Remove hashing in enricher #1512
 * skip meta tag enrichment when we can #1515
 * Optimize autocomplete queries #1514
