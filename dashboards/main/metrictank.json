@@ -671,7 +671,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "sortByName(aliasByNode(metrictank.stats.$environment.$instance.input.kafka-mdm.partition.*.lag.gauge64, 3, 7), true)"
+              "target": "sortByName(groupByNode(metrictank.stats.$environment.$instance.input.kafka-mdm.partition.*.lag.gauge64, 3, 'max'), true)"
             }
           ],
           "thresholds": [],
