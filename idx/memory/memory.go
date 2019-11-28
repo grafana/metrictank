@@ -410,7 +410,7 @@ func (a *addPlanner) prepareModifications(archive *idx.Archive, path string, tre
 	})
 }
 
-func (a *addPlanner) execute(tree *Tree, defById map[schema.MKey]*idx.Archive, debugLogs bool) *Tree {
+func (a *addPlanner) execute(tree *Tree, defById map[schema.MKey]*idx.Archive) *Tree {
 	var i int
 
 	if a.newTree != nil {
@@ -961,7 +961,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	m.RUnlock()
 
 	m.Lock()
-	m.tree[def.OrgId] = addPlanner.execute(m.tree[def.OrgId], m.defById, log.IsLevelEnabled(log.DebugLevel))
+	m.tree[def.OrgId] = addPlanner.execute(m.tree[def.OrgId], m.defById)
 	m.Unlock()
 
 	m.addDelMutex.Unlock()
