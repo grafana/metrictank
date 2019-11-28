@@ -3129,20 +3129,20 @@
       "targets": [
         {
           "refId": "A",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.latency.mean.gauge32, 5, 6, 8)"
+          "target": "groupByNodes(metrictank.stats.$environment.$instance.idx.*.*.latency.mean.gauge32, 'avg',5, 6, 8)"
         },
         {
           "refId": "B",
-          "target": "aliasByNode(consolidateBy(metrictank.stats.$environment.$instance.idx.*.*.latency.{p90,max}.gauge32, 'max'), 5, 6, 8)"
+          "target": "groupByNodes(consolidateBy(metrictank.stats.$environment.$instance.idx.*.*.latency.{p90,max}.gauge32, 'max'), 'max', 5, 6, 8)"
         },
         {
           "refId": "C",
-          "target": "aliasByNode(metrictank.stats.$environment.$instance.idx.*.*.*.latency.mean.gauge32, 5, 6, 7, 9)",
+          "target": "groupByNodes(metrictank.stats.$environment.$instance.idx.*.*.*.latency.mean.gauge32, 'avg', 5, 6, 7, 9)",
           "textEditor": false
         },
         {
           "refId": "D",
-          "target": "aliasByNode(consolidateBy(metrictank.stats.$environment.$instance.idx.*.*.*.latency.{p90,max}.gauge32, 'max'), 5, 6, 7, 9)",
+          "target": "groupByNodes(consolidateBy(metrictank.stats.$environment.$instance.idx.*.*.*.latency.{p90,max}.gauge32, 'max'), 'max', 5, 6, 7, 9)",
           "textEditor": false
         }
       ],
@@ -3247,11 +3247,6 @@
           "lines": true,
           "linewidth": 0,
           "points": false
-        },
-        {
-          "alias": "es-retrybuf-items",
-          "lines": true,
-          "points": false
         }
       ],
       "spaceLength": 10,
@@ -3260,14 +3255,14 @@
       "targets": [
         {
           "refId": "A",
-          "target": "aliasByNode(perSecond(metrictank.stats.$environment.$instance.idx.*.ops.*.counter32), 5, 7)",
+          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.idx.*.ops.*.counter32), 'sum', 5, 7)",
           "textEditor": false
         },
-        {
-          "refId": "B",
-          "target": "aliasByNode(sumSeriesWithWildcards(metrictank.stats.$environment.$instance.idx.*.add.values.rate32, 2, 3), 3, 4)",
-          "textEditor": false
-        },
+	{
+           "refId": "B",
+           "target": "aliasByNode(sumSeriesWithWildcards(metrictank.stats.$environment.$instance.idx.*.add.values.rate32, 2, 3), 3, 4)",
+           "textEditor": false
+	},
         {
           "refId": "C",
           "target": "aliasByNode(sumSeriesWithWildcards(metrictank.stats.$environment.$instance.idx.*.query-insert.exec.values.rate32, 2, 3), 3, 4)",
@@ -3278,7 +3273,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "backend status",
+      "title": "operation rates",
       "tooltip": {
         "msResolution": true,
         "shared": true,
