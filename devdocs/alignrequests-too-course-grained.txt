@@ -1,0 +1,91 @@
+## MDP-optimizable
+
+### Greedy-resolution functions
+
+A Greedy-resolution function (GR-function) is a certain processing function that requires, or may require, high resolution data to do their computations, even if their output will be consolidated down (due to maxDatapoints setting)
+For example summarize().
+For these, we should return as high-resolution data as we can.
+
+### MDP-optimizable 
+
+MDP-optimizable aka maxDataPoints-optimizable is a data request where we can safely fetch lower precision data by taking into account MaxDataPoints-based consolidation that will take place after function processing.
+A data request is MDP-optimizable if we know for sure that the render request does not execute GR-functions.
+I.O.W. when both of these conditions are true:
+* the client was an end-user, not Graphite (Graphite may run any processing, such as GR-functions, without telling us)
+* we (metrictank) will not run GR-functions on this data
+
+What kind of optimizations can we do? Consider this retention rule:
+
+`1s:1d,10s:1y`
+request from=now-2hours to=now, MDP=800
+Our options are:
+* 7200 raw (archive 0) datapoints, consolidate aggNum 9, down to 800 (by the way, current code does generate "odd" intervals like 9s in this case)
+* 720 datapoints of archive 1.
+
+While archive 1 is a bit less accurate, it is less data to load, decode, and requires no consolidation. We have a strong suspicion that it is less costly to use this data to satisfy the request.
+
+This is a more refined solution of https://github.com/grafana/metrictank/issues/463.
+In the past, we MDP-optimized every request, which led to incorrect data when fed into GR-functions.
+We corrected it by turning off all MDP-optimizations, which I think led to increased latencies, though we don't have the stats off-hand.
+The hope is by re-introducing MDP-optimizations the correct way, we can speed up many requests again.
+
+## Pre-normalizable
+
+### Interval-altering function
+
+Certain functions will return output series in an interval different from the input interval.
+For example summarize() and smartSummarize(). We refer to these as IA-functions below.
+In principle we can predict what the output interval will be during the plan phase, because we can parse the function arguments.
+However, for simplicty, we don't implement this.
+
+### Transparent aggregation
+
+A trans-aggregation is a processing function that aggregates multiple series together in a predictable way (known at planning time, before fetching the data).
+E.g. sumSeries, averageSeries are known to always aggregate all their inputs together.
+
+### Opaque aggregation
+
+An opaque-aggregation is a processing function where we cannot accurately predict which series will be aggregated together
+because it depends on information (e.g. names, tags) that will only be known at runtime. (e.g. groupByTags, groupByNode(s))
+
+### Pre-normalizable
+
+when data will be used together (e.g. aggregating multiple series together) they will need to have the same resolution.
+(note that generally, series do *not* need to have the same resolution. We have been aligning resolutions much too aggressively. see https://github.com/grafana/metrictank/issues/926)
+An aggregation can be opaque or transparent as defined above.
+
+Pre-normalizing is when we can safely - during planning - set up normalization to happen right after fetching (or better: set up the fetch parameters such that normalizing is not needed)
+This is the case when series go from fetching to transparent aggregation, possibly with some processing functions - except opaque aggregation(s) or IA-function(s) - in between.
+
+For example if we have these schemas:
+```
+series A: 1s:1d,10s:1y
+series B: 10s:1d
+```
+
+Let's say the initial fetch parameters are to get the raw data for both A and B.
+If we know that these series will be aggregated together, they will need to be normalized, meaning A will need to be at 10s resolution.
+If the query is `sum(A,B)` or `sum(perSecond(A),B)` we can safely pre-normalize, specifically, we can fetch the first rollup of series A, rather than fetching the raw data
+and then normalizing (consolidating) at runtime - and thus spend less resources - because we know for sure that having the coarser data for A will not cause trouble in this pipeline.
+However, if the query is `sum(A, summarize(B,...))` we cannot safely do this as we don't have a prediction of what the output interval of `summarize(B,...)` will be.
+Likewise, if the query is `groupByNode(group(A,B), 2, callback='sum')` we cannot predict whether A and B will end up in the same group, and thus should be normalized.
+
+
+## Proposed changes
+
+1) Don't align any requests (as in `models.Req`) up front
+2) Make sure all aggregation functions can normalize at runtime (if necessary), otherwise they will fail to process multiple input series that now can have different intervals
+3) Implement pre-normalization
+4) While we're at it, may as well implement MDP-optimization
+5) (planning-stage awareness of the output interval of IA-functions, which means we can set up fetching/(pre)normalization in a smarter way)
+
+Step 1 and 2 will solve our most urgent problem of over-aligning data (https://github.com/grafana/metrictank/issues/926)
+However it will probably (?) leave some performance optimizations on the table. Which step 3 and 4 address. It's unclear how urgent step 3 and 4 are, though they aren't too difficult to implement.
+Implementing both of them can probably be done in one shot, as solving them is done in a similar way.
+
+Note that step 1 has a complication:
+since we no longer set up all models.Req for a request at once, it's trickier to implement "max-points-per-req-soft" and "max-points-per-req-hard".
+Think of it this way: if the number of datapoints fetched in a request is higher than the soft limit, which series should we fetch in a more course way? We can implement a heuristic that picks series that are highest resolution, and fetch the next rollup for them, trying to avoid those series that will be processed by a GR-function - though if we have no other choice, we will do it, as we currently do. We keep making fetches coarser until we fetch the coarsest archives of all series. Then we compare against the hard limit and bail out if the limit is breached. Similar to how we currently do it.
+Note that to keep the support for the max-points-per-req-soft/max-points-per-req-hard setting we have to implement tracking of GR-functions which means we can probably just do step 4 while we're at it.
+
+Step 5 is something that can wait.
