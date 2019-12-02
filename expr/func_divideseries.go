@@ -7,8 +7,10 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/util"
 )
 
+// FuncDivideSeries divides 1-N dividend series by 1 dividend series
 type FuncDivideSeries struct {
 	dividend GraphiteFunc
 	divisor  GraphiteFunc
@@ -53,11 +55,30 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 	if len(divisors) != 1 {
 		return nil, errors.NewBadRequestf("need 1 divisor series, not %d", len(divisors))
 	}
-	divisor := divisors[0]
 
 	var series []models.Series
+	// if len(dividends) > 1 the same divisor series will be used multiple times,
+	// and we'll possibly need to normalize it to different intervals (if the dividends have differing intervals)
+	// (we also need to normalize if there's only 1 dividend but it has a different interval than the divisor)
+	// so let's keep track of the different "versions" of the divisor that we have available.
+	// (the dividend(s) may also need to be normalized but we only use them once so the require no special attention)
+	divisorsByRes := make(map[uint32]models.Series)
+	divisorsByRes[divisors[0].Interval] = divisors[0]
 	for _, dividend := range dividends {
 		out := pointSlicePool.Get().([]schema.Point)
+		divisor := divisors[0]
+		if dividend.Interval != divisors[0].Interval {
+			lcm := util.Lcm([]uint32{dividend.Interval, divisor.Interval})
+			newDiv, ok := divisorsByRes[lcm]
+			if ok {
+				divisor = newDiv
+				// we now have the right divisor but may still need to normalize the dividend
+				dividend, divisor = normalizeTwo(cache, dividend, divisor)
+			} else {
+				dividend, divisor = normalizeTwo(cache, dividend, divisor)
+				divisorsByRes[lcm] = divisor
+			}
+		}
 		for i := 0; i < len(dividend.Datapoints); i++ {
 			p := schema.Point{
 				Ts: dividend.Datapoints[i].Ts,

@@ -152,8 +152,8 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 				outSeries = append(outSeries, nonesSerie)
 			} else {
 				// key found in both inByKey and totalSerieByKey
+				serie1, serie2 := normalizeTwo(cache, serie1, totalSerieByKey[key])
 				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
-				serie2 := totalSerieByKey[key]
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
 				serie1.Tags = map[string]string{"name": serie1.Target}
@@ -179,7 +179,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[R
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalsSerie = sumSeries(in, cache)
+		totalsSerie = sumSeries(normalize(cache, in), cache)
 		if len(in) == 1 {
 			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.QueryPatt = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
@@ -207,19 +207,21 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[R
 		if len(totals) == len(in) {
 			totalsSerie = totals[i]
 		}
-		serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
+		if len(totalsSerie.Datapoints) > 0 {
+			serie, totalsSerie = normalizeTwo(cache, serie, totalsSerie)
+			serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
+			for i := range serie.Datapoints {
+				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
+			}
+		} else {
+			serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
+			for i := range serie.Datapoints {
+				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, s.totalFloat)
+			}
+		}
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.Target)
 		serie.Tags = map[string]string{"name": serie.Target}
-		for i := range serie.Datapoints {
-			var totalVal float64
-			if len(totalsSerie.Datapoints) > 0 {
-				totalVal = totalsSerie.Datapoints[i].Val
-			} else {
-				totalVal = s.totalFloat
-			}
-			serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalVal)
-		}
 		serie.Meta = serie.Meta.Merge(totalsSerie.Meta)
 		outSeries = append(outSeries, serie)
 		cache[Req{}] = append(cache[Req{}], serie)
@@ -262,7 +264,7 @@ func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, cache 
 	totalSerieByKey := make(map[string]models.Series, len(totalSeriesByKey))
 	for key := range totalSeriesByKey {
 		if _, ok := inByKey[key]; ok {
-			totalSerieByKey[key] = sumSeries(totalSeriesByKey[key], cache)
+			totalSerieByKey[key] = sumSeries(normalize(cache, totalSeriesByKey[key]), cache)
 		} else {
 			totalSerieByKey[key] = totalSeriesByKey[key][0]
 		}

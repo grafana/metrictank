@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
+// FuncDivideSeriesLists divides dividends by divisors, pairwise
 type FuncDivideSeriesLists struct {
 	dividends GraphiteFunc
 	divisors  GraphiteFunc
@@ -50,8 +51,9 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 	}
 
 	var series []models.Series
-	for i, dividend := range dividends {
-		divisor := divisors[i]
+	for i := range dividends {
+		dividend, divisor := normalizeTwo(cache, dividends[i], divisors[i])
+
 		out := pointSlicePool.Get().([]schema.Point)
 		for i := 0; i < len(dividend.Datapoints); i++ {
 			p := schema.Point{
