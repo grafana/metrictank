@@ -7,9 +7,11 @@ import (
 
 // Context describes a series timeframe and consolidator
 type Context struct {
-	from   uint32
-	to     uint32
-	consol consolidation.Consolidator // can be 0 to mean undefined
+	from    uint32
+	to      uint32
+	consol  consolidation.Consolidator // can be 0 to mean undefined
+	PNGroup PNGroup                    // pre-normalization group. if the data can be safely pre-normalized
+	MDP     uint32                     // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise
 }
 
 // GraphiteFunc defines a graphite processing function
@@ -54,7 +56,7 @@ func init() {
 		"aliasByTags":           {NewAliasByNode, true},
 		"aliasByNode":           {NewAliasByNode, true},
 		"aliasSub":              {NewAliasSub, true},
-		"asPercent":             {NewAsPercent, true},
+		"asPercent":             {NewAsPercent, false}, // disabled because it needs an update for runtime normalization and possibly MDP/pre-normalization
 		"avg":                   {NewAggregateConstructor("average", crossSeriesAvg), true},
 		"averageAbove":          {NewFilterSeriesConstructor("average", ">"), true},
 		"averageBelow":          {NewFilterSeriesConstructor("average", "<="), true},

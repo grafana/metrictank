@@ -1,3 +1,28 @@
+Considerations when writing function:
+make sure to return pointer, so that properties can be set, and we get a consistent PNGroup through the pipeline (if applicable)
+(the exception here is the data loading function FuncGet() which doesn't need to set any properties)
+consider whether the function is GR, IA, a transparant or opaque aggregation. because those require special options. see https://github.com/grafana/metrictank/issues/926#issuecomment-559596384
+make sure to do the right things wrt getting slicepools, adding them to the cache for cleanup, not modifying tags, etc. (see below re memory management)
+
+
+## MDP-optimization
+
+MDP at the leaf of the expr tree (fetch request) 0 means don't optimize, set it to >0 means, can be optimized.
+When the data may be subjected to a GR-function, we set it to 0.
+How do we achieve this?
+* MDP at the root is set 0 if request came from graphite or to MaxDataPoints otherwise.
+* as the context flows from root through the processing functions to the data requests, if we hit a GR function, we set to MDP to 0 on the context (and thus also on any subsequent requests)
+
+## Pre-normalization
+
+Any data requested (checked at the leaf node of the expr tree) should have its own independent interval.
+However, multiple series getting fetched that then get aggregated together, may be pre-normalized if they are part of the same pre-normalization-group. ( have a common PNGroup that is > 0 )
+(for more details see devdocs/alignrequests-too-course-grained.txt)
+The mechanics here are:
+* we set PNGroup to 0 by default on the context, which gets inherited down the tree
+* as we traverse down tree: transparant aggregations set PNGroups to the pointer value of that function, to uniquely identify any further data requests that will be fed into the same transparant aggregation.
+* as we traverse down, any opaque aggregation functions and IA-functions reset PNGroup back to 0.
+
 ## Management of point slices
 
 The `models.Series` type, even when passed by value, has a few fields that need special attention:

@@ -32,6 +32,8 @@ func (s *FuncSummarize) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncSummarize) Context(context Context) Context {
+	context.MDP = 0
+	context.PNGroup = 0
 	context.consol = 0
 	return context
 }

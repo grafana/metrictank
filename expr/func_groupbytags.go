@@ -28,6 +28,7 @@ func (s *FuncGroupByTags) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncGroupByTags) Context(context Context) Context {
+	context.PNGroup = 0
 	return context
 }
 

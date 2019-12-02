@@ -11,11 +11,16 @@ import (
 
 // Req represents a request for one/more series
 type Req struct {
-	Query string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
-	From  uint32
-	To    uint32
-	Cons  consolidation.Consolidator // can be 0 to mean undefined
+	Query   string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
+	From    uint32
+	To      uint32
+	PNGroup PNGroup
+	Cons    consolidation.Consolidator // can be 0 to mean undefined
+	MDP     uint32                     // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise.
 }
+
+// PNGroup is an identifier for a pre-normalization group: data that can be pre-normalized together
+type PNGroup uint64
 
 // NewReq creates a new Req. pass cons=0 to leave consolidator undefined,
 // leaving up to the caller (in graphite's case, it would cause a lookup into storage-aggregation.conf)
@@ -25,6 +30,17 @@ func NewReq(query string, from, to uint32, cons consolidation.Consolidator) Req 
 		From:  from,
 		To:    to,
 		Cons:  cons,
+	}
+}
+
+func NewReqFromContext(query string, c Context) Req {
+	return Req{
+		Query:   query,
+		From:    c.from,
+		To:      c.to,
+		Cons:    c.consol,
+		PNGroup: c.PNGroup,
+		MDP:     c.MDP,
 	}
 }
 
@@ -69,8 +85,10 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan
 	for _, e := range exprs {
 		var fn GraphiteFunc
 		context := Context{
-			from: from,
-			to:   to,
+			from:    from,
+			to:      to,
+			MDP:     mdp,
+			PNGroup: 0, // making this explicit here for easy code grepping
 		}
 		fn, reqs, err = newplan(e, context, stable, reqs)
 		if err != nil {
@@ -94,7 +112,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		return nil, nil, errors.NewBadRequest("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
-		req := NewReq(e.str, context.from, context.to, context.consol)
+		req := NewReqFromContext(e.str, context)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	} else if e.etype == etFunc && e.str == "seriesByTag" {
@@ -104,7 +122,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		// string back into the Query member of a new request to be parsed later.
 		// TODO - find a way to prevent this parse/encode/parse/encode loop
 		expressionStr := "seriesByTag(" + e.argsStr + ")"
-		req := NewReq(expressionStr, context.from, context.to, context.consol)
+		req := NewReqFromContext(expressionStr, context)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	}

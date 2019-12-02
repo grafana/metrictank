@@ -1,10 +1,11 @@
 package api
 
 import (
-	"math"
+	"fmt"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
@@ -24,13 +25,128 @@ var (
 	errMaxPointsPerReq = response.NewError(413, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
 )
 
-// alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
-// it chooses the highest resolution possible within ttl, but
-// subjects the request to the max-points-per-req-{soft,hard} settings (lowering resolution to meet the soft setting)
-// note: it is assumed that all requests have the same maxDataPoints, from & to.
+// planRequests updates the requests with all details for fetching.
+// starting point:
+//     if MDP-optimization enabled -> select the coarsest archive that results in pointcount >= MDP/2, which hopefully lets us avoid, or at least minimize runtime consolidation.
+//     otherwise, the highest resolution possible within ttl
+// then:
+// * subjects the request to max-points-per-req-soft settings, lowering resolution to meet the soft setting.
+// * subjects to max-points-per-req-hard setting, rejecting queries that can't be met
+// * pre-normalization: a clue that series will need to be normalized together, so may as well try to read from archives that are equivalent to normalization
+//   need to watch out here, due to MDP-optimization might result in too low res here
+//
+// note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
-func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint32, uint32, error) {
+func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) ([]models.Req, uint32, uint32, error) {
+
+	var singleRets [][]conf.Retention
+	for i, req := range reqs.single {
+		rets := mdata.Schemas.Get(req.SchemaId).Retentions.Rets
+		singleRets = append(singleRets, rets)
+		var ok bool
+		if req.MaxPoints == 0 {
+			req, ok = initialHighestResWithinTTL(now, from, to, req, rets)
+		} else {
+			req, ok = initialLowestResForMDP(now, from, to, req, rets)
+		}
+		reqs.single[i] = req
+		if !ok {
+			return nil, 0, 0, errUnSatisfiable
+		}
+	}
+
+	for group, groupReqs := range reqs.pngroups {
+		fmt.Println("processing group", group)
+		var groupRets [][]conf.Retention
+		for i, req := range groupReqs {
+			rets := mdata.Schemas.Get(req.SchemaId).Retentions.Rets
+			groupRets = append(singleRets, rets)
+			var ok bool
+			if req.MaxPoints == 0 {
+				req, ok = initialHighestResWithinTTL(now, from, to, req, rets)
+			} else {
+				req, ok = initialLowestResForMDP(now, from, to, req, rets)
+			}
+			reqs.pngroups[group][i] = req
+			if !ok {
+				return nil, 0, 0, errUnSatisfiable
+			}
+		}
+		reqs, _, _, _ := alignRequests(now, from, to, groupReqs)
+
+	}
+
+	pointsReturn := uint32(len(reqs)) * pointsPerSerie
+	reqRenderPointsFetched.ValueUint32(pointsFetch)
+	reqRenderPointsReturned.ValueUint32(pointsReturn)
+
+	return reqs, pointsFetch, pointsReturn, nil
+}
+
+func initialHighestResWithinTTL(now, from, to uint32, req models.Req, rets []conf.Retention) (models.Req, bool) {
+	minTTL := now - from
+	var ok bool
+	for i, ret := range rets {
+		// skip non-ready option.
+		if ret.Ready > from {
+			continue
+		}
+		ok = true
+		req.Archive = uint8(i)
+		req.TTL = uint32(ret.MaxRetention())
+		if i == 0 {
+			// The first retention is raw data, so use its native interval
+			req.ArchInterval = req.RawInterval
+		} else {
+			req.ArchInterval = uint32(ret.SecondsPerPoint)
+		}
+		req.OutInterval = req.ArchInterval
+		req.AggNum = 1
+
+		if req.TTL >= minTTL {
+			break
+		}
+	}
+	return req, ok
+}
+
+func initialLowestResForMDP(now, from, to uint32, req models.Req, rets []conf.Retention) (models.Req, bool) {
 	tsRange := to - from
+	var ok bool
+	for i := len(rets) - 1; i >= 0; i-- {
+		ret := rets[i]
+		// skip non-ready option.
+		if ret.Ready > from {
+			continue
+		}
+		ok = true
+		req.Archive = uint8(i)
+		req.TTL = uint32(ret.MaxRetention())
+		if i == 0 {
+			// The first retention is raw data, so use its native interval
+			req.ArchInterval = req.RawInterval
+		} else {
+			req.ArchInterval = uint32(ret.SecondsPerPoint)
+		}
+		req.OutInterval = req.ArchInterval
+		req.AggNum = 1
+
+		numPoints := tsRange / req.ArchInterval
+		if numPoints >= req.MaxPoints/2 {
+			// if numPoints > req.MaxPoints, we may be able to set up normalization here
+			// however, lets leave non-normalized for now. maybe this function will be used for PNGroups later.
+			// we wouldn't want to set up AggNum=2 if we need AggNum=3 for the LCM of the PNGroup
+			// why? imagine this scenario:
+			// interval 10s, numPoints 1000, req.MaxPoints 800 -> if we set AggNum to 2 now, we change interval to 20s
+			// but if we have a PNGroup with another series that has interval 30s, we would bring everything to 60s, needlessly coarse
+			// (we should bring everything to 30s instead)
+			// TODO AggNum/OutInterval not correct here
+			break
+		}
+	}
+	return req, ok
+}
+func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint32, uint32, error) {
 
 	var listIntervals []uint32
 	var seenIntervals = make(map[uint32]struct{})
@@ -39,65 +155,12 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 	for _, req := range reqs {
 		targets[req.Target] = struct{}{}
 	}
-	numTargets := uint32(len(targets))
-	minTTL := now - reqs[0].From
-
-	minIntervalSoft := uint32(0)
-	minIntervalHard := uint32(0)
-
-	if maxPointsPerReqSoft > 0 {
-		minIntervalSoft = uint32(math.Ceil(float64(tsRange) / (float64(maxPointsPerReqSoft) / float64(numTargets))))
-	}
-	if maxPointsPerReqHard > 0 {
-		minIntervalHard = uint32(math.Ceil(float64(tsRange) / (float64(maxPointsPerReqHard) / float64(numTargets))))
-	}
-
-	// set preliminary settings. may be adjusted further down
-	// but for now:
-	// for each req, find the highest res archive
-	// (starting with raw, then rollups in decreasing precision)
-	// that retains all the data we need and does not exceed minIntervalSoft.
-	// fallback to lowest res option (which *should* have the longest TTL)
-	var found bool
-	for i := range reqs {
-		req := &reqs[i]
-		retentions := mdata.Schemas.Get(req.SchemaId).Retentions.Rets
-		for i, ret := range retentions {
-			// skip non-ready option.
-			if ret.Ready > from {
-				continue
-			}
-			found = true
-			req.Archive = uint8(i)
-			req.TTL = uint32(ret.MaxRetention())
-			if i == 0 {
-				// The first retention is raw data, so use its native interval
-				req.ArchInterval = req.RawInterval
-			} else {
-				req.ArchInterval = uint32(ret.SecondsPerPoint)
-			}
-
-			if req.TTL >= minTTL && req.ArchInterval >= minIntervalSoft {
-				break
-			}
-		}
-		if !found {
-			return nil, 0, 0, errUnSatisfiable
-		}
-
-		if _, ok := seenIntervals[req.ArchInterval]; !ok {
-			listIntervals = append(listIntervals, req.ArchInterval)
-			seenIntervals[req.ArchInterval] = struct{}{}
-		}
-	}
 
 	// due to different retentions coming into play, different requests may end up with different resolutions
 	// we all need to emit them at the same interval, the LCM interval >= interval of the req
 	interval := util.Lcm(listIntervals)
 
-	if interval < minIntervalHard {
-		return nil, 0, 0, errMaxPointsPerReq
-	}
+	// ??? NOW WHAT TODO RESUME HERE :) :{)
 
 	// now, for all our requests, set all their properties.  we may have to apply runtime consolidation to get the
 	// correct output interval if out interval != native.  In that case, we also check whether we can fulfill
@@ -147,16 +210,13 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 	}
 
 	pointsPerSerie := tsRange / interval
-	if reqs[0].MaxPoints > 0 && pointsPerSerie > reqs[0].MaxPoints {
+
+	// TODO series are not same resolution, need to account for separate intervals
+	if planMDP > 0 && pointsPerSerie > planMDP {
 		// note that we don't assign to req.AggNum here, because that's only for normalization.
 		// MDP runtime consolidation doesn't look at req.AggNum
 		aggNum := consolidation.AggEvery(pointsPerSerie, reqs[0].MaxPoints)
 		pointsPerSerie /= aggNum
 	}
 
-	pointsReturn := uint32(len(reqs)) * pointsPerSerie
-	reqRenderPointsFetched.ValueUint32(pointsFetch)
-	reqRenderPointsReturned.ValueUint32(pointsReturn)
-
-	return reqs, pointsFetch, pointsReturn, nil
 }

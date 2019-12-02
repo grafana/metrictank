@@ -26,6 +26,18 @@ func (s *FuncDivideSeries) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncDivideSeries) Context(context Context) Context {
+	// note: technically divideSeries() is a sort of aggregation function
+	// that "aggregates" each dividend series together with the divisor.
+	// thus, it's theoretically possible to apply pre-normalization
+	// but, if it receives dividend series that may differ in their interval, then
+	// this would be really hard to juggle because the divisor would get used
+	// multiple times with different intervals.
+	// so to be safe, let's just treat divideSeries like an opaque aggregation and
+	// cancel out ongoing pre-normalization.
+	// we wouldn't want to pre-normalize all dividends and the divisor to 1 common
+	// interval because that could cause coarse dividends to affect (coarsen)
+	// their fellow dividends
+	context.PNGroup = 0
 	return context
 }
 

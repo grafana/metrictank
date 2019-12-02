@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unsafe"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/errors"
@@ -38,6 +39,22 @@ func (s *FuncAsPercent) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncAsPercent) Context(context Context) Context {
+	// when is passing through a PNGroup (or setting one) the right thing? when all series need to be aligned to the same interval
+	// if we only combine some series with some other series, we don't want coarse series to needlessly coarsen higher resolution data
+
+	// 1) nodes-nil, total single-series -> align all to same interval
+	// 2) nodes-nil, total multi-series -> match up in pairs
+	// 3) nodes-nil, total nil (and not a float) -> align all together
+	// 4) nodes-non-nil, total nil -> divides groupwise
+	// 5) nodes non-nil, total serieslist -> divides groupwise
+
+	// note: we can't tell the difference between 1/2 up front, so we play it safe and don't align up front
+	// the only scenario where PNGroup is safe, is case 3
+	if s.totalSeries == nil && s.nodes == nil {
+		context.PNGroup = models.PNGroup(uintptr(unsafe.Pointer(s)))
+	} else {
+		context.PNGroup = 0
+	}
 	return context
 }
 

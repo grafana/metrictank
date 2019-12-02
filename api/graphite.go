@@ -661,7 +661,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
-	var reqs []models.Req
+	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
 	// note that different patterns to query can have different from / to, so they require different index lookups
@@ -686,7 +686,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 			if err != nil {
 				return nil, meta, err
 			}
-			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs), false)
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-int(reqs.cnt), false)
 		} else {
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		}
@@ -719,8 +719,8 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 					}
 
 					newReq := models.NewReq(
-						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
-					reqs = append(reqs, newReq)
+						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, r.MDP, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
+					reqs.Add(newReq, r.PNGroup)
 				}
 
 				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
@@ -739,31 +739,33 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	default:
 	}
 
-	reqRenderSeriesCount.Value(len(reqs))
-	if len(reqs) == 0 {
+	reqRenderSeriesCount.ValueUint32(reqs.cnt)
+	if reqs.cnt == 0 {
 		return nil, meta, nil
 	}
 
-	meta.RenderStats.SeriesFetch = uint32(len(reqs))
+	meta.RenderStats.SeriesFetch = reqs.cnt
 
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	var err error
-	reqs, meta.RenderStats.PointsFetch, meta.RenderStats.PointsReturn, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	var reqsList []models.Req
+	// TODO get rid of alignrequests and all "align" terminology
+	reqsList, meta.RenderStats.PointsFetch, meta.RenderStats.PointsReturn, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints)
 	if err != nil {
 		log.Errorf("HTTP Render alignReq error: %s", err.Error())
 		return nil, meta, err
 	}
 	span := opentracing.SpanFromContext(ctx)
-	span.SetTag("num_reqs", len(reqs))
+	span.SetTag("num_reqs", len(reqsList))
 	span.SetTag("points_fetch", meta.RenderStats.PointsFetch)
 	span.SetTag("points_return", meta.RenderStats.PointsReturn)
 
-	for _, req := range reqs {
+	for _, req := range reqsList {
 		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
 	}
 
 	a := time.Now()
-	out, err := s.getTargets(ctx, &meta.StorageStats, reqs)
+	out, err := s.getTargets(ctx, &meta.StorageStats, reqsList)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
 		return nil, meta, err

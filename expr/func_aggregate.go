@@ -2,6 +2,7 @@ package expr
 
 import (
 	"strings"
+	"unsafe"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
@@ -26,6 +27,7 @@ func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncAggregate) Context(context Context) Context {
+	context.PNGroup = PNGroup(uintptr(unsafe.Pointer(s)))
 	return context
 }
 
