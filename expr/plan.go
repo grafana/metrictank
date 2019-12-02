@@ -79,31 +79,28 @@ func (p Plan) Dump(w io.Writer) {
 // * validation of arguments
 // * allow functions to modify the Context (change data range or consolidation)
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
-func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan, error) {
-	var err error
-	var funcs []GraphiteFunc
+func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool) (Plan, error) {
+	plan := Plan{
+		exprs:         exprs,
+		MaxDataPoints: mdp,
+		From:          from,
+		To:            to,
+	}
 	for _, e := range exprs {
-		var fn GraphiteFunc
 		context := Context{
 			from:    from,
 			to:      to,
 			MDP:     mdp,
 			PNGroup: 0, // making this explicit here for easy code grepping
 		}
-		fn, reqs, err = newplan(e, context, stable, reqs)
+		fn, reqs, err := newplan(e, context, stable, plan.Reqs)
 		if err != nil {
 			return Plan{}, err
 		}
-		funcs = append(funcs, fn)
+		plan.Reqs = reqs
+		plan.funcs = append(plan.funcs, fn)
 	}
-	return Plan{
-		Reqs:          reqs,
-		exprs:         exprs,
-		funcs:         funcs,
-		MaxDataPoints: mdp,
-		From:          from,
-		To:            to,
-	}, nil
+	return plan, nil
 }
 
 // newplan adds requests as needed for the given expr, resolving function calls as needed
