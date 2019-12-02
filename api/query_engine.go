@@ -25,6 +25,8 @@ var (
 )
 
 // alignRequests updates the requests with all details for fetching, making sure all metrics are in the same, optimal interval
+// it chooses the highest resolution possible within ttl, but
+// subjects the request to the max-points-per-req-{soft,hard} settings (lowering resolution to meet the soft setting)
 // note: it is assumed that all requests have the same maxDataPoints, from & to.
 // also takes a "now" value which we compare the TTL against
 func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint32, uint32, error) {
@@ -132,7 +134,7 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 			}
 			if req.ArchInterval != interval {
 				// we have not been able to find an archive matching the desired output interval
-				// we will have to apply runtime consolidation
+				// we will have to apply normalization
 				// we use the initially found archive as starting point. there could be some cases - if you have exotic settings -
 				// where it may be more efficient to pick a lower res archive as starting point (it would still require an interval
 				// divisible by the output interval) but let's not worry about that edge case.
@@ -146,8 +148,10 @@ func alignRequests(now, from, to uint32, reqs []models.Req) ([]models.Req, uint3
 
 	pointsPerSerie := tsRange / interval
 	if reqs[0].MaxPoints > 0 && pointsPerSerie > reqs[0].MaxPoints {
+		// note that we don't assign to req.AggNum here, because that's only for normalization.
+		// MDP runtime consolidation doesn't look at req.AggNum
 		aggNum := consolidation.AggEvery(pointsPerSerie, reqs[0].MaxPoints)
-		pointsPerSerie = pointsPerSerie / aggNum
+		pointsPerSerie /= aggNum
 	}
 
 	pointsReturn := uint32(len(reqs)) * pointsPerSerie
