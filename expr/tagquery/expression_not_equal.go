@@ -24,7 +24,7 @@ func (e *expressionNotEqual) GetOperator() ExpressionOperator {
 }
 
 func (e *expressionNotEqual) GetOperatorCost() uint32 {
-	return 1
+	return 2
 }
 
 func (e *expressionNotEqual) RequiresNonEmptyValue() bool {

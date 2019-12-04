@@ -45,6 +45,7 @@ func NewTagQueryContext(query tagquery.Query) TagQueryContext {
 type expressionCost struct {
 	operatorCost  uint32
 	cardinality   uint32
+	metaTag       bool
 	expressionIdx int
 }
 
@@ -70,22 +71,42 @@ func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 			if expr.MatchesExactly() {
 				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
+				_, costs[i].metaTag = q.metaTagIndex[expr.GetKey()]
 			} else {
 				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index))
+
+				// if MetaTagIndex is disabled q.metaTagIndex is nil,
+				// so this will not loop at all
+				for tag := range q.metaTagIndex {
+					if expr.Matches(tag) {
+						costs[i].metaTag = true
+					}
+				}
 			}
 		} else {
 			if expr.MatchesExactly() {
 				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index[expr.GetKey()][expr.GetValue()]))
+				_, costs[i].metaTag = q.metaTagIndex[expr.GetKey()][expr.GetValue()]
 			} else {
 				costs[i].operatorCost = expr.GetOperatorCost()
 				costs[i].cardinality = uint32(len(q.index[expr.GetKey()]))
+				_, costs[i].metaTag = q.metaTagIndex[expr.GetKey()]
 			}
 		}
 	}
 
 	sort.Slice(costs, func(i, j int) bool {
+		// if one of the two is a meta tag, but the other isn't, then we always
+		// want to move the meta tag to the back
+		if costs[i].metaTag != costs[j].metaTag {
+			if costs[i].metaTag {
+				return false
+			}
+			return true
+		}
+
 		if costs[i].operatorCost == costs[j].operatorCost {
 			return costs[i].cardinality < costs[j].cardinality
 		}
