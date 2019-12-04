@@ -121,10 +121,48 @@ curl -H "X-Org-Id: 12345" "http://localhost:6060/render?target=statsd.fakesite.c
 
 #### Metadata
 
+The metadata of a render response (provided when `meta=true` is passed), includes:
+
 * response global performance measurements
 * series-specific lineage information describing storage-schemas, read archive, archive interval and any consolidation and normalization applied.
   note that explicit function calls like summarize are *not* considered runtime consolidation for this purpose.
 
+##### Response-global performance measurements
+
+| Key                                 | Description                                                                |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| executeplan.resolve-series.ms       | Time spent doing the (distributed) index query                             |
+| executeplan.get-targets.ms          | Time spent doing the (distributed) fetching of data                        |
+| executeplan.prepare-series.ms       | Time spent preparing for plan run. so merging, sorting of fetched series   |
+| executeplan.plan-run.ms             | Time spent executing all processing functions                              |
+| executeplan.series-fetch.count      | Number of series fetched                                                   |
+| executeplan.points-fetch.count      | Number of points fetched                                                   |
+| executeplan.points-return.count     | Number of points returned                                                  |
+| executeplan.cache-miss.count        | Number of cache misses (series with no useful chunks in cache)             |
+| executeplan.cache-hit-partial.count | Number of partial cache hits (series with some useful chunks in cache)     |
+| executeplan.cache-hit.count         | Number of full cache hits (series with all needed chunks in cache)         |
+| executeplan.chunks-from-tank.count  | Number of chunks loaded from tank                                          |
+| executeplan.chunks-from-cache.count | Number of chunks loaded from chunk cache                                   |
+| executeplan.chunks-from-store.count | Number of chunks loaded from data storage                                  |
+
+##### Series-specific lineage information
+
+Every output series comes with lineage information. The lineage information is one or more lineage sections.
+Each section describes a certain lineage, and the number of input series matching that lineage that were part
+of the corresponding output series.
+Each lineage section has these fields:
+
+| Key                    | Description                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| schema-name            | Name of the section in storage-schemas.conf                                                                    |
+| schema-retentions      | Retentions defined in storage-schemas.conf                                                                     |
+| archive-read           | Which archive was read as defined in the retentions. (0 means raw, 1 first rollup, etc)                        |
+| archive-interval       | The native interval of the archive that was read                                                               |
+| aggnum-norm            | If >1, number of points aggregated together per point, as part of normalization (series alignment)             |
+| aggnum-rc              | If >1, number of points aggregated together per output point, as part of runtime consolidation (MaxDataPoints) |
+| consolidator-normfetch | Consolidator used for normalization (if aggnum-norm > 1) and which rollup was read (if archive-read > 0)       |
+| consolidator-rc        | Consolidator used for runtime consolidation (MaxDataPoints) (if aggnum-rc > 1)                                 |
+| count                  | Number of input series matching this lineage that were part of this output series                              |
 
 
 ## Get Cluster Status
