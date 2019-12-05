@@ -360,7 +360,9 @@ func (k *KafkaMdm) trackStats(topic string, partition int32) {
 			kafkaStats.Lag.Set(lag)
 			k.lagMonitor.StoreOffsets(partition, currentOffset, newest, ts)
 			kafkaStats.Priority.Set(k.lagMonitor.GetPartitionPriority(partition))
-			kafkaStats.Ready.Set(cluster.Manager.IsReady())
+			if cluster.Manager != nil {
+				kafkaStats.Ready.Set(cluster.Manager.IsReady())
+			}
 		}
 	}
 }
