@@ -348,7 +348,7 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 		nameWithTags := def.NameWithTags()
 		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], def)
 		return true
-	}, bigtable.RowFilter(bigtable.FamilyFilter(COLUMN_FAMILY)))
+	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(COLUMN_FAMILY), bigtable.LatestNFilter(1))))
 	if err != nil {
 		log.Fatalf("bigtable-idx: failed to load defs from Bigtable. %s", err)
 	}
