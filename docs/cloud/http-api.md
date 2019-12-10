@@ -7,7 +7,8 @@ weight: 2
 
 The HTTP API is the same as that of Graphite, with the addition of ingestion, authentication and meta tags.
 
-First of all, there are two endpoints you will be talking to. They are provided in your grafana.com Hosted Metrics instance UI.
+First of all, there are two endpoints you will be talking to. They are provided on your grafana.com Hosted Metrics instance details page.
+
 They will look something like:
 
 * `<base_in>` : `https://tsdb-<id>.hosted-metrics.grafana.net/metrics`
