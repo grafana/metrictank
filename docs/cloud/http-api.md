@@ -11,8 +11,8 @@ First of all, there are two endpoints you will be talking to. They are provided 
 
 They will look something like:
 
-* `<base_in>` : `https://tsdb-<id>.hosted-metrics.grafana.net/metrics`
-* `<base_out>` : `https://tsdb-<id>.hosted-metrics.grafana.net/graphite`
+* `<base_in>` : `https://something.grafana.net/metrics`
+* `<base_out>` : `https://something.grafana.net/graphite`
 
 Furthermore, you will need to provision API keys to talk to the API. Each key will be of one of these types:
 
@@ -21,6 +21,49 @@ Furthermore, you will need to provision API keys to talk to the API. Each key wi
 * Editor
 * Admin
 
+API keys can be provisioned on your Grafana.com organisation page under "security > API Keys".
+
+## Authentication
+
+Authentication differs depending on whether your instance is provisioned on a dedicated or a shared cluster.
+How to tell the difference?
+On your Grafana.com instance details page, if your query and metrics endpoint look generic like this:
+
+```
+https://graphite-us-central1.grafana.net/graphite
+https://graphite-us-central1.grafana.net/metrics
+```
+
+Then you are on a shared cluster. However if your URL's look more like this:
+
+```
+https://tsdb-123-your-company-name.hosted-metrics.grafana.net/graphite
+https://tsdb-123-your-company-name.hosted-metrics.grafana.net/metrics
+```
+
+Then you are on a dedicated cluster.
+
+You have several ways to authenticate:
+
+* For dedicated clusters, any of these HTTP headers will work:
+
+```
+Authorization: Basic base64(api_key:<api key>)
+Authorization: Bearer <api key>
+Authorization: Bearer api_key:<api key>
+```
+
+* For shared clusters, use any of these HTTP headers:
+
+```
+Authorization: Basic base64(<instance id>:<api key>)
+Authorization: Bearer <instance id>:<api key>
+```
+
+Note that you can find the instance ID as the username in the "Using Grafana with Hosted Metrics" section of your Grafana.com instance details page
+
+So essentially you can use basic auth with username "api_key" (for dedicated clusters) or your instance ID (for shared clusters) and password the api key that you provisoned
+And you can also use a bearer token in "username:password" format (if username not specified, "api_key" is assumed)
 
 ## Common Request Parameters
 
@@ -60,7 +103,7 @@ The main entry point for any publisher to publish data to, be it [carbon-relay-n
 
 #### Headers
 
-* `Authorization: Bearer <api-key>` required
+* `Authorization:` header is required (see authentication section above)
 * `Content-Type`: supports 3 values:
   - `application/json`: the simplest one, and the one used here
   - `rt-metric-binary`: same datastructure, but messagepack encoded. (see [the MetricData Marshal/Encode methods](https://godoc.org/github.com/grafana/metrictank/schema#MetricData))
