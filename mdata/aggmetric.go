@@ -44,7 +44,6 @@ type AggMetric struct {
 	ingestFromT0    uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
-	lastSaveFinish  uint32 // last chunk T0 successfully written to Cassandra.
 	lastWrite       uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
 	firstTs         uint32 // timestamp of first point seen
 }
@@ -93,11 +92,6 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncChunkSaveState(ts uint32, sendPersist bool) ChunkSaveCallback {
 	return func() {
-		lastSaveFinish := atomic.LoadUint32(&a.lastSaveFinish)
-		if ts > lastSaveFinish {
-			atomic.StoreUint32(&a.lastSaveFinish, ts)
-		}
-
 		lastSaveStart := atomic.LoadUint32(&a.lastSaveStart)
 		if ts > lastSaveStart {
 			atomic.StoreUint32(&a.lastSaveStart, ts)
@@ -497,7 +491,6 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		a.lastWrite = uint32(time.Now().Unix())
 		if a.dropFirstChunk {
 			atomic.StoreUint32(&a.lastSaveStart, t0)
-			atomic.StoreUint32(&a.lastSaveFinish, t0)
 		}
 		a.addAggregators(ts, val)
 		return
