@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/cluster"
@@ -92,14 +93,16 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncChunkSaveState(ts uint32, sendPersist bool) ChunkSaveCallback {
 	return func() {
-		a.Lock()
-		if ts > a.lastSaveFinish {
-			a.lastSaveFinish = ts
+		lastSaveFinish := atomic.LoadUint32(&a.lastSaveFinish)
+		if ts > lastSaveFinish {
+			atomic.StoreUint32(&a.lastSaveFinish, ts)
 		}
-		if ts > a.lastSaveStart {
-			a.lastSaveStart = ts
+
+		lastSaveStart := atomic.LoadUint32(&a.lastSaveStart)
+		if ts > lastSaveStart {
+			atomic.StoreUint32(&a.lastSaveStart, ts)
 		}
-		a.Unlock()
+
 		log.Debugf("AM: metric %s at chunk T0=%d has been saved.", a.key, ts)
 		if sendPersist {
 			SendPersistMessage(a.key.String(), ts)
@@ -360,7 +363,8 @@ func (a *AggMetric) persist(pos int) {
 	chunk := a.chunks[pos]
 	pre := time.Now()
 
-	if a.lastSaveStart >= chunk.Series.T0 {
+	lastSaveStart := atomic.LoadUint32(&a.lastSaveStart)
+	if lastSaveStart >= chunk.Series.T0 {
 		// this can happen if
 		// a) there are 2 primary MT nodes both saving chunks to Cassandra
 		// b) a primary failed and this node was promoted to be primary but metric consuming is lagging.
@@ -391,7 +395,7 @@ func (a *AggMetric) persist(pos int) {
 		previousPos += len(a.chunks)
 	}
 	previousChunk := a.chunks[previousPos]
-	for (previousChunk.Series.T0 < chunk.Series.T0) && (a.lastSaveStart < previousChunk.Series.T0) {
+	for (previousChunk.Series.T0 < chunk.Series.T0) && (lastSaveStart < previousChunk.Series.T0) {
 		log.Debugf("AM: persist(): old chunk needs saving. Adding %s:%d to writeQueue", a.key, previousChunk.Series.T0)
 		cwr := NewChunkWriteRequest(
 			a.SyncChunkSaveState(previousChunk.Series.T0, true),
@@ -410,7 +414,7 @@ func (a *AggMetric) persist(pos int) {
 	}
 
 	// Every chunk with a T0 <= this chunks' T0 is now either saved, or in the writeQueue.
-	a.lastSaveStart = chunk.Series.T0
+	atomic.StoreUint32(&a.lastSaveStart, chunk.Series.T0)
 
 	log.Debugf("AM: persist(): sending %d chunks to write queue", len(pending))
 
@@ -492,8 +496,8 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		log.Debugf("AM: %s Add(): created first chunk with first point: %v", a.key, a.chunks[0])
 		a.lastWrite = uint32(time.Now().Unix())
 		if a.dropFirstChunk {
-			a.lastSaveStart = t0
-			a.lastSaveFinish = t0
+			atomic.StoreUint32(&a.lastSaveStart, t0)
+			atomic.StoreUint32(&a.lastSaveFinish, t0)
 		}
 		a.addAggregators(ts, val)
 		return
