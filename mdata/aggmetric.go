@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/metrictank/mdata/chunk"
 	mdataerrors "github.com/grafana/metrictank/mdata/errors"
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -92,10 +93,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncChunkSaveState(ts uint32, sendPersist bool) ChunkSaveCallback {
 	return func() {
-		lastSaveStart := atomic.LoadUint32(&a.lastSaveStart)
-		if ts > lastSaveStart {
-			atomic.StoreUint32(&a.lastSaveStart, ts)
-		}
+		util.AtomicallySwapIfLargerUint32(&a.lastSaveStart, ts)
 
 		log.Debugf("AM: metric %s at chunk T0=%d has been saved.", a.key, ts)
 		if sendPersist {
@@ -408,7 +406,7 @@ func (a *AggMetric) persist(pos int) {
 	}
 
 	// Every chunk with a T0 <= this chunks' T0 is now either saved, or in the writeQueue.
-	atomic.StoreUint32(&a.lastSaveStart, chunk.Series.T0)
+	util.AtomicallySwapIfLargerUint32(&a.lastSaveStart, chunk.Series.T0)
 
 	log.Debugf("AM: persist(): sending %d chunks to write queue", len(pending))
 
@@ -490,7 +488,7 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		log.Debugf("AM: %s Add(): created first chunk with first point: %v", a.key, a.chunks[0])
 		a.lastWrite = uint32(time.Now().Unix())
 		if a.dropFirstChunk {
-			atomic.StoreUint32(&a.lastSaveStart, t0)
+			util.AtomicallySwapIfLargerUint32(&a.lastSaveStart, t0)
 		}
 		a.addAggregators(ts, val)
 		return
