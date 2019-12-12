@@ -1,48 +1,18 @@
 ---
-title: Hosted Metrics - Graphite
-header: false
+title: HTTP API
+weight: 2
 ---
 
-# Hosted Metrics - Graphite
-
-Grafana Labs' Hosted metrics Graphite service offers a graphite-compatible monitoring backend as a service.
-It acts and behaves as a regular graphite datasource within Grafana (or other tools), but behind the scenes, it is a sophisticated platform run by a team of dedicated engineers.
-
-* [data ingestion](#data-ingestion)
-* [http api](#http-api)
-* [faq](#faq)
-
----
-
-## Data Ingestion
-
-We support:
-* [carbon-relay-ng](https://github.com/graphite-ng/carbon-relay-ng), which is a graphite carbon relay, which supports aggregations and sending data to our endpoint over a secure, robust transport.
-* custom tools that use our API. See our [golang, python and shell examples](https://github.com/grafana/hosted-metrics-sender-example)
-* direct carbon input. This is discouraged though, as it is not reliable over the internet and not secure.
-
-The recommended and most popular option is using carbon-relay-ng.
-Customers typically deploy using either of these 2 options:
-
-* run the relay as an extra component external to your existing graphite pipeline. Data can be directed to it from any existing carbon relay.
-* replace an existing carbon-relay with carbon-relay-ng
-
-If your Graphite stack does not currently contain any relay, then you can simply add carbon-relay-ng, have your clients (statsd, collectd, diamond, etc) send data to the relay, which in turn can send data to your existing graphite server *and* to our platform.
-
-When creating a Hosted Metrics Graphite instance, we provide a carbon-relay-ng config file that you can plug in and be ready to use out of the box.
-We also have Grafana Labs engineers ready to advise further on set up, if needed.
-
----
-
-## HTTP API
+# HTTP API
 
 The HTTP API is the same as that of Graphite, with the addition of ingestion, authentication and meta tags.
 
-First of all, there are two endpoints you will be talking to. They are provided in your grafana.com Hosted Metrics instance UI.
+First of all, there are two endpoints you will be talking to. They are provided on your grafana.com Hosted Metrics instance details page.
+
 They will look something like:
 
-* `<base_in>` : `https://tsdb-<id>.hosted-metrics.grafana.net/metrics`
-* `<base_out>` : `https://tsdb-<id>.hosted-metrics.grafana.net/graphite`
+* `<base_in>` : `https://something.grafana.net/metrics`
+* `<base_out>` : `https://something.grafana.net/graphite`
 
 Furthermore, you will need to provision API keys to talk to the API. Each key will be of one of these types:
 
@@ -51,6 +21,52 @@ Furthermore, you will need to provision API keys to talk to the API. Each key wi
 * Editor
 * Admin
 
+A "Viewer" key can only be used to execute queries, while a "MetricsPublisher" key can only be used to push metrics into the platform.  "Editor" and "Admin" keys can be used for both pushing metrics and performing queries.
+
+API keys can be provisioned on your Grafana.com organization page under "Security > API Keys".
+
+## Authentication
+
+Authentication differs depending on whether your instance is provisioned on a dedicated or a shared cluster.
+How to tell the difference?
+On your Grafana.com instance details page, if your query and metrics endpoint look generic like this:
+
+```
+https://graphite-us-central1.grafana.net/graphite
+https://graphite-us-central1.grafana.net/metrics
+```
+
+Then you are on a shared cluster. However if your URL's look more like this:
+
+```
+https://tsdb-123-your-company-name.hosted-metrics.grafana.net/graphite
+https://tsdb-123-your-company-name.hosted-metrics.grafana.net/metrics
+```
+
+Then you are on a dedicated cluster.
+
+You have several ways to authenticate:
+
+* For dedicated clusters, any of these HTTP headers will work:
+
+```
+Authorization: Basic base64(api_key:<api key>)
+Authorization: Bearer <api key>
+Authorization: Bearer api_key:<api key>
+```
+
+* For shared clusters, use any of these HTTP headers:
+
+```
+Authorization: Basic base64(<instance id>:<api key>)
+Authorization: Bearer <instance id>:<api key>
+```
+
+Note that you can find the instance ID as the username in the "Using Grafana with Hosted Metrics" section of your Grafana.com instance details page
+
+So essentially you can use basic auth with username "api_key" (for dedicated clusters) or your instance ID (for shared clusters) and password the api key that you provisoned
+
+You can also use a bearer token in "username:password" format (if username not specified, "api_key" is assumed)
 
 ## Common Request Parameters
 
@@ -90,7 +106,7 @@ The main entry point for any publisher to publish data to, be it [carbon-relay-n
 
 #### Headers
 
-* `Authorization: Bearer <api-key>` required
+* `Authorization:` header is required (see authentication section above)
 * `Content-Type`: supports 3 values:
   - `application/json`: the simplest one, and the one used here
   - `rt-metric-binary`: same datastructure, but messagepack encoded. (see [the MetricData Marshal/Encode methods](https://godoc.org/github.com/grafana/metrictank/schema#MetricData))
@@ -309,35 +325,3 @@ Data queried for must be stored under the given org or be public data (see [mult
 ```bash
 curl -H "Authorization: Bearer $key" "http://localhost:6060/render?target=statsd.fakesite.counters.session_start.*.count&from=3h&to=2h"
 ```
-
-
----
-
-## FAQ
-
-### Can I use tags?
-
-Yes, our platform supports graphite tags as well as [meta tags](https://grafana.com/blog/2019/04/09/metrictank-meta-tags/), allowing to add extra metadata tags your series.
-
-### Can I import my existing data?
-
-You can import pre-existing data into the hosted platform, from either a Graphite or metrictank installation.
-We either provide you with the tools and instructions, or if provided access, we offer this service for a hands-off experience.
-Grafana dashboards can also be imported if you choose to use a hosted Grafana instance.
-
-### How do I send data to the service?
-
-See [data ingestion](#data-ingestion)
-
-### How does this compare to stock graphite?
-
-The hosted platform is built on top of [metrictank](/oss/metrictank) and [graphite](/oss/graphite)
-Important differences with stock Graphite to be aware of:
-
-* support for meta tags
-* the platform is optimized for append-only workloads. While historical data can be imported, we generally don't support out of order writes.
-* timeseries can change resolution (interval) over time, they will be merged automatically.
-
-## Do I have to use hosted grafana or exclusively the hosted platform?
-
-No, the hosted platform is a datasource that you can use however you like. E.g. in combination with other datasources, and queried from any Grafana instance or other client.
