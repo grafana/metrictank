@@ -328,9 +328,19 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 	return
 }
 
+// bumpLastUpdate increases lastUpdate.
+// note:
+// * received point may be older than a previously received point, in which case the previous value was correct
+// * someone else may have just concurrently updated lastUpdate to a higher value than what we have, which we should restore
+// * by the time we look at the previous value and try to restore it, someone else may have updated it to a higher value
+// all these scenarios are unlikely but we should accommodate them anyway.
+func bumpLastUpdate(loc *int64, newVal int64) {
+	util.AtomicBumpInt64(loc, newVal)
+}
+
 // updates the partition and lastUpdate ts in an archive. Returns the previously set partition
 func updateExisting(existing *idx.Archive, partition int32, lastUpdate int64, pre time.Time) int32 {
-	util.AtomicallySwapIfLargerInt64(&existing.LastUpdate, lastUpdate)
+	bumpLastUpdate(&existing.LastUpdate, lastUpdate)
 
 	oldPart := atomic.SwapInt32(&existing.Partition, partition)
 	statUpdate.Inc()
@@ -902,7 +912,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		// cant be passed back to the caller (cassandraIdx,BigtableIdx).
 		// If the partition has changed, then the next datapoint will update
 		// the partition and notify the caller of the change.
-		util.AtomicallySwapIfLargerInt64(&existing.LastUpdate, archive.LastUpdate)
+		bumpLastUpdate(&existing.LastUpdate, archive.LastUpdate)
 		return
 	}
 
