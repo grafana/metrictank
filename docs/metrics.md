@@ -370,6 +370,9 @@ your (infrequent) updates.  Any points revcieved for a chunk that has already be
 * `tank.discarded.sample-out-of-order`:  
 points that go back in time beyond the scope of the optional reorder window.
 these points will end up being dropped and lost.
+* `tank.discarded.sample-too-far-ahead`:  
+points with a timestamp too far in the future, beyond the
+limitation of the future tolerance window defined via the retention.future-tolerance-ratio parameter
 * `tank.discarded.unknown`:  
 points that have been discarded for unknown reasons.
 * `tank.gc_metric`:  

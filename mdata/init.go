@@ -39,6 +39,10 @@ var (
 	// these points will end up being dropped and lost.
 	discardedSampleOutOfOrder = stats.NewCounterRate32("tank.discarded.sample-out-of-order")
 
+	// metric tank.discarded.sample-too-far-ahead is points with a timestamp too far in the future, beyond the
+	// limitation of the future tolerance window defined via the retention.future-tolerance-ratio parameter
+	discardedSampleTooFarAhead = stats.NewCounterRate32("tank.discarded.sample-too-far-ahead")
+
 	// metric tank.discarded.received-too-late is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
 	// this indicates that your GC is actively sealing chunks and saving them before you have the chance to send

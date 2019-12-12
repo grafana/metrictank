@@ -454,6 +454,8 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("AM: discarding metric <%d,%f>: timestamp is too far in the future, accepting timestamps up to %d seconds into the future", ts, val, a.futureTolerance)
 		}
+
+		discardedSampleTooFarAhead.Inc()
 		return
 	}
 
