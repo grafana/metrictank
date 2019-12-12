@@ -19,6 +19,7 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -334,11 +335,7 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 // * by the time we look at the previous value and try to restore it, someone else may have updated it to a higher value
 // all these scenarios are unlikely but we should accommodate them anyway.
 func bumpLastUpdate(loc *int64, newVal int64) {
-	prev := atomic.SwapInt64(loc, newVal)
-	for prev > newVal {
-		newVal = prev
-		prev = atomic.SwapInt64(loc, newVal)
-	}
+	util.AtomicBumpInt64(loc, newVal)
 }
 
 // updates the partition and lastUpdate ts in an archive. Returns the previously set partition
