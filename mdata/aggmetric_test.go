@@ -132,7 +132,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	chunkAddCount, chunkSpan := uint32(10), uint32(300)
 	rets := conf.MustParseRetentions("1s:1s:5min:5:true")
-	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), rets, 0, chunkSpan, nil, false, false, 0)
+	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), rets, 0, chunkSpan, nil, false, false, 0, 0)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -168,7 +168,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := conf.MustParseRetentions("1s:1s:2min:5:true")
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0))
+	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0, 0))
 
 	// chunk t0's: 120, 240, 360, 480, 600, 720, 840, 960
 
@@ -246,7 +246,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
 	ret := conf.MustParseRetentions("1s:1s:2min:5:true")
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, 1, &agg, false, false, 0))
+	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, 1, &agg, false, false, 0, 0))
 
 	// basic adds and verifies with test data
 	c.Add(121, 121)
@@ -284,7 +284,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
 	rets := conf.MustParseRetentions("1s:1s:10s:5:true")
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), rets, 0, 1, nil, false, true, 0)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), rets, 0, 1, nil, false, true, 0, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -312,7 +312,7 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	mockstore.Reset()
 	ingestFrom := int64(25)
 	ret := conf.MustParseRetentions("1s:1s:10s:5:true")
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, ingestFrom)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, ingestFrom, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -373,7 +373,7 @@ func TestGetAggregated(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Sum},
 	}
 
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, 0)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, 0, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -419,7 +419,7 @@ func TestGetAggregatedIngestFrom(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Sum},
 	}
 
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, ingestFrom)
+	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, ingestFrom, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -459,7 +459,7 @@ func BenchmarkAggMetricAdd(b *testing.B) {
 
 	// each chunk contains 180 points
 	rets := conf.MustParseRetentions("10s:1000000000s,30min:1")
-	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), rets, 0, 10, nil, false, false, 0)
+	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), rets, 0, 10, nil, false, false, 0, 0)
 
 	max := uint32(b.N*10 + 1)
 	for t := uint32(1); t < max; t += 10 {

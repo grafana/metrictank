@@ -41,6 +41,7 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	dropFirstChunk  bool
 	ingestFromT0    uint32
+	futureTolerance uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
 	lastSaveFinish  uint32 // last chunk T0 successfully written to Cassandra.
@@ -54,20 +55,21 @@ type AggMetric struct {
 // it's the callers responsibility to make sure agg is not nil in that case!
 // If reorderWindow is greater than 0, a reorder buffer is enabled. In that case data points with duplicate timestamps
 // the behavior is defined by reorderAllowUpdate
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64, futureTolerance uint32) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions.Rets[0]
 
 	m := AggMetric{
-		cachePusher:    cachePusher,
-		store:          store,
-		key:            key,
-		chunkSpan:      ret.ChunkSpan,
-		numChunks:      ret.NumChunks,
-		chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk: dropFirstChunk,
-		ttl:            uint32(ret.MaxRetention()),
+		cachePusher:     cachePusher,
+		store:           store,
+		key:             key,
+		chunkSpan:       ret.ChunkSpan,
+		numChunks:       ret.NumChunks,
+		chunks:          make([]*chunk.Chunk, 0, ret.NumChunks),
+		dropFirstChunk:  dropFirstChunk,
+		futureTolerance: futureTolerance,
+		ttl:             uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
@@ -443,6 +445,15 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// for example let's say a chunk starts at t0=3600 but we have 300-secondly aggregates
 		// that mean the aggregators need data from 3301 and onwards, because we aggregate 3301-3600 into a point with ts=3600
 		a.addAggregators(ts, val)
+		return
+	}
+
+	// need to check if ts > futureTolerance to prevent that we reject a datapoint
+	// because the ts value has wrapped around the uint32 boundary
+	if a.futureTolerance > 0 && ts > a.futureTolerance && int64(ts-a.futureTolerance) > time.Now().Unix() {
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("AM: discarding metric <%d,%f>: timestamp is too far in the future, accepting timestamps up to %d seconds into the future", ts, val, a.futureTolerance)
+		}
 		return
 	}
 

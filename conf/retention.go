@@ -31,6 +31,10 @@ func (r Retentions) Sub(pos int) Retentions {
 	}
 }
 
+func (r Retentions) MaxRetention() int {
+	return r.Rets[len(r.Rets)-1].MaxRetention()
+}
+
 func BuildFromRetentions(rets ...Retention) Retentions {
 	return Retentions{
 		Orig: buildOrigFromRetentions(rets),

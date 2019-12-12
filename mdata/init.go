@@ -84,8 +84,9 @@ var (
 	Aggregations conf.Aggregations
 	Schemas      conf.Schemas
 
-	schemasFile = "/etc/metrictank/storage-schemas.conf"
-	aggFile     = "/etc/metrictank/storage-aggregation.conf"
+	schemasFile          = "/etc/metrictank/storage-schemas.conf"
+	aggFile              = "/etc/metrictank/storage-aggregation.conf"
+	futureToleranceRatio = uint(10)
 
 	promActiveMetrics = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "metrictank",
@@ -104,6 +105,7 @@ func ConfigSetup() {
 	retentionConf := flag.NewFlagSet("retention", flag.ExitOnError)
 	retentionConf.StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
 	retentionConf.StringVar(&aggFile, "aggregations-file", "/etc/metrictank/storage-aggregation.conf", "path to storage-aggregation.conf file")
+	retentionConf.UintVar(&futureToleranceRatio, "future-tolerance-ratio", 10, "defines until how far in the future we accept datapoints. defined as a percentage fraction of the maxTTL of the matching retention storage schema")
 	globalconf.Register("retention", retentionConf, flag.ExitOnError)
 }
 

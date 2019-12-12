@@ -47,31 +47,31 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey,
 		case conf.Avg:
 			if aggregator.sumMetric == nil {
 				key.Archive = schema.NewArchive(schema.Sum, span)
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom, 0)
 			}
 			if aggregator.cntMetric == nil {
 				key.Archive = schema.NewArchive(schema.Cnt, span)
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.cntMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom, 0)
 			}
 		case conf.Sum:
 			if aggregator.sumMetric == nil {
 				key.Archive = schema.NewArchive(schema.Sum, span)
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom, 0)
 			}
 		case conf.Lst:
 			if aggregator.lstMetric == nil {
 				key.Archive = schema.NewArchive(schema.Lst, span)
-				aggregator.lstMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.lstMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom, 0)
 			}
 		case conf.Max:
 			if aggregator.maxMetric == nil {
 				key.Archive = schema.NewArchive(schema.Max, span)
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.maxMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom, 0)
 			}
 		case conf.Min:
 			if aggregator.minMetric == nil {
 				key.Archive = schema.NewArchive(schema.Min, span)
-				aggregator.minMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.minMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom, 0)
 			}
 		}
 	}

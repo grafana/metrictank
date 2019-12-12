@@ -151,6 +151,10 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 
 	agg := Aggregations.Get(aggId)
 	confSchema := Schemas.Get(schemaId)
+	var futureTolerance uint32
+	if futureToleranceRatio > 0 {
+		futureTolerance = uint32(confSchema.Retentions.MaxRetention()) * uint32(futureToleranceRatio) / 100
+	}
 
 	// if it wasn't there, get the write lock and prepare to add it
 	// but first we need to check again if someone has added it in
@@ -165,7 +169,7 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 		return m
 	}
 	ingestFrom := ms.ingestFrom[key.Org]
-	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, confSchema.ReorderAllowUpdate, ms.dropFirstChunk, ingestFrom)
+	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, confSchema.ReorderAllowUpdate, ms.dropFirstChunk, ingestFrom, futureTolerance)
 	ms.Metrics[key.Org][key.Key] = m
 	active := len(ms.Metrics[key.Org])
 	ms.Unlock()
