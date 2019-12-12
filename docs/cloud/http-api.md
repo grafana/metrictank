@@ -21,7 +21,9 @@ Furthermore, you will need to provision API keys to talk to the API. Each key wi
 * Editor
 * Admin
 
-API keys can be provisioned on your Grafana.com organisation page under "security > API Keys".
+A "Viewer" key can only be used to execute queries, while a "MetricsPublisher" key can only be used to push metrics into the platform.  "Editor" and "Admin" keys can be used for both pushing metrics and performing queries.
+
+API keys can be provisioned on your Grafana.com organization page under "Security > API Keys".
 
 ## Authentication
 
@@ -63,7 +65,8 @@ Authorization: Bearer <instance id>:<api key>
 Note that you can find the instance ID as the username in the "Using Grafana with Hosted Metrics" section of your Grafana.com instance details page
 
 So essentially you can use basic auth with username "api_key" (for dedicated clusters) or your instance ID (for shared clusters) and password the api key that you provisoned
-And you can also use a bearer token in "username:password" format (if username not specified, "api_key" is assumed)
+
+You can also use a bearer token in "username:password" format (if username not specified, "api_key" is assumed)
 
 ## Common Request Parameters
 
