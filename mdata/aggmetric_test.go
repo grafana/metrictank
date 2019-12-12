@@ -334,6 +334,38 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	}
 }
 
+// TestAggMetricFutureTolerance tests whether the future tolerance limit works correctly
+// there is a race condition because it depends on the return value of time.Now().Unix(),
+// realistically it should never fail due to that race condition unless it executes
+// unreasonably slow.
+func TestAggMetricFutureTolerance(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(true)
+	mockstore.Reset()
+	ret := conf.MustParseRetentions("1s:1s:10s:5:true")
+	aggMetricLimited := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0, 60)
+	aggMetricUnlimited := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0, 0)
+
+	// add datapoint which is 90 seconds in the future
+	// the limited aggmetric should not accept it because it is more than 60 seconds in the future
+	// the unlimited aggmetric should accept it because there is no limit
+	aggMetricLimited.Add(uint32(time.Now().Unix()+90), 10)
+	aggMetricUnlimited.Add(uint32(time.Now().Unix()+90), 10)
+	if len(aggMetricLimited.chunks) != 0 {
+		t.Fatalf("expected to have no chunks in limited aggmetric, but there were %d", len(aggMetricLimited.chunks))
+	}
+	if len(aggMetricUnlimited.chunks) != 1 {
+		t.Fatalf("expected to have 1 chunk in the unlimited aggmetric, but there were %d", len(aggMetricUnlimited.chunks))
+	}
+
+	// add datapoint where the timestamp is now
+	// the limited aggmetric should accept this one, because it only rejects datapoints from at least 60 seconds in the future
+	aggMetricLimited.Add(uint32(time.Now().Unix()), 10)
+	if len(aggMetricLimited.chunks) != 1 {
+		t.Fatalf("expected to have 1 chunk in the limited aggmetric, but there were %d", len(aggMetricLimited.chunks))
+	}
+}
+
 func itersToPoints(iters []tsz.Iter) []schema.Point {
 	var points []schema.Point
 	for _, it := range iters {
