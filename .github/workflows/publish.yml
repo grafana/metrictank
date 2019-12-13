@@ -5,7 +5,7 @@ on:
     branches:
     - master
     paths:
-    - 'docs/sources/**'
+    - 'docs/cloud/**'
 
 jobs:
   build:
@@ -19,11 +19,11 @@ jobs:
       id: publish
       with:
         repository: grafana/website
-        branch: docs-hosted-metrics-api
+        branch: docs-cloud-graphite
         host: github.com
         github_pat: '${{ secrets.GH_BOT_ACCESS_TOKEN }}'
-        source_folder: docs/sources
-        target_folder: content/docs/hosted-metrics-api/latest
+        source_folder: docs/cloud
+        target_folder: content/docs/cloud-graphite
     - shell: bash
       run: |
         test -n "${{ steps.publish.outputs.commit_hash }}"
