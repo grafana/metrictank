@@ -220,7 +220,9 @@ create-cf = true
 schemas-file = /etc/metrictank/storage-schemas.conf
 # path to storage-aggregation.conf file
 aggregations-file = /etc/metrictank/storage-aggregation.conf
-# defines until how far in the future we accept datapoints. defined as a percentage fraction of the maxTTL of the matching retention storage schema
+# enables/disables the enforcement of the future tolerance limitation
+enforce-future-tolerance = true
+# defines until how far in the future we accept datapoints. defined as a percentage fraction of the raw ttl of the matching retention storage schema
 future-tolerance-ratio = 10
 ```
 

@@ -98,7 +98,6 @@ func TestAggMetricsGetOrCreate(t *testing.T) {
 		t.Fatalf("Expected GetOrCreate to return twice the same metric for the same key")
 	}
 
-	// verify that disabling future tolerance limitation works
 	futureToleranceRatio = 0
 	testKey2, _ := schema.AMKeyFromString("1.12345678901234567890123456789013")
 	metric3 := aggMetrics.GetOrCreate(testKey2.MKey, 1, 0, 10).(*AggMetric)

@@ -55,7 +55,7 @@ type AggMetric struct {
 // it's the callers responsibility to make sure agg is not nil in that case!
 // If reorderWindow is greater than 0, a reorder buffer is enabled. In that case data points with duplicate timestamps
 // the behavior is defined by reorderAllowUpdate
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64, futureTolerance uint32) *AggMetric {
+func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions.Rets[0]
@@ -68,7 +68,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		numChunks:       ret.NumChunks,
 		chunks:          make([]*chunk.Chunk, 0, ret.NumChunks),
 		dropFirstChunk:  dropFirstChunk,
-		futureTolerance: futureTolerance,
+		futureTolerance: uint32(ret.MaxRetention()) * uint32(futureToleranceRatio) / 100,
 		ttl:             uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
@@ -450,13 +450,15 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 
 	// need to check if ts > futureTolerance to prevent that we reject a datapoint
 	// because the ts value has wrapped around the uint32 boundary
-	if a.futureTolerance > 0 && ts > a.futureTolerance && int64(ts-a.futureTolerance) > time.Now().Unix() {
-		if log.IsLevelEnabled(log.DebugLevel) {
-			log.Debugf("AM: discarding metric <%d,%f>: timestamp is too far in the future, accepting timestamps up to %d seconds into the future", ts, val, a.futureTolerance)
-		}
-
+	if ts > a.futureTolerance && int64(ts-a.futureTolerance) > time.Now().Unix() {
 		discardedSampleTooFarAhead.Inc()
-		return
+
+		if enforceFutureTolerance {
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("AM: discarding metric <%d,%f>: timestamp is too far in the future, accepting timestamps up to %d seconds into the future", ts, val, a.futureTolerance)
+			}
+			return
+		}
 	}
 
 	a.Lock()
