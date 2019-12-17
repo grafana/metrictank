@@ -10,7 +10,7 @@
   To predict whether Metrictank would drop incoming data points once the enforcement is turned on,
   the metric `tank.sample-too-far-ahead` can be used, this metric counts the data points which
   would be dropped if the enforcement were turned on while it is off.
-  PR: https://github.com/grafana/metrictank/pull/1572
+  #1572 
   
 # v0.13.1: Meta tag and http api improvements, lineage metadata, per partition metrics and more. Nov 28, 2019.
 
