@@ -43,6 +43,7 @@ type AggMetric struct {
 	aggregators     []*Aggregator
 	dropFirstChunk  bool
 	ingestFromT0    uint32
+	futureTolerance uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
 	lastWrite       uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
@@ -61,14 +62,15 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 	ret := retentions.Rets[0]
 
 	m := AggMetric{
-		cachePusher:    cachePusher,
-		store:          store,
-		key:            key,
-		chunkSpan:      ret.ChunkSpan,
-		numChunks:      ret.NumChunks,
-		chunks:         make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk: dropFirstChunk,
-		ttl:            uint32(ret.MaxRetention()),
+		cachePusher:     cachePusher,
+		store:           store,
+		key:             key,
+		chunkSpan:       ret.ChunkSpan,
+		numChunks:       ret.NumChunks,
+		chunks:          make([]*chunk.Chunk, 0, ret.NumChunks),
+		dropFirstChunk:  dropFirstChunk,
+		futureTolerance: uint32(ret.MaxRetention()) * uint32(futureToleranceRatio) / 100,
+		ttl:             uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
 		lastWrite: uint32(time.Now().Unix()),
@@ -440,6 +442,22 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// that mean the aggregators need data from 3301 and onwards, because we aggregate 3301-3600 into a point with ts=3600
 		a.addAggregators(ts, val)
 		return
+	}
+
+	// need to check if ts > futureTolerance to prevent that we reject a datapoint
+	// because the ts value has wrapped around the uint32 boundary
+	if ts > a.futureTolerance && int64(ts-a.futureTolerance) > time.Now().Unix() {
+		sampleTooFarAhead.Inc()
+
+		if enforceFutureTolerance {
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("AM: discarding metric <%d,%f>: timestamp is too far in the future, accepting timestamps up to %d seconds into the future", ts, val, a.futureTolerance)
+			}
+
+			discardedSampleTooFarAhead.Inc()
+			PromDiscardedSamples.WithLabelValues(tooFarAhead, strconv.Itoa(int(a.key.MKey.Org))).Inc()
+			return
+		}
 	}
 
 	a.Lock()

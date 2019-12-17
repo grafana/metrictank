@@ -20,6 +20,7 @@ const (
 	sampleOutOfOrder     = "sample-out-of-order"
 	receivedTooLate      = "received-too-late"
 	newValueForTimestamp = "new-value-for-timestamp"
+	tooFarAhead          = "too-far-in-future"
 )
 
 var (
@@ -38,6 +39,17 @@ var (
 	// metric tank.discarded.sample-out-of-order is points that go back in time beyond the scope of the optional reorder window.
 	// these points will end up being dropped and lost.
 	discardedSampleOutOfOrder = stats.NewCounterRate32("tank.discarded.sample-out-of-order")
+
+	// metric tank.discarded.sample-too-far-ahead is count of points which got discareded because their timestamp
+	// is too far in the future, beyond the limitation of the future tolerance window defined via the
+	// retention.future-tolerance-ratio parameter.
+	discardedSampleTooFarAhead = stats.NewCounterRate32("tank.discarded.sample-too-far-ahead")
+
+	// metric tank.sample-too-far-ahead is count of points with a timestamp which is too far in the future,
+	// beyond the limitation of the future tolerance window defined via the retention.future-tolerance-ratio
+	// parameter. it also gets increased if the enforcement of the future tolerance is disabled, this is
+	// useful for prediciting whether data points would get rejected once enforcement gets turned on.
+	sampleTooFarAhead = stats.NewCounterRate32("tank.sample-too-far-ahead")
 
 	// metric tank.discarded.received-too-late is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.
@@ -84,8 +96,10 @@ var (
 	Aggregations conf.Aggregations
 	Schemas      conf.Schemas
 
-	schemasFile = "/etc/metrictank/storage-schemas.conf"
-	aggFile     = "/etc/metrictank/storage-aggregation.conf"
+	schemasFile            = "/etc/metrictank/storage-schemas.conf"
+	aggFile                = "/etc/metrictank/storage-aggregation.conf"
+	futureToleranceRatio   = uint(10)
+	enforceFutureTolerance = true
 
 	promActiveMetrics = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "metrictank",
@@ -104,6 +118,8 @@ func ConfigSetup() {
 	retentionConf := flag.NewFlagSet("retention", flag.ExitOnError)
 	retentionConf.StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
 	retentionConf.StringVar(&aggFile, "aggregations-file", "/etc/metrictank/storage-aggregation.conf", "path to storage-aggregation.conf file")
+	retentionConf.UintVar(&futureToleranceRatio, "future-tolerance-ratio", 10, "defines until how far in the future we accept datapoints. defined as a percentage fraction of the raw ttl of the matching retention storage schema")
+	retentionConf.BoolVar(&enforceFutureTolerance, "enforce-future-tolerance", true, "enables/disables the enforcement of the future tolerance limitation")
 	globalconf.Register("retention", retentionConf, flag.ExitOnError)
 }
 

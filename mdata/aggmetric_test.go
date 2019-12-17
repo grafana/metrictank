@@ -334,6 +334,109 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	}
 }
 
+// TestAggMetricFutureTolerance tests whether the future tolerance limit works correctly
+// there is a race condition because it depends on the return value of time.Now().Unix(),
+// realistically it should never fail due to that race condition unless it executes
+// unreasonably slow.
+func TestAggMetricFutureTolerance(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetPrimary(true)
+	mockstore.Reset()
+	ret := conf.MustParseRetentions("1s:10m:6h:5:true")
+
+	_futureToleranceRatio := futureToleranceRatio
+	_enforceFutureTolerance := enforceFutureTolerance
+	discardedSampleTooFarAhead.SetUint32(0)
+	sampleTooFarAhead.SetUint32(0)
+	defer func() {
+		futureToleranceRatio = _futureToleranceRatio
+		enforceFutureTolerance = _enforceFutureTolerance
+		discardedSampleTooFarAhead.SetUint32(0)
+		sampleTooFarAhead.SetUint32(0)
+	}()
+
+	// with a raw retention of 600s, this will result in a future tolerance of 60s
+	futureToleranceRatio = 10
+	aggMetricTolerate60 := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+
+	// will not tolerate future datapoints at all
+	futureToleranceRatio = 0
+	aggMetricTolerate0 := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+
+	// add datapoint which is 30 seconds in the future to both aggmetrics, they should both accept it
+	// because enforcement of future tolerance is disabled, but the one with tolerance 0 should increase
+	// the counter of data points that would have been rejected
+	enforceFutureTolerance = false
+	aggMetricTolerate60.Add(uint32(time.Now().Unix()+30), 10)
+	if len(aggMetricTolerate60.chunks) != 1 {
+		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate60.chunks))
+	}
+	if sampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 0, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
+	}
+
+	aggMetricTolerate0.Add(uint32(time.Now().Unix()+30), 10)
+	if len(aggMetricTolerate0.chunks) != 1 {
+		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate0.chunks))
+	}
+	if sampleTooFarAhead.Peek() != 1 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 1, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
+	}
+
+	// enable the enforcement of the future tolerance limit and re-initialize the two agg metrics
+	// then add a data point with time stamp 30 sec in the future to both aggmetrics again.
+	// this time only the one that tolerates up to 60 secs should accept the datapoint.
+	discardedSampleTooFarAhead.SetUint32(0)
+	sampleTooFarAhead.SetUint32(0)
+	enforceFutureTolerance = true
+	futureToleranceRatio = 10
+	aggMetricTolerate60 = NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+	futureToleranceRatio = 0
+	aggMetricTolerate0 = NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+
+	aggMetricTolerate60.Add(uint32(time.Now().Unix()+30), 10)
+	if len(aggMetricTolerate60.chunks) != 1 {
+		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate60.chunks))
+	}
+	if sampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 0, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
+	}
+
+	aggMetricTolerate0.Add(uint32(time.Now().Unix()+30), 10)
+	if len(aggMetricTolerate0.chunks) != 0 {
+		t.Fatalf("expected to have 0 chunks in aggmetric, but there were %d", len(aggMetricTolerate0.chunks))
+	}
+	if sampleTooFarAhead.Peek() != 1 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 1, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 1 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 1, but it was %d", discardedSampleTooFarAhead.Peek())
+	}
+
+	// add another datapoint with timestamp of now() to the aggmetric tolerating 0, should be accepted
+	discardedSampleTooFarAhead.SetUint32(0)
+	sampleTooFarAhead.SetUint32(0)
+	aggMetricTolerate0.Add(uint32(time.Now().Unix()), 10)
+	if len(aggMetricTolerate0.chunks) != 1 {
+		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate0.chunks))
+	}
+	if sampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 0, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
+	}
+}
+
 func itersToPoints(iters []tsz.Iter) []schema.Point {
 	var points []schema.Point
 	for _, it := range iters {
