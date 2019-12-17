@@ -1,3 +1,17 @@
+# master
+
+## breaking changes
+
+* as of v0.13.1-38-gb88c3b84 by default we reject data points with a timestamp far in the future.
+  By default the cutoff is at 10% of the raw retention's TTL, so for example with the default
+  storage schema `1s:35d:10min:7` the cutoff is at `35d*0.1=3.5d`. 
+  The limit can be configured by using the parameter `retention.future-tolerance-ratio`, or it can
+  be completely disabled by using the parameter `retention.enforce-future-tolerance`. 
+  To predict whether Metrictank would drop incoming data points once the enforcement is turned on,
+  the metric `tank.sample-too-far-ahead` can be used, this metric counts the data points which
+  would be dropped if the enforcement were turned on while it is off.
+  PR: https://github.com/grafana/metrictank/pull/1572
+  
 # v0.13.1: Meta tag and http api improvements, lineage metadata, per partition metrics and more. Nov 28, 2019.
 
 ## meta tags
@@ -53,14 +67,6 @@
 
 ## breaking changes
 
-* as of v0.13.1-38-gb88c3b84 by default we reject data points with a timestamp far in the future.
-  By default the cutoff is at 10% of the raw retention's TTL, so for example with the default
-  storage schema `1s:35d:10min:7` the cutoff is at `35d*0.1=3.5d`. 
-  The limit can be configured by using the parameter `retention.future-tolerance-ratio`, or it can
-  be completely disabled by using the parameter `retention.enforce-future-tolerance`. 
-  To predict whether Metrictank would drop incoming data points once the enforcement is turned on,
-  the metric `tank.sample-too-far-ahead` can be used, this metric counts the data points which
-  would be dropped if the enforcement were turned on while it is off.
 * as of v0.13.0-160-gd2703083 the default setting for `memory-idx.tag-query-workers` is `5` instead of `50`.
   If a user still has the value `50` in their config file we recommend decreasing that, because due to how
   meta tag queries get processed MT may now create multiple pools of workers concurrently to process a single
