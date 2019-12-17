@@ -371,9 +371,9 @@ your (infrequent) updates.  Any points revcieved for a chunk that has already be
 points that go back in time beyond the scope of the optional reorder window.
 these points will end up being dropped and lost.
 * `tank.discarded.sample-too-far-ahead`:  
-points with a timestamp too far in the future, beyond the
-limitation of the future tolerance window defined via the retention.future-tolerance-ratio parameter.
-if enforcement of this limit is disabled, this metric still counts how many data points would get rejected.
+count of points which got discareded because their timestamp
+is too far in the future, beyond the limitation of the future tolerance window defined via the
+retention.future-tolerance-ratio parameter.
 * `tank.discarded.unknown`:  
 points that have been discarded for unknown reasons.
 * `tank.gc_metric`:  
@@ -388,6 +388,11 @@ ts is not older than the 60th datapoint counting from the newest.
 * `tank.persist`:  
 how long it takes to persist a chunk (and chunks preceding it)
 this is subject to backpressure from the store when the store's queue runs full
+* `tank.sample-too-far-ahead`:  
+count of points with a timestamp which is too far in the future,
+beyond the limitation of the future tolerance window defined via the retention.future-tolerance-ratio
+parameter. it also gets increased if the enforcement of the future tolerance is disabled, this is
+useful for prediciting whether data points would get rejected once enforcement gets turned on.
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
 * `version.%s`:  

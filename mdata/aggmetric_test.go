@@ -347,10 +347,12 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 	_futureToleranceRatio := futureToleranceRatio
 	_enforceFutureTolerance := enforceFutureTolerance
 	discardedSampleTooFarAhead.SetUint32(0)
+	sampleTooFarAhead.SetUint32(0)
 	defer func() {
 		futureToleranceRatio = _futureToleranceRatio
 		enforceFutureTolerance = _enforceFutureTolerance
 		discardedSampleTooFarAhead.SetUint32(0)
+		sampleTooFarAhead.SetUint32(0)
 	}()
 
 	// with a raw retention of 600s, this will result in a future tolerance of 60s
@@ -369,6 +371,9 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 	if len(aggMetricTolerate60.chunks) != 1 {
 		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate60.chunks))
 	}
+	if sampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 0, but it was %d", sampleTooFarAhead.Peek())
+	}
 	if discardedSampleTooFarAhead.Peek() != 0 {
 		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
 	}
@@ -377,14 +382,18 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 	if len(aggMetricTolerate0.chunks) != 1 {
 		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate0.chunks))
 	}
-	if discardedSampleTooFarAhead.Peek() != 1 {
-		t.Fatalf("expected the discardedSampleTooFarAhead count to be 1, but it was %d", discardedSampleTooFarAhead.Peek())
+	if sampleTooFarAhead.Peek() != 1 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 1, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
 	}
 
 	// enable the enforcement of the future tolerance limit and re-initialize the two agg metrics
 	// then add a data point with time stamp 30 sec in the future to both aggmetrics again.
 	// this time only the one that tolerates up to 60 secs should accept the datapoint.
 	discardedSampleTooFarAhead.SetUint32(0)
+	sampleTooFarAhead.SetUint32(0)
 	enforceFutureTolerance = true
 	futureToleranceRatio = 10
 	aggMetricTolerate60 = NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
@@ -395,6 +404,9 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 	if len(aggMetricTolerate60.chunks) != 1 {
 		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate60.chunks))
 	}
+	if sampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 0, but it was %d", sampleTooFarAhead.Peek())
+	}
 	if discardedSampleTooFarAhead.Peek() != 0 {
 		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
 	}
@@ -403,17 +415,25 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 	if len(aggMetricTolerate0.chunks) != 0 {
 		t.Fatalf("expected to have 0 chunks in aggmetric, but there were %d", len(aggMetricTolerate0.chunks))
 	}
+	if sampleTooFarAhead.Peek() != 1 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 1, but it was %d", sampleTooFarAhead.Peek())
+	}
 	if discardedSampleTooFarAhead.Peek() != 1 {
 		t.Fatalf("expected the discardedSampleTooFarAhead count to be 1, but it was %d", discardedSampleTooFarAhead.Peek())
 	}
 
 	// add another datapoint with timestamp of now() to the aggmetric tolerating 0, should be accepted
+	discardedSampleTooFarAhead.SetUint32(0)
+	sampleTooFarAhead.SetUint32(0)
 	aggMetricTolerate0.Add(uint32(time.Now().Unix()), 10)
 	if len(aggMetricTolerate0.chunks) != 1 {
 		t.Fatalf("expected to have 1 chunk in aggmetric, but there were %d", len(aggMetricTolerate0.chunks))
 	}
-	if discardedSampleTooFarAhead.Peek() != 1 {
-		t.Fatalf("expected the discardedSampleTooFarAhead count to be 1, but it was %d", discardedSampleTooFarAhead.Peek())
+	if sampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the sampleTooFarAhead count to be 0, but it was %d", sampleTooFarAhead.Peek())
+	}
+	if discardedSampleTooFarAhead.Peek() != 0 {
+		t.Fatalf("expected the discardedSampleTooFarAhead count to be 0, but it was %d", discardedSampleTooFarAhead.Peek())
 	}
 }
 

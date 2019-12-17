@@ -20,6 +20,7 @@ const (
 	sampleOutOfOrder     = "sample-out-of-order"
 	receivedTooLate      = "received-too-late"
 	newValueForTimestamp = "new-value-for-timestamp"
+	tooFarAhead          = "too-far-in-future"
 )
 
 var (
@@ -39,10 +40,16 @@ var (
 	// these points will end up being dropped and lost.
 	discardedSampleOutOfOrder = stats.NewCounterRate32("tank.discarded.sample-out-of-order")
 
-	// metric tank.discarded.sample-too-far-ahead is points with a timestamp too far in the future, beyond the
-	// limitation of the future tolerance window defined via the retention.future-tolerance-ratio parameter.
-	// if enforcement of this limit is disabled, this metric still counts how many data points would get rejected.
+	// metric tank.discarded.sample-too-far-ahead is count of points which got discareded because their timestamp
+	// is too far in the future, beyond the limitation of the future tolerance window defined via the
+	// retention.future-tolerance-ratio parameter.
 	discardedSampleTooFarAhead = stats.NewCounterRate32("tank.discarded.sample-too-far-ahead")
+
+	// metric tank.sample-too-far-ahead is count of points with a timestamp which is too far in the future,
+	// beyond the limitation of the future tolerance window defined via the retention.future-tolerance-ratio
+	// parameter. it also gets increased if the enforcement of the future tolerance is disabled, this is
+	// useful for prediciting whether data points would get rejected once enforcement gets turned on.
+	sampleTooFarAhead = stats.NewCounterRate32("tank.sample-too-far-ahead")
 
 	// metric tank.discarded.received-too-late is points received for the most recent chunk
 	// when that chunk is already being "closed", ie the end-of-stream marker has been written to the chunk.

@@ -451,15 +451,15 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 	// need to check if ts > futureTolerance to prevent that we reject a datapoint
 	// because the ts value has wrapped around the uint32 boundary
 	if ts > a.futureTolerance && int64(ts-a.futureTolerance) > time.Now().Unix() {
-		// we increase this counter in any case, even if the enforcement of the future tolerance
-		// is disabled. this is useful to predict whether data points would get rejected once
-		// the feature gets enabled.
-		discardedSampleTooFarAhead.Inc()
+		sampleTooFarAhead.Inc()
 
 		if enforceFutureTolerance {
 			if log.IsLevelEnabled(log.DebugLevel) {
 				log.Debugf("AM: discarding metric <%d,%f>: timestamp is too far in the future, accepting timestamps up to %d seconds into the future", ts, val, a.futureTolerance)
 			}
+
+			discardedSampleTooFarAhead.Inc()
+			PromDiscardedSamples.WithLabelValues(tooFarAhead, strconv.Itoa(int(a.key.MKey.Org))).Inc()
 			return
 		}
 	}
