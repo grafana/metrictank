@@ -533,7 +533,12 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 		if len(b) < 2 {
 			return itgens, errChunkTooSmall
 		}
-		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, b)
+		// due to changes in gocql we need to manually copy the []byte before
+		// creating an itergen
+		// reference: https://github.com/gocql/gocql/pull/1167
+		copiedBytes := make([]byte, len(b))
+		copy(copiedBytes, b)
+		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, copiedBytes)
 		if err != nil {
 			return itgens, err
 		}
