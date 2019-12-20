@@ -533,7 +533,10 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 		if len(b) < 2 {
 			return itgens, errChunkTooSmall
 		}
-		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, b)
+		// As 'b' is re-used for each scan, we need to make a copy of the []byte slice before assigning it to a new IterGen.
+		safeBytes := make([]byte, len(b))
+		copy(safeBytes, b)
+		itgen, err := chunk.NewIterGen(uint32(t0), intervalHint, safeBytes)
 		if err != nil {
 			return itgens, err
 		}

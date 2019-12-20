@@ -280,8 +280,10 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, sourceSession, destS
 			if *verbose {
 				log.Printf("id=%d processing rownum=%d table=%q key=%q ts=%d query=%q data='%x'\n", id, atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, query, data)
 			}
-
-			batch.Query(insertQuery, data, key, ts, ttl)
+			// As 'data' is re-used for each scan, we need to make a copy of the []byte slice before assigning it to a new batch.
+			safeData := make([]byte, len(data))
+			copy(safeData, data)
+			batch.Query(insertQuery, safeData, key, ts, ttl)
 
 			if batch.Size() >= *maxBatchSize {
 				if *verbose {

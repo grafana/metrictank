@@ -5,6 +5,7 @@
 package gocql
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,12 +13,18 @@ import (
 	"net"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 )
 
 type unsetColumn struct{}
 
+// UnsetValue represents a value used in a query binding that will be ignored by Cassandra.
+//
+// By setting a field to the unset value Cassandra will ignore the write completely.
+// The main advantage is the ability to keep the same prepared statement even when you don't
+// want to update some fields, where before you needed to make another prepared statement.
+//
+// UnsetValue is only available when using the version 4 of the protocol.
 var UnsetValue = unsetColumn{}
 
 type namedValue struct {
@@ -40,6 +47,7 @@ const (
 	protoVersion2      = 0x02
 	protoVersion3      = 0x03
 	protoVersion4      = 0x04
+	protoVersion5      = 0x05
 
 	maxFrameSize = 256 * 1024 * 1024
 )
@@ -149,12 +157,17 @@ const (
 	flagWithSerialConsistency byte = 0x10
 	flagDefaultTimestamp      byte = 0x20
 	flagWithNameValues        byte = 0x40
+	flagWithKeyspace          byte = 0x80
+
+	// prepare flags
+	flagWithPreparedKeyspace uint32 = 0x01
 
 	// header flags
 	flagCompress      byte = 0x01
 	flagTracing       byte = 0x02
 	flagCustomPayload byte = 0x04
 	flagWarning       byte = 0x08
+	flagBetaProtocol  byte = 0x10
 )
 
 type Consistency uint16
@@ -319,13 +332,12 @@ func readShort(p []byte) uint16 {
 }
 
 type frameHeader struct {
-	version       protoVersion
-	flags         byte
-	stream        int
-	op            frameOp
-	length        int
-	customPayload map[string][]byte
-	warnings      []string
+	version  protoVersion
+	flags    byte
+	stream   int
+	op       frameOp
+	length   int
+	warnings []string
 }
 
 func (f frameHeader) String() string {
@@ -338,13 +350,32 @@ func (f frameHeader) Header() frameHeader {
 
 const defaultBufSize = 128
 
-var framerPool = sync.Pool{
-	New: func() interface{} {
-		return &framer{
-			wbuf:       make([]byte, defaultBufSize),
-			readBuffer: make([]byte, defaultBufSize),
-		}
-	},
+type ObservedFrameHeader struct {
+	Version protoVersion
+	Flags   byte
+	Stream  int16
+	Opcode  frameOp
+	Length  int32
+
+	// StartHeader is the time we started reading the frame header off the network connection.
+	Start time.Time
+	// EndHeader is the time we finished reading the frame header off the network connection.
+	End time.Time
+
+	// Host is Host of the connection the frame header was read from.
+	Host *HostInfo
+}
+
+func (f ObservedFrameHeader) String() string {
+	return fmt.Sprintf("[observed header version=%s flags=0x%x stream=%d op=%s length=%d]", f.Version, f.Flags, f.Stream, f.Opcode, f.Length)
+}
+
+// FrameHeaderObserver is the interface implemented by frame observers / stat collectors.
+//
+// Experimental, this interface and use may change
+type FrameHeaderObserver interface {
+	// ObserveFrameHeader gets called on every received frame header.
+	ObserveFrameHeader(context.Context, ObservedFrameHeader)
 }
 
 // a framer is responsible for reading, writing and parsing frames on a single stream
@@ -369,13 +400,21 @@ type framer struct {
 
 	rbuf []byte
 	wbuf []byte
+
+	customPayload map[string][]byte
 }
 
 func newFramer(r io.Reader, w io.Writer, compressor Compressor, version byte) *framer {
-	f := framerPool.Get().(*framer)
+	f := &framer{
+		wbuf:       make([]byte, defaultBufSize),
+		readBuffer: make([]byte, defaultBufSize),
+	}
 	var flags byte
 	if compressor != nil {
 		flags |= flagCompress
+	}
+	if version == protoVersion5 {
+		flags |= flagBetaProtocol
 	}
 
 	version &= protoVersionMask
@@ -414,7 +453,7 @@ func readHeader(r io.Reader, p []byte) (head frameHeader, err error) {
 
 	version := p[0] & protoVersionMask
 
-	if version < protoVersion1 || version > protoVersion4 {
+	if version < protoVersion1 || version > protoVersion5 {
 		return frameHeader{}, fmt.Errorf("gocql: unsupported protocol response version: %d", version)
 	}
 
@@ -457,6 +496,11 @@ func readHeader(r io.Reader, p []byte) (head frameHeader, err error) {
 // explicitly enables tracing for the framers outgoing requests
 func (f *framer) trace() {
 	f.flags |= flagTracing
+}
+
+// explicitly enables the custom payload flag
+func (f *framer) payload() {
+	f.flags |= flagCustomPayload
 }
 
 // reads a frame form the wire into the framers buffer
@@ -523,7 +567,7 @@ func (f *framer) parseFrame() (frame frame, err error) {
 	}
 
 	if f.header.flags&flagCustomPayload == flagCustomPayload {
-		f.header.customPayload = f.readBytesMap()
+		f.customPayload = f.readBytesMap()
 	}
 
 	// assumes that the frame body has been read into rbuf
@@ -617,7 +661,14 @@ func (f *framer) parseErrorFrame() frame {
 		res.Consistency = f.readConsistency()
 		res.Received = f.readInt()
 		res.BlockFor = f.readInt()
+		if f.proto > protoVersion4 {
+			res.ErrorMap = f.readErrorMap()
+			res.NumFailures = len(res.ErrorMap)
+		} else {
+			res.NumFailures = f.readInt()
+		}
 		res.DataPresent = f.readByte() != 0
+
 		return res
 	case errWriteFailure:
 		res := &RequestErrWriteFailure{
@@ -626,17 +677,29 @@ func (f *framer) parseErrorFrame() frame {
 		res.Consistency = f.readConsistency()
 		res.Received = f.readInt()
 		res.BlockFor = f.readInt()
-		res.NumFailures = f.readInt()
+		if f.proto > protoVersion4 {
+			res.ErrorMap = f.readErrorMap()
+			res.NumFailures = len(res.ErrorMap)
+		} else {
+			res.NumFailures = f.readInt()
+		}
 		res.WriteType = f.readString()
 		return res
 	case errFunctionFailure:
-		res := RequestErrFunctionFailure{
+		res := &RequestErrFunctionFailure{
 			errorFrame: errD,
 		}
 		res.Keyspace = f.readString()
 		res.Function = f.readString()
 		res.ArgTypes = f.readStringList()
 		return res
+
+	case errCDCWriteFailure:
+		res := &RequestErrCDCWriteFailure{
+			errorFrame: errD,
+		}
+		return res
+
 	case errInvalid, errBootstrapping, errConfig, errCredentials, errOverloaded,
 		errProtocol, errServer, errSyntax, errTruncate, errUnauthorized:
 		// TODO(zariel): we should have some distinct types for these errors
@@ -644,6 +707,16 @@ func (f *framer) parseErrorFrame() frame {
 	default:
 		panic(fmt.Errorf("unknown error code: 0x%x", errD.code))
 	}
+}
+
+func (f *framer) readErrorMap() (errMap ErrorMap) {
+	errMap = make(ErrorMap)
+	numErrs := f.readInt()
+	for i := 0; i < numErrs; i++ {
+		ip := f.readInetAdressOnly().String()
+		errMap[ip] = f.readShort()
+	}
+	return
 }
 
 func (f *framer) writeHeader(flags byte, op frameOp, stream int) {
@@ -755,28 +828,42 @@ func (w writeStartupFrame) String() string {
 	return fmt.Sprintf("[startup opts=%+v]", w.opts)
 }
 
-func (w *writeStartupFrame) writeFrame(framer *framer, streamID int) error {
-	return framer.writeStartupFrame(streamID, w.opts)
-}
-
-func (f *framer) writeStartupFrame(streamID int, options map[string]string) error {
+func (w *writeStartupFrame) writeFrame(f *framer, streamID int) error {
 	f.writeHeader(f.flags&^flagCompress, opStartup, streamID)
-	f.writeStringMap(options)
+	f.writeStringMap(w.opts)
 
 	return f.finishWrite()
 }
 
 type writePrepareFrame struct {
-	statement string
+	statement     string
+	keyspace      string
+	customPayload map[string][]byte
 }
 
-func (w *writePrepareFrame) writeFrame(framer *framer, streamID int) error {
-	return framer.writePrepareFrame(streamID, w.statement)
-}
+func (w *writePrepareFrame) writeFrame(f *framer, streamID int) error {
+	if len(w.customPayload) > 0 {
+		f.payload()
+	}
+	f.writeHeader(f.flags, opPrepare, streamID)
+	f.writeCustomPayload(&w.customPayload)
+	f.writeLongString(w.statement)
 
-func (f *framer) writePrepareFrame(stream int, statement string) error {
-	f.writeHeader(f.flags, opPrepare, stream)
-	f.writeLongString(statement)
+	var flags uint32 = 0
+	if w.keyspace != "" {
+		if f.proto > protoVersion4 {
+			flags |= flagWithPreparedKeyspace
+		} else {
+			panic(fmt.Errorf("The keyspace can only be set with protocol 5 or higher"))
+		}
+	}
+	if f.proto > protoVersion4 {
+		f.writeUint(flags)
+	}
+	if w.keyspace != "" {
+		f.writeString(w.keyspace)
+	}
+
 	return f.finishWrite()
 }
 
@@ -925,6 +1012,10 @@ type resultMetadata struct {
 	// it is at minimum len(columns) but may be larger, for instance when a column
 	// is a UDT or tuple.
 	actualColCount int
+}
+
+func (r *resultMetadata) morePages() bool {
+	return r.flags&flagHasMorePages == flagHasMorePages
 }
 
 func (r resultMetadata) String() string {
@@ -1112,7 +1203,24 @@ func (f schemaChangeTable) String() string {
 	return fmt.Sprintf("[event schema_change change=%q keyspace=%q object=%q]", f.change, f.keyspace, f.object)
 }
 
+type schemaChangeType struct {
+	frameHeader
+
+	change   string
+	keyspace string
+	object   string
+}
+
 type schemaChangeFunction struct {
+	frameHeader
+
+	change   string
+	keyspace string
+	name     string
+	args     []string
+}
+
+type schemaChangeAggregate struct {
 	frameHeader
 
 	change   string
@@ -1156,7 +1264,7 @@ func (f *framer) parseResultSchemaChange() frame {
 			frame.keyspace = f.readString()
 
 			return frame
-		case "TABLE", "TYPE":
+		case "TABLE":
 			frame := &schemaChangeTable{
 				frameHeader: *f.header,
 				change:      change,
@@ -1166,8 +1274,29 @@ func (f *framer) parseResultSchemaChange() frame {
 			frame.object = f.readString()
 
 			return frame
-		case "FUNCTION", "AGGREGATE":
+		case "TYPE":
+			frame := &schemaChangeType{
+				frameHeader: *f.header,
+				change:      change,
+			}
+
+			frame.keyspace = f.readString()
+			frame.object = f.readString()
+
+			return frame
+		case "FUNCTION":
 			frame := &schemaChangeFunction{
+				frameHeader: *f.header,
+				change:      change,
+			}
+
+			frame.keyspace = f.readString()
+			frame.name = f.readString()
+			frame.args = f.readStringList()
+
+			return frame
+		case "AGGREGATE":
+			frame := &schemaChangeAggregate{
 				frameHeader: *f.header,
 				change:      change,
 			}
@@ -1322,11 +1451,13 @@ type queryParams struct {
 	// v3+
 	defaultTimestamp      bool
 	defaultTimestampValue int64
+	// v5+
+	keyspace string
 }
 
 func (q queryParams) String() string {
-	return fmt.Sprintf("[query_params consistency=%v skip_meta=%v page_size=%d paging_state=%q serial_consistency=%v default_timestamp=%v values=%v]",
-		q.consistency, q.skipMeta, q.pageSize, q.pagingState, q.serialConsistency, q.defaultTimestamp, q.values)
+	return fmt.Sprintf("[query_params consistency=%v skip_meta=%v page_size=%d paging_state=%q serial_consistency=%v default_timestamp=%v values=%v keyspace=%s]",
+		q.consistency, q.skipMeta, q.pageSize, q.pagingState, q.serialConsistency, q.defaultTimestamp, q.values, q.keyspace)
 }
 
 func (f *framer) writeQueryParams(opts *queryParams) {
@@ -1367,7 +1498,19 @@ func (f *framer) writeQueryParams(opts *queryParams) {
 		}
 	}
 
-	f.writeByte(flags)
+	if opts.keyspace != "" {
+		if f.proto > protoVersion4 {
+			flags |= flagWithKeyspace
+		} else {
+			panic(fmt.Errorf("The keyspace can only be set with protocol 5 or higher"))
+		}
+	}
+
+	if f.proto > protoVersion4 {
+		f.writeUint(uint32(flags))
+	} else {
+		f.writeByte(flags)
+	}
 
 	if n := len(opts.values); n > 0 {
 		f.writeShort(uint16(n))
@@ -1406,11 +1549,18 @@ func (f *framer) writeQueryParams(opts *queryParams) {
 		}
 		f.writeLong(ts)
 	}
+
+	if opts.keyspace != "" {
+		f.writeString(opts.keyspace)
+	}
 }
 
 type writeQueryFrame struct {
 	statement string
 	params    queryParams
+
+	// v4+
+	customPayload map[string][]byte
 }
 
 func (w *writeQueryFrame) String() string {
@@ -1418,11 +1568,15 @@ func (w *writeQueryFrame) String() string {
 }
 
 func (w *writeQueryFrame) writeFrame(framer *framer, streamID int) error {
-	return framer.writeQueryFrame(streamID, w.statement, &w.params)
+	return framer.writeQueryFrame(streamID, w.statement, &w.params, w.customPayload)
 }
 
-func (f *framer) writeQueryFrame(streamID int, statement string, params *queryParams) error {
+func (f *framer) writeQueryFrame(streamID int, statement string, params *queryParams, customPayload map[string][]byte) error {
+	if len(customPayload) > 0 {
+		f.payload()
+	}
 	f.writeHeader(f.flags, opQuery, streamID)
+	f.writeCustomPayload(&customPayload)
 	f.writeLongString(statement)
 	f.writeQueryParams(params)
 
@@ -1442,6 +1596,9 @@ func (f frameWriterFunc) writeFrame(framer *framer, streamID int) error {
 type writeExecuteFrame struct {
 	preparedID []byte
 	params     queryParams
+
+	// v4+
+	customPayload map[string][]byte
 }
 
 func (e *writeExecuteFrame) String() string {
@@ -1449,11 +1606,15 @@ func (e *writeExecuteFrame) String() string {
 }
 
 func (e *writeExecuteFrame) writeFrame(fr *framer, streamID int) error {
-	return fr.writeExecuteFrame(streamID, e.preparedID, &e.params)
+	return fr.writeExecuteFrame(streamID, e.preparedID, &e.params, &e.customPayload)
 }
 
-func (f *framer) writeExecuteFrame(streamID int, preparedID []byte, params *queryParams) error {
+func (f *framer) writeExecuteFrame(streamID int, preparedID []byte, params *queryParams, customPayload *map[string][]byte) error {
+	if len(*customPayload) > 0 {
+		f.payload()
+	}
 	f.writeHeader(f.flags, opExecute, streamID)
+	f.writeCustomPayload(customPayload)
 	f.writeShortBytes(preparedID)
 	if f.proto > protoVersion1 {
 		f.writeQueryParams(params)
@@ -1490,14 +1651,21 @@ type writeBatchFrame struct {
 	serialConsistency     SerialConsistency
 	defaultTimestamp      bool
 	defaultTimestampValue int64
+
+	//v4+
+	customPayload map[string][]byte
 }
 
 func (w *writeBatchFrame) writeFrame(framer *framer, streamID int) error {
-	return framer.writeBatchFrame(streamID, w)
+	return framer.writeBatchFrame(streamID, w, w.customPayload)
 }
 
-func (f *framer) writeBatchFrame(streamID int, w *writeBatchFrame) error {
+func (f *framer) writeBatchFrame(streamID int, w *writeBatchFrame, customPayload map[string][]byte) error {
+	if len(customPayload) > 0 {
+		f.payload()
+	}
 	f.writeHeader(f.flags, opBatch, streamID)
+	f.writeCustomPayload(&customPayload)
 	f.writeByte(byte(w.typ))
 
 	n := len(w.statements)
@@ -1517,10 +1685,13 @@ func (f *framer) writeBatchFrame(streamID int, w *writeBatchFrame) error {
 
 		f.writeShort(uint16(len(b.values)))
 		for j := range b.values {
-			col := &b.values[j]
+			col := b.values[j]
 			if f.proto > protoVersion2 && col.name != "" {
 				// TODO: move this check into the caller and set a flag on writeBatchFrame
 				// to indicate using named values
+				if f.proto <= protoVersion5 {
+					return fmt.Errorf("gocql: named query values are not supported in batches, please see https://issues.apache.org/jira/browse/CASSANDRA-10246")
+				}
 				flags |= flagWithNameValues
 				f.writeString(col.name)
 			}
@@ -1542,7 +1713,11 @@ func (f *framer) writeBatchFrame(streamID int, w *writeBatchFrame) error {
 			flags |= flagDefaultTimestamp
 		}
 
-		f.writeByte(flags)
+		if f.proto > protoVersion4 {
+			f.writeUint(uint32(flags))
+		} else {
+			f.writeByte(flags)
+		}
 
 		if w.serialConsistency > 0 {
 			f.writeConsistency(Consistency(w.serialConsistency))
@@ -1569,7 +1744,7 @@ func (w *writeOptionsFrame) writeFrame(framer *framer, streamID int) error {
 }
 
 func (f *framer) writeOptionsFrame(stream int, _ *writeOptionsFrame) error {
-	f.writeHeader(f.flags, opOptions, stream)
+	f.writeHeader(f.flags&^flagCompress, opOptions, stream)
 	return f.finishWrite()
 }
 
@@ -1710,7 +1885,7 @@ func (f *framer) readShortBytes() []byte {
 	return l
 }
 
-func (f *framer) readInet() (net.IP, int) {
+func (f *framer) readInetAdressOnly() net.IP {
 	if len(f.rbuf) < 1 {
 		panic(fmt.Errorf("not enough bytes in buffer to read inet size require %d got: %d", 1, len(f.rbuf)))
 	}
@@ -1729,9 +1904,11 @@ func (f *framer) readInet() (net.IP, int) {
 	ip := make([]byte, size)
 	copy(ip, f.rbuf[:size])
 	f.rbuf = f.rbuf[size:]
+	return net.IP(ip)
+}
 
-	port := f.readInt()
-	return net.IP(ip), port
+func (f *framer) readInet() (net.IP, int) {
+	return f.readInetAdressOnly(), f.readInt()
 }
 
 func (f *framer) readConsistency() Consistency {
@@ -1740,7 +1917,7 @@ func (f *framer) readConsistency() Consistency {
 
 func (f *framer) readStringMap() map[string]string {
 	size := f.readShort()
-	m := make(map[string]string)
+	m := make(map[string]string, size)
 
 	for i := 0; i < int(size); i++ {
 		k := f.readString()
@@ -1753,7 +1930,7 @@ func (f *framer) readStringMap() map[string]string {
 
 func (f *framer) readBytesMap() map[string][]byte {
 	size := f.readShort()
-	m := make(map[string][]byte)
+	m := make(map[string][]byte, size)
 
 	for i := 0; i < int(size); i++ {
 		k := f.readString()
@@ -1766,7 +1943,7 @@ func (f *framer) readBytesMap() map[string][]byte {
 
 func (f *framer) readStringMultiMap() map[string][]string {
 	size := f.readShort()
-	m := make(map[string][]string)
+	m := make(map[string][]string, size)
 
 	for i := 0; i < int(size); i++ {
 		k := f.readString()
@@ -1804,6 +1981,13 @@ func appendInt(p []byte, n int32) []byte {
 		byte(n))
 }
 
+func appendUint(p []byte, n uint32) []byte {
+	return append(p, byte(n>>24),
+		byte(n>>16),
+		byte(n>>8),
+		byte(n))
+}
+
 func appendLong(p []byte, n int64) []byte {
 	return append(p,
 		byte(n>>56),
@@ -1817,9 +2001,22 @@ func appendLong(p []byte, n int64) []byte {
 	)
 }
 
+func (f *framer) writeCustomPayload(customPayload *map[string][]byte) {
+	if len(*customPayload) > 0 {
+		if f.proto < protoVersion4 {
+			panic("Custom payload is not supported with version V3 or less")
+		}
+		f.writeBytesMap(*customPayload)
+	}
+}
+
 // these are protocol level binary types
 func (f *framer) writeInt(n int32) {
 	f.wbuf = appendInt(f.wbuf, n)
+}
+
+func (f *framer) writeUint(n uint32) {
+	f.wbuf = appendUint(f.wbuf, n)
 }
 
 func (f *framer) writeShort(n uint16) {
@@ -1897,5 +2094,13 @@ func (f *framer) writeStringMap(m map[string]string) {
 	for k, v := range m {
 		f.writeString(k)
 		f.writeString(v)
+	}
+}
+
+func (f *framer) writeBytesMap(m map[string][]byte) {
+	f.writeShort(uint16(len(m)))
+	for k, v := range m {
+		f.writeString(k)
+		f.writeBytes(v)
 	}
 }
