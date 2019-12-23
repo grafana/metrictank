@@ -66,6 +66,47 @@ json and treejson are the same.
 curl -H "X-Org-Id: 12345" "http://localhost:6060/metrics/find?query=statsd.fakesite.counters.session_start.*.count"
 ```
 
+## Find tagged metrics
+
+```
+GET /tags/findSeries
+POST /tags/findSeries
+```
+
+Returns metrics which match tag queries and have received an update since `from`.
+Note: the returned results are not deduplicated and in certain cases it is possible
+that duplicate entries will be returned.
+
+##### Parameters
+
+* expr (required): a list of [tag expressions](#tag-expressions)
+* from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
+* format: series-json, lastupdate-json. (defaults to series-json)
+* limit: max number to return, 0 to defer to the instance configured max (default: 0). Note: if limit is 0 or greater than the instance configured max and the result set is greater than the instance configured max, an error is returned. Otherwise, the result set is truncated at the limit
+
+##### Example
+
+```sh
+curl "http://localhost:6060/tags/findSeries?expr=datacenter=dc1&expr=server=web01"
+
+[
+  "disk.used;datacenter=dc1;rack=a1;server=web01"
+]
+```
+
+```sh
+curl "http://localhost:6060/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastupdate-json"
+
+{
+    "series": [
+        {
+            "lastTs": 1576683990,
+            "val": "disk.used;datacenter=dc1;rack=a1;server=web01"
+        }
+    ]
+}
+```
+
 ## Deleting metrics
 
 This will delete any metrics (technically metricdefinitions) matching the query from the index.
@@ -475,4 +516,3 @@ The time specification is used throughout the http api and it can be any of thes
 	- `y`, `year`, `years`
 
 * datetime in any of the following formats: `15:04 20060102`, `20060102`, `01/02/06`
-
