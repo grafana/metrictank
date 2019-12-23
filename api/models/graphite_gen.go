@@ -373,6 +373,356 @@ func (z *GraphiteTagDelSeriesResp) Msgsize() (s int) {
 }
 
 // DecodeMsg implements msgp.Decodable
+func (z *GraphiteTagFindSeriesLastUpdateResp) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Series":
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
+			if err != nil {
+				err = msgp.WrapError(err, "Series")
+				return
+			}
+			if cap(z.Series) >= int(zb0002) {
+				z.Series = (z.Series)[:zb0002]
+			} else {
+				z.Series = make([]SeriesLastUpdate, zb0002)
+			}
+			for za0001 := range z.Series {
+				var zb0003 uint32
+				zb0003, err = dc.ReadMapHeader()
+				if err != nil {
+					err = msgp.WrapError(err, "Series", za0001)
+					return
+				}
+				for zb0003 > 0 {
+					zb0003--
+					field, err = dc.ReadMapKeyPtr()
+					if err != nil {
+						err = msgp.WrapError(err, "Series", za0001)
+						return
+					}
+					switch msgp.UnsafeString(field) {
+					case "Series":
+						z.Series[za0001].Series, err = dc.ReadString()
+						if err != nil {
+							err = msgp.WrapError(err, "Series", za0001, "Series")
+							return
+						}
+					case "Ts":
+						z.Series[za0001].Ts, err = dc.ReadInt64()
+						if err != nil {
+							err = msgp.WrapError(err, "Series", za0001, "Ts")
+							return
+						}
+					default:
+						err = dc.Skip()
+						if err != nil {
+							err = msgp.WrapError(err, "Series", za0001)
+							return
+						}
+					}
+				}
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z *GraphiteTagFindSeriesLastUpdateResp) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 1
+	// write "Series"
+	err = en.Append(0x81, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+	if err != nil {
+		return
+	}
+	err = en.WriteArrayHeader(uint32(len(z.Series)))
+	if err != nil {
+		err = msgp.WrapError(err, "Series")
+		return
+	}
+	for za0001 := range z.Series {
+		// map header, size 2
+		// write "Series"
+		err = en.Append(0x82, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+		if err != nil {
+			return
+		}
+		err = en.WriteString(z.Series[za0001].Series)
+		if err != nil {
+			err = msgp.WrapError(err, "Series", za0001, "Series")
+			return
+		}
+		// write "Ts"
+		err = en.Append(0xa2, 0x54, 0x73)
+		if err != nil {
+			return
+		}
+		err = en.WriteInt64(z.Series[za0001].Ts)
+		if err != nil {
+			err = msgp.WrapError(err, "Series", za0001, "Ts")
+			return
+		}
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *GraphiteTagFindSeriesLastUpdateResp) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 1
+	// string "Series"
+	o = append(o, 0x81, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Series)))
+	for za0001 := range z.Series {
+		// map header, size 2
+		// string "Series"
+		o = append(o, 0x82, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+		o = msgp.AppendString(o, z.Series[za0001].Series)
+		// string "Ts"
+		o = append(o, 0xa2, 0x54, 0x73)
+		o = msgp.AppendInt64(o, z.Series[za0001].Ts)
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *GraphiteTagFindSeriesLastUpdateResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Series":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Series")
+				return
+			}
+			if cap(z.Series) >= int(zb0002) {
+				z.Series = (z.Series)[:zb0002]
+			} else {
+				z.Series = make([]SeriesLastUpdate, zb0002)
+			}
+			for za0001 := range z.Series {
+				var zb0003 uint32
+				zb0003, bts, err = msgp.ReadMapHeaderBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "Series", za0001)
+					return
+				}
+				for zb0003 > 0 {
+					zb0003--
+					field, bts, err = msgp.ReadMapKeyZC(bts)
+					if err != nil {
+						err = msgp.WrapError(err, "Series", za0001)
+						return
+					}
+					switch msgp.UnsafeString(field) {
+					case "Series":
+						z.Series[za0001].Series, bts, err = msgp.ReadStringBytes(bts)
+						if err != nil {
+							err = msgp.WrapError(err, "Series", za0001, "Series")
+							return
+						}
+					case "Ts":
+						z.Series[za0001].Ts, bts, err = msgp.ReadInt64Bytes(bts)
+						if err != nil {
+							err = msgp.WrapError(err, "Series", za0001, "Ts")
+							return
+						}
+					default:
+						bts, err = msgp.Skip(bts)
+						if err != nil {
+							err = msgp.WrapError(err, "Series", za0001)
+							return
+						}
+					}
+				}
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *GraphiteTagFindSeriesLastUpdateResp) Msgsize() (s int) {
+	s = 1 + 7 + msgp.ArrayHeaderSize
+	for za0001 := range z.Series {
+		s += 1 + 7 + msgp.StringPrefixSize + len(z.Series[za0001].Series) + 3 + msgp.Int64Size
+	}
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
+func (z *SeriesLastUpdate) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Series":
+			z.Series, err = dc.ReadString()
+			if err != nil {
+				err = msgp.WrapError(err, "Series")
+				return
+			}
+		case "Ts":
+			z.Ts, err = dc.ReadInt64()
+			if err != nil {
+				err = msgp.WrapError(err, "Ts")
+				return
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z SeriesLastUpdate) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 2
+	// write "Series"
+	err = en.Append(0x82, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+	if err != nil {
+		return
+	}
+	err = en.WriteString(z.Series)
+	if err != nil {
+		err = msgp.WrapError(err, "Series")
+		return
+	}
+	// write "Ts"
+	err = en.Append(0xa2, 0x54, 0x73)
+	if err != nil {
+		return
+	}
+	err = en.WriteInt64(z.Ts)
+	if err != nil {
+		err = msgp.WrapError(err, "Ts")
+		return
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z SeriesLastUpdate) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 2
+	// string "Series"
+	o = append(o, 0x82, 0xa6, 0x53, 0x65, 0x72, 0x69, 0x65, 0x73)
+	o = msgp.AppendString(o, z.Series)
+	// string "Ts"
+	o = append(o, 0xa2, 0x54, 0x73)
+	o = msgp.AppendInt64(o, z.Ts)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *SeriesLastUpdate) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Series":
+			z.Series, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Series")
+				return
+			}
+		case "Ts":
+			z.Ts, bts, err = msgp.ReadInt64Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Ts")
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z SeriesLastUpdate) Msgsize() (s int) {
+	s = 1 + 7 + msgp.StringPrefixSize + len(z.Series) + 3 + msgp.Int64Size
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
 func (z *SeriesPickle) DecodeMsg(dc *msgp.Reader) (err error) {
 	var zb0002 uint32
 	zb0002, err = dc.ReadArrayHeader()

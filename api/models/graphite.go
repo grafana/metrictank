@@ -117,12 +117,22 @@ type GraphiteTagDetailsValueResp struct {
 }
 
 type GraphiteTagFindSeries struct {
-	Expr []string `json:"expr" form:"expr"`
-	From int64    `json:"from" form:"from"`
+	Expr   []string `json:"expr" form:"expr"`
+	From   int64    `json:"from" form:"from"`
+	Format string   `json:"format" form:"format" binding:"Default(seriesjson)"`
 }
 
 type GraphiteTagFindSeriesResp struct {
 	Series []string `json:"series"`
+}
+
+type SeriesLastUpdate struct {
+	Series string `json:"val"`
+	Ts     int64  `json:"lastTs"`
+}
+
+type GraphiteTagFindSeriesLastUpdateResp struct {
+	Series []SeriesLastUpdate `json:"series"`
 }
 
 type GraphiteTagDelSeries struct {

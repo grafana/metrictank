@@ -1025,11 +1025,31 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 		return
 	default:
 	}
-	seriesNames := make([]string, 0, len(series))
-	for _, serie := range series {
-		seriesNames = append(seriesNames, serie.Pattern)
+
+	switch request.Format {
+	case "lastupdate-json":
+		seriesVals := make([]models.SeriesLastUpdate, 0, len(series))
+		for _, serie := range series {
+			var lastUpdate int64
+			for _, node := range serie.Series {
+				for _, ndef := range node.Defs {
+					if ndef.LastUpdate > lastUpdate {
+						lastUpdate = ndef.LastUpdate
+					}
+				}
+			}
+			seriesVals = append(seriesVals, models.SeriesLastUpdate{Series: serie.Pattern, Ts: lastUpdate})
+		}
+		response.Write(ctx, response.NewJson(200, models.GraphiteTagFindSeriesLastUpdateResp{Series: seriesVals}, ""))
+	default:
+		// Backwards compatibility note:
+		// Before `Format` was added, it was ignored if specified. So, treat unknown formats as `seriesjson`.
+		seriesNames := make([]string, 0, len(series))
+		for _, serie := range series {
+			seriesNames = append(seriesNames, serie.Pattern)
+		}
+		response.Write(ctx, response.NewJson(200, seriesNames, ""))
 	}
-	response.Write(ctx, response.NewJson(200, seriesNames, ""))
 }
 
 func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagquery.Expressions, from int64, maxSeries int) ([]Series, error) {
