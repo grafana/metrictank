@@ -70,7 +70,7 @@ func (q *querier) Select(matchers ...*labels.Matcher) (storage.SeriesSet, error)
 		return nil, err
 	}
 
-	series, err := q.clusterFindByTag(q.ctx, q.OrgID, parsedExpressions, 0, maxSeriesPerReq)
+	series, err := q.clusterFindByTag(q.ctx, q.OrgID, parsedExpressions, 0, maxSeriesPerReq, false)
 	if err != nil {
 		return nil, err
 	}
