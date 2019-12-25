@@ -312,15 +312,90 @@ func (c *CassandraStore) Add(cwr *mdata.ChunkWriteRequest) {
 	c.writeQueues[which] <- cwr
 }
 
+func (c *CassandraStore) deadConnectionCheck() {
+	defer c.wg.Done()
+
+	ticker := time.NewTicker(time.Second * 5)
+	attempts := 0
+	totaltime := 0
+	var err error
+
+OUTER:
+	for {
+		// connection to cassandra has been down for at least 30 seconds
+		if attempts >= 6 {
+			c.sessionLock.Lock()
+			for {
+				select {
+				case <-c.shutdown:
+					log.Info("cassandra_store: received shutdown, exiting deadConnectionCheck")
+					if c.Session != nil && !c.Session.Closed() {
+						c.Session.Close()
+					}
+					// make sure we unlock the sessionLock before returning
+					c.sessionLock.Unlock()
+					return
+				default:
+					log.Errorf("cassandra_store: creating new session to cassandra using hosts: %v", c.config.Addrs)
+					if c.Session != nil && !c.Session.Closed() {
+						c.Session.Close()
+						c.Session = nil
+					}
+					c.Session, err = c.Cluster.CreateSession()
+					if err != nil {
+						log.Errorf("cassandra_store: error while attempting to recreate cassandra session. will retry after 5 seconds: %v", err)
+						time.Sleep(time.Second * 5)
+						totaltime += 5
+						attempts++
+						// continue inner loop to attempt to reconnect
+						continue
+					}
+					c.sessionLock.Unlock()
+					log.Errorf("cassandra_store: reconnecting to cassandra took %d seconds", totaltime)
+					totaltime = 0
+					attempts = 0
+					// we connected, so go back to the normal outer loop
+					continue OUTER
+				}
+			}
+		}
+
+		select {
+		case <-c.shutdown:
+			log.Info("cassandra_store: received shutdown, exiting deadConnectionCheck")
+			if c.Session != nil && !c.Session.Closed() {
+				c.Session.Close()
+			}
+			return
+		case <-ticker.C:
+			c.sessionLock.RLock()
+			// this query should work on all cassandra deployments, but we may need to revisit this
+			err = c.Session.Query("SELECT cql_version FROM system.local").Exec()
+			if err == nil {
+				attempts = 0
+			} else {
+				attempts++
+				log.Errorf("cassandra_store: could not execute connection check query for %d attempts: %v", attempts, err)
+			}
+			c.sessionLock.RUnlock()
+		}
+	}
+}
+
 /* process writeQueue.
  */
 func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *stats.Range32) {
 	defer c.wg.Done()
 
-	tick := time.Tick(time.Duration(1) * time.Second)
+	ticker := time.NewTicker(time.Second * 1)
+
 	for {
 		select {
-		case <-tick:
+		case <-c.shutdown:
+			log.Info("cassandra_store: received shutdown, exiting processWriteQueue")
+			ticker.Stop()
+			return
+		case <-ticker.C:
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
@@ -335,37 +410,38 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			success := false
 			attempts := 0
 			for !success {
-				err := c.insertChunk(keyStr, cwr.T0, cwr.TTL, cwr.Data)
+				select {
+				case <-c.shutdown:
+					log.Info("cassandra_store: received shutdown, exiting processWriteQueue")
+					ticker.Stop()
+					return
+				default:
+					err := c.insertChunk(keyStr, cwr.T0, cwr.TTL, cwr.Data)
 
-				if err == nil {
-					success = true
-					if cwr.Callback != nil {
-						cwr.Callback()
+					if err == nil {
+						success = true
+						if cwr.Callback != nil {
+							cwr.Callback()
+						}
+						if log.IsLevelEnabled(log.DebugLevel) {
+							log.Debugf("cassandra_store: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
+						}
+						chunkSaveOk.Inc()
+					} else {
+						errmetrics.Inc(err)
+						if (attempts % 20) == 0 {
+							log.Warnf("cassandra_store: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
+						}
+						chunkSaveFail.Inc()
+						sleepTime := 100 * attempts
+						if sleepTime > 2000 {
+							sleepTime = 2000
+						}
+						time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+						attempts++
 					}
-					if log.IsLevelEnabled(log.DebugLevel) {
-						log.Debugf("cassandra_store: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
-					}
-					chunkSaveOk.Inc()
-				} else {
-					errmetrics.Inc(err)
-					if (attempts % 20) == 0 {
-						log.Warnf("cassandra_store: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
-					}
-					chunkSaveFail.Inc()
-					sleepTime := 100 * attempts
-					if sleepTime > 2000 {
-						sleepTime = 2000
-					}
-					time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-					attempts++
 				}
 			}
-		case <-c.shutdown:
-			log.Info("cassandra_store: received shutdown, exiting processWriteQueue")
-			if c.Session != nil && !c.Session.Closed() {
-				c.Session.Close()
-			}
-			return
 		}
 	}
 }
@@ -444,6 +520,7 @@ func (c *CassandraStore) processReadQueue() {
 				continue
 			}
 
+			// the sessionLocks are handled in SearchTable
 			pre := time.Now()
 			iter := readResult{
 				i:   c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
@@ -453,58 +530,6 @@ func (c *CassandraStore) processReadQueue() {
 			crr.out <- iter
 		case <-c.shutdown:
 			log.Info("cassandra_store: received shutdown, exiting processReadQueue")
-			if c.Session != nil && !c.Session.Closed() {
-				c.Session.Close()
-			}
-			return
-		}
-	}
-}
-
-func (c *CassandraStore) deadConnectionCheck() {
-	defer c.wg.Done()
-
-	ticker := time.NewTicker(time.Second * 5)
-	attempts := 0
-	for {
-		select {
-		case <-ticker.C:
-			c.sessionLock.RLock()
-			err := c.Session.Query("SELECT cql_version FROM system.local").Exec()
-			if err == nil {
-				attempts = 0
-			} else {
-				attempts++
-				log.Errorf("cassandra_store: could not execute connection check query for %d attempts: %v", attempts, err)
-			}
-			c.sessionLock.RUnlock()
-
-			if attempts >= 6 {
-				success := false
-				attempts = 0
-				c.sessionLock.Lock()
-				for !success {
-					log.Errorf("cassandra_store: creating new session to cassandra using hosts: %v", c.config.Addrs)
-					// c.Cluster.Hosts = strings.Split(c.config.Addrs, ",")
-					if c.Session != nil && !c.Session.Closed() {
-						c.Session.Close()
-						c.Session = nil
-					}
-					c.Session, err = c.Cluster.CreateSession()
-					if err != nil {
-						log.Errorf("cassandra_store: error while attempting to recreate cassandra session. will retry after 5 seconds: %v", err)
-						time.Sleep(time.Second * 5)
-					} else {
-						success = true
-					}
-				}
-				c.sessionLock.Unlock()
-			}
-		case <-c.shutdown:
-			log.Info("cassandra_store: received shutdown, exiting deadConnectionCheck")
-			if c.Session != nil && !c.Session.Closed() {
-				c.Session.Close()
-			}
 			return
 		}
 	}

@@ -64,7 +64,9 @@ type CasIdx struct {
 	Session          *gocql.Session
 	metaRecords      metaRecordStatusByOrg
 	writeQueue       chan writeReq
+	shutdown         chan struct{}
 	wg               sync.WaitGroup
+	sessionLock      sync.RWMutex
 	updateInterval32 uint32
 }
 
@@ -102,6 +104,7 @@ func New(cfg *IdxConfig) *CasIdx {
 		Config:           cfg,
 		cluster:          cluster,
 		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),
+		shutdown:         make(chan struct{}),
 	}
 	if cfg.updateCassIdx {
 		idx.writeQueue = make(chan writeReq, cfg.writeQueueSize)
@@ -115,7 +118,7 @@ func (c *CasIdx) InitBare() error {
 	var err error
 	tmpSession, err := c.cluster.CreateSession()
 	if err != nil {
-		return fmt.Errorf("failed to create cassandra session: %s", err)
+		return fmt.Errorf("cassandra-idx: failed to create cassandra session: %s", err)
 	}
 
 	// read templates
@@ -127,12 +130,12 @@ func (c *CasIdx) InitBare() error {
 		log.Infof("cassandra-idx: ensuring that keyspace %s exists.", c.Config.Keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, c.Config.Keyspace)).Exec()
 		if err != nil {
-			return fmt.Errorf("failed to initialize cassandra keyspace: %s", err)
+			return fmt.Errorf("cassandra-idx: failed to initialize cassandra keyspace: %s", err)
 		}
 		log.Infof("cassandra-idx: ensuring that table %s exists.", c.Config.Table)
 		err = tmpSession.Query(fmt.Sprintf(schemaTable, c.Config.Keyspace, c.Config.Table)).Exec()
 		if err != nil {
-			return fmt.Errorf("failed to initialize cassandra table: %s", err)
+			return fmt.Errorf("cassandra-idx: failed to initialize cassandra table: %s", err)
 		}
 		err = c.EnsureTableExists(tmpSession, c.Config.SchemaFile, "schema_archive_table", c.Config.ArchiveTable)
 		if err != nil {
@@ -144,10 +147,10 @@ func (c *CasIdx) InitBare() error {
 		for attempt := 1; attempt <= 5; attempt++ {
 			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(c.Config.Keyspace)
 			if err != nil {
-				err = fmt.Errorf("cassandra keyspace %s not found", c.Config.Keyspace)
+				err = fmt.Errorf("cassandra-idx: cassandra keyspace %s not found", c.Config.Keyspace)
 			} else {
 				if _, ok := keyspaceMetadata.Tables[c.Config.Table]; !ok {
-					err = fmt.Errorf("cassandra table %s not found", c.Config.Table)
+					err = fmt.Errorf("cassandra-idx: cassandra table %s not found", c.Config.Table)
 				} else {
 					break
 				}
@@ -155,7 +158,7 @@ func (c *CasIdx) InitBare() error {
 
 			if err != nil {
 				if attempt >= 5 {
-					return fmt.Errorf("attempt %d: %s", attempt, err)
+					return fmt.Errorf("cassandra-idx: attempt %d: %s", attempt, err)
 				}
 				log.Warnf("cassandra-idx: attempt %d, retrying in 5s: %s", attempt, err)
 				time.Sleep(5 * time.Second)
@@ -172,7 +175,7 @@ func (c *CasIdx) InitBare() error {
 	c.cluster.Keyspace = c.Config.Keyspace
 	session, err := c.cluster.CreateSession()
 	if err != nil {
-		return fmt.Errorf("failed to create cassandra session: %s", err)
+		return fmt.Errorf("cassandra-idx: failed to create cassandra session: %s", err)
 	}
 
 	c.Session = session
@@ -192,7 +195,7 @@ func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName
 	if session == nil {
 		session, err = c.cluster.CreateSession()
 		if err != nil {
-			return fmt.Errorf("failed to create cassandra session: %s", err)
+			return fmt.Errorf("cassandra-idx: failed to create cassandra session: %s", err)
 		}
 	}
 
@@ -202,16 +205,16 @@ func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName
 		log.Infof("cassandra-idx: ensuring that table %s exists.", tableName)
 		err = session.Query(fmt.Sprintf(tableSchema, c.Config.Keyspace, tableName)).Exec()
 		if err != nil {
-			return fmt.Errorf("failed to initialize cassandra table: %s", err)
+			return fmt.Errorf("cassandra-idx: failed to initialize cassandra table: %s", err)
 		}
 	} else {
 		var keyspaceMetadata *gocql.KeyspaceMetadata
 		keyspaceMetadata, err = session.KeyspaceMetadata(c.Config.Keyspace)
 		if err != nil {
-			return fmt.Errorf("failed to read cassandra tables: %s", err)
+			return fmt.Errorf("cassandra-idx: failed to read cassandra tables: %s", err)
 		}
 		if _, ok := keyspaceMetadata.Tables[tableName]; !ok {
-			return fmt.Errorf("table %s does not exist", tableName)
+			return fmt.Errorf("cassandra-idx: table %s does not exist", tableName)
 		}
 	}
 	return nil
@@ -220,7 +223,7 @@ func (c *CasIdx) EnsureTableExists(session *gocql.Session, schemaFile, entryName
 // Init makes sure the needed keyspace, table, index in cassandra exists, creates the session,
 // rebuilds the in-memory index, sets up write queues, metrics and pruning routines
 func (c *CasIdx) Init() error {
-	log.Infof("initializing cassandra-idx. Hosts=%s", c.Config.Hosts)
+	log.Infof("cassandra-idx: initializing cassandra-idx. Hosts=%s", c.Config.Hosts)
 	if err := c.MemoryIndex.Init(); err != nil {
 		return err
 	}
@@ -241,15 +244,21 @@ func (c *CasIdx) Init() error {
 	c.rebuildIndex()
 
 	if memory.IndexRules.Prunable() {
+		c.wg.Add(1)
 		go c.prune()
 	}
 
 	if memory.MetaTagSupport {
+		c.wg.Add(1)
 		go c.pollStore()
 		if c.Config.updateCassIdx {
+			c.wg.Add(1)
 			go c.pruneMetaRecords()
 		}
 	}
+
+	c.wg.Add(1)
+	go c.deadConnectionCheck()
 
 	return nil
 }
@@ -258,12 +267,12 @@ func (c *CasIdx) Stop() {
 	log.Info("cassandra-idx: stopping")
 	c.MemoryIndex.Stop()
 
+	close(c.shutdown)
 	// if updateCassIdx is disabled then writeQueue should never have been initialized
 	if c.Config.updateCassIdx {
 		close(c.writeQueue)
 	}
 	c.wg.Wait()
-	c.Session.Close()
 }
 
 // Update updates an existing archive, if found.
@@ -410,6 +419,8 @@ func (c *CasIdx) rebuildIndex() {
 }
 
 func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
+	c.sessionLock.RLock()
+	defer c.sessionLock.RUnlock()
 	iter := c.Session.Query(fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s", c.Config.Table)).Iter()
 	return c.load(defs, iter, now)
 }
@@ -421,6 +432,9 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefiniti
 		placeholders[i] = strconv.Itoa(int(p))
 	}
 	q := fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s where partition in (%s)", c.Config.Table, strings.Join(placeholders, ","))
+
+	c.sessionLock.RLock()
+	defer c.sessionLock.RUnlock()
 	iter := c.Session.Query(q).Iter()
 	return c.load(defs, iter, now)
 }
@@ -458,7 +472,7 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time
 		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], mdef)
 	}
 	if err := iter.Close(); err != nil {
-		log.Fatalf("Could not close iterator: %s", err.Error())
+		log.Fatalf("cassandra-idx: could not close iterator: %s", err.Error())
 	}
 
 	// getting all cutoffs once saves having to recompute everytime we have a match
@@ -551,50 +565,135 @@ func (c *CasIdx) processWriteQueue() {
 	var err error
 	var req writeReq
 	qry := fmt.Sprintf("INSERT INTO %s (id, orgid, partition, name, interval, unit, mtype, tags, lastupdate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", c.Config.Table)
-	for req = range c.writeQueue {
-		if err != nil {
-			log.Errorf("Failed to marshal metricDef: %s. value was: %+v", err, *req.def)
-			continue
-		}
-		statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
-		pre := time.Now()
-		success = false
-		attempts = 0
-
-		for !success {
-			if err := c.Session.Query(
-				qry,
-				req.def.Id.String(),
-				req.def.OrgId,
-				req.def.Partition,
-				req.def.Name,
-				req.def.Interval,
-				req.def.Unit,
-				req.def.Mtype,
-				req.def.Tags,
-				req.def.LastUpdate).Exec(); err != nil {
-
-				statQueryInsertFail.Inc()
-				errmetrics.Inc(err)
-				if (attempts % 20) == 0 {
-					log.Warnf("cassandra-idx: Failed to write def to cassandra. it will be retried. %s. the value was: %+v", err, *req.def)
-				}
-				sleepTime := 100 * attempts
-				if sleepTime > 2000 {
-					sleepTime = 2000
-				}
-				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-				attempts++
-			} else {
-				success = true
-				statQueryInsertExecDuration.Value(time.Since(pre))
-				statQueryInsertOk.Inc()
-				log.Debugf("cassandra-idx: metricDef %s saved to cassandra", req.def.Id)
+	for {
+		select {
+		case req = <-c.writeQueue:
+			if err != nil {
+				log.Errorf("cassandra-idx: failed to marshal metricDef: %s. value was: %+v", err, *req.def)
+				continue
 			}
+			statQueryInsertWaitDuration.Value(time.Since(req.recvTime))
+			pre := time.Now()
+			success = false
+			attempts = 0
+
+			for !success {
+				select {
+				case <-c.shutdown:
+					log.Info("cassandra-idx: received shutdown, exiting processWriteQueue")
+					return
+				default:
+					c.sessionLock.RLock()
+					if err := c.Session.Query(
+						qry,
+						req.def.Id.String(),
+						req.def.OrgId,
+						req.def.Partition,
+						req.def.Name,
+						req.def.Interval,
+						req.def.Unit,
+						req.def.Mtype,
+						req.def.Tags,
+						req.def.LastUpdate).Exec(); err != nil {
+
+						statQueryInsertFail.Inc()
+						errmetrics.Inc(err)
+						if (attempts % 20) == 0 {
+							log.Warnf("cassandra-idx: Failed to write def to cassandra. it will be retried. %s. the value was: %+v", err, *req.def)
+						}
+						sleepTime := 100 * attempts
+						if sleepTime > 2000 {
+							sleepTime = 2000
+						}
+						time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+						attempts++
+					} else {
+						success = true
+						statQueryInsertExecDuration.Value(time.Since(pre))
+						statQueryInsertOk.Inc()
+						log.Debugf("cassandra-idx: metricDef %s saved to cassandra", req.def.Id)
+					}
+					c.sessionLock.RUnlock()
+				}
+			}
+		case <-c.shutdown:
+			log.Info("cassandra-idx: received shutdown, exiting processWriteQueue")
+			return
 		}
 	}
+
 	log.Info("cassandra-idx: writeQueue handler ended.")
 	c.wg.Done()
+}
+
+func (c *CasIdx) deadConnectionCheck() {
+	defer c.wg.Done()
+
+	ticker := time.NewTicker(time.Second * 5)
+	attempts := 0
+	totaltime := 0
+	var err error
+
+OUTER:
+	for {
+		// connection to cassandra has been down for at least 30 seconds
+		if attempts >= 6 {
+			c.sessionLock.Lock()
+			for {
+				select {
+				case <-c.shutdown:
+					log.Info("cassandra-idx: received shutdown, exiting deadConnectionCheck")
+					if c.Session != nil && !c.Session.Closed() {
+						c.Session.Close()
+					}
+					// make sure we unlock the sessionLock before returning
+					c.sessionLock.Unlock()
+					return
+				default:
+					log.Errorf("cassandra-idx: creating new session to cassandra using hosts: %v", c.Config.Hosts)
+					if c.Session != nil && !c.Session.Closed() {
+						c.Session.Close()
+						c.Session = nil
+					}
+					c.Session, err = c.cluster.CreateSession()
+					if err != nil {
+						log.Errorf("cassandra-idx: error while attempting to recreate cassandra session. will retry after 5 seconds: %v", err)
+						time.Sleep(time.Second * 5)
+						totaltime += 5
+						attempts++
+						// continue inner loop to attempt to reconnect
+						continue
+					}
+					c.sessionLock.Unlock()
+					log.Errorf("cassandra-idx: reconnecting to cassandra took %d seconds", totaltime)
+					totaltime = 0
+					attempts = 0
+					// we connected, so go back to the normal outer loop
+					continue OUTER
+				}
+			}
+		}
+
+		select {
+		case <-c.shutdown:
+			log.Info("cassandra-idx: received shutdown, exiting deadConnectionCheck")
+			if c.Session != nil && !c.Session.Closed() {
+				c.Session.Close()
+			}
+			return
+		case <-ticker.C:
+			c.sessionLock.RLock()
+			// this query should work on all cassandra deployments, but we may need to revisit this
+			err = c.Session.Query("SELECT cql_version FROM system.local").Exec()
+			if err == nil {
+				attempts = 0
+			} else {
+				attempts++
+				log.Errorf("cassandra-idx: could not execute connection check query for %d attempts: %v", attempts, err)
+			}
+			c.sessionLock.RUnlock()
+		}
+	}
 }
 
 func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
@@ -612,6 +711,7 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 		}
 
+		c.sessionLock.RLock()
 		err := c.Session.Query(
 			insertQry,
 			def.Id.String(),
@@ -624,6 +724,7 @@ func (c *CasIdx) addDefToArchive(def schema.MetricDefinition) error {
 			def.Tags,
 			def.LastUpdate,
 			now).Exec()
+		c.sessionLock.RUnlock()
 
 		if err == nil {
 			return nil
@@ -662,7 +763,9 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 	keyStr := key.String()
 	for attempts < 5 {
 		attempts++
+		c.sessionLock.RLock()
 		err := c.Session.Query(fmt.Sprintf("DELETE FROM %s where partition=? AND id=?", c.Config.Table), part, keyStr).Exec()
+		c.sessionLock.RUnlock()
 		if err != nil {
 			statQueryDeleteFail.Inc()
 			errmetrics.Inc(err)
@@ -674,7 +777,7 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("unable to delete metricDef %s from index after %d attempts.", keyStr, attempts)
+	return fmt.Errorf("cassandra-idx: unable to delete metricDef %s from index after %d attempts", keyStr, attempts)
 }
 
 func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
@@ -699,8 +802,14 @@ func (c *CasIdx) Prune(now time.Time) ([]idx.Archive, error) {
 }
 
 func (c *CasIdx) prune() {
+	defer c.wg.Done()
 	ticker := time.NewTicker(c.Config.pruneInterval)
-	for now := range ticker.C {
-		c.Prune(now)
+	for {
+		select {
+		case now := <-ticker.C:
+			c.Prune(now)
+		case <-c.shutdown:
+			return
+		}
 	}
 }
