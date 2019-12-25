@@ -325,7 +325,9 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 		case cwr := <-queue:
 			meter.Value(len(queue))
 			keyStr := cwr.Key.String()
-			log.Debugf("CS: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("cassandra_store: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
+			}
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
@@ -340,12 +342,14 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 					if cwr.Callback != nil {
 						cwr.Callback()
 					}
-					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
+					if log.IsLevelEnabled(log.DebugLevel) {
+						log.Debugf("cassandra_store: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
+					}
 					chunkSaveOk.Inc()
 				} else {
 					errmetrics.Inc(err)
 					if (attempts % 20) == 0 {
-						log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
+						log.Warnf("cassandra_store: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
 					}
 					chunkSaveFail.Inc()
 					sleepTime := 100 * attempts
@@ -358,6 +362,9 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			}
 		case <-c.shutdown:
 			log.Info("cassandra_store: received shutdown, exiting processWriteQueue")
+			if c.Session != nil && !c.Session.Closed() {
+				c.Session.Close()
+			}
 			return
 		}
 	}
@@ -446,6 +453,9 @@ func (c *CassandraStore) processReadQueue() {
 			crr.out <- iter
 		case <-c.shutdown:
 			log.Info("cassandra_store: received shutdown, exiting processReadQueue")
+			if c.Session != nil && !c.Session.Closed() {
+				c.Session.Close()
+			}
 			return
 		}
 	}
@@ -459,24 +469,42 @@ func (c *CassandraStore) deadConnectionCheck() {
 	for {
 		select {
 		case <-ticker.C:
+			c.sessionLock.RLock()
 			err := c.Session.Query("SELECT cql_version FROM system.local").Exec()
-			if err != nil {
+			if err == nil {
+				attempts = 0
+			} else {
 				attempts++
 				log.Errorf("cassandra_store: could not execute connection check query for %d attempts: %v", attempts, err)
 			}
+			c.sessionLock.RUnlock()
+
 			if attempts >= 6 {
+				success := false
 				attempts = 0
-				log.Errorf("cassandra_store: creating new session to cassandra using hosts: %v", c.config.Addrs)
-				c.Cluster.Hosts = strings.Split(c.config.Addrs, ",")
-				c.Session.Close()
-				c.Session, err = c.Cluster.CreateSession()
-				if err != nil {
-					log.Errorf("cassandra_store: error while attempting to recreate cassandra session. will retry after %d seconds: %v", time.Second*30, err)
-					attempts++
+				c.sessionLock.Lock()
+				for !success {
+					log.Errorf("cassandra_store: creating new session to cassandra using hosts: %v", c.config.Addrs)
+					// c.Cluster.Hosts = strings.Split(c.config.Addrs, ",")
+					if c.Session != nil && !c.Session.Closed() {
+						c.Session.Close()
+						c.Session = nil
+					}
+					c.Session, err = c.Cluster.CreateSession()
+					if err != nil {
+						log.Errorf("cassandra_store: error while attempting to recreate cassandra session. will retry after 5 seconds: %v", err)
+						time.Sleep(time.Second * 5)
+					} else {
+						success = true
+					}
 				}
+				c.sessionLock.Unlock()
 			}
 		case <-c.shutdown:
 			log.Info("cassandra_store: received shutdown, exiting deadConnectionCheck")
+			if c.Session != nil && !c.Session.Closed() {
+				c.Session.Close()
+			}
 			return
 		}
 	}
@@ -554,6 +582,9 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 		ctx:       ctx,
 	}
 
+	c.sessionLock.RLock()
+	defer c.sessionLock.RUnlock()
+
 	select {
 	case <-ctx.Done():
 		// request has been canceled, so no need to continue queuing reads.
@@ -624,7 +655,4 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 func (c *CassandraStore) Stop() {
 	close(c.shutdown)
 	c.wg.Wait()
-	if c.Session != nil && !c.Session.Closed() {
-		c.Session.Close()
-	}
 }
