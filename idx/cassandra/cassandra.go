@@ -560,6 +560,8 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 }
 
 func (c *CasIdx) processWriteQueue() {
+	defer c.wg.Done()
+
 	var success bool
 	var attempts int
 	var err error
@@ -621,9 +623,6 @@ func (c *CasIdx) processWriteQueue() {
 			return
 		}
 	}
-
-	log.Info("cassandra-idx: writeQueue handler ended.")
-	c.wg.Done()
 }
 
 func (c *CasIdx) deadConnectionCheck() {
