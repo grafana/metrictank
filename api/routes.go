@@ -38,6 +38,7 @@ func (s *Server) RegisterRoutes() {
 
 	r.Combo("/getdata", ready, bind(models.GetData{})).Get(s.getData).Post(s.getData)
 
+	// Intra-cluster (inter-node) communication
 	r.Combo("/index/find", ready, bind(models.IndexFind{})).Get(s.indexFind).Post(s.indexFind)
 	r.Combo("/index/list", ready, bind(models.IndexList{})).Get(s.indexList).Post(s.indexList)
 	r.Combo("/index/delete", ready, bind(models.IndexDelete{})).Get(s.indexDelete).Post(s.indexDelete)
@@ -48,14 +49,16 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tags/autoComplete/tags", ready, bind(models.IndexAutoCompleteTags{})).Get(s.indexAutoCompleteTags).Post(s.indexAutoCompleteTags)
 	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTagValues{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
 	r.Combo("/index/tags/delSeries", ready, bind(models.IndexTagDelSeries{})).Get(s.indexTagDelSeries).Post(s.indexTagDelSeries)
-
-	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
+	r.Combo("/index/tags/terms", ready, bind(models.IndexTagTerms{})).Get(s.IndexTagTerms).Post(s.IndexTagTerms)
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)
 	})
 
+	// Miscellaneous MetricTank-only user facing endpoints
 	r.Combo("/showplan", cBody, withOrg, ready, bind(models.GraphiteRender{})).Get(s.showPlan).Post(s.showPlan)
+	r.Combo("/tags/terms", ready, bind(models.GraphiteTagTerms{})).Get(s.graphiteTagTerms).Post(s.graphiteTagTerms)
+	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
 
 	// Graphite endpoints
 	r.Combo("/render", cBody, withOrg, ready, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)

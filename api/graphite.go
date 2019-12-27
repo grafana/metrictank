@@ -1275,6 +1275,38 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32,
 	return vals, nil
 }
 
+func (s *Server) graphiteTagTerms(ctx *middleware.Context, request models.GraphiteTagTerms) {
+	data := models.IndexTagTerms{OrgId: ctx.OrgId, Tags: request.Tags, Expr: request.Expr}
+	responses, err := s.peerQuerySpeculative(ctx.Req.Context(), data, "graphiteTagTerms", "/index/tags/terms")
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	var allTerms models.GraphiteTagTermsResp
+	allTerms.Terms = make(map[string]map[string]uint32)
+
+	for _, peerResponse := range responses {
+		var resp models.GraphiteTagTermsResp
+		_, err = resp.UnmarshalMsg(peerResponse.buf)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+		allTerms.TotalSeries += resp.TotalSeries
+		for tag, terms := range resp.Terms {
+			if _, ok := allTerms.Terms[tag]; !ok {
+				allTerms.Terms[tag] = make(map[string]uint32)
+			}
+			for val, count := range terms {
+				allTerms.Terms[tag][val] += count
+			}
+
+		}
+	}
+	response.Write(ctx, response.NewJson(200, allTerms, ""))
+}
+
 func (s *Server) graphiteFunctions(ctx *middleware.Context) {
 	ctx.Req.Request.Body = ctx.Body
 	graphiteProxy.ServeHTTP(ctx.Resp, ctx.Req.Request)

@@ -1110,6 +1110,62 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 	return results
 }
 
+func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query tagquery.Query) (uint32, map[string]map[string]uint32) {
+	if !TagSupport {
+		log.Warn("memory-idx: received tag query, but tag support is disabled")
+		return 0, nil
+	}
+
+	queryCtx := NewTagQueryContext(query)
+
+	needsName := false
+	terms := make(map[string]map[string]uint32)
+	for _, tag := range tags {
+		if tag == "name" {
+			needsName = true
+		}
+		terms[tag] = make(map[string]uint32)
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	// TODO - terms for meta tags?
+
+	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
+	resCh := m.idsByTagQuery(orgID, queryCtx)
+
+	var totalResults uint32
+	for id := range resCh {
+		def, ok := m.defById[id]
+		if !ok {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
+			continue
+		}
+
+		totalResults++
+
+		for _, tag := range def.Tags {
+			tagValue := strings.SplitN(tag, "=", 2)
+			if len(tagValue) < 2 {
+				// should never happen because invalid tags should get rejected at ingestion
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: tag \"%s\" is invalid because it has no \"=\"", tag)
+				continue
+			}
+			if tagTerm, ok := terms[tagValue[0]]; ok {
+				tagTerm[tagValue[1]]++
+			}
+		}
+		if needsName {
+			terms["name"][def.Name]++
+		}
+	}
+
+	return totalResults, terms
+}
+
 // Tags returns a list of all tag keys associated with the metrics of a given
 // organization. The return values are filtered by the regex in the second parameter.
 func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []string {

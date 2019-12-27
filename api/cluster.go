@@ -290,6 +290,24 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 	response.Write(ctx, response.NewMsgp(200, res))
 }
 
+func (s *Server) IndexTagTerms(ctx *middleware.Context, req models.IndexTagTerms) {
+	// query nodes don't own any data.
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, &models.GraphiteTagTermsResp{}))
+		return
+	}
+
+	query, err := tagquery.NewQueryFromStrings(req.Expr, 0)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	total, terms := s.MetricIndex.FindTerms(req.OrgId, req.Tags, query)
+
+	response.Write(ctx, response.NewMsgp(200, &models.GraphiteTagTermsResp{TotalSeries: total, Terms: terms}))
+}
+
 func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByTag) {
 
 	// query nodes don't own any data.
