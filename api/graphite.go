@@ -692,7 +692,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 			}
 
 			remainingSeriesLimit := maxSeriesPerReq - len(reqs)
-			if remainingSeriesLimit <= 0 {
+			if remainingSeriesLimit <= 0 && maxSeriesPerReq > 0 {
 				// Use 1 to enable series count checking.
 				remainingSeriesLimit = 1
 			}
