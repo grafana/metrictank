@@ -90,10 +90,16 @@ var (
 		false,
 		"More detailed logging",
 	)
+	customHeadersString = flag.String(
+		"custom-headers",
+		"",
+		"headers to add to every request, in the format \"<name>:<value>;<name>:<value>\"",
+	)
 	schemas        conf.Schemas
 	nameFilter     *regexp.Regexp
 	processedCount uint32
 	skippedCount   uint32
+	customHeaders  map[string]string
 )
 
 func init() {
@@ -110,6 +116,17 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	} else {
 		log.SetLevel(log.InfoLevel)
+	}
+
+	if len(*customHeadersString) > 0 {
+		customHeaders = make(map[string]string)
+		for _, header := range strings.Split(*customHeadersString, ";") {
+			splits := strings.SplitN(header, ":", 2)
+			if len(splits) < 2 {
+				panic(fmt.Sprintf("Invalid custom headers specified: %q", *customHeadersString))
+			}
+			customHeaders[splits[0]] = splits[1]
+		}
 	}
 
 	nameFilter = regexp.MustCompile(*nameFilterPattern)
@@ -190,6 +207,9 @@ func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
 
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Content-Encoding", "gzip")
+			for name, value := range customHeaders {
+				req.Header.Set(name, value)
+			}
 
 			if len(*httpAuth) > 0 {
 				req.Header.Add("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(*httpAuth)))
