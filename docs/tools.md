@@ -890,6 +890,8 @@ to see UTC times, just prefix command with TZ=UTC
 
 ```
 Usage of ./mt-whisper-importer-reader:
+  -custom-headers string
+    	headers to add to every request, in the format "<name>:<value>;<name>:<value>"
   -dst-schemas string
     	The filename of the output schemas definition file
   -http-auth string
