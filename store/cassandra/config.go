@@ -2,6 +2,7 @@ package cassandra
 
 import (
 	"flag"
+	"time"
 
 	"github.com/grafana/globalconf"
 )
@@ -30,6 +31,8 @@ type StoreConfig struct {
 	Username                 string
 	Password                 string
 	SchemaFile               string
+	ConnectionCheckInterval  time.Duration
+	ConnectionCheckTimeout   time.Duration
 }
 
 // return StoreConfig with default values set.
@@ -58,6 +61,8 @@ func NewStoreConfig() *StoreConfig {
 		Username:                 "cassandra",
 		Password:                 "cassandra",
 		SchemaFile:               "/etc/metrictank/schema-store-cassandra.toml",
+		ConnectionCheckInterval:  time.Second * 5,
+		ConnectionCheckTimeout:   time.Second * 30,
 	}
 }
 
@@ -88,6 +93,8 @@ func ConfigSetup() *flag.FlagSet {
 	cas.StringVar(&CliConfig.Username, "username", CliConfig.Username, "username for authentication")
 	cas.StringVar(&CliConfig.Password, "password", CliConfig.Password, "password for authentication")
 	cas.StringVar(&CliConfig.SchemaFile, "schema-file", CliConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
+	cas.DurationVar(&CliConfig.ConnectionCheckInterval, "connection-check-interval", CliConfig.ConnectionCheckInterval, "interval at which to perform a connection check to cassandra, set to 0 to disable.")
+	cas.DurationVar(&CliConfig.ConnectionCheckTimeout, "connection-check-timeout", CliConfig.ConnectionCheckTimeout, "maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval.")
 	globalconf.Register("cassandra", cas, flag.ExitOnError)
 	return cas
 }

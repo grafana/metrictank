@@ -118,8 +118,8 @@ func (c *CasIdx) pollStore() {
 func (c *CasIdx) loadMetaRecords() {
 	q := fmt.Sprintf("SELECT batchid, orgid, createdat, lastupdate FROM %s", c.Config.MetaRecordBatchTable)
 
-	c.sessionLock.RLock()
-	iter := c.Session.Query(q).RetryPolicy(&metaRecordRetryPolicy).Iter()
+	session := c.Session.CurrentSession()
+	iter := session.Query(q).RetryPolicy(&metaRecordRetryPolicy).Iter()
 	var batchId gocql.UUID
 	var orgId uint32
 	var createdAt, lastUpdate uint64
@@ -134,18 +134,16 @@ func (c *CasIdx) loadMetaRecords() {
 	var err error
 	if err = iter.Close(); err != nil {
 		log.Errorf("Error when loading batches of meta records: %s", err.Error())
-		c.sessionLock.RUnlock()
 		return
 	}
-	c.sessionLock.RUnlock()
 
 	for orgId, batchId := range toLoad {
 		log.Infof("cassandra-idx: Loading meta record batch %s of org %d", batchId.String(), orgId)
 		var expressions, metatags string
 		q = fmt.Sprintf("SELECT expressions, metatags FROM %s WHERE batchid=? AND orgid=?", c.Config.MetaRecordTable)
 
-		c.sessionLock.RLock()
-		iter = c.Session.Query(q, batchId, orgId).RetryPolicy(&metaRecordRetryPolicy).Iter()
+		session := c.Session.CurrentSession()
+		iter = session.Query(q, batchId, orgId).RetryPolicy(&metaRecordRetryPolicy).Iter()
 
 		var records []tagquery.MetaTagRecord
 		for iter.Scan(&expressions, &metatags) {
@@ -167,10 +165,8 @@ func (c *CasIdx) loadMetaRecords() {
 
 		if err = iter.Close(); err != nil {
 			log.Errorf("Error when reading meta records: %s", err.Error())
-			c.sessionLock.RUnlock()
 			continue
 		}
-		c.sessionLock.RUnlock()
 
 		if err = c.MemoryIndex.MetaTagRecordSwap(orgId, records); err != nil {
 			log.Errorf("Error when swapping batch of meta records: %s", err.Error())
@@ -188,8 +184,8 @@ func (c *CasIdx) pruneMetaRecords() {
 		default:
 			q := fmt.Sprintf("SELECT batchid, orgid, createdat FROM %s", c.Config.MetaRecordBatchTable)
 
-			c.sessionLock.RLock()
-			iter := c.Session.Query(q).RetryPolicy(&metaRecordRetryPolicy).Iter()
+			session := c.Session.CurrentSession()
+			iter := session.Query(q).RetryPolicy(&metaRecordRetryPolicy).Iter()
 			var batchId gocql.UUID
 			var orgId uint32
 			var createdAt uint64
@@ -207,7 +203,6 @@ func (c *CasIdx) pruneMetaRecords() {
 					}
 				}
 			}
-			c.sessionLock.RUnlock()
 			time.Sleep(c.Config.MetaRecordPruneInterval)
 		}
 	}
@@ -216,9 +211,8 @@ func (c *CasIdx) pruneMetaRecords() {
 func (c *CasIdx) pruneBatch(orgId uint32, batchId gocql.UUID) error {
 	qry := fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND batchid=?", c.Config.MetaRecordTable)
 
-	c.sessionLock.RLock()
-	defer c.sessionLock.RUnlock()
-	err := c.Session.Query(
+	session := c.Session.CurrentSession()
+	err := session.Query(
 		qry,
 		orgId,
 		batchId,
@@ -228,7 +222,7 @@ func (c *CasIdx) pruneBatch(orgId uint32, batchId gocql.UUID) error {
 	}
 
 	qry = fmt.Sprintf("DELETE FROM %s WHERE orgid=? AND batchid=?", c.Config.MetaRecordBatchTable)
-	return c.Session.Query(
+	return session.Query(
 		qry,
 		orgId,
 		batchId,
@@ -269,13 +263,11 @@ func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord
 }
 
 func (c *CasIdx) markMetaRecordBatchUpdated(orgId uint32, batchId gocql.UUID) error {
-	c.sessionLock.RLock()
-	defer c.sessionLock.RUnlock()
-
+	session := c.Session.CurrentSession()
 	now := time.Now().UnixNano() / 1000000
 	if batchId == defaultBatchId {
 		qry := fmt.Sprintf("INSERT INTO %s (orgid, batchid, createdat, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordBatchTable)
-		return c.Session.Query(
+		return session.Query(
 			qry,
 			orgId,
 			batchId,
@@ -285,7 +277,7 @@ func (c *CasIdx) markMetaRecordBatchUpdated(orgId uint32, batchId gocql.UUID) er
 	}
 
 	qry := fmt.Sprintf("INSERT INTO %s (orgid, batchid, lastupdate) VALUES (?, ?, ?)", c.Config.MetaRecordBatchTable)
-	return c.Session.Query(
+	return session.Query(
 		qry,
 		orgId,
 		batchId,
@@ -320,8 +312,8 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 		}
 		qry = fmt.Sprintf("INSERT INTO %s (batchid, orgid, expressions, metatags) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
 
-		c.sessionLock.RLock()
-		err = c.Session.Query(
+		session := c.Session.CurrentSession()
+		err = session.Query(
 			qry,
 			newBatchId,
 			orgId,
@@ -329,22 +321,18 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 			metaTags,
 		).RetryPolicy(&metaRecordRetryPolicy).Exec()
 		if err != nil {
-			c.sessionLock.RUnlock()
 			return fmt.Errorf("Failed to save meta record: %s", err)
 		}
-		c.sessionLock.RUnlock()
 	}
 
 	return c.createNewBatch(orgId, newBatchId)
 }
 
 func (c *CasIdx) createNewBatch(orgId uint32, batchId gocql.UUID) error {
-	c.sessionLock.RLock()
-	defer c.sessionLock.RUnlock()
-
+	session := c.Session.CurrentSession()
 	now := time.Now().UnixNano() / 1000000
 	qry := fmt.Sprintf("INSERT INTO %s (orgid, batchid, createdat, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordBatchTable)
-	return c.Session.Query(
+	return session.Query(
 		qry,
 		orgId,
 		batchId,
@@ -363,10 +351,9 @@ func (c *CasIdx) persistMetaRecord(orgId uint32, batchId gocql.UUID, record tagq
 		return fmt.Errorf("Failed to marshal meta tags: %s", err)
 	}
 
-	c.sessionLock.RLock()
-	defer c.sessionLock.RUnlock()
+	session := c.Session.CurrentSession()
 	qry := fmt.Sprintf("INSERT INTO %s (batchid, orgid, expressions, metatags) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
-	return c.Session.Query(
+	return session.Query(
 		qry,
 		batchId,
 		orgId,
@@ -380,10 +367,9 @@ func (c *CasIdx) deleteMetaRecord(orgId uint32, batchId gocql.UUID, record tagqu
 		return fmt.Errorf("Failed to marshal record expressions: %s", err)
 	}
 
-	c.sessionLock.RLock()
-	defer c.sessionLock.RUnlock()
+	session := c.Session.CurrentSession()
 	qry := fmt.Sprintf("DELETE FROM %s WHERE batchid=? AND orgid=? AND expressions=?", c.Config.MetaRecordTable)
-	return c.Session.Query(
+	return session.Query(
 		qry,
 		batchId,
 		orgId,
