@@ -54,13 +54,6 @@
       "type": "row"
     },
     {
-      "aliasColors": {
-        "ES backpressure": "#052B51",
-        "add-to-closed": "#C15C17",
-        "primary": "#2F575E",
-        "store backpressure": "#962D82",
-        "too old": "#890F02"
-      },
       "bars": false,
       "dashLength": 10,
       "dashes": false,
@@ -95,16 +88,27 @@
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "alias": "too old",
-          "lines": false,
-          "points": true
+          "alias": "/decode err/",
+          "color": "#890F02",
+          "yaxis": 2
         },
         {
-          "alias": "primary",
-          "fill": 3,
-          "lines": true,
-          "linewidth": 0,
-          "points": false,
+          "alias": "/discarded/",
+          "color": "#C15C17",
+          "yaxis": 2
+        },
+        {
+          "alias": "/tank.discarded/",
+	  "color": "#e02F44",
+          "lines": false,
+          "points": true,
+          "yaxis": 2
+        },
+        {
+          "alias": "/warning/",
+	  "color": "#fa6400",
+          "lines": false,
+          "points": true,
           "yaxis": 2
         },
         {
@@ -127,18 +131,6 @@
           "lines": true,
           "points": false,
           "stack": "A"
-        },
-        {
-          "alias": "/invalid/",
-          "color": "#C15C17"
-        },
-        {
-          "alias": "/decode err/",
-          "color": "#890F02"
-        },
-        {
-          "alias": "/unknown/",
-          "color": "#890F02"
         }
       ],
       "spaceLength": 10,
@@ -155,22 +147,18 @@
         },
         {
           "refId": "C",
-          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.discarded.invalid*.counter32), 'sum', 5, 6, 7, 8)"
+          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.discarded.*.counter32), 'sum', 5, 6, 7, 8)"
         },
         {
           "refId": "D",
-          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.input.*.*.discarded.unknown.counter32), 'sum', 5, 6, 7, 8)"
+          "target": "groupByNodes(perSecond(metrictank.stats.$environment.$instance.tank.discarded.*.counter32), 'sum', 4, 5, 6)"
         },
         {
           "refId": "E",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.discarded.sample-out-of-order.counter32)), 'too old')"
+          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.sample-too-far-ahead.counter32)), 'warning-too-far-ahead')"
         },
         {
           "refId": "F",
-          "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.discarded.received-too-late.counter32)), 'add-to-saved')"
-        },
-        {
-          "refId": "G",
           "target": "alias(sumSeries(perSecond(metrictank.stats.$environment.$instance.tank.metrics_reordered.counter32)), 'reordered')"
         }
       ],
@@ -202,10 +190,10 @@
           "show": true
         },
         {
-          "format": "percentunit",
+          "format": "hertz",
           "logBase": 1,
           "max": null,
-          "min": 0,
+          "min": null,
           "show": true
         }
       ],
