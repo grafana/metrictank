@@ -48,7 +48,7 @@ var (
 	// metric tank.sample-too-far-ahead is count of points with a timestamp which is too far in the future,
 	// beyond the limitation of the future tolerance window defined via the retention.future-tolerance-ratio
 	// parameter. it also gets increased if the enforcement of the future tolerance is disabled, this is
-	// useful for prediciting whether data points would get rejected once enforcement gets turned on.
+	// useful for predicting whether data points would get rejected once enforcement gets turned on.
 	sampleTooFarAhead = stats.NewCounterRate32("tank.sample-too-far-ahead")
 
 	// metric tank.discarded.received-too-late is points received for the most recent chunk
