@@ -1313,3 +1313,85 @@ func TestPointsConversionAvg2(t *testing.T) {
 	verifyPointMaps(t, points2_1, expectedPoints2_1)
 	verifyPointMaps(t, points3_1, expectedPoints3_1)
 }
+
+// TestPointsConversionSchemaCombo1 tests a conversion where 2 input archives
+// could be used to generate the desired output archive. The first one has a
+// sufficiently long retention to satisfy the requested retention period and
+// the second has a sufficiently high resolution to satisfy the requested
+// resolution.
+// Testing fix for bug https://github.com/grafana/metrictank/issues/1596
+func TestPointsConversionSchemaCombo1(t *testing.T) {
+	c := converter{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 4},
+			{SecondsPerPoint: 2, Points: 4},
+		},
+
+		points: map[int][]whisper.Point{
+			0: {
+				{Timestamp: 1578215448, Value: float64(5)},
+				{Timestamp: 1578215449, Value: float64(6)},
+				{Timestamp: 1578215450, Value: float64(7)},
+				{Timestamp: 1578215451, Value: float64(8)},
+			},
+			1: {
+				{Timestamp: 1578215444, Value: float64(1.5)},
+				{Timestamp: 1578215446, Value: float64(3.5)},
+				{Timestamp: 1578215448, Value: float64(5.5)},
+				{Timestamp: 1578215450, Value: float64(7.5)},
+			},
+		},
+		method: schema.Sum,
+		until:  math.MaxUint32,
+	}
+
+	expectedPoints1 := map[schema.Method][]whisper.Point{
+		schema.Sum: {
+			{Timestamp: 1578215448, Value: float64(5.5)},
+			{Timestamp: 1578215450, Value: float64(7.5)},
+		},
+	}
+
+	points1 := c.getPoints(0, 2, 2)
+	verifyPointMaps(t, points1, expectedPoints1)
+}
+
+func TestPointsConversionWithoutAnyChange(t *testing.T) {
+	inputPoints := map[int][]whisper.Point{
+		0: {
+			{Timestamp: 1578215448, Value: float64(5)},
+			{Timestamp: 1578215449, Value: float64(6)},
+			{Timestamp: 1578215450, Value: float64(7)},
+			{Timestamp: 1578215451, Value: float64(8)},
+		},
+		1: {
+			{Timestamp: 1578215444, Value: float64(1.5)},
+			{Timestamp: 1578215446, Value: float64(3.5)},
+			{Timestamp: 1578215448, Value: float64(5.5)},
+			{Timestamp: 1578215450, Value: float64(7.5)},
+		},
+	}
+
+	expected0 := map[schema.Method][]whisper.Point{
+		schema.Sum: inputPoints[0],
+	}
+	expected1 := map[schema.Method][]whisper.Point{
+		schema.Sum: inputPoints[1],
+	}
+
+	c := converter{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 4},
+			{SecondsPerPoint: 2, Points: 4},
+		},
+
+		points: inputPoints,
+		method: schema.Sum,
+		until:  math.MaxUint32,
+	}
+
+	points1 := c.getPoints(0, 1, 4)
+	points2 := c.getPoints(0, 2, 4)
+	verifyPointMaps(t, points1, expected0)
+	verifyPointMaps(t, points2, expected1)
+}
