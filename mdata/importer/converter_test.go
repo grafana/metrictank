@@ -1355,3 +1355,36 @@ func TestPointsConversionSchemaCombo1(t *testing.T) {
 	points1 := c.getPoints(0, 2, 2)
 	verifyPointMaps(t, points1, expectedPoints1)
 }
+
+func TestPointsConversionWithoutAnyChange(t *testing.T) {
+	inputPoints := map[int][]whisper.Point{
+		0: {
+			{Timestamp: 1578215448, Value: float64(5)},
+			{Timestamp: 1578215449, Value: float64(6)},
+			{Timestamp: 1578215450, Value: float64(7)},
+			{Timestamp: 1578215451, Value: float64(8)},
+		},
+		1: {
+			{Timestamp: 1578215444, Value: float64(1.5)},
+			{Timestamp: 1578215446, Value: float64(3.5)},
+			{Timestamp: 1578215448, Value: float64(5.5)},
+			{Timestamp: 1578215450, Value: float64(7.5)},
+		},
+	}
+
+	c := converter{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 1, Points: 4},
+			{SecondsPerPoint: 2, Points: 4},
+		},
+
+		points: inputPoints,
+		method: schema.Sum,
+		until:  math.MaxUint32,
+	}
+
+	points1 := c.getPoints(0, 1, 4)
+	points2 := c.getPoints(0, 2, 4)
+	verifyPointMaps(t, points1, inputPoints[0])
+	verifyPointMaps(t, points2, inputPoints[1])
+}
