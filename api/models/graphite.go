@@ -26,6 +26,7 @@ import (
 //msgp:ignore GraphiteTagDetailsValueResp
 //msgp:ignore GraphiteTagFindSeries
 //msgp:ignore GraphiteTagFindSeriesResp
+//msgp:ignore GraphiteTagFindSeriesLastUpdateResp
 //msgp:ignore GraphiteTagResp
 //msgp:ignore GraphiteTags
 //msgp:ignore GraphiteTagsResp
@@ -33,6 +34,7 @@ import (
 //msgp:ignore MetricsDelete
 //msgp:ignore SeriesCompleter
 //msgp:ignore SeriesCompleterItem
+//msgp:ignore SeriesLastUpdate
 //msgp:ignore SeriesTree
 //msgp:ignore SeriesTreeItem
 
@@ -119,7 +121,7 @@ type GraphiteTagDetailsValueResp struct {
 type GraphiteTagFindSeries struct {
 	Expr   []string `json:"expr" form:"expr"`
 	From   int64    `json:"from" form:"from"`
-	Format string   `json:"format" form:"format" binding:"Default(seriesjson)"`
+	Format string   `json:"format" form:"format" binding:"Default(series-json)"`
 	Limit  int      `json:"limit" binding:"Default(0)"`
 }
 
