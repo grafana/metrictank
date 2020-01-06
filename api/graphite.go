@@ -1046,7 +1046,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	}
 
 	switch request.Format {
-	case "lastupdate-json":
+	case "lastts-json":
 		seriesVals := make([]models.SeriesLastUpdate, 0, len(series))
 		for _, serie := range series {
 			var lastUpdate int64
@@ -1062,7 +1062,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 		response.Write(ctx, response.NewJson(200, models.GraphiteTagFindSeriesLastUpdateResp{Series: seriesVals}, ""))
 	default:
 		// Backwards compatibility note:
-		// Before `Format` was added, it was ignored if specified. So, treat unknown formats as `seriesjson`.
+		// Before `Format` was added, it was ignored if specified. So, treat unknown formats as `series-json`.
 		seriesNames := make([]string, 0, len(series))
 		for _, serie := range series {
 			seriesNames = append(seriesNames, serie.Pattern)

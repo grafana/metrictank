@@ -279,7 +279,7 @@ that duplicate entries will be returned.
 
 * expr (required): a list of [tag expressions](#tag-expressions)
 * from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
-* format: series-json, lastupdate-json. (defaults to series-json)
+* format: series-json, lastts-json. (defaults to series-json)
 * limit: max number to return, 0 to defer to the instance configured max (default: 0). Note: if limit is 0 or greater than the instance configured max and the result set is greater than the instance configured max, an error is returned. Otherwise, the result set is truncated at the limit
 
 ##### Example
@@ -293,7 +293,7 @@ curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&e
 ```
 
 ```sh
-curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastupdate-json"
+curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastts-json"
 
 {
     "series": [

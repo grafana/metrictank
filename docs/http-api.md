@@ -81,8 +81,8 @@ that duplicate entries will be returned.
 
 * expr (required): a list of [tag expressions](#tag-expressions)
 * from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
-* format: series-json, lastupdate-json. (defaults to series-json)
-* limit: max number to return, 0 to defer to the instance configured max (default: 0). Note: if limit is 0 or greater than the instance configured max and the result set is greater than the instance configured max, an error is returned. Otherwise, the result set is truncated at the limit
+* format: series-json, lastts-json. (defaults to series-json)
+* limit: max number to return, 0 to defer to `http.max-series-per-req` (default: 0). Note: if limit is 0 or greater than `http.max-series-per-req` and the result set is greater than `http.max-series-per-req`, an error is returned. Otherwise, the result set is truncated at the limit
 
 ##### Example
 
@@ -95,7 +95,7 @@ curl "http://localhost:6060/tags/findSeries?expr=datacenter=dc1&expr=server=web0
 ```
 
 ```sh
-curl "http://localhost:6060/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastupdate-json"
+curl "http://localhost:6060/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastts-json"
 
 {
     "series": [
