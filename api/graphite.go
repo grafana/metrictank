@@ -38,10 +38,6 @@ var MissingOrgHeaderErr = errors.New("orgId not set in headers")
 var MissingQueryErr = errors.New("missing query param")
 var InvalidFormatErr = errors.New("invalid format specified")
 var InvalidTimeRangeErr = errors.New("invalid time range requested")
-var TooManySeriesErr = response.NewError(
-	http.StatusRequestEntityTooLarge,
-	"Request exceeds max-series-per-req limit. Reduce the number of targets or ask your admin to increase the limit.")
-
 var renderReqProxied = stats.NewCounter32("api.request.render.proxied")
 
 var (
@@ -1032,7 +1028,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	}
 
 	series, err := s.clusterFindByTag(reqCtx, ctx.OrgId, expressions, request.From, limit, isSoftLimit)
-	if err != nil && (!isSoftLimit || err != TooManySeriesErr) {
+	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
@@ -1098,8 +1094,12 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 						Series:  []idx.Node{series},
 					})
 				}
+				return allSeries, nil
 			}
-			return allSeries, TooManySeriesErr
+			return nil,
+				response.NewError(
+					http.StatusRequestEntityTooLarge,
+					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
 		}
 
 		for _, series := range resp.Metrics {
