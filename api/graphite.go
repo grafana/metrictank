@@ -1041,9 +1041,15 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	default:
 	}
 
+	var warnings []string
+	if len(series) == limit {
+		warnings = append(warnings, "Result set truncated due to limit")
+	}
+
 	switch request.Format {
 	case "lastts-json":
-		seriesVals := make([]models.SeriesLastUpdate, 0, len(series))
+		retval := models.GraphiteTagFindSeriesLastTsResp{Warnings: warnings}
+		retval.Series = make([]models.SeriesLastTs, 0, len(series))
 		for _, serie := range series {
 			var lastUpdate int64
 			for _, node := range serie.Series {
@@ -1053,17 +1059,22 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 					}
 				}
 			}
-			seriesVals = append(seriesVals, models.SeriesLastUpdate{Series: serie.Pattern, Ts: lastUpdate})
+			retval.Series = append(retval.Series, models.SeriesLastTs{Series: serie.Pattern, Ts: lastUpdate})
 		}
-		response.Write(ctx, response.NewJson(200, models.GraphiteTagFindSeriesLastUpdateResp{Series: seriesVals}, ""))
-	default:
-		// Backwards compatibility note:
-		// Before `Format` was added, it was ignored if specified. So, treat unknown formats as `series-json`.
+
+		response.Write(ctx, response.NewJson(200, retval, ""))
+	case "series-json":
 		seriesNames := make([]string, 0, len(series))
 		for _, serie := range series {
 			seriesNames = append(seriesNames, serie.Pattern)
 		}
-		response.Write(ctx, response.NewJson(200, seriesNames, ""))
+
+		if request.Meta == true {
+			retval := models.GraphiteTagFindSeriesMetaResp{Series: seriesNames, Warnings: warnings}
+			response.Write(ctx, response.NewJson(200, retval, ""))
+		} else {
+			response.Write(ctx, response.NewJson(200, seriesNames, ""))
+		}
 	}
 }
 
