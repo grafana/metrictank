@@ -83,6 +83,7 @@ that duplicate entries will be returned.
 * from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
 * format: series-json, lastts-json. (defaults to series-json)
 * limit: max number to return, 0 to defer to `http.max-series-per-req` (default: 0). Note: if limit is 0 or greater than `http.max-series-per-req` and the result set is greater than `http.max-series-per-req`, an error is returned. Otherwise, the result set is truncated at the limit
+* meta: If false and format is `series-json` then return series names as array (graphite compatibility). If true, include meta information like warnings.  (defaults to false)
 
 ##### Example
 
