@@ -280,7 +280,9 @@ that duplicate entries will be returned.
 * expr (required): a list of [tag expressions](#tag-expressions)
 * from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
 * format: series-json, lastts-json. (defaults to series-json)
-* limit: max number to return, 0 to defer to the instance configured max (default: 0). Note: if limit is 0 or greater than the instance configured max and the result set is greater than the instance configured max, an error is returned. Otherwise, the result set is truncated at the limit
+* limit: max number to return. (default: 0)
+  Note: the resultset is also subjected to the cluster configuration.
+  if the result set is larger than the cluster configuration, an error is returned. If it breaches the provided limit, the result is truncated.
 * meta: If false and format is `series-json` then return series names as array (graphite compatibility). If true, include meta information like warnings.  (defaults to false)
 
 ##### Example

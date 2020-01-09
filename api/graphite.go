@@ -1017,9 +1017,8 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 		return
 	}
 
-	// If limit is specified and less than the global `maxSeriesPerReq` (or `maxSeriesPerReq` is disabled),
-	// then this is a "soft" limit, meaning we stop and don't return an error. If global `maxSeriesPerReq`
-	// exists, then respect that
+	// Out of the provided soft limit and the global `maxSeriesPerReq` hard limit
+	// (either of which may be 0 aka disabled), pick the only one that matters: the most strict one.
 	isSoftLimit := true
 	limit := request.Limit
 	if maxSeriesPerReq > 0 && (limit == 0 || limit > maxSeriesPerReq) {
@@ -1078,6 +1077,8 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	}
 }
 
+// clusterFindByTag returns the Series matching the given expressions.
+// If maxSeries is > 0, it specifies a limit which will truncate the resultset (if softLimit is true) or return an error otherwise.
 func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagquery.Expressions, from int64, maxSeries int, softLimit bool) ([]Series, error) {
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions.Strings(), From: from}
 	newCtx, cancel := context.WithCancel(ctx)
