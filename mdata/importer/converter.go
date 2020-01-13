@@ -11,12 +11,13 @@ import (
 
 type converter struct {
 	archives []whisper.ArchiveInfo
-	points   map[int][]whisper.Point
+	points   map[int][]whisper.Point // read from the archives
 	method   schema.Method
 	from     uint32
 	until    uint32
 }
 
+// this needs a comment
 const fakeAvg schema.Method = 255
 
 func newConverter(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, method schema.Method, from, until uint32) *converter {
@@ -24,6 +25,8 @@ func newConverter(arch []whisper.ArchiveInfo, points map[int][]whisper.Point, me
 }
 
 // generates points according to specified parameters by finding and using the best archives as input
+// the arguments specify the desired output archive:
+// retIdx is the index of retention (archive) within the schema rule. spp=seconds per point. nop= number of points
 func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]whisper.Point {
 	res := make(map[schema.Method][]whisper.Point)
 

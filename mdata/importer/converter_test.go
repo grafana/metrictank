@@ -4,9 +4,90 @@ import (
 	"math"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/schema"
 	"github.com/kisielk/whisper-go/whisper"
 )
+
+func MustParseArchive(in string) whisper.ArchiveInfo {
+	archive, err := whisper.ParseArchiveInfo(in)
+	if err != nil {
+		panic(err)
+	}
+	return archive
+}
+
+func TestFindSmallestLargest(t *testing.T) {
+	type testCase struct {
+		name string
+		src  []whisper.ArchiveInfo
+		dst  whisper.ArchiveInfo // note: dest won't actually be a whisper archive, but we use this type to get parsing
+		want []int               // which archives to use
+	}
+	cases := []testCase{
+		{
+			name: "no need for archive with extra high res data even its TTL is long enough",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:1d"),
+				MustParseArchive("15s:5d"),
+			},
+			dst:  MustParseArchive("15s:1d"),
+			want: []int{1},
+		},
+		{
+			name: "no need for any archives with extra high res data even its TTL is long enough",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:1d"),
+				MustParseArchive("10s:2d"),
+				MustParseArchive("15s:5d"),
+			},
+			dst:  MustParseArchive("15s:1d"),
+			want: []int{2},
+		},
+		{
+			name: "avoid sufficiently-high res data that doesn't cleanly align to the needed interval",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1h:2y"),
+				MustParseArchive("3h:3y"),
+			},
+			dst:  MustParseArchive("4h:1y"),
+			want: []int{0},
+		},
+		{
+			name: "pick an archive with a suitable interval - that aligns - that requires least consolidation work",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:12h"),
+				MustParseArchive("2s:1d"),
+				MustParseArchive("6s:2d"),
+				MustParseArchive("24s:3d"),
+				MustParseArchive("48s:4d"),
+			},
+			dst:  MustParseArchive("30s:12h"),
+			want: []int{2}, // 0 or 1 would be fine too, it would just be slightly less efficient
+		},
+		{
+			name: "straightforward case where we need data from 2 archives",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("10s:1d"),
+				MustParseArchive("1m:7d"),
+			},
+			dst:  MustParseArchive("30s:5d"),
+			want: []int{0, 1},
+		},
+	}
+	for i, cas := range cases {
+		c := newConverter(cas.src, nil, 0, 0, 0)
+		a, b := c.findSmallestLargestArchive(cas.dst.SecondsPerPoint, cas.dst.Points)
+		got := []int{a}
+		if b != a {
+			got = append(got, b)
+		}
+
+		if diff := cmp.Diff(cas.want, got); diff != "" {
+			t.Errorf("TestFindSmallestLargest case %d (%s) mismatch (-want +got):\n%s", i, cas.name, diff)
+		}
+	}
+}
 
 func testIncResolution(t *testing.T, inData []whisper.Point, expectedResult map[schema.Method][]whisper.Point, method schema.Method, inRes, outRes, rawRes, from, until uint32) {
 	t.Helper()
