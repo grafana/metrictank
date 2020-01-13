@@ -1116,8 +1116,6 @@ func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query ta
 		return 0, nil
 	}
 
-	queryCtx := NewTagQueryContext(query)
-
 	needsName := false
 	terms := make(map[string]map[string]uint32)
 	for _, tag := range tags {
@@ -1127,10 +1125,10 @@ func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query ta
 		terms[tag] = make(map[string]uint32)
 	}
 
+	queryCtx := NewTagQueryContext(query)
+
 	m.RLock()
 	defer m.RUnlock()
-
-	// TODO - terms for meta tags?
 
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	resCh := m.idsByTagQuery(orgID, queryCtx)

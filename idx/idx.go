@@ -102,7 +102,7 @@ type MetricIndex interface {
 	// that duplicate entries will be returned.
 	FindByTag(orgId uint32, query tagquery.Query) []Node
 
-	// FindTerms tags a query object and executes the query on the index. The query
+	// FindTerms takes a query object and executes the query on the index. The query
 	// is composed of one or many query expressions. From the matching series, a count
 	// is kept for each value of the requested tags.
 	// The series are not deduplicated and in certain cases it is possible that some
