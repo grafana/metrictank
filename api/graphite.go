@@ -686,13 +686,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 			if err != nil {
 				return nil, meta, err
 			}
-
-			remainingSeriesLimit := maxSeriesPerReq - len(reqs)
-			if remainingSeriesLimit <= 0 && maxSeriesPerReq > 0 {
-				// Use 1 to enable series count checking.
-				remainingSeriesLimit = 1
-			}
-			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), remainingSeriesLimit, false)
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs), false)
 		} else {
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		}
@@ -1019,8 +1013,8 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 
 	// Out of the provided soft limit and the global `maxSeriesPerReq` hard limit
 	// (either of which may be 0 aka disabled), pick the only one that matters: the most strict one.
-	isSoftLimit := true
 	limit := request.Limit
+	isSoftLimit := limit > 0
 	if maxSeriesPerReq > 0 && (limit == 0 || limit > maxSeriesPerReq) {
 		limit = maxSeriesPerReq
 		isSoftLimit = false
@@ -1094,8 +1088,9 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 			return nil, err
 		}
 
-		// 0 disables the check, so only check if maxSeriesPerReq > 0
-		if maxSeries > 0 && len(resp.Metrics)+len(allSeries) > maxSeries {
+		// Only check if maxSeriesPerReq > 0 (meaning enabled) or soft-limited
+		checkSeriesLimit := maxSeriesPerReq > 0 || softLimit
+		if checkSeriesLimit && len(resp.Metrics)+len(allSeries) > maxSeries {
 			if softLimit {
 				remainingSpace := maxSeries - len(allSeries)
 				// Fill in up to maxSeries
