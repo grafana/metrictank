@@ -42,7 +42,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-view-boundaries (version: %s - runtime: %s)\n", version, runtime.Version())
+		fmt.Printf("mt-keygen (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
 	d := schema.MetricDefinition{
