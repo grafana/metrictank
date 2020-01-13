@@ -1313,3 +1313,91 @@ func TestPointsConversionAvg2(t *testing.T) {
 	verifyPointMaps(t, points2_1, expectedPoints2_1)
 	verifyPointMaps(t, points3_1, expectedPoints3_1)
 }
+
+// input: 1m:30d,10m:2y
+// output: 10s:2d,1m:30d
+func TestConversionJustUseFirstInputArchive(t *testing.T) {
+	c := converter{
+		archives: []whisper.ArchiveInfo{
+			{SecondsPerPoint: 60, Points: 43200},
+			{SecondsPerPoint: 600, Points: 105120},
+		},
+		points: map[int][]whisper.Point{
+			0: {
+				{1578946320, 1000},
+				{1578946380, 1001},
+				{1578946440, 1002},
+				{1578946500, 1003},
+				{1578946560, 1004},
+				{1578946620, 1005},
+				{1578946680, 1006},
+				{1578946740, 1007},
+				{1578946800, 1008},
+				{1578946860, 1009},
+				{1578946920, 1010},
+				{1578946980, 1011},
+				{1578947040, 1012},
+				{1578947100, 1013},
+				{1578947160, 1014},
+				{1578947220, 1015},
+				{1578947280, 1016},
+				{1578947340, 1017},
+				{1578947400, 1018},
+				{1578947460, 1019},
+				{1578947520, 1020},
+				{1578947580, 1021},
+				{1578947640, 1022},
+				{1578947700, 1023},
+				{1578947760, 1024},
+				{1578947820, 1025},
+				{1578947880, 1026},
+				{1578947940, 1027},
+				{1578948000, 1028},
+			},
+			1: {
+				{1578946200, 1003.5},
+				{1578946800, 1012.5},
+				{1578947400, 1022.5},
+			},
+		},
+		method: schema.Avg,
+		from:   1578946270,
+		until:  1578946500,
+	}
+
+	// conversion to 10s:2d
+	smallest, largest := c.findSmallestLargestArchive(10, 17280)
+	if smallest != 0 || largest != 0 {
+		t.Fatalf("expected smallest / largest archive to be 0 / 0, but they were %d / %d", smallest, largest)
+	}
+
+	points := c.getPoints(0, 10, 17280)
+	expectedPoints := map[schema.Method][]whisper.Point{
+		schema.Avg: {
+			{Timestamp: 1578946270, Value: 1000}, {Timestamp: 1578946280, Value: 1000}, {Timestamp: 1578946290, Value: 1000}, {Timestamp: 1578946300, Value: 1000}, {Timestamp: 1578946310, Value: 1000}, {Timestamp: 1578946320, Value: 1000},
+			{Timestamp: 1578946330, Value: 1001}, {Timestamp: 1578946340, Value: 1001}, {Timestamp: 1578946350, Value: 1001}, {Timestamp: 1578946360, Value: 1001}, {Timestamp: 1578946370, Value: 1001}, {Timestamp: 1578946380, Value: 1001},
+			{Timestamp: 1578946390, Value: 1002}, {Timestamp: 1578946400, Value: 1002}, {Timestamp: 1578946410, Value: 1002}, {Timestamp: 1578946420, Value: 1002}, {Timestamp: 1578946430, Value: 1002}, {Timestamp: 1578946440, Value: 1002},
+			{Timestamp: 1578946450, Value: 1003}, {Timestamp: 1578946460, Value: 1003}, {Timestamp: 1578946470, Value: 1003}, {Timestamp: 1578946480, Value: 1003}, {Timestamp: 1578946490, Value: 1003}, {Timestamp: 1578946500, Value: 1003},
+		},
+	}
+
+	verifyPointMaps(t, points, expectedPoints)
+
+	// conversion to 1m:30d
+	smallest, largest = c.findSmallestLargestArchive(60, 28800)
+	if smallest != 0 || largest != 0 {
+		t.Fatalf("expected smallest / largest archive to be 0 / 0, but they were %d / %d", smallest, largest)
+	}
+
+	points = c.getPoints(1, 60, 43200)
+	expectedPoints = map[schema.Method][]whisper.Point{
+		schema.Sum: {
+			{Timestamp: 1578946320, Value: 1000}, {Timestamp: 1578946380, Value: 1001}, {Timestamp: 1578946440, Value: 1002}, {Timestamp: 1578946500, Value: 1003},
+		},
+		schema.Cnt: {
+			{Timestamp: 1578946320, Value: 1}, {Timestamp: 1578946380, Value: 1}, {Timestamp: 1578946440, Value: 1}, {Timestamp: 1578946500, Value: 1},
+		},
+	}
+
+	verifyPointMaps(t, points, expectedPoints)
+}
