@@ -61,7 +61,7 @@ type CasIdx struct {
 	memory.MemoryIndex
 	Config           *IdxConfig
 	cluster          *gocql.ClusterConfig
-	Session          *util.CassandraSession
+	Session          *cassandra.Session
 	metaRecords      metaRecordStatusByOrg
 	writeQueue       chan writeReq
 	shutdown         chan struct{}
@@ -177,7 +177,7 @@ func (c *CasIdx) InitBare() error {
 		return fmt.Errorf("cassandra-idx: failed to create cassandra session: %s", err)
 	}
 
-	c.Session = util.NewCassandraSession(session, c.cluster, c.shutdown, c.Config.ConnectionCheckTimeout, c.Config.ConnectionCheckInterval, c.Config.Hosts, "cassnadra-idx")
+	c.Session = cassandra.NewSession(session, c.cluster, c.shutdown, c.Config.ConnectionCheckTimeout, c.Config.ConnectionCheckInterval, c.Config.Hosts, "cassnadra-idx")
 
 	return nil
 }

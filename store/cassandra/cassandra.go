@@ -78,7 +78,7 @@ type ChunkReadRequest struct {
 }
 
 type CassandraStore struct {
-	Session          *util.CassandraSession
+	Session          *cassandra.Session
 	cluster          *gocql.ClusterConfig
 	writeQueues      []chan *mdata.ChunkWriteRequest
 	writeQueueMeters []*stats.Range32
@@ -225,7 +225,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 
 	sd := make(chan struct{})
 
-	cs := util.NewCassandraSession(session, cluster, sd, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra_store")
+	cs := cassandra.NewSession(session, cluster, sd, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra_store")
 
 	log.Debugf("cassandra_store: created session with config %+v", config)
 	c := &CassandraStore{
