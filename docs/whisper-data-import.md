@@ -1,7 +1,7 @@
 # Whisper data import
 
 Metrictank comes with a set of tools to import Whisper data into the chunk format used by Metrictank. 
-The usage of the tools is documented on [this page](https://github.com/grafana/metrictank/blob/master/docs/tools.md), this document specifically focuses on how the import procedure of Whisper files works.
+The usage of the tools is documented on [this page](https://github.com/grafana/metrictank/blob/master/docs/tools.md)([reader](https://github.com/grafana/metrictank/blob/master/docs/tools.md#mt-whisper-importer-reader)/[writer](https://github.com/grafana/metrictank/blob/master/docs/tools.md#mt-whisper-importer-writer)), this document specifically focuses on how the import procedure of Whisper files works.
 
 ## Import procedure
 
