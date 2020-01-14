@@ -28,7 +28,7 @@ See the [Makefile](../Makefile) for more targets
 6. Never merge master into your PR. As it mangles Git history and makes things harder to review. Instead, rebase your PR on top of master.
 7. Code must be well formatted. It is checked via `scripts/qa/gofmt.sh`, `make qa`, and circleCI.
 8. Regarding configuration:
-   * Configurantion options and metrictank-sample.ini must be in sync.
+   * Configuration options and metrictank-sample.ini must be in sync.
    * All other configuration files should also be in sync with metrictank-sample.ini except where the file should differ on purpose.
    (Example: `docker/docker-cluster/metrictank.ini` is the same as metrictank-sample.ini except for the options that support the use case of running metrictank in a cluster.)
    Use `scripts/dev/sync-configs.sh` which helps with the process of updating all configs based on metrictank-sample.ini.
