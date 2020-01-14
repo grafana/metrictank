@@ -44,6 +44,25 @@ Example:
 ```
 
 
+## mt-http-gw
+
+```
+mt-http-gw
+
+Usage:
+
+	mt-http-gw [flags]
+
+Flags:
+  -addr string
+    	http service address (default ":80")
+  -metrictank-url string
+    	metrictank address (default "http://localhost:6060")
+  -version
+    	print version string
+```
+
+
 ## mt-index-cat
 
 ```
