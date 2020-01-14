@@ -172,12 +172,12 @@ func (c *CasIdx) InitBare() error {
 
 	tmpSession.Close()
 	c.cluster.Keyspace = c.Config.Keyspace
-	session, err := c.cluster.CreateSession()
+
+	c.Session, err = cassandra.NewSession(c.cluster, c.shutdown, c.Config.ConnectionCheckTimeout, c.Config.ConnectionCheckInterval, c.Config.Hosts, "cassandra-idx")
+
 	if err != nil {
 		return fmt.Errorf("cassandra-idx: failed to create cassandra session: %s", err)
 	}
-
-	c.Session = cassandra.NewSession(session, c.cluster, c.shutdown, c.Config.ConnectionCheckTimeout, c.Config.ConnectionCheckInterval, c.Config.Hosts, "cassnadra-idx")
 
 	return nil
 }
@@ -259,7 +259,7 @@ func (c *CasIdx) Init() error {
 	if c.Config.ConnectionCheckInterval > 0 {
 		log.Infof("cassandra-idx: dead connection check enabled with an interval of %s", c.Config.ConnectionCheckInterval.String())
 		c.wg.Add(1)
-		go c.Session.DeadConnectionCheck(&c.wg)
+		go c.Session.DeadConnectionRefresh(&c.wg)
 	}
 
 	return nil

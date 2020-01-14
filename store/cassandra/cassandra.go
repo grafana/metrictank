@@ -94,12 +94,12 @@ type CassandraStore struct {
 // while also allowing them to be specified as durations.
 func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	if timeoutI, err := strconv.Atoi(timeout); err == nil {
-		log.Warn("cassandra_store: specifying the timeout as integer is deprecated, please use a duration value")
+		log.Warn("cassandra-store: specifying the timeout as integer is deprecated, please use a duration value")
 		return time.Duration(timeoutI) * defaultUnit
 	}
 	timeoutD, err := time.ParseDuration(timeout)
 	if err != nil {
-		log.Fatalf("cassandra_store: invalid duration value %q", timeout)
+		log.Fatalf("cassandra-store: invalid duration value %q", timeout)
 	}
 	return timeoutD
 }
@@ -132,7 +132,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
-		log.Errorf("cassandra_store: failed to create cassandra session. %s", err.Error())
+		log.Errorf("cassandra-store: failed to create cassandra session. %s", err.Error())
 		return nil, err
 	}
 
@@ -143,13 +143,13 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 
 	// create or verify the metrictank keyspace
 	if config.CreateKeyspace {
-		log.Infof("cassandra_store: ensuring that keyspace %s exists.", config.Keyspace)
+		log.Infof("cassandra-store: ensuring that keyspace %s exists.", config.Keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, config.Keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, table := range ttlTables {
-			log.Infof("cassandra_store: ensuring that table %s exists.", table.Name)
+			log.Infof("cassandra-store: ensuring that table %s exists.", table.Name)
 			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
@@ -218,16 +218,15 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", config.HostSelectionPolicy)
 	}
 
-	session, err := cluster.CreateSession()
+	sd := make(chan struct{})
+
+	cs, err := cassandra.NewSession(cluster, sd, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra-store")
+
 	if err != nil {
 		return nil, err
 	}
 
-	sd := make(chan struct{})
-
-	cs := cassandra.NewSession(session, cluster, sd, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra_store")
-
-	log.Debugf("cassandra_store: created session with config %+v", config)
+	log.Debugf("cassandra-store: created session with config %+v", config)
 	c := &CassandraStore{
 		Session:          cs,
 		cluster:          cluster,
@@ -253,9 +252,9 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	}
 
 	if config.ConnectionCheckInterval > 0 {
-		log.Infof("cassandra_store: dead connection check enabled with an interval of %s", config.ConnectionCheckInterval.String())
+		log.Infof("cassandra-store: dead connection check enabled with an interval of %s", config.ConnectionCheckInterval.String())
 		c.wg.Add(1)
-		go c.Session.DeadConnectionCheck(&c.wg)
+		go c.Session.DeadConnectionRefresh(&c.wg)
 	}
 
 	return c, err
@@ -321,12 +320,12 @@ func (c *CassandraStore) Add(cwr *mdata.ChunkWriteRequest) {
 func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *stats.Range32) {
 	defer c.wg.Done()
 
-	ticker := time.NewTicker(time.Second * 1)
+	ticker := time.NewTicker(time.Second)
 
 	for {
 		select {
 		case <-c.shutdown:
-			log.Info("cassandra_store: received shutdown, exiting processWriteQueue")
+			log.Info("cassandra-store: received shutdown, exiting processWriteQueue")
 			ticker.Stop()
 			return
 		case <-ticker.C:
@@ -335,7 +334,7 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			meter.Value(len(queue))
 			keyStr := cwr.Key.String()
 			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("cassandra_store: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
+				log.Debugf("cassandra-store: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
 			}
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
@@ -346,7 +345,7 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			for !success {
 				select {
 				case <-c.shutdown:
-					log.Info("cassandra_store: received shutdown, exiting processWriteQueue")
+					log.Info("cassandra-store: received shutdown, exiting processWriteQueue")
 					ticker.Stop()
 					return
 				default:
@@ -358,13 +357,13 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 							cwr.Callback()
 						}
 						if log.IsLevelEnabled(log.DebugLevel) {
-							log.Debugf("cassandra_store: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
+							log.Debugf("cassandra-store: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
 						}
 						chunkSaveOk.Inc()
 					} else {
 						errmetrics.Inc(err)
 						if (attempts % 20) == 0 {
-							log.Warnf("cassandra_store: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
+							log.Warnf("cassandra-store: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
 						}
 						chunkSaveFail.Inc()
 						sleepTime := 100 * attempts
@@ -462,7 +461,7 @@ func (c *CassandraStore) processReadQueue() {
 			cassGetExecDuration.Value(time.Since(pre))
 			crr.out <- iter
 		case <-c.shutdown:
-			log.Info("cassandra_store: received shutdown, exiting processReadQueue")
+			log.Info("cassandra-store: received shutdown, exiting processReadQueue")
 			return
 		}
 	}

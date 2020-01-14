@@ -1,6 +1,7 @@
 package cassandra
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -20,19 +21,22 @@ type Session struct {
 	sync.RWMutex
 }
 
-// NewSession creates and returns a CassandraSession
-func NewSession(session *gocql.Session,
-	clusterConfig *gocql.ClusterConfig,
+// NewSession creates and returns a Session. Upon failure it will return nil and an error.
+func NewSession(clusterConfig *gocql.ClusterConfig,
 	shutdown chan struct{},
 	timeout time.Duration,
 	interval time.Duration,
 	addrs string,
-	logPrefix string) *Session {
+	logPrefix string) (*Session, error) {
 	if clusterConfig == nil {
-		panic("NewSession received nil pointer for ClusterConfig")
+		log.Errorf("cassandra.NewSession received nil pointer for ClusterConfig")
+		return nil, fmt.Errorf("cassandra.NewSession received nil pointer for ClusterConfig")
 	}
-	if session == nil {
-		panic("NewSession received nil pointer for session")
+
+	session, err := clusterConfig.CreateSession()
+	if err != nil {
+		log.Errorf("cassandra.NewSession failed to create session: %v", err)
+		return nil, err
 	}
 
 	cs := &Session{
@@ -45,20 +49,20 @@ func NewSession(session *gocql.Session,
 		logPrefix:               logPrefix,
 	}
 
-	return cs
+	return cs, nil
 
 }
 
-// DeadConnectionCheck will run a query using the current Cassandra session every connectionCheckInterval
+// DeadConnectionRefresh will run a query using the current Cassandra session every connectionCheckInterval
 // if it cannot query Cassandra for longer than connectionCheckTimeout it will create a new session
 //
 // if you are not using a WaitGroup in the caller, just pass in nil
-func (s *Session) DeadConnectionCheck(wg *sync.WaitGroup) {
+func (s *Session) DeadConnectionRefresh(wg *sync.WaitGroup) {
 	if wg != nil {
 		defer wg.Done()
 	}
 
-	ticker := time.NewTicker(time.Second * s.connectionCheckInterval)
+	ticker := time.NewTicker(s.connectionCheckInterval)
 	var totaltime time.Duration
 	var err error
 	var oldSession *gocql.Session
@@ -68,10 +72,11 @@ OUTER:
 		// connection to Cassandra has been down for longer than the configured timeout
 		if totaltime >= s.connectionCheckTimeout {
 			s.Lock()
+			start := time.Now()
 			for {
 				select {
 				case <-s.shutdown:
-					log.Infof("%s: received shutdown, exiting deadConnectionCheck", s.logPrefix)
+					log.Infof("%s: received shutdown, exiting DeadConnectionRefresh", s.logPrefix)
 					if s.session != nil && !s.session.Closed() {
 						s.session.Close()
 					}
@@ -92,7 +97,7 @@ OUTER:
 						continue
 					}
 					s.Unlock()
-					log.Errorf("%s: reconnecting to cassandra took %v", s.logPrefix, (totaltime - s.connectionCheckTimeout).String())
+					log.Errorf("%s: reconnecting to cassandra took %s", s.logPrefix, time.Since(start).String())
 					totaltime = 0
 					if oldSession != nil {
 						oldSession.Close()
@@ -106,7 +111,7 @@ OUTER:
 
 		select {
 		case <-s.shutdown:
-			log.Infof("%s: received shutdown, exiting deadConnectionCheck", s.logPrefix)
+			log.Infof("%s: received shutdown, exiting DeadConnectionRefresh", s.logPrefix)
 			if s.session != nil && !s.session.Closed() {
 				s.session.Close()
 			}
@@ -115,13 +120,13 @@ OUTER:
 			s.RLock()
 			// this query should work on all cassandra deployments, but we may need to revisit this
 			err = s.session.Query("SELECT cql_version FROM system.local").Exec()
+			s.RUnlock()
 			if err == nil {
 				totaltime = 0
 			} else {
 				totaltime += s.connectionCheckInterval
 				log.Errorf("%s: could not execute connection check query for %v: %v", s.logPrefix, totaltime.String(), err)
 			}
-			s.RUnlock()
 		}
 	}
 }
