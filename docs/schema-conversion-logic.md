@@ -33,8 +33,8 @@ For example when converting `2` datapoints from a `5s` interval archive which ha
 Input:
   Sum: [40 65]
 Output:
-  Sum: [8 8 8 8 8 13 13 13 13 13]
-  Cnt: [1 1 1 1 1 1 1 1 1 1]
+  Sum: [8  8  8  8  8 13 13 13 13 13]
+  Cnt: [1  1  1  1  1  1  1  1  1  1]
 ```
 
 Because the ratio between `5s` interval and `1s` interval is `5`, so `40/5=8` and `65/5=13`.
@@ -60,8 +60,8 @@ However, if the destination archive for the same input is a rollup, so not the f
 Input:
   Avg: [1 2]
 Output:
-  Sum: [5 5 5 5 5 10 10 10 10 10]
-  Cnt: [5 5 5 5 5 5 5 5 5 5]
+  Sum: [5  5  5  5  5 10 10 10 10 10]
+  Cnt: [5  5  5  5  5  5  5  5  5  5]
 ```
 When viewed in Metrictank it divides the sums by the counts, so the averages stay correct.
 
@@ -86,12 +86,12 @@ Destination archive: 1s:30s
 Input archives: 1s:5s,5s:30s
 Input Point Values:
   Archive 1:
-    Sum: [1 2 3 4 5]
+    Sum: [ 1   2   3   4   5]
   Archive 2:
-    Sum: [15 40 65 90 115 140]
+    Sum: [15  40  65  90 115 140]
 Output Point Values:
   Archive 1:
-    Sum: [1 2 3 4 5 8 8 8 8 8 13 13 13 13 13 18 18 18 18 18 23 23 23 23 23 28 28 28 28 28]
-    Cnt: [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+    Sum: [1  2  3  4  5  8  8  8  8  8 13 13 13 13 13 18 18 18 18 18 23 23 23 23 23 28 28 28 28 28]
+    Cnt: [1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1]
 ```
 Note that the ratio between input interval and destination interval is `5` so `40/5=8`, `65/5=13`, `90/5=18`, `115/5=23`, `140/5=28`. At the same time, for the first `5` points it used the higher resolution archive to achieve max accuracy.
