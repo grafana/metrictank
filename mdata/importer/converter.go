@@ -122,7 +122,8 @@ func (c *converter) findSmallestLargestArchive(spp, nop uint32) (int, int) {
 		smallestArchiveIdx = i
 	}
 
-	// find smallest archive that still contains enough data to satisfy requested range
+	// find smallest archive that still contains enough data to satisfy requested range,
+	// check archives in increasing order starting from previously chosen largest
 	for i := smallestArchiveIdx; i < len(c.archives); i++ {
 		largestArchiveIdx = i
 		arch := c.archives[largestArchiveIdx]
