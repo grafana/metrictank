@@ -257,7 +257,7 @@ func (c *CasIdx) Init() error {
 	}
 
 	if c.Config.ConnectionCheckInterval > 0 {
-		log.Infof("cassandra-idx: dead connection check enabled with an interval of %v", c.Config.ConnectionCheckInterval)
+		log.Infof("cassandra-idx: dead connection check enabled with an interval of %s", c.Config.ConnectionCheckInterval.String())
 		c.wg.Add(1)
 		go c.Session.DeadConnectionCheck(&c.wg)
 	}

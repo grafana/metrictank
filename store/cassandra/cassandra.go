@@ -253,7 +253,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	}
 
 	if config.ConnectionCheckInterval > 0 {
-		log.Infof("cassandra_store: dead connection check enabled with an interval of %v", config.ConnectionCheckInterval)
+		log.Infof("cassandra_store: dead connection check enabled with an interval of %s", config.ConnectionCheckInterval.String())
 		c.wg.Add(1)
 		go c.Session.DeadConnectionCheck(&c.wg)
 	}
