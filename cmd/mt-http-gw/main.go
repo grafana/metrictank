@@ -28,6 +28,7 @@ func init() {
 func main() {
 	flag.Usage = func() {
 		fmt.Println("mt-http-gw")
+		fmt.Println("Provides an HTTP gateway for interacting with metrictank, including metrics ingestion")
 		fmt.Println()
 		fmt.Println("Usage:")
 		fmt.Println()

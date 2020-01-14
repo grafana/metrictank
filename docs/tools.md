@@ -48,6 +48,7 @@ Example:
 
 ```
 mt-http-gw
+Provides an HTTP gateway for interacting with metrictank, including metrics ingestion
 
 Usage:
 
