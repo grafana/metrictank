@@ -7,7 +7,7 @@
 /cmd/metrictank/metrictank
 /cmd/mt-aggs-explain/mt-aggs-explain
 /cmd/mt-explain/mt-explain
-/cmd/mt-http-gw/mt-http-gw
+/cmd/mt-gateway/mt-gateway
 /cmd/mt-index-cat/mt-index-cat
 /cmd/mt-index-migrate/mt-index-migrate
 /cmd/mt-index-prune/mt-index-prune

@@ -27,12 +27,12 @@ func init() {
 
 func main() {
 	flag.Usage = func() {
-		fmt.Println("mt-http-gw")
+		fmt.Println("mt-gateway")
 		fmt.Println("Provides an HTTP gateway for interacting with metrictank, including metrics ingestion")
 		fmt.Println()
 		fmt.Println("Usage:")
 		fmt.Println()
-		fmt.Println("	mt-http-gw [flags]")
+		fmt.Println("	mt-gateway [flags]")
 		fmt.Println()
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
@@ -40,7 +40,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("mt-http-gw (version: %s - runtime: %s)\n", version, runtime.Version())
+		fmt.Printf("mt-gateway (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
 
