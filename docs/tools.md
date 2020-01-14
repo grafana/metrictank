@@ -44,15 +44,15 @@ Example:
 ```
 
 
-## mt-http-gw
+## mt-gateway
 
 ```
-mt-http-gw
+mt-gateway
 Provides an HTTP gateway for interacting with metrictank, including metrics ingestion
 
 Usage:
 
-	mt-http-gw [flags]
+	mt-gateway [flags]
 
 Flags:
   -addr string
