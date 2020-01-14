@@ -57,6 +57,10 @@ Usage:
 Flags:
   -addr string
     	http service address (default ":80")
+  -graphite-url string
+    	graphite-api address (default "http://localhost:8080")
+  -importer-url string
+    	mt-whisper-importer-writer address
   -metrictank-url string
     	metrictank address (default "http://localhost:6060")
   -version
