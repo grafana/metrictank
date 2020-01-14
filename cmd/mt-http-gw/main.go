@@ -14,8 +14,8 @@ import (
 var (
 	version       = "(none)"
 	showVersion   = flag.Bool("version", false, "print version string")
-	metrictankUrl = flag.String("metrictank-url", "", "the url of the metrictank instance to proxy requests to")
-	bindAddress   = flag.String("bind-address", ":8080", "the address to bind to")
+	metrictankUrl = flag.String("metrictank-url", "http://localhost:6060", "metrictank address")
+	addr          = flag.String("addr", ":80", "http service address")
 )
 
 func init() {
@@ -50,5 +50,5 @@ func main() {
 	proxy := httputil.NewSingleHostReverseProxy(mtUrl)
 
 	http.HandleFunc("/metrics/index.json", proxy.ServeHTTP)
-	log.Fatal(http.ListenAndServe(*bindAddress, nil))
+	log.Fatal(http.ListenAndServe(*addr, nil))
 }
