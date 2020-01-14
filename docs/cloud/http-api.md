@@ -279,6 +279,11 @@ that duplicate entries will be returned.
 
 * expr (required): a list of [tag expressions](#tag-expressions)
 * from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
+* format: series-json, lastts-json. (defaults to series-json)
+* limit: max number to return. (default: 0)
+  Note: the resultset is also subjected to the cluster configuration.
+  if the result set is larger than the cluster configuration, an error is returned. If it breaches the provided limit, the result is truncated.
+* meta: If false and format is `series-json` then return series names as array (graphite compatibility). If true, include meta information like warnings.  (defaults to false)
 
 ##### Example
 
@@ -288,6 +293,19 @@ curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&e
 [
   "disk.used;datacenter=dc1;rack=a1;server=web01"
 ]
+```
+
+```sh
+curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastts-json"
+
+{
+    "series": [
+        {
+            "lastTs": 1576683990,
+            "val": "disk.used;datacenter=dc1;rack=a1;server=web01"
+        }
+    ]
+}
 ```
 
 ### Render `/render` (return data for a given query)

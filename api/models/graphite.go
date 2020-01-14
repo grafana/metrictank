@@ -26,6 +26,8 @@ import (
 //msgp:ignore GraphiteTagDetailsValueResp
 //msgp:ignore GraphiteTagFindSeries
 //msgp:ignore GraphiteTagFindSeriesResp
+//msgp:ignore GraphiteTagFindSeriesLastTsResp
+//msgp:ignore GraphiteTagFindSeriesMetaResp
 //msgp:ignore GraphiteTagResp
 //msgp:ignore GraphiteTags
 //msgp:ignore GraphiteTagsResp
@@ -33,6 +35,7 @@ import (
 //msgp:ignore MetricsDelete
 //msgp:ignore SeriesCompleter
 //msgp:ignore SeriesCompleterItem
+//msgp:ignore SeriesLastTs
 //msgp:ignore SeriesTree
 //msgp:ignore SeriesTreeItem
 
@@ -117,12 +120,30 @@ type GraphiteTagDetailsValueResp struct {
 }
 
 type GraphiteTagFindSeries struct {
-	Expr []string `json:"expr" form:"expr"`
-	From int64    `json:"from" form:"from"`
+	Expr   []string `json:"expr" form:"expr"`
+	From   int64    `json:"from" form:"from"`
+	Format string   `json:"format" form:"format" binding:"In(,series-json,lastts-json);Default(series-json)"`
+	Limit  int      `json:"limit" binding:"Default(0)"`
+	Meta   bool     `json:"meta" binding:"Default(false)"`
 }
 
 type GraphiteTagFindSeriesResp struct {
 	Series []string `json:"series"`
+}
+
+type SeriesLastTs struct {
+	Series string `json:"val"`
+	Ts     int64  `json:"lastTs"`
+}
+
+type GraphiteTagFindSeriesLastTsResp struct {
+	Series   []SeriesLastTs `json:"series"`
+	Warnings []string       `json:"warnings,omitempty"`
+}
+
+type GraphiteTagFindSeriesMetaResp struct {
+	Series   []string `json:"series"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type GraphiteTagDelSeries struct {
