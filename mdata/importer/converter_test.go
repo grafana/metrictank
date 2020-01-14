@@ -74,6 +74,278 @@ func TestFindSmallestLargest(t *testing.T) {
 			dst:  MustParseArchive("30s:5d"),
 			want: []int{0, 1},
 		},
+
+		// ------
+		// testing all planned conversions,
+		// one case per generated archive of schemas which change
+		// ------
+
+		{
+			name: "ci-tests: keep 3m raw",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("3m:7d"),
+				MustParseArchive("1d:180d"),
+				MustParseArchive("30d:5y"),
+			},
+			dst:  MustParseArchive("3m:7d"),
+			want: []int{0},
+		}, {
+			name: "ci-tests: keep 1h rollup for 5y",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("3m:7d"),
+				MustParseArchive("1d:180d"),
+				MustParseArchive("30d:5y"),
+			},
+			dst:  MustParseArchive("1h:5y"),
+			want: []int{0, 2},
+		},
+		{
+			name: "ci-native_apps-build_errors: keep one retention",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("5m:7d"),
+				MustParseArchive("1d:1y"),
+			},
+			dst:  MustParseArchive("5m:7d"),
+			want: []int{0},
+		}, {
+			name: "ci-native_apps-build_errors: do 1h rollups instead of 1d rollups",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("5m:7d"),
+				MustParseArchive("1d:1y"),
+			},
+			dst:  MustParseArchive("1h:1y"),
+			want: []int{0, 1},
+		},
+		{
+			name: "vms: keep retention 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:5m"),
+				MustParseArchive("5m:14d"),
+				MustParseArchive("14d:5y"),
+			},
+			dst:  MustParseArchive("1s:5m"),
+			want: []int{0},
+		}, {
+			name: "vms: keep retention 1",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:5m"),
+				MustParseArchive("5m:14d"),
+				MustParseArchive("14d:5y"),
+			},
+			dst:  MustParseArchive("5m:14d"),
+			want: []int{1},
+		}, {
+			name: "vms: do 1h rollups instead of 14d rollups",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:5m"),
+				MustParseArchive("5m:14d"),
+				MustParseArchive("14d:5y"),
+			},
+			dst:  MustParseArchive("1h:5y"),
+			want: []int{1, 2},
+		},
+		{
+			name: "analytics: just do raw (1h) for 10y",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1h:30d"),
+				MustParseArchive("1d:10y"),
+			},
+			dst:  MustParseArchive("1h:10y"),
+			want: []int{0, 1},
+		},
+		{
+			name: "performance-asset_stats-build: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:30d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1m:30d"),
+			want: []int{0},
+		}, {
+			name: "performance-asset_stats-build: do 1h rollup instead of 1d",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:30d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1h:3y"),
+			want: []int{0, 1},
+		},
+
+		{
+			name: "performance-appthwack: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("5m:1d"),
+				MustParseArchive("1d:480d"),
+			},
+			dst:  MustParseArchive("5m:1d"),
+			want: []int{0},
+		}, {
+			name: "performance-appthwack: do 1h rollup instead of 1d",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("5m:1d"),
+				MustParseArchive("1d:480d"),
+			},
+			dst:  MustParseArchive("1h:480d"),
+			want: []int{0, 1},
+		},
+		{
+			name: "performance-devicefarm: just do raw (1h) for 3y",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1h:90d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1h:3y"),
+			want: []int{0, 1},
+		},
+		{
+			name: "performance-deployinator: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("5m:60d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("5m:60d"),
+			want: []int{0},
+		}, {
+			name: "performance-deployinator: do 1h rollup instead of 1d",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("5m:60d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1h:3y"),
+			want: []int{0, 1},
+		},
+		{
+			name: "pdu_stats: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:7d"),
+				MustParseArchive("15m:30d"),
+				MustParseArchive("1h:1y"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1m:7d"),
+			want: []int{0},
+		}, {
+			name: "pdu_stats: keep archive 1",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:7d"),
+				MustParseArchive("15m:30d"),
+				MustParseArchive("1h:1y"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("15m:30d"),
+			want: []int{1},
+		}, {
+			name: "pdu_stats: keep 1h rollup for 3y and drop 1d rollup",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:7d"),
+				MustParseArchive("15m:30d"),
+				MustParseArchive("1h:1y"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1h:3y"),
+			want: []int{2, 3},
+		},
+		{
+			name: "mobile-crittercism_live: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:14d"),
+				MustParseArchive("1h:1y"),
+				MustParseArchive("1d:5y"),
+			},
+			dst:  MustParseArchive("1m:14d"),
+			want: []int{0},
+		}, {
+			name: "mobile-crittercism_live: keep 1h rollup for 5year and drop 1d rollup",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:14d"),
+				MustParseArchive("1h:1y"),
+				MustParseArchive("1d:5y"),
+			},
+			dst:  MustParseArchive("1h:5y"),
+			want: []int{1, 2},
+		},
+		{
+			name: "dashboards: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1:300"),
+				MustParseArchive("300:14d"),
+				MustParseArchive("14d:2y"),
+			},
+			dst:  MustParseArchive("1:300"),
+			want: []int{0},
+		}, {
+			name: "dashboards: keep archive 1",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1:300"),
+				MustParseArchive("300:14d"),
+				MustParseArchive("14d:2y"),
+			},
+			dst:  MustParseArchive("300:14d"),
+			want: []int{1},
+		}, {
+			name: "dashboards: do 1h rollup instead of 14d",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1:300"),
+				MustParseArchive("300:14d"),
+				MustParseArchive("14d:2y"),
+			},
+			dst:  MustParseArchive("1h:2y"),
+			want: []int{1, 2},
+		},
+		{
+			name: "shard_lowres: just keep raw (2h) for 5y",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("2h:1w"),
+				MustParseArchive("1d:5y"),
+			},
+			dst:  MustParseArchive("2h:5y"),
+			want: []int{0, 1},
+		},
+		{
+			name: "native_apps-internal-downloads: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:1m"),
+				MustParseArchive("1m:1d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1s:1m"),
+			want: []int{0},
+		}, {
+			name: "native_apps-internal-downloads: keep archive 1",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:1m"),
+				MustParseArchive("1m:1d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1m:1d"),
+			want: []int{1},
+		}, {
+			name: "native_apps-internal-downloads: do 1h rollup instead of 1d",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1s:1m"),
+				MustParseArchive("1m:1d"),
+				MustParseArchive("1d:3y"),
+			},
+			dst:  MustParseArchive("1h:3y"),
+			want: []int{1, 2},
+		},
+		{
+			name: "collectd-sda1-disk: assume correction 10s:2d,1m:30 to 10s:2d,1m:30d: convert from default archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:30d"),
+				MustParseArchive("10m:2y"),
+			},
+			dst:  MustParseArchive("10s:2d"),
+			want: []int{0},
+		}, {
+			name: "collectd-sda1-disk: keep archive 0",
+			src: []whisper.ArchiveInfo{
+				MustParseArchive("1m:30d"),
+				MustParseArchive("10m:2y"),
+			},
+			dst:  MustParseArchive("1m:30d"),
+			want: []int{0},
+		},
 	}
 	for i, cas := range cases {
 		c := newConverter(cas.src, nil, 0, 0, 0)
