@@ -1,6 +1,6 @@
-# Schema conversion logic
+# Schema conversion logic for Whisper data
 
-Metrictank comes with a schema conversion logic (`mdata/importer/converter.go`) which can be used to convert data from one storage schema into another one. This is currently only used by the whisper importer, but may in the future also be used to import from other types of data sources.
+Metrictank comes with schema conversion logic (`mdata/importer/converter.go`) which can be used to convert data from one storage schema into another one. This is currently only used by the Whisper importer, but may in the future also be used to import from other types of data sources.
 
 The conversion happens on a destination archive by destination archive basis. In this context the term "archive" refers to one section between the `,` of a storage schema, f.e. the schema `1s:1d,10min:1y` has two archives. Each destination archive gets generated separately, in some cases the same input archives may be used to generate multiple destination archives and in others different input archives may be used. Multiple input archives may also be combined into a single destination archive, if this makes sense given the input schema and the destination schema.
 
