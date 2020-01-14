@@ -26,6 +26,10 @@ docker:
 	./scripts/build_docker.sh
 qa: bin qa-common
 
+#refresh content in docs/tools.md, strictly a dev time task that is exluded from the `all` target
+document-tools:
+	./scripts/dev/tools-to-doc.sh > docs/tools.md
+
 #debug versions for remote debugging with delve
 bin-debug:
 	./scripts/build.sh -debug

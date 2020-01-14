@@ -28,12 +28,12 @@ See the [Makefile](../Makefile) for more targets
 6. Never merge master into your PR. As it mangles Git history and makes things harder to review. Instead, rebase your PR on top of master.
 7. Code must be well formatted. It is checked via `scripts/qa/gofmt.sh`, `make qa`, and circleCI.
 8. Regarding configuration:
-   * Configurantion options and metrictank-sample.ini must be in sync.
+   * Configuration options and metrictank-sample.ini must be in sync.
    * All other configuration files should also be in sync with metrictank-sample.ini except where the file should differ on purpose.
    (Example: `docker/docker-cluster/metrictank.ini` is the same as metrictank-sample.ini except for the options that support the use case of running metrictank in a cluster.)
    Use `scripts/dev/sync-configs.sh` which helps with the process of updating all configs based on metrictank-sample.ini.
    Use `scripts/dev/config-to-doc.sh > docs/config.md` to sync the sample configuration into the documentation. It is checked via `qa/docs.sh` , `make qa`, and circleCI.
-9. Any new tools must be properly documented. Use `scripts/dev/tools-to-doc.sh > docs/tools.md`. It is checked via `qa/docs.sh` , `make qa`, and circleCI.
+9. Any new tools must be properly documented. Use `scripts/dev/tools-to-doc.sh > docs/tools.md` or `make document-tools`. It is checked via `qa/docs.sh` , `make qa`, and circleCI.
 10. PR's will only be merged if all tests pass
 11. Any errors which can be recovered from sanely, must do so. And must trigger a high-level recovery metric (see other recovered_errors metrics) and an error message describing the problem. In other words, panic is only legal in unrecoverable, unexpected situations.
 12. When defining multiple functions or structures stick to this ordering:
