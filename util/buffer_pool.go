@@ -22,7 +22,6 @@ func (b *BufferPool) Put(buf []byte) {
 	b.pool.Put(buf[:0])
 }
 
-
 // BufferPool33 is a pool that returns cap=33 len=0 byte slices
 type BufferPool33 struct {
 	pool sync.Pool
