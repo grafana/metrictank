@@ -234,7 +234,7 @@ Each lineage section has these fields:
 | schema-retentions      | Retentions defined in storage-schemas.conf                                                                     |
 | archive-read           | Which archive was read as defined in the retentions. (0 means raw, 1 first rollup, etc)                        |
 | archive-interval       | The native interval of the archive that was read                                                               |
-| aggnum-norm            | If >1, number of points aggregated together per point, as part of normalization (series alignment)             |
+| aggnum-norm            | If >1, number of points aggregated together per point, as part of normalization                                |
 | aggnum-rc              | If >1, number of points aggregated together per output point, as part of runtime consolidation (MaxDataPoints) |
 | consolidator-normfetch | Consolidator used for normalization (if aggnum-norm > 1) and which rollup was read (if archive-read > 0)       |
 | consolidator-rc        | Consolidator used for runtime consolidation (MaxDataPoints) (if aggnum-rc > 1)                                 |

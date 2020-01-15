@@ -16,6 +16,7 @@ import (
 func testAlign(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
 	var schemas []conf.Schema
 	oriMaxPointsPerReqSoft := maxPointsPerReqSoft
+	oriMaxPointsPerHardReq := maxPointsPerReqHard
 
 	for _, ret := range retentions {
 		schemas = append(schemas, conf.Schema{
@@ -28,6 +29,7 @@ func testAlign(reqs []models.Req, retentions []conf.Retentions, outReqs []models
 			maxPointsPerReqSoft = points
 		}
 	}
+	maxPointsPerReqHard = maxPointsPerReqSoft * 10
 
 	mdata.Schemas = conf.NewSchemas(schemas)
 	out, _, _, err := alignRequests(now, reqs[0].From, reqs[0].To, reqs)
@@ -45,6 +47,7 @@ func testAlign(reqs []models.Req, retentions []conf.Retentions, outReqs []models
 	}
 
 	maxPointsPerReqSoft = oriMaxPointsPerReqSoft
+	maxPointsPerReqHard = oriMaxPointsPerHardReq
 }
 
 // 2 series requested with equal raw intervals. req 0-30. now 1200. one archive of ttl=1200 does it

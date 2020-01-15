@@ -89,6 +89,6 @@ such that they can be used together (for aggregating, merging, etc)
 
 
 TODO talk about
-alignRequests -> getTargets -> mergeSeries -> sort Series -> plan.Run (executes functions and does MDP consolidation with nudging)
+planRequests -> getTargets -> mergeSeries -> sort Series -> plan.Run (executes functions and does MDP consolidation with nudging)
 
 talk more about what happens at each step, how data is manipulated etc

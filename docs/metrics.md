@@ -24,7 +24,8 @@ the archive chosen for the request.
 * `api.request.render.points_fetched`:  
 the number of points that need to be fetched for a /render request.
 * `api.request.render.points_returned`:  
-the number of points the request will return.
+the number of points the request will return
+best effort: not aware of summarize(), aggregation functions, runtime normalization. but does account for runtime consolidation
 * `api.request.render.series`:  
 the number of series a /render request is handling.  This is the number
 of metrics after all of the targets in the request have expanded by searching the index.

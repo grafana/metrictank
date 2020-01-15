@@ -748,11 +748,14 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	var err error
-	var reqsList []models.Req
-	// TODO get rid of alignrequests and all "align" terminology
-	reqsList, meta.RenderStats.PointsFetch, meta.RenderStats.PointsReturn, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints)
+	var rp *ReqsPlan
+	rp, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints)
+	meta.RenderStats.PointsFetch = rp.PointsFetch()
+	meta.RenderStats.PointsReturn = rp.PointsReturn(plan.MaxDataPoints)
+	reqsList := rp.List()
+
 	if err != nil {
-		log.Errorf("HTTP Render alignReq error: %s", err.Error())
+		log.Errorf("HTTP Render planRequests error: %s", err.Error())
 		return nil, meta, err
 	}
 	span := opentracing.SpanFromContext(ctx)
