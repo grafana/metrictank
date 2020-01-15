@@ -23,55 +23,50 @@ When creating a Hosted Metrics Graphite instance, we provide a carbon-relay-ng c
 We also have Grafana Labs engineers ready to advise further on set up, if needed.
 
 
-## Forwarding traffic from carbon-relay to carbon-relay-ng
+## Sending carbon traffic to GrafanaCloud from an existing Graphite setup
 
-### Sending all your traffic to carbon-relay-ng instead of carbon-relay
+### Using carbon-relay-ng as a replacement for carbon-relay or carbon-cache
 
-The most simple way to get your traffic into carbon-relay-ng is to change the value of the `relay.DESTINATIONS` in your `carbon.conf` to the ip and port where the carbon-relay-ng's carbon input is listening. This will make the carbon-relay forward all your metrics to the defined carbon-relay-ng instance. 
+The most simple way to send your carbon traffic to GrafanaCloud is to use carbon-relay-ng as a replacement for your current carbon-relay or carbon-cache. Carbon-relay-ng has a carbon input which supports the plain text and the pickle protocols, just like carbon-relay and carbon-cache. 
 
-For example if your carbon-relay-ng is running on the host `crng-host` and it's listening on the default port `2003`, then in your `carbon.conf` you should have this setting:
+An example configuration to do that can be downloaded from your Hosted Metrics instance's "Details" page. It contains a `grafanaNet` route pointing at your instance.
+
+### Sending a copy of your carbon traffic to GrafanaCloud
+
+It is possible to duplicate your data to send one copy to your existing Graphite infrastructure and the other to GrafanaCloud. To do this you can put an instance of carbon-relay-ng in front of your existing carbon-relay or carbon-cache and make it duplicate the traffic. Carbon-relay-ng allows you to specify routes of various types, to send a copy to GrafanaCloud you need to add a route of the type `grafanaNet`, to send a copy to your existing carbon-relay/carbon-cache you can add a carbon route.
+
+For example if you currently have carbon-relay listening on port `2003` and all of your infrastructure is sending its carbon traffic there, you could change it to listen on port `2053` instead and then start a carbon-relay-ng on port `2003` with this config to send a copy of the traffic to `localhost:2053`:
+
+```
+[[route]]
+key = 'carbon'
+type = 'sendAllMatch'
+destinations = [
+    'localhost:2053 spool=true pickle=false'
+]
+
+[[route]]
+key = 'grafanaNet'
+type = 'grafanaNet'
+addr = 'https://<Your endpoint address>'
+apikey = '<Your Grafana.com API Key>'
+schemasFile = '/etc/carbon-relay-ng/storage-schemas.conf'
+```
+
+### Duplicating the data in carbon-relay
+
+If you prefer to make your carbon-relay duplicate the carbon traffic and send one copy to carbon-relay-ng, this is possible if your current carbon-relay setup sends one copy of all the traffic to each of its known destinations. 
+
+For example if your carbon-relay currently forwards the traffic to two destinations called `host1` and `host2` and the replication factor (`relay.REPLICATION_FACTOR`) is set to the value `2`, then it is possible to just add carbon-relay-ng as an additional destination and increase the replication factor by `1` to create an additional copy of the traffic and send it to carbon-relay-ng:
+
 ```
 [relay]
-DESTINATIONS = crng-host:2003
-```
-
-### Duplicating your traffic to carbon-relay-ng
-
-#### With a single relay destination
-
-If your current carbon-relay is forwarding to only one destination (`relay.DESTINATIONS` only has one entry), or if there are multiple destinations and your `relay.REPLICATION_FACTOR` equals the number of destinations (data gets replicated to every destination), then you can simply add the carbon-relay-ng's carbon input to this list and increase the `relay.REPLICATION_FACTOR` setting by `1`. This will make carbon-relay send every data point once to every listed destinations. For the replication factor setting to take effect the `relay.RELAY_METHOD` setting must be set to `consistent-hashing`.
-
-For example if your carbon-relay-ng is running on the host `crng-host` and it's listening on the default port `2003` and your other destination is `other-host:2003`, then in your `carbon.conf` should look like this:
-
-```
-[relay]
-DESTINATIONS = crng-host:2003,other-host:2003
-REPLICATION_FACTOR = 2
-RELAY_METHOD = consistent-hashing
-```
-
-Or if your current setup already has `2` destinations and a `REPLICATION_FACTOR` of `2`, then after adding carbon-relay-ng and increasing the replication factor, the `carbon.conf` would look like this:
-
-```
-[relay]
-DESTINATIONS = crng-host:2003,other-host1:2003,other-host2:2003
+DESTINATIONS = host1:2003,host2:2003,crng-host:2003
 REPLICATION_FACTOR = 3
 RELAY_METHOD = consistent-hashing
 ```
 
-#### With a sharded cluster of multiple relay destinations
-
-If your current carbon-relay is already forwarding to multiple destinations (`relay.DESTINATIONS` has multiple entries) and the `relay.REPLICATION_FACTOR` is less then the number of destinations, then there is no easy way to make carbon-relay send a copy of each data point to carbon-relay-ng. 
-In this case the recommended setup is to add an additional instance of carbon-relay in front of your existing one, this additional carbon-relay needs to have `2` entries in the list of relay destinations where one is your current carbon-relay instance and the other is your carbon-relay-ng. By setting `relay.REPLICATION_FACTOR` to `2` the data then gets duplicated among these two destinations. 
-
-For example if your current carbon-relay instance is listening on port `2003` of the host `carbon-host` and your carbon-relay-ng is listening on port `2003` of `crng-host` in your new carbon-relay instance's config you would need these entries:
-
-```
-[relay]
-DESTINATIONS = crng-host:2003,carbon-host:2003
-REPLICATION_FACTOR = 2
-RELAY_METHOD = consistent-hashing
-```
+For the replication factor to take effect the relay method must be set to `consistent-hashing`.
 
 ## High availability and scaling of carbon-relay-ng
 
