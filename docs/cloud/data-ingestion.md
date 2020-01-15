@@ -50,21 +50,6 @@ apikey = '<Your Grafana.com API Key>'
 schemasFile = '/etc/carbon-relay-ng/storage-schemas.conf'
 ```
 
-## Duplicating the data in carbon-relay
-
-If you prefer to make your carbon-relay duplicate the carbon traffic and send one copy to carbon-relay-ng, this is possible if your current carbon-relay setup sends one copy of all the traffic to each of its known destinations. 
-
-For example if your carbon-relay currently forwards the traffic to two destinations called `host1` and `host2` and the replication factor (`relay.REPLICATION_FACTOR`) is set to the value `2`, then it is possible to just add carbon-relay-ng as an additional destination and increase the replication factor by `1` to create an additional copy of the traffic and send it to carbon-relay-ng:
-
-```
-[relay]
-DESTINATIONS = host1:2003,host2:2003,crng-host:2003
-REPLICATION_FACTOR = 3
-RELAY_METHOD = consistent-hashing
-```
-
-For the replication factor to take effect the relay method must be set to `consistent-hashing`.
-
 # High availability and scaling of carbon-relay-ng
 
 ## Scaling with carbon-relay-ng
