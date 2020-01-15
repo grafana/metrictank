@@ -3,10 +3,10 @@ package publish
 import (
 	"strconv"
 
+	"github.com/grafana/metrictank/metrics_client"
 	schema "github.com/grafana/metrictank/schema"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/raintank/tsdb-gw/metrics_client"
 	log "github.com/sirupsen/logrus"
 )
 
