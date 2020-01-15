@@ -308,6 +308,42 @@ curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&e
 }
 ```
 
+### Tag Exploration
+
+#### Count tag values With `/tags/terms`
+
+Returns count of series for each tag value which matches tag queries for a given set of tag keys.
+
+* Method: GET or POST
+* API key type: any (including MetricsPublisher)
+
+##### Headers
+
+* `Authorization: Bearer <api-key>` required
+
+##### Parameters
+
+* expr (required): a list of [tag expressions](#tag-expressions)
+* tags: a list of tag keys for which to count values series
+
+##### Example
+
+```sh
+curl -H "Authorization: Bearer $key" "$out/tags/terms?expr=datacenter=dc1&expr=server=web01&tags=rack"
+
+{
+  "totalSeries": 5892,
+  "terms": {
+    "rack": {
+      "a1": 2480,
+      "a2": 465,
+      "b1": 2480,
+      "b2": 467
+    }
+  }
+}
+```
+
 ### Render `/render` (return data for a given query)
 
 Graphite-web-like api. It can return JSON, pickle or messagepack output
