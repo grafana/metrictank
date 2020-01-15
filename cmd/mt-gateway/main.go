@@ -69,17 +69,12 @@ func main() {
 
 	metrictankProxy := httputil.NewSingleHostReverseProxy(urls.metrictank)
 	http.HandleFunc("/metrics/index.json", metrictankProxy.ServeHTTP)
-	//TODO drop `/graphite` prefix... Or just drop this entry, do we really need the alias?
-	http.HandleFunc("/graphite/metrics/index.json", metrictankProxy.ServeHTTP)
+	http.HandleFunc("/graphite/metrics/index.json", newSingleHostReverseProxyWithoutPrefix("/graphite", urls.metrictank).ServeHTTP)
 	http.HandleFunc("/metrics/delete", metrictankProxy.ServeHTTP)
 
-	graphiteProxy := httputil.NewSingleHostReverseProxy(urls.graphite)
-	//TODO drop `/graphite` prefix
-	http.HandleFunc("/graphite/", graphiteProxy.ServeHTTP)
+	http.HandleFunc("/graphite/", newSingleHostReverseProxyWithoutPrefix("/graphite", urls.graphite).ServeHTTP)
 
-	bulkImporterProxy := httputil.NewSingleHostReverseProxy(urls.bulkImporter)
-	//TODO figure out the final URL here
-	http.HandleFunc("/metrics/import", bulkImporterProxy.ServeHTTP)
+	http.HandleFunc("/metrics/import", newSingleHostReverseProxyWithoutPrefix("/metrics/import", urls.bulkImporter).ServeHTTP)
 
 	//TODO implement kafka metrics ingest
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
