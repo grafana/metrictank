@@ -278,7 +278,7 @@ func (m *mtPublisher) Publish(metrics []*schema.MetricData) error {
 		if metric.Interval == 0 {
 			if m.autoInterval {
 				_, s := m.schemas.Match(metric.Name, 0)
-				metric.Interval = s.Retentions[0].SecondsPerPoint
+				metric.Interval = s.Retentions.Rets[0].SecondsPerPoint
 				metric.SetId()
 			} else {
 				log.Error("interval is 0 but can't deduce interval automatically. this should never happen")
