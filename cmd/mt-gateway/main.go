@@ -6,7 +6,6 @@ import (
 	"github.com/grafana/metrictank/logger"
 	log "github.com/sirupsen/logrus"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"runtime"
 )
@@ -18,7 +17,6 @@ var (
 	graphiteURL   = flag.String("graphite-url", "http://localhost:8080", "graphite-api address")
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
 	addr          = flag.String("addr", ":80", "http service address")
-	urls          = Urls{}
 )
 
 type Urls struct {
@@ -52,7 +50,9 @@ func main() {
 		fmt.Printf("mt-gateway (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
+
 	var err error
+	urls := Urls{}
 
 	urls.metrictank, err = url.Parse(*metrictankUrl)
 	if err != nil {
@@ -67,21 +67,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	metrictankProxy := httputil.NewSingleHostReverseProxy(urls.metrictank)
-	http.HandleFunc("/metrics/index.json", metrictankProxy.ServeHTTP)
-	http.HandleFunc("/graphite/metrics/index.json", newSingleHostReverseProxyWithoutPrefix("/graphite", urls.metrictank).ServeHTTP)
-	http.HandleFunc("/metrics/delete", metrictankProxy.ServeHTTP)
-
-	http.HandleFunc("/graphite/", newSingleHostReverseProxyWithoutPrefix("/graphite", urls.graphite).ServeHTTP)
-
-	http.HandleFunc("/metrics/import", newSingleHostReverseProxyWithoutPrefix("/metrics/import", urls.bulkImporter).ServeHTTP)
-
-	//TODO implement kafka metrics ingest
-	http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotImplemented)
-		fmt.Fprintln(w, "metrics ingest endpoint not yet implemented")
-
-	})
-
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	log.WithField("addr", *addr).Info("starting server")
+	log.WithError(http.ListenAndServe(*addr, NewApi(urls).Mux())).Fatal("terminating")
 }
