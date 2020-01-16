@@ -64,19 +64,27 @@ func withMiddleware(svc string, base http.Handler) http.Handler {
 	return defaultOrgIdMiddleware(loggingMiddleware(svc, base))
 }
 
+//http.ResponseWriter that saves the status code
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+//delegate to the main response writer, but save the code
+func (rec *statusRecorder) WriteHeader(code int) {
+	rec.status = code
+	rec.ResponseWriter.WriteHeader(code)
+}
+
 //add request logging to the given handler
 func loggingMiddleware(svc string, base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		base.ServeHTTP(w, request)
-		logEntry := log.WithField("service", svc).
+		recorder := statusRecorder{w, -1}
+		base.ServeHTTP(&recorder, request)
+		log.WithField("service", svc).
 			WithField("method", request.Method).
 			WithField("path", request.URL.Path).
-			WithField("status", request.Close)
-		if request.Response != nil {
-			logEntry.WithField("status", request.Response.StatusCode).Info()
-		} else {
-			logEntry.WithField("status", nil).Warn("no response received")
-		}
+			WithField("status", recorder.status).Info()
 	})
 }
 
