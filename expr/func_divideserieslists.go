@@ -78,6 +78,8 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 			QueryCons:    dividend.QueryCons,
 			QueryFrom:    dividend.QueryFrom,
 			QueryTo:      dividend.QueryTo,
+			QueryMDP:     dividend.QueryMDP,
+			QueryPNGroup: dividend.QueryPNGroup,
 			Meta:         dividend.Meta.Copy().Merge(divisor.Meta),
 		}
 		cache[Req{}] = append(cache[Req{}], output)

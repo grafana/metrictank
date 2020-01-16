@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/cluster"
@@ -22,6 +23,7 @@ type Req struct {
 	From        uint32      `json:"from"`
 	To          uint32      `json:"to"`
 	MaxPoints   uint32      `json:"maxPoints"`
+	PNGroup     PNGroup     `json:"pngroup"`
 	RawInterval uint32      `json:"rawInterval"` // the interval of the raw metric before any consolidation
 	// the consolidation method for rollup archive and normalization (pre-normalization and runtime normalization). (but not runtime consolidation)
 	// ConsReq 0 -> configured value
@@ -44,22 +46,19 @@ type Req struct {
 	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive (normalization)
 }
 
-// NewReq creates a new request. It sets all properties minus the ones that need request planning
-func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
-	return Req{
-		MKey:         key,
-		Target:       target,
-		Pattern:      patt,
-		From:         from,
-		To:           to,
-		MaxPoints:    maxPoints,
-		RawInterval:  rawInterval,
-		Consolidator: cons,
-		ConsReq:      consReq,
-		Node:         node,
-		SchemaId:     schemaId,
-		AggId:        aggId,
-	}
+// PNGroup is an identifier for a pre-normalization group: data that can be pre-normalized together
+type PNGroup uint64
+
+// Init initializes a request based on the metadata that we know of.
+// It sets all properties minus the ones that need request planning
+func (r *Req) Init(archive idx.Archive, cons consolidation.Consolidator, node cluster.Node) {
+	r.MKey = archive.Id
+	r.Target = archive.NameWithTags()
+	r.RawInterval = uint32(archive.Interval)
+	r.Consolidator = cons
+	r.Node = node
+	r.SchemaId = archive.SchemaId
+	r.AggId = archive.AggId
 }
 
 // Plan updates the planning parameters to match the i'th archive in its retention rules
@@ -131,8 +130,8 @@ func (r Req) String() string {
 }
 
 func (r Req) DebugString() string {
-	return fmt.Sprintf("Req key=%q target=%q pattern=%q %d - %d (%s - %s) (span %d) maxPoints=%d rawInt=%d cons=%s consReq=%d schemaId=%d aggId=%d archive=%d archInt=%d ttl=%d outInt=%d aggNum=%d",
-		r.MKey, r.Target, r.Pattern, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.RawInterval, r.Consolidator, r.ConsReq, r.SchemaId, r.AggId, r.Archive, r.ArchInterval, r.TTL, r.OutInterval, r.AggNum)
+	return fmt.Sprintf("Req key=%q target=%q pattern=%q %d - %d (%s - %s) (span %d) maxPoints=%d pngroup=%d rawInt=%d cons=%s consReq=%d schemaId=%d aggId=%d archive=%d archInt=%d ttl=%d outInt=%d aggNum=%d",
+		r.MKey, r.Target, r.Pattern, r.From, r.To, util.TS(r.From), util.TS(r.To), r.To-r.From-1, r.MaxPoints, r.PNGroup, r.RawInterval, r.Consolidator, r.ConsReq, r.SchemaId, r.AggId, r.Archive, r.ArchInterval, r.TTL, r.OutInterval, r.AggNum)
 }
 
 // TraceLog puts all request properties in a span log entry
@@ -148,6 +147,7 @@ func (r Req) TraceLog(span opentracing.Span) {
 		log.Uint32("to", r.To),
 		log.Uint32("span", r.To-r.From-1),
 		log.Uint32("mdp", r.MaxPoints),
+		log.Uint64("pngroup", uint64(r.PNGroup)),
 		log.Uint32("rawInterval", r.RawInterval),
 		log.String("cons", r.Consolidator.String()),
 		log.String("consReq", r.ConsReq.String()),
@@ -186,6 +186,9 @@ func (a Req) Equals(b Req) bool {
 		return false
 	}
 	if a.MaxPoints != b.MaxPoints {
+		return false
+	}
+	if a.PNGroup != b.PNGroup {
 		return false
 	}
 	if a.RawInterval != b.RawInterval {

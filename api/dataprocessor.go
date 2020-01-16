@@ -352,6 +352,8 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 		QueryTo:      req.To,
 		QueryCons:    req.ConsReq,
 		Consolidator: req.Consolidator,
+		QueryMDP:     req.MaxPoints,
+		QueryPNGroup: req.PNGroup,
 		Meta: []models.SeriesMetaProperties{
 			{
 				// note that for simplicity, we pretend that a read of rollup avg data is a read of 1 "avg series"
@@ -617,17 +619,19 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 	return iters, nil
 }
 
-// check for duplicate series names for the same query. If found merge the results.
+// check for duplicate series names for the same query target. If found merge the results.
 // each first uniquely-identified series's backing datapoints slice is reused
 // any subsequent non-uniquely-identified series is merged into the former and has its
 // datapoints slice returned to the pool. input series must be canonical
 func mergeSeries(in []models.Series) []models.Series {
 	type segment struct {
-		target string
-		query  string
-		from   uint32
-		to     uint32
-		con    consolidation.Consolidator
+		target  string
+		query   string
+		from    uint32
+		to      uint32
+		con     consolidation.Consolidator
+		mdp     uint32
+		pngroup models.PNGroup
 	}
 	seriesByTarget := make(map[segment][]models.Series)
 	for _, series := range in {
@@ -637,6 +641,8 @@ func mergeSeries(in []models.Series) []models.Series {
 			series.QueryFrom,
 			series.QueryTo,
 			series.Consolidator,
+			series.QueryMDP,
+			series.QueryPNGroup,
 		}
 		seriesByTarget[s] = append(seriesByTarget[s], series)
 	}

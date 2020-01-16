@@ -27,7 +27,7 @@ func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncAggregate) Context(context Context) Context {
-	context.PNGroup = PNGroup(uintptr(unsafe.Pointer(s)))
+	context.PNGroup = models.PNGroup(uintptr(unsafe.Pointer(s)))
 	return context
 }
 

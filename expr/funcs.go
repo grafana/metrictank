@@ -10,7 +10,7 @@ type Context struct {
 	from    uint32
 	to      uint32
 	consol  consolidation.Consolidator // can be 0 to mean undefined
-	PNGroup PNGroup                    // pre-normalization group. if the data can be safely pre-normalized
+	PNGroup models.PNGroup             // pre-normalization group. if the data can be safely pre-normalized
 	MDP     uint32                     // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise
 }
 

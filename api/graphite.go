@@ -718,9 +718,9 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 						cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
 					}
 
-					newReq := models.NewReq(
-						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, r.MDP, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
-					reqs.Add(newReq, r.PNGroup)
+					newReq := r.ToModel()
+					newReq.Init(archive, cons, s.Node)
+					reqs.Add(newReq)
 				}
 
 				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
@@ -792,7 +792,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	data := make(map[expr.Req][]models.Series)
 	for _, serie := range out {
-		q := expr.NewReq(serie.QueryPatt, serie.QueryFrom, serie.QueryTo, serie.QueryCons)
+		q := expr.NewReqFromSerie(serie)
 		data[q] = append(data[q], serie)
 	}
 

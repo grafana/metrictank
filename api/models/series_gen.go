@@ -97,6 +97,18 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "Consolidator")
 				return
 			}
+		case "QueryMDP":
+			z.QueryMDP, err = dc.ReadUint32()
+			if err != nil {
+				err = msgp.WrapError(err, "QueryMDP")
+				return
+			}
+		case "QueryPNGroup":
+			err = z.QueryPNGroup.DecodeMsg(dc)
+			if err != nil {
+				err = msgp.WrapError(err, "QueryPNGroup")
+				return
+			}
 		case "Meta":
 			var zb0003 uint32
 			zb0003, err = dc.ReadArrayHeader()
@@ -148,9 +160,9 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 10
+	// map header, size 12
 	// write "Target"
-	err = en.Append(0x8a, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
+	err = en.Append(0x8c, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
 	if err != nil {
 		return
 	}
@@ -241,6 +253,26 @@ func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "Consolidator")
 		return
 	}
+	// write "QueryMDP"
+	err = en.Append(0xa8, 0x51, 0x75, 0x65, 0x72, 0x79, 0x4d, 0x44, 0x50)
+	if err != nil {
+		return
+	}
+	err = en.WriteUint32(z.QueryMDP)
+	if err != nil {
+		err = msgp.WrapError(err, "QueryMDP")
+		return
+	}
+	// write "QueryPNGroup"
+	err = en.Append(0xac, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x4e, 0x47, 0x72, 0x6f, 0x75, 0x70)
+	if err != nil {
+		return
+	}
+	err = z.QueryPNGroup.EncodeMsg(en)
+	if err != nil {
+		err = msgp.WrapError(err, "QueryPNGroup")
+		return
+	}
 	// write "Meta"
 	err = en.Append(0xa4, 0x4d, 0x65, 0x74, 0x61)
 	if err != nil {
@@ -281,9 +313,9 @@ func (z *Series) EncodeMsg(en *msgp.Writer) (err error) {
 // MarshalMsg implements msgp.Marshaler
 func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 10
+	// map header, size 12
 	// string "Target"
-	o = append(o, 0x8a, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
+	o = append(o, 0x8c, 0xa6, 0x54, 0x61, 0x72, 0x67, 0x65, 0x74)
 	o = msgp.AppendString(o, z.Target)
 	// string "Tags"
 	o = append(o, 0xa4, 0x54, 0x61, 0x67, 0x73)
@@ -316,6 +348,16 @@ func (z *Series) MarshalMsg(b []byte) (o []byte, err error) {
 	o, err = z.Consolidator.MarshalMsg(o)
 	if err != nil {
 		err = msgp.WrapError(err, "Consolidator")
+		return
+	}
+	// string "QueryMDP"
+	o = append(o, 0xa8, 0x51, 0x75, 0x65, 0x72, 0x79, 0x4d, 0x44, 0x50)
+	o = msgp.AppendUint32(o, z.QueryMDP)
+	// string "QueryPNGroup"
+	o = append(o, 0xac, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x4e, 0x47, 0x72, 0x6f, 0x75, 0x70)
+	o, err = z.QueryPNGroup.MarshalMsg(o)
+	if err != nil {
+		err = msgp.WrapError(err, "QueryPNGroup")
 		return
 	}
 	// string "Meta"
@@ -431,6 +473,18 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "Consolidator")
 				return
 			}
+		case "QueryMDP":
+			z.QueryMDP, bts, err = msgp.ReadUint32Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "QueryMDP")
+				return
+			}
+		case "QueryPNGroup":
+			bts, err = z.QueryPNGroup.UnmarshalMsg(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "QueryPNGroup")
+				return
+			}
 		case "Meta":
 			var zb0003 uint32
 			zb0003, bts, err = msgp.ReadArrayHeaderBytes(bts)
@@ -490,7 +544,7 @@ func (z *Series) Msgsize() (s int) {
 			s += msgp.StringPrefixSize + len(za0001) + msgp.StringPrefixSize + len(za0002)
 		}
 	}
-	s += 9 + msgp.Uint32Size + 10 + msgp.StringPrefixSize + len(z.QueryPatt) + 10 + msgp.Uint32Size + 8 + msgp.Uint32Size + 10 + z.QueryCons.Msgsize() + 13 + z.Consolidator.Msgsize() + 5 + msgp.ArrayHeaderSize
+	s += 9 + msgp.Uint32Size + 10 + msgp.StringPrefixSize + len(z.QueryPatt) + 10 + msgp.Uint32Size + 8 + msgp.Uint32Size + 10 + z.QueryCons.Msgsize() + 13 + z.Consolidator.Msgsize() + 9 + msgp.Uint32Size + 13 + z.QueryPNGroup.Msgsize() + 5 + msgp.ArrayHeaderSize
 	for za0003 := range z.Meta {
 		s += z.Meta[za0003].Msgsize()
 	}

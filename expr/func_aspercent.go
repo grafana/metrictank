@@ -304,6 +304,8 @@ Loop:
 		QueryCons:    queryCons,
 		QueryFrom:    in[0].QueryFrom,
 		QueryTo:      in[0].QueryTo,
+		QueryMDP:     in[0].QueryMDP,
+		QueryPNGroup: in[0].QueryPNGroup,
 		Tags:         map[string]string{"name": name},
 		Meta:         meta,
 	}

@@ -14,13 +14,10 @@ type Req struct {
 	Query   string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
 	From    uint32
 	To      uint32
-	PNGroup PNGroup
 	Cons    consolidation.Consolidator // can be 0 to mean undefined
-	MDP     uint32                     // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise.
+	PNGroup models.PNGroup
+	MDP     uint32 // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise.
 }
-
-// PNGroup is an identifier for a pre-normalization group: data that can be pre-normalized together
-type PNGroup uint64
 
 // NewReq creates a new Req. pass cons=0 to leave consolidator undefined,
 // leaving up to the caller (in graphite's case, it would cause a lookup into storage-aggregation.conf)
@@ -41,6 +38,32 @@ func NewReqFromContext(query string, c Context) Req {
 		Cons:    c.consol,
 		PNGroup: c.PNGroup,
 		MDP:     c.MDP,
+	}
+}
+
+// NewReqFromSeries generates a Req back from a series
+// a models.Series has all the properties attached to it
+// to find out which Req it came from
+func NewReqFromSerie(serie models.Series) Req {
+	return Req{
+		Query:   serie.QueryPatt,
+		From:    serie.QueryFrom,
+		To:      serie.QueryTo,
+		Cons:    serie.QueryCons,
+		PNGroup: serie.QueryPNGroup,
+		MDP:     serie.QueryMDP,
+	}
+
+}
+
+func (r Req) ToModel() models.Req {
+	return models.Req{
+		Pattern:   r.Query,
+		From:      r.From,
+		To:        r.To,
+		MaxPoints: r.MDP,
+		PNGroup:   r.PNGroup,
+		ConsReq:   r.Cons,
 	}
 }
 

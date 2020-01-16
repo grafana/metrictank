@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/expr"
 )
 
 // ReqMap is a map of requests of data,
@@ -12,22 +11,23 @@ import (
 // requests are that can be pre-normalized together to the same resolution, bundled by their PNGroup
 type ReqMap struct {
 	single   []models.Req
-	pngroups map[expr.PNGroup][]models.Req
+	pngroups map[models.PNGroup][]models.Req
 	cnt      uint32
 }
 
 func NewReqMap() *ReqMap {
 	return &ReqMap{
-		pngroups: make(map[expr.PNGroup][]models.Req),
+		pngroups: make(map[models.PNGroup][]models.Req),
 	}
 }
 
-func (r *ReqMap) Add(req models.Req, group expr.PNGroup) {
+func (r *ReqMap) Add(req models.Req) {
 	r.cnt++
-	if group == 0 {
+	if req.PNGroup == 0 {
 		r.single = append(r.single, req)
+		return
 	}
-	r.pngroups[group] = append(r.pngroups[group], req)
+	r.pngroups[req.PNGroup] = append(r.pngroups[req.PNGroup], req)
 }
 func (r ReqMap) Dump() string {
 	out := fmt.Sprintf("ReqsMap (%d entries):\n", r.cnt)
@@ -53,7 +53,7 @@ type PNGroupSplit struct {
 
 // ReqsPlan holds requests that have been planned
 type ReqsPlan struct {
-	pngroups map[expr.PNGroup]PNGroupSplit
+	pngroups map[models.PNGroup]PNGroupSplit
 	single   PNGroupSplit
 	cnt      uint32
 }
