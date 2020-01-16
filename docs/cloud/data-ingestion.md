@@ -54,10 +54,7 @@ schemasFile = '/etc/carbon-relay-ng/storage-schemas.conf'
 
 ## Scaling with carbon-relay-ng
 
-When distributing traffic among multiple instances of carbon-relay-ng it is important to ensure that the same metrics always get sent to the same carbon-relay-ng instances to preserve the order of the data points, this can be done using consistent hashing.
-The carbon-relay and carbon-relay-ng daemons both support consistent hashing to distribute traffic among its carbon destinations. If the carbon-relay(-ng) instance which does the consistent hashing itself becomes a bottleneck it is also ok to have multiple carbon-relay(-ng) instances running in parallel.
-
-Example which uses carbon-relay-ng to do the consistent hashing before forwarding the carbon traffic to multiple other carbon-relay-ng instances:
+When distributing traffic among multiple instances of carbon-relay-ng it is important to ensure that the same metrics always get sent to the same carbon-relay-ng instances to preserve the order of the data points. It's ok to have many carbon-relay-ng instances send data to GrafanaCloud concurrently.
 ```
 
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
@@ -71,42 +68,20 @@ Example which uses carbon-relay-ng to do the consistent hashing before forwardin
                          \                |-------------------|    |-------------------|                 /
                           \---------------| carbon-relay-ng-1 |    | carbon-relay-ng-2 |----------------/
                                           |-------------------|    |-------------------|
-                                                       |                     |
-                                            <consistent hashing>  <consistent hashing>
-                                                       |      \    /         |
-                                                       |       \  /          |
-                                                       |        \/           |
-                                                       |        /\           |
-                                                       |       /  \          |
-                                                       |      /    \         |
-                                          |-------------------|    |-------------------|
-                                          | carbon-relay-ng-3 |    | carbon-relay-ng-4 |
-                                          |-------------------|    |-------------------|
+                                                             \      /
                                                               \    /
                                                          |--------------|
                                                          | GrafanaCloud |
                                                          |--------------|
 ```
 
-To use consistent hashing in carbon-relay-ng configure a carbon route with multiple destinations and set the type to `consistentHashing`. For the above example the route would look like this:
-
-```
-[[route]]
-key = 'consistent-hashing'
-type = 'consistentHashing'
-destinations = [
-  'carbon-relay-ng-3:2001',
-  'carbon-relay-ng-4:2001'
-]
-```
-
 ## Failure tolerance with carbon-relay-ng
 
 As mentioned in the previous chapter, it is important that metrics get distributed among carbon-relay-ng instances in a consistent way to preserve the order of the datapoints. However, it is ok if the data gets duplicated among carbon-relay-ng instances to achieve failure tolerance, whichever copy of a given data point gets ingested by GrafanaCloud first will be accepted and the second copy will be rejected. Keep in mind that this will double the internet bandwidth used to send the data to GrafanaCloud.
 
-With-carbon-relay-ng it is possible to duplicate traffic by adding multiple routes. To have one cluster of carbon-relay-ng instances in each of two different availability zones and send one copy of every data point to each availability zone you need to create two routes where each sends the data to one availability zone and does consistent hashing within the instances of that availability zone. The consistent hashing is necessary to prevent that data gets out of order.
+With-carbon-relay-ng it is possible to duplicate traffic by adding multiple routes. To have two clusters of carbon-relay-ng instances in two different availability zones, each with their own local spool to buffer data, and send one copy of every data point to each availability zone you need to create two routes where each sends the data to one availability zone and does consistent hashing within the instances of that availability zone. The consistent hashing is necessary to prevent that data gets out of order.
 
-For example if you have two instances of carbon-relay-ng called `carbon-relay-ng-1`/`carbon-relay-ng-2` running in availability zone `availability-zone-1` and another two called `carbon-relay-ng-3`/`carbon-relay-ng-4` running in availability zone `availability-zone-2` then your carbon-relay-ng config would need to have these two routes:
+For example if you have two instances of carbon-relay-ng called `carbon-relay-ng-1`/`carbon-relay-ng-2` running in availability zone `availability-zone-1` and another two called `carbon-relay-ng-3`/`carbon-relay-ng-4` running in availability zone `availability-zone-2` then your carbon-relay-ng config of the instance which does the duplication and sends the carbon traffic to these two clusters would need to have these two routes:
 
 ```
 [[route]]
