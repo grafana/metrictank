@@ -218,9 +218,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", config.HostSelectionPolicy)
 	}
 
-	sd := make(chan struct{})
-
-	cs, err := cassandra.NewSession(cluster, sd, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra-store")
+	cs, err := cassandra.NewSession(cluster, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra-store")
 
 	if err != nil {
 		return nil, err
@@ -236,7 +234,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		omitReadTimeout:  ConvertTimeout(config.OmitReadTimeout, time.Second),
 		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
-		shutdown:         sd,
+		shutdown:         make(chan struct{}),
 	}
 
 	for i := 0; i < config.WriteConcurrency; i++ {
@@ -249,12 +247,6 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	for i := 0; i < config.ReadConcurrency; i++ {
 		c.wg.Add(1)
 		go c.processReadQueue()
-	}
-
-	if config.ConnectionCheckInterval > 0 {
-		log.Infof("cassandra-store: dead connection check enabled with an interval of %s", config.ConnectionCheckInterval.String())
-		c.wg.Add(1)
-		go c.Session.DeadConnectionRefresh(&c.wg)
 	}
 
 	return c, err
@@ -609,4 +601,5 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 func (c *CassandraStore) Stop() {
 	close(c.shutdown)
 	c.wg.Wait()
+	c.Session.Stop()
 }

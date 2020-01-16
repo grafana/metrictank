@@ -173,7 +173,7 @@ func (c *CasIdx) InitBare() error {
 	tmpSession.Close()
 	c.cluster.Keyspace = c.Config.Keyspace
 
-	c.Session, err = cassandra.NewSession(c.cluster, c.shutdown, c.Config.ConnectionCheckTimeout, c.Config.ConnectionCheckInterval, c.Config.Hosts, "cassandra-idx")
+	c.Session, err = cassandra.NewSession(c.cluster, c.Config.ConnectionCheckTimeout, c.Config.ConnectionCheckInterval, c.Config.Hosts, "cassandra-idx")
 
 	if err != nil {
 		return fmt.Errorf("cassandra-idx: failed to create cassandra session: %s", err)
@@ -256,12 +256,6 @@ func (c *CasIdx) Init() error {
 		}
 	}
 
-	if c.Config.ConnectionCheckInterval > 0 {
-		log.Infof("cassandra-idx: dead connection check enabled with an interval of %s", c.Config.ConnectionCheckInterval.String())
-		c.wg.Add(1)
-		go c.Session.DeadConnectionRefresh(&c.wg)
-	}
-
 	return nil
 }
 
@@ -274,7 +268,9 @@ func (c *CasIdx) Stop() {
 	if c.Config.updateCassIdx {
 		close(c.writeQueue)
 	}
+
 	c.wg.Wait()
+	c.Session.Stop()
 }
 
 // Update updates an existing archive, if found.

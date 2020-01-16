@@ -11,6 +11,7 @@ import (
 
 // Session stores a connection to Cassandra along with associated configurations
 type Session struct {
+	wg                      sync.WaitGroup
 	session                 *gocql.Session
 	cluster                 *gocql.ClusterConfig
 	shutdown                chan struct{}
@@ -23,7 +24,6 @@ type Session struct {
 
 // NewSession creates and returns a Session. Upon failure it will return nil and an error.
 func NewSession(clusterConfig *gocql.ClusterConfig,
-	shutdown chan struct{},
 	timeout time.Duration,
 	interval time.Duration,
 	addrs string,
@@ -42,25 +42,33 @@ func NewSession(clusterConfig *gocql.ClusterConfig,
 	cs := &Session{
 		session:                 session,
 		cluster:                 clusterConfig,
-		shutdown:                shutdown,
+		shutdown:                make(chan struct{}),
 		connectionCheckTimeout:  timeout,
 		connectionCheckInterval: interval,
 		addrs:                   addrs,
 		logPrefix:               logPrefix,
 	}
 
+	if cs.connectionCheckInterval > 0 {
+		cs.wg.Add(1)
+		go cs.deadConnectionRefresh()
+	}
+
 	return cs, nil
 
 }
 
-// DeadConnectionRefresh will run a query using the current Cassandra session every connectionCheckInterval
+func (s *Session) Stop() {
+	close(s.shutdown)
+	s.wg.Wait()
+}
+
+// deadConnectionRefresh will run a query using the current Cassandra session every connectionCheckInterval
 // if it cannot query Cassandra for longer than connectionCheckTimeout it will create a new session
-//
-// if you are not using a WaitGroup in the caller, just pass in nil
-func (s *Session) DeadConnectionRefresh(wg *sync.WaitGroup) {
-	if wg != nil {
-		defer wg.Done()
-	}
+func (s *Session) deadConnectionRefresh() {
+	defer s.wg.Done()
+
+	log.Infof("%s: dead connection check enabled with an interval of %s", s.logPrefix, s.connectionCheckInterval.String())
 
 	ticker := time.NewTicker(s.connectionCheckInterval)
 	var totaltime time.Duration
@@ -76,7 +84,7 @@ OUTER:
 			for {
 				select {
 				case <-s.shutdown:
-					log.Infof("%s: received shutdown, exiting DeadConnectionRefresh", s.logPrefix)
+					log.Infof("%s: received shutdown, exiting deadConnectionRefresh", s.logPrefix)
 					if s.session != nil && !s.session.Closed() {
 						s.session.Close()
 					}
@@ -111,7 +119,7 @@ OUTER:
 
 		select {
 		case <-s.shutdown:
-			log.Infof("%s: received shutdown, exiting DeadConnectionRefresh", s.logPrefix)
+			log.Infof("%s: received shutdown, exiting deadConnectionRefresh", s.logPrefix)
 			if s.session != nil && !s.session.Closed() {
 				s.session.Close()
 			}
