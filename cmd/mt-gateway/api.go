@@ -19,16 +19,18 @@ type Api struct {
 //Constructs a new Api based on the passed in URLS
 func NewApi(urls Urls) Api {
 	api := Api{}
-	//TODO implement actual kafka based import handler
-	api.ingestHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotImplemented)
-		_, _ = fmt.Fprintln(w, "http ingest not yet implemented")
-	})
+	api.ingestHandler = withMiddleware("ingest", ingestHandlerStub)
 	api.graphiteHandler = withMiddleware("graphite", httputil.NewSingleHostReverseProxy(urls.graphite))
 	api.metrictankHandler = withMiddleware("metrictank", httputil.NewSingleHostReverseProxy(urls.metrictank))
 	api.bulkImportHandler = withMiddleware("bulk-importer", bulkImportHandler(urls))
 	return api
 }
+
+//TODO replace this with an actual implementation
+var ingestHandlerStub = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+	_, _ = fmt.Fprintln(w, "http ingest not yet implemented")
+})
 
 //Returns a proxy to the bulk importer if one is configured, otherwise a handler that always returns a 503
 func bulkImportHandler(urls Urls) http.Handler {
