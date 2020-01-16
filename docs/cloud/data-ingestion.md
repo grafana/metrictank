@@ -77,28 +77,27 @@ When distributing traffic among multiple instances of carbon-relay-ng it is impo
 
 ## Failure tolerance with carbon-relay-ng
 
-As mentioned in the previous chapter, it is important that metrics get distributed among carbon-relay-ng instances in a consistent way to preserve the order of the datapoints. However, it is ok if the data gets duplicated among carbon-relay-ng instances to achieve failure tolerance, whichever copy of a given data point gets ingested by GrafanaCloud first will be accepted and the second copy will be rejected. Keep in mind that this will double the internet bandwidth used to send the data to GrafanaCloud.
+As mentioned in the previous chapter, it is important that metrics get distributed among carbon-relay-ng instances in a consistent way to preserve the order of the datapoints. However, it is ok to run carbon-relay-ng in a hot / cold-standby setup to ensure that if the primary goes down the secondary would take over its load.
 
-With-carbon-relay-ng it is possible to duplicate traffic by adding multiple routes. To have two clusters of carbon-relay-ng instances in two different availability zones, each with their own local spool to buffer data, and send one copy of every data point to each availability zone you need to create two routes where each sends the data to one availability zone and does consistent hashing within the instances of that availability zone. The consistent hashing is necessary to prevent that data gets out of order.
-
-For example if you have two instances of carbon-relay-ng called `carbon-relay-ng-1`/`carbon-relay-ng-2` running in availability zone `availability-zone-1` and another two called `carbon-relay-ng-3`/`carbon-relay-ng-4` running in availability zone `availability-zone-2` then your carbon-relay-ng config of the instance which does the duplication and sends the carbon traffic to these two clusters would need to have these two routes:
+This setup gives you failure tolerance and scalability:
 
 ```
-[[route]]
-key = 'availability-zone-1'
-type = 'consistentHashing'
-destinations = [
-  'carbon-relay-ng-1:2001',
-  'carbon-relay-ng-2:2001'
-]
 
-[[route]]
-key = 'availability-zone-2'
-type = 'consistentHashing'
-destinations = [
-  'carbon-relay-ng-3:2001',
-  'carbon-relay-ng-4:2001'
-]
+|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
+| metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 | 
+|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| 
+          \                     /                   /                        \                    /                    /
+           \                   /                   /                          \                  /                    /
+            \                 / /-----------------/                            \                / /------------------/
+             \               / /                                                \              / /
+              \ <hot>       / /       <cold-standby>                             \    <hot>   / /         <cold-standby>
+         |-------------------|    |-------------------|                       |-------------------|    |-------------------|
+         | carbon-relay-ng-1 |    | carbon-relay-ng-2 |                       | carbon-relay-ng-3 |    | carbon-relay-ng-4 |
+         |-------------------|    |-------------------|                       |-------------------|    |-------------------|
+                            \                        \                         /                        /
+                             \                        \                       /                        /
+                              \                        \                     /                        /
+                               \                        |-------------------|                        /
+                                \-----------------------|   GrafanaCloud    |-----------------------/
+                                                        |-------------------|
 ```
-
-This setup gives you redundancy because each availability zone has one copy of the data and it also gives you scalability because within each availability zone you can scale up the cluster by adding more entries to the `destinations` parameter.
