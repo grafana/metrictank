@@ -27,8 +27,24 @@ func NewApi(urls Urls) Api {
 	})
 	api.graphiteHandler = newProxyWithLogging("graphite", urls.graphite)
 	api.metrictankHandler = newProxyWithLogging("metrictank", urls.metrictank)
-	api.bulkImportHandler = newProxyWithLogging("bulk-importer", urls.bulkImporter)
+	api.bulkImportHandler = bulkImportHandler(urls)
 	return api
+}
+
+func bulkImportHandler(urls Urls) http.Handler {
+	if urls.bulkImporter.String() != "" {
+		log.WithField("url", urls.bulkImporter.String()).Info("bulk importer configured")
+		return newProxyWithLogging("bulk-importer", urls.bulkImporter)
+	}
+	log.Warn("no url configured for bulk importer service")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.WithField("service", "bulk-importer").
+			WithField("method", r.Method).
+			WithField("path", r.URL.Path).
+			WithField("status", http.StatusServiceUnavailable).Info()
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = fmt.Fprintln(w, "no url configured for bulk importer service")
+	})
 }
 
 //Builds an http.ServeMux based on the handlers defined in the Api
