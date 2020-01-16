@@ -25,9 +25,9 @@ func NewApi(urls Urls) Api {
 		w.WriteHeader(http.StatusNotImplemented)
 		_, _ = fmt.Fprintln(w, "http ingest not yet implemented")
 	})
-	api.graphiteHandler = newProxyWithLogging("graphite", urls.graphite)
-	api.metrictankHandler = newProxyWithLogging("metrictank", urls.metrictank)
-	api.bulkImportHandler = bulkImportHandler(urls)
+	api.graphiteHandler = defaultOrgIdMiddleware(newProxyWithLogging("graphite", urls.graphite))
+	api.metrictankHandler = defaultOrgIdMiddleware(newProxyWithLogging("metrictank", urls.metrictank))
+	api.bulkImportHandler = defaultOrgIdMiddleware(bulkImportHandler(urls))
 	return api
 }
 
@@ -74,4 +74,13 @@ func newProxyWithLogging(svc string, baseUrl *url.URL) *httputil.ReverseProxy {
 		return nil
 	}
 	return proxy
+}
+
+func defaultOrgIdMiddleware(base http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Org-Id") == "" && *defaultOrgId != "" {
+			r.Header.Set("X-Org-Id", *defaultOrgId)
+		}
+		base.ServeHTTP(w, r)
+	})
 }

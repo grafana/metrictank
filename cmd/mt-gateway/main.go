@@ -17,6 +17,7 @@ var (
 	graphiteURL   = flag.String("graphite-url", "http://localhost:8080", "graphite-api address")
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
 	addr          = flag.String("addr", ":80", "http service address")
+	defaultOrgId  = flag.String("default-org-id", "", "default org ID to send to downstream services if none is provided")
 )
 
 type Urls struct {

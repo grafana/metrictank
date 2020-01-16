@@ -57,6 +57,8 @@ Usage:
 Flags:
   -addr string
     	http service address (default ":80")
+  -default-org-id string
+    	default org ID to send to downstream services if none is provided
   -graphite-url string
     	graphite-api address (default "http://localhost:8080")
   -importer-url string
