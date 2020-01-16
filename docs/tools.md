@@ -44,6 +44,32 @@ Example:
 ```
 
 
+## mt-gateway
+
+```
+mt-gateway
+Provides an HTTP gateway for interacting with metrictank, including metrics ingestion
+
+Usage:
+
+	mt-gateway [flags]
+
+Flags:
+  -addr string
+    	http service address (default ":80")
+  -default-org-id int
+    	default org ID to send to downstream services if none is provided (default -1)
+  -graphite-url string
+    	graphite-api address (default "http://localhost:8080")
+  -importer-url string
+    	mt-whisper-importer-writer address
+  -metrictank-url string
+    	metrictank address (default "http://localhost:6060")
+  -version
+    	print version string
+```
+
+
 ## mt-index-cat
 
 ```
