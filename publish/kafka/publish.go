@@ -197,11 +197,11 @@ func New(brokers []string, autoInterval bool) *mtPublisher {
 	}
 
 	if autoInterval {
-		schemas, err := getSchemas(schemasConf)
+		schemas, err := conf.ReadSchemas(schemasConf)
 		if err != nil {
 			log.Fatalf("failed to load schemas config. %s", err)
 		}
-		mp.schemas = schemas
+		mp.schemas = &schemas
 	}
 
 	// We are looking for strong consistency semantics.
