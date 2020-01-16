@@ -38,7 +38,7 @@ func bulkImportHandler(urls Urls) http.Handler {
 		log.WithField("url", urls.bulkImporter.String()).Info("bulk importer configured")
 		return httputil.NewSingleHostReverseProxy(urls.bulkImporter)
 	}
-	log.Warn("no url configured for bulk importer service")
+	log.Info("no url configured for bulk importer service, disabling")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = fmt.Fprintln(w, "no url configured for bulk importer service")
