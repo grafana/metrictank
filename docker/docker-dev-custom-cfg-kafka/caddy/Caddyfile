@@ -29,3 +29,11 @@
     errors stderr
     tls off
 }
+
+:9000 {
+	proxy / tsdb-gw1 tsdb-gw2 tsdb-gw3 {
+	policy round_robin
+	}
+    errors stderr
+    tls off
+}

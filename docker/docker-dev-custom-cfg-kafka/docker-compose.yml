@@ -140,17 +140,50 @@ services:
       - "8080:8081"
       - "8081:8081"
       - "8082:8082"
+      - "9000:9000"
     volumes:
       - ./caddy/:/etc/caddy/
     restart: unless-stopped
     labels:
       org.label-schema.group: "monitoring"
 
-  tsdb-gw:
-    hostname: tsdb-gw
-    image: raintank/tsdb-gw
+  tsdb-gw1:
+    hostname: tsdb-gw1
+    image: raintank/tsdb-gw:0.10.0-127-g1ce840a
     ports:
-     - "9000:80"
+     - "9001:80"
+    volumes:
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ./gw:/etc/gw/
+    environment:
+     WAIT_HOSTS: kafka:9092
+     WAIT_TIMEOUT: 60
+    links:
+     - metrictank
+     - graphite
+     - kafka
+
+  tsdb-gw2:
+    hostname: tsdb-gw2
+    image: raintank/tsdb-gw:0.10.0-127-g1ce840a
+    ports:
+     - "9002:80"
+    volumes:
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ./gw:/etc/gw/
+    environment:
+     WAIT_HOSTS: kafka:9092
+     WAIT_TIMEOUT: 60
+    links:
+     - metrictank
+     - graphite
+     - kafka
+
+  tsdb-gw3:
+    hostname: tsdb-gw3
+    image: raintank/tsdb-gw:0.10.0-127-g1ce840a
+    ports:
+     - "9003:80"
     volumes:
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./gw:/etc/gw/
