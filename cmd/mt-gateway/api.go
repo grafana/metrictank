@@ -5,6 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 )
 
 //Maintains a set of `http.Handlers` for the different API endpoints.
@@ -93,8 +94,8 @@ func loggingMiddleware(svc string, base http.Handler) http.Handler {
 //Set the `X-Org-Id` header to the default if there is not one present
 func defaultOrgIdMiddleware(base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Org-Id") == "" && *defaultOrgId != "" {
-			r.Header.Set("X-Org-Id", *defaultOrgId)
+		if r.Header.Get("X-Org-Id") == "" && *defaultOrgId != -1 {
+			r.Header.Set("X-Org-Id", strconv.Itoa(*defaultOrgId))
 		}
 		base.ServeHTTP(w, r)
 	})
