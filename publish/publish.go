@@ -3,7 +3,6 @@ package publish
 import (
 	"strconv"
 
-	"github.com/grafana/metrictank/metrics_client"
 	schema "github.com/grafana/metrictank/schema"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -25,9 +24,6 @@ type Publisher interface {
 
 var (
 	publisher Publisher
-
-	// Persister allows pushing metrics to the Persistor Service
-	Persistor *metrics_client.Client
 )
 
 func Init(p Publisher) {
