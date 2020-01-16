@@ -55,32 +55,37 @@ schemasFile = '/etc/carbon-relay-ng/storage-schemas.conf'
 ## Scaling with carbon-relay-ng
 
 When distributing traffic among multiple instances of carbon-relay-ng it is important to ensure that the same metrics always get sent to the same carbon-relay-ng instances to preserve the order of the data points, this can be done using consistent hashing.
-The carbon-relay and carbon-relay-ng daemons both support consistent hashing to distribute traffic among its carbon destinations. If the carbon-relay(-ng) instance which does the consistent hashing itself becomes a bottleneck it is also ok to have multiple carbon-relay(-ng) instances running in parallel and doing the consistent hashing, among these instances the traffic may then be round-robed.
+The carbon-relay and carbon-relay-ng daemons both support consistent hashing to distribute traffic among its carbon destinations. If the carbon-relay(-ng) instance which does the consistent hashing itself becomes a bottleneck it is also ok to have multiple carbon-relay(-ng) instances running in parallel.
 
 Example which uses carbon-relay-ng to do the consistent hashing before forwarding the carbon traffic to multiple other carbon-relay-ng instances:
 ```
-            incoming carbon traffic
-                       |
-                 <round-robin>
-                /             \
-|-------------------|    |-------------------|
-| carbon-relay-ng-1 |    | carbon-relay-ng-2 |
-|-------------------|    |-------------------|
-             |                     |
-  <consistent hashing>  <consistent hashing>
-             |      \    /         |
-             |       \  /          |
-             |        \/           |
-             |        /\           |
-             |       /  \          |
-             |      /    \         |
-|-------------------|    |-------------------|
-| carbon-relay-ng-3 |    | carbon-relay-ng-4 |
-|-------------------|    |-------------------|
-                    \    /
-               |--------------|
-               | GrafanaCloud |
-               |--------------|
+
+|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
+| metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 | 
+|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| 
+                    \                     \           |                      |          /                     /
+                     \                     \          |                      |         /                     /
+                      \                     \         |                      |        /                     /
+                       \                     \        |                      |       /                     /
+                        \                     \       |                      |      /                     /
+                         \                |-------------------|    |-------------------|                 /
+                          \---------------| carbon-relay-ng-1 |    | carbon-relay-ng-2 |----------------/
+                                          |-------------------|    |-------------------|
+                                                       |                     |
+                                            <consistent hashing>  <consistent hashing>
+                                                       |      \    /         |
+                                                       |       \  /          |
+                                                       |        \/           |
+                                                       |        /\           |
+                                                       |       /  \          |
+                                                       |      /    \         |
+                                          |-------------------|    |-------------------|
+                                          | carbon-relay-ng-3 |    | carbon-relay-ng-4 |
+                                          |-------------------|    |-------------------|
+                                                              \    /
+                                                         |--------------|
+                                                         | GrafanaCloud |
+                                                         |--------------|
 ```
 
 To use consistent hashing in carbon-relay-ng configure a carbon route with multiple destinations and set the type to `consistentHashing`. For the above example the route would look like this:
