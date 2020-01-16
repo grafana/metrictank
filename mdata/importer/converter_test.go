@@ -1372,6 +1372,13 @@ func TestPointsConversionWithoutAnyChange(t *testing.T) {
 		},
 	}
 
+	expected0 := map[schema.Method][]whisper.Point{
+		schema.Sum: inputPoints[0],
+	}
+	expected1 := map[schema.Method][]whisper.Point{
+		schema.Sum: inputPoints[1],
+	}
+
 	c := converter{
 		archives: []whisper.ArchiveInfo{
 			{SecondsPerPoint: 1, Points: 4},
@@ -1385,6 +1392,6 @@ func TestPointsConversionWithoutAnyChange(t *testing.T) {
 
 	points1 := c.getPoints(0, 1, 4)
 	points2 := c.getPoints(0, 2, 4)
-	verifyPointMaps(t, points1, inputPoints[0])
-	verifyPointMaps(t, points2, inputPoints[1])
+	verifyPointMaps(t, points1, expected0)
+	verifyPointMaps(t, points2, expected1)
 }
