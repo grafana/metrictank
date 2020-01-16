@@ -5,7 +5,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 )
 
 //Maintains a set of `http.Handlers` for the different API endpoints.
@@ -25,23 +24,20 @@ func NewApi(urls Urls) Api {
 		w.WriteHeader(http.StatusNotImplemented)
 		_, _ = fmt.Fprintln(w, "http ingest not yet implemented")
 	})
-	api.graphiteHandler = defaultOrgIdMiddleware(newProxyWithLogging("graphite", urls.graphite))
-	api.metrictankHandler = defaultOrgIdMiddleware(newProxyWithLogging("metrictank", urls.metrictank))
-	api.bulkImportHandler = defaultOrgIdMiddleware(bulkImportHandler(urls))
+	api.graphiteHandler = withMiddleware("graphite", httputil.NewSingleHostReverseProxy(urls.graphite))
+	api.metrictankHandler = withMiddleware("metrictank", httputil.NewSingleHostReverseProxy(urls.metrictank))
+	api.bulkImportHandler = withMiddleware("bulk-importer", bulkImportHandler(urls))
 	return api
 }
 
+//Returns a proxy to the bulk importer if one is configured, otherwise a handler that always returns a 503
 func bulkImportHandler(urls Urls) http.Handler {
 	if urls.bulkImporter.String() != "" {
 		log.WithField("url", urls.bulkImporter.String()).Info("bulk importer configured")
-		return newProxyWithLogging("bulk-importer", urls.bulkImporter)
+		return httputil.NewSingleHostReverseProxy(urls.bulkImporter)
 	}
 	log.Warn("no url configured for bulk importer service")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.WithField("service", "bulk-importer").
-			WithField("method", r.Method).
-			WithField("path", r.URL.Path).
-			WithField("status", http.StatusServiceUnavailable).Info()
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = fmt.Fprintln(w, "no url configured for bulk importer service")
 	})
@@ -63,19 +59,28 @@ func (api Api) Mux() *http.ServeMux {
 	return mux
 }
 
-//Creates a new single host reverse proxy with additional logging based on the response (and service name)
-func newProxyWithLogging(svc string, baseUrl *url.URL) *httputil.ReverseProxy {
-	proxy := httputil.NewSingleHostReverseProxy(baseUrl)
-	proxy.ModifyResponse = func(response *http.Response) error {
-		log.WithField("service", svc).
-			WithField("method", response.Request.Method).
-			WithField("path", response.Request.URL.Path).
-			WithField("status", response.StatusCode).Info()
-		return nil
-	}
-	return proxy
+//Add logging and default orgId middleware to the http handler
+func withMiddleware(svc string, base http.Handler) http.Handler {
+	return defaultOrgIdMiddleware(loggingMiddleware(svc, base))
 }
 
+//add request logging to the given handler
+func loggingMiddleware(svc string, base http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		base.ServeHTTP(w, request)
+		logEntry := log.WithField("service", svc).
+			WithField("method", request.Method).
+			WithField("path", request.URL.Path).
+			WithField("status", request.Close)
+		if request.Response != nil {
+			logEntry.WithField("status", request.Response.StatusCode).Info()
+		} else {
+			logEntry.WithField("status", nil).Warn("no response received")
+		}
+	})
+}
+
+//Set the `X-Org-Id` header to the default if there is not one present
 func defaultOrgIdMiddleware(base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Org-Id") == "" && *defaultOrgId != "" {
