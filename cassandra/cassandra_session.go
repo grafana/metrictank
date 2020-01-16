@@ -65,6 +65,9 @@ func (s *Session) Stop() {
 
 // deadConnectionRefresh will run a query using the current Cassandra session every connectionCheckInterval
 // if it cannot query Cassandra for longer than connectionCheckTimeout it will create a new session
+//
+// We implemented this due to an issue in gocql (https://github.com/gocql/gocql/issues/831). Once that issue is resolved
+// we should be able to get rid of this code.
 func (s *Session) deadConnectionRefresh() {
 	defer s.wg.Done()
 
