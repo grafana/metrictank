@@ -40,8 +40,9 @@ func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	name := fmt.Sprintf("countSeries(%s)", strings.Join(queryPatts, ","))
 	out := pointSlicePool.Get().([]schema.Point)
 
+	l := float64(len(series))
 	for _, p := range series[0].Datapoints {
-		p.Val = float64(len(series))
+		p.Val = l
 		out = append(out, p)
 	}
 
