@@ -66,10 +66,6 @@ unused-packages = true
   revision = "1982a06ad6b987c24beec15336019914d71b2e31"
 
 [[constraint]]
-  name = "github.com/golang/snappy"
-  branch = "master"
-
-[[constraint]]
   name = "github.com/hailocab/go-hostpool"
   branch = "master"
 
@@ -137,11 +133,6 @@ unused-packages = true
 [[constraint]]
   name = "gopkg.in/macaron.v1"
   version = "1.1.8"
-
-[[constraint]]
-  name = "github.com/prometheus/prometheus"
-  source = "https://github.com/Dieterbe/prometheus.git"
-  branch = "v2.1.0-tom-fix-testing-flags"
 
 [[constraint]]
   name = "github.com/prometheus/procfs"
