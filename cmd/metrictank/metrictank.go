@@ -27,7 +27,6 @@ import (
 	"github.com/grafana/metrictank/input"
 	inCarbon "github.com/grafana/metrictank/input/carbon"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
-	inPrometheus "github.com/grafana/metrictank/input/prometheus"
 	"github.com/grafana/metrictank/jaeger"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata"
@@ -110,7 +109,6 @@ func main() {
 	// load config for metric ingestors
 	inCarbon.ConfigSetup()
 	inKafkaMdm.ConfigSetup()
-	inPrometheus.ConfigSetup()
 
 	// load config for metricIndexers
 	memory.ConfigSetup()
@@ -182,7 +180,6 @@ func main() {
 	inCarbon.ConfigProcess()
 	inKafkaMdm.ConfigProcess(*instance)
 	memory.ConfigProcess()
-	inPrometheus.ConfigProcess()
 	notifierKafka.ConfigProcess(*instance)
 	statsConfig.ConfigProcess(*instance)
 	mdata.ConfigProcess()
@@ -191,7 +188,7 @@ func main() {
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 	jaeger.ConfigProcess()
 
-	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled || inPrometheus.Enabled
+	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled
 	wantInput := cluster.Mode == cluster.ModeDev || cluster.Mode == cluster.ModeShard
 	if !inputEnabled && wantInput {
 		log.Fatal("you should enable at least 1 input plugin in 'dev' or 'shard' cluster mode")
@@ -315,10 +312,6 @@ func main() {
 	// note. all these New functions must either return a valid instance or call log.Fatal
 	if inCarbon.Enabled {
 		inputs = append(inputs, inCarbon.New())
-	}
-
-	if inPrometheus.Enabled {
-		inputs = append(inputs, inPrometheus.New())
 	}
 
 	if inKafkaMdm.Enabled {
