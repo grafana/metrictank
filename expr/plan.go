@@ -90,8 +90,20 @@ func (p Plan) Dump(w io.Writer) {
 		fmt.Fprintln(w, e.Print(2))
 	}
 	fmt.Fprintf(w, "* Reqs:\n")
+
+	maxQueryLen := 5
 	for _, r := range p.Reqs {
-		fmt.Fprintln(w, "   ", r)
+		if len(r.Query) > maxQueryLen {
+			maxQueryLen = len(r.Query)
+		}
+	}
+	// ! PNGroups are pointers which can be upto 21 characters long on 64bit
+	headPatt := fmt.Sprintf("%%%ds %%12s %%12s %%25s %%21s %%6s\n", maxQueryLen)
+	linePatt := fmt.Sprintf("%%%ds %%12d %%12d %%25s %%21d %%6d\n", maxQueryLen)
+	fmt.Fprintf(w, headPatt, "query", "from", "to", "consolidator", "PNGroup", "MDP")
+
+	for _, r := range p.Reqs {
+		fmt.Fprintf(w, linePatt, r.Query, r.From, r.To, r.Cons, r.PNGroup, r.MDP)
 	}
 	fmt.Fprintf(w, "MaxDataPoints: %d\n", p.MaxDataPoints)
 	fmt.Fprintf(w, "From: %d\n", p.From)

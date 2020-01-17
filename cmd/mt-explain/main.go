@@ -33,6 +33,7 @@ func main() {
 		fmt.Println()
 		fmt.Printf("Usage:\n\n")
 		fmt.Printf("  mt-explain\n")
+		flag.PrintDefaults()
 		fmt.Println()
 		fmt.Printf("Example:\n\n")
 		fmt.Printf("  mt-explain -from -24h -to now -mdp 1000 \"movingAverage(sumSeries(foo.bar), '2min')\" \"alias(averageSeries(foo.*), 'foo-avg')\"\n\n")
