@@ -225,7 +225,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		// as graphite needs high-res data to perform its processing.
 		mdp = 0
 	}
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable)
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, fetchOptimizations)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
 			if request.NoProxy {
@@ -1420,7 +1420,7 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 	stable := request.Process == "stable"
 	mdp := request.MaxDataPoints
 
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable)
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, fetchOptimizations)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

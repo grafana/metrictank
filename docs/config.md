@@ -293,6 +293,8 @@ get-targets-concurrency = 20
 tagdb-default-limit = 100
 # ratio of peer responses after which speculative querying (aka spec-exec) is used. Set to 1 to disable.
 speculation-threshold = 1
+# enable MaxDataPoints optimization and pre-normalization optimizations
+fetch-optimizations = false
 ```
 
 ## metric data inputs ##

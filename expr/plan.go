@@ -31,14 +31,17 @@ func NewReq(query string, from, to uint32, cons consolidation.Consolidator) Req 
 }
 
 func NewReqFromContext(query string, c Context) Req {
-	return Req{
-		Query:   query,
-		From:    c.from,
-		To:      c.to,
-		Cons:    c.consol,
-		PNGroup: c.PNGroup,
-		MDP:     c.MDP,
+	r := Req{
+		Query: query,
+		From:  c.from,
+		To:    c.to,
+		Cons:  c.consol,
 	}
+	if c.fetchOptimizations {
+		r.PNGroup = c.PNGroup
+		r.MDP = c.MDP
+	}
+	return r
 }
 
 // NewReqFromSeries generates a Req back from a series
@@ -102,7 +105,7 @@ func (p Plan) Dump(w io.Writer) {
 // * validation of arguments
 // * allow functions to modify the Context (change data range or consolidation)
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
-func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool) (Plan, error) {
+func NewPlan(exprs []*expr, from, to, mdp uint32, stable, fetchOptimizations bool) (Plan, error) {
 	plan := Plan{
 		exprs:         exprs,
 		MaxDataPoints: mdp,
@@ -111,10 +114,11 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool) (Plan, error) {
 	}
 	for _, e := range exprs {
 		context := Context{
-			from:    from,
-			to:      to,
-			MDP:     mdp,
-			PNGroup: 0, // making this explicit here for easy code grepping
+			from:               from,
+			to:                 to,
+			MDP:                mdp,
+			PNGroup:            0, // making this explicit here for easy code grepping
+			fetchOptimizations: fetchOptimizations,
 		}
 		fn, reqs, err := newplan(e, context, stable, plan.Reqs)
 		if err != nil {
