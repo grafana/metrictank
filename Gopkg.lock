@@ -213,25 +213,6 @@
   revision = "fd3024d87ee21a36d3ccc4367f509fec89cd90ee"
 
 [[projects]]
-  digest = "1:1742dfb45dc72afbbab0d9179091fa75f6acb1d36e0bb4829f881cb535c59045"
-  name = "github.com/go-kit/kit"
-  packages = [
-    "log",
-    "log/level",
-  ]
-  pruneopts = "NUT"
-  revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
-  version = "v0.6.0"
-
-[[projects]]
-  digest = "1:341a7df38da99fe91ed40e4008c13cc5d02dcc98ed1a094360cb7d5df26d6d26"
-  name = "github.com/go-logfmt/logfmt"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "390ab7935ee28ec6b286364bba9b4dd6410cb3d5"
-  version = "v0.3.0"
-
-[[projects]]
   digest = "1:d2e68004ab21e836f35f06412fe7aa124db1953d359e59f6ba3ccdb3d3a6b194"
   name = "github.com/go-macaron/binding"
   packages = ["."]
@@ -248,14 +229,6 @@
   revision = "d8a0b8677191f4380287cfebd08e462217bac7ad"
 
 [[projects]]
-  digest = "1:a1efdbc2762667c8a41cbf02b19a0549c846bf2c1d08cad4f445e3344089f1f0"
-  name = "github.com/go-stack/stack"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "259ab82a6cad3992b4e21ff5cac294ccb06474bc"
-  version = "v1.7.0"
-
-[[projects]]
   digest = "1:301a5ade4fa27d783576ad0b5e59b4bc424142794b293d323ad1d4d812e5488e"
   name = "github.com/gocql/gocql"
   packages = [
@@ -268,31 +241,23 @@
   revision = "1982a06ad6b987c24beec15336019914d71b2e31"
 
 [[projects]]
-  digest = "1:1ba798075c507fb2513d955f8c04314acdb233b269671224a602ed4dc550eb64"
+  digest = "1:40a8df12855884453745185448712618ae2e4ec8b8ddf0d9ead35a84a0d7f511"
   name = "github.com/gogo/protobuf"
-  packages = [
-    "gogoproto",
-    "proto",
-    "protoc-gen-gogo/descriptor",
-    "sortkeys",
-    "types",
-  ]
+  packages = ["proto"]
   pruneopts = "NUT"
   revision = "1adfc126b41513cc696b209667c8656ea7aac67c"
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:18a98708a4fb0438c7778fd4d4a94d6a604c8c279eb9164d3cfc88a76d317f72"
+  digest = "1:a2b5a96dacf89548bf1138ff08f8617d5fa90bbc8b91a8769844b971b02dbd2a"
   name = "github.com/golang/protobuf"
   packages = [
-    "jsonpb",
     "proto",
     "protoc-gen-go/descriptor",
     "ptypes",
     "ptypes/any",
     "ptypes/duration",
     "ptypes/empty",
-    "ptypes/struct",
     "ptypes/timestamp",
     "ptypes/wrappers",
   ]
@@ -344,18 +309,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "7a1aae0695d90c7ce662097c9589dfe1ae3c4f47"
-
-[[projects]]
-  digest = "1:a191ed8e21025522d5857d14c3ec0a6513f83bea2ff45967f301fb701f3849dd"
-  name = "github.com/grpc-ecosystem/grpc-gateway"
-  packages = [
-    "runtime",
-    "runtime/internal",
-    "utilities",
-  ]
-  pruneopts = "NUT"
-  revision = "07f5e79768022f9a3265235f0db4ac8c3f675fec"
-  version = "v1.3.1"
 
 [[projects]]
   branch = "master"
@@ -499,14 +452,6 @@
   version = "v1.0.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:f91bb67d051a94cf6ab2cf07eee0550432afc31655838d42cdec258db4b348f0"
-  name = "github.com/kr/logfmt"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "b84e30acd515aadc4b783ad4ff83aff3299bdfe0"
-
-[[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -630,19 +575,6 @@
   ]
   pruneopts = "NUT"
   revision = "75f2d6163c7a100bed6e971044ea3de30ee3a678"
-
-[[projects]]
-  branch = "v2.1.0-tom-fix-testing-flags"
-  digest = "1:3d8f3c5efc7442b65bdbde4b52b5afde2fb17eb7d60dda5a2ed880fcd0d2c801"
-  name = "github.com/prometheus/prometheus"
-  packages = [
-    "pkg/labels",
-    "prompb",
-    "storage",
-  ]
-  pruneopts = "NUT"
-  revision = "74fa41334a571bd78e941aae802f422fa88b4e7f"
-  source = "https://github.com/Dieterbe/prometheus.git"
 
 [[projects]]
   branch = "master"
@@ -1130,8 +1062,6 @@
     "github.com/docker/docker/client",
     "github.com/go-macaron/binding",
     "github.com/gocql/gocql",
-    "github.com/gogo/protobuf/proto",
-    "github.com/golang/snappy",
     "github.com/google/go-cmp/cmp",
     "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
@@ -1148,11 +1078,7 @@
     "github.com/pelletier/go-toml",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",
-    "github.com/prometheus/common/model",
     "github.com/prometheus/procfs",
-    "github.com/prometheus/prometheus/pkg/labels",
-    "github.com/prometheus/prometheus/prompb",
-    "github.com/prometheus/prometheus/storage",
     "github.com/raintank/dur",
     "github.com/raintank/gziper",
     "github.com/raintank/met",
