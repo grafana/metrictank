@@ -538,22 +538,6 @@
   revision = "b8bc1bf767474819792c23f32d8286a45736f1c6"
 
 [[projects]]
-  branch = "master"
-  digest = "1:fa21ce52102db5a5cbb134a550d3544e5aed27e990107ad38fb28147d08e8853"
-  name = "github.com/nightlyone/lockfile"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "6a197d5ea61168f2ac821de2b7f011b250904900"
-
-[[projects]]
-  digest = "1:2d5cd1e32189ae4366eff373f2b2345c9072c236bd9e29d9ee2ce732dd6ee3c5"
-  name = "github.com/oklog/ulid"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "d311cb43c92434ec4072dfbbda3400741d0a6337"
-  version = "v0.3.0"
-
-[[projects]]
   digest = "1:6846140b3f116579680eefdc17145f2bcf064b68deb9febf86b4419a454049af"
   name = "github.com/opentracing/opentracing-go"
   packages = [
@@ -606,12 +590,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:41d1e93e43e7e941b970ebc720cc428a2a74fcc13eff306c44a42883cd99f433"
+  digest = "1:27d40615ecb8e8156811a3b13a5644d2893d2b0ecd16757944db902a6b9fb17e"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
     "prometheus/promauto",
-    "prometheus/promhttp",
   ]
   pruneopts = "NUT"
   revision = "676eaf6b948046fcd9dbbcf5cc9ff5077921aa81"
@@ -650,39 +633,16 @@
 
 [[projects]]
   branch = "v2.1.0-tom-fix-testing-flags"
-  digest = "1:33fa5dec0d85ad2e80c280a1ec7cb6da054ef732b2bcaede70c09091ebf4e0a7"
+  digest = "1:3d8f3c5efc7442b65bdbde4b52b5afde2fb17eb7d60dda5a2ed880fcd0d2c801"
   name = "github.com/prometheus/prometheus"
   packages = [
     "pkg/labels",
-    "pkg/textparse",
-    "pkg/timestamp",
-    "pkg/value",
     "prompb",
-    "promql",
     "storage",
-    "storage/tsdb",
-    "util/stats",
-    "util/strutil",
-    "util/testutil",
   ]
   pruneopts = "NUT"
   revision = "74fa41334a571bd78e941aae802f422fa88b4e7f"
   source = "https://github.com/Dieterbe/prometheus.git"
-
-[[projects]]
-  branch = "master"
-  digest = "1:b86e3a04e0c08582bc688dcdd885c375632949cd958cf0a6666d469dfd6d1b01"
-  name = "github.com/prometheus/tsdb"
-  packages = [
-    ".",
-    "chunkenc",
-    "chunks",
-    "fileutil",
-    "index",
-    "labels",
-  ]
-  pruneopts = "NUT"
-  revision = "f6c76078f5a1b4a0e56bd1c8caaeaf3ccbc447e3"
 
 [[projects]]
   branch = "master"
@@ -1188,12 +1148,10 @@
     "github.com/pelletier/go-toml",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",
-    "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/common/model",
     "github.com/prometheus/procfs",
     "github.com/prometheus/prometheus/pkg/labels",
     "github.com/prometheus/prometheus/prompb",
-    "github.com/prometheus/prometheus/promql",
     "github.com/prometheus/prometheus/storage",
     "github.com/raintank/dur",
     "github.com/raintank/gziper",
