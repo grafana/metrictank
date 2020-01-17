@@ -1,4 +1,4 @@
-# Schema conversion logic for Whisper data
+# Schema conversion logic
 
 Metrictank comes with schema conversion logic (`mdata/importer/converter.go`) which can be used to convert data from one storage schema into another one. This is currently only used by the Whisper importer, but may in the future also be used to import from other types of data sources.
 
