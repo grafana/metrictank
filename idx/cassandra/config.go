@@ -43,6 +43,8 @@ type IdxConfig struct {
 	Password                 string
 	Consistency              string
 	Timeout                  time.Duration
+	ConnectionCheckInterval  time.Duration
+	ConnectionCheckTimeout   time.Duration
 	NumConns                 int
 	ProtoVer                 int
 	DisableInitialHostLookup bool
@@ -64,6 +66,8 @@ func NewIdxConfig() *IdxConfig {
 		MetaRecordPruneAge:       time.Hour * 72,
 		Consistency:              "one",
 		Timeout:                  time.Second,
+		ConnectionCheckInterval:  time.Second * 5,
+		ConnectionCheckTimeout:   time.Second * 30,
 		NumConns:                 10,
 		writeQueueSize:           100000,
 		updateCassIdx:            true,
@@ -110,6 +114,8 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.DurationVar(&CliConfig.MetaRecordPruneAge, "meta-record-prune-age", CliConfig.MetaRecordPruneAge, "The minimum age a batch of meta records must have to be pruned.")
 	casIdx.StringVar(&CliConfig.Consistency, "consistency", CliConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra request timeout")
+	casIdx.DurationVar(&CliConfig.ConnectionCheckInterval, "connection-check-interval", CliConfig.ConnectionCheckInterval, "interval at which to perform a connection check to cassandra, set to 0 to disable.")
+	casIdx.DurationVar(&CliConfig.ConnectionCheckTimeout, "connection-check-timeout", CliConfig.ConnectionCheckTimeout, "maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval.")
 	casIdx.IntVar(&CliConfig.NumConns, "num-conns", CliConfig.NumConns, "number of concurrent connections to cassandra")
 	casIdx.IntVar(&CliConfig.writeQueueSize, "write-queue-size", CliConfig.writeQueueSize, "Max number of metricDefs allowed to be unwritten to cassandra")
 	casIdx.BoolVar(&CliConfig.updateCassIdx, "update-cassandra-index", CliConfig.updateCassIdx, "synchronize index changes to cassandra. not all your nodes need to do this.")

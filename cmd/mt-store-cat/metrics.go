@@ -52,7 +52,8 @@ func match(prefix, substr, glob string, metric Metric) bool {
 // getMetrics lists all metrics from the store matching the given condition.
 func getMetrics(idx *cassandra.CasIdx, prefix, substr, glob string, archive schema.Archive) ([]Metric, error) {
 	var metrics []Metric
-	iter := idx.Session.Query(fmt.Sprintf("select id, name from %s", idx.Config.Table)).Iter()
+	session := idx.Session.CurrentSession()
+	iter := session.Query(fmt.Sprintf("select id, name from %s", idx.Config.Table)).Iter()
 	var m Metric
 	var idString string
 	for iter.Scan(&idString, &m.name) {
@@ -80,7 +81,8 @@ func getMetrics(idx *cassandra.CasIdx, prefix, substr, glob string, archive sche
 func getMetric(idx *cassandra.CasIdx, amkey schema.AMKey) ([]Metric, error) {
 	var metrics []Metric
 	// index only stores MKey's, not AMKey's.
-	iter := idx.Session.Query(fmt.Sprintf("select name from %s where id=? ALLOW FILTERING", idx.Config.Table), amkey.MKey.String()).Iter()
+	session := idx.Session.CurrentSession()
+	iter := session.Query(fmt.Sprintf("select name from %s where id=? ALLOW FILTERING", idx.Config.Table), amkey.MKey.String()).Iter()
 
 	var m Metric
 	for iter.Scan(&m.name) {

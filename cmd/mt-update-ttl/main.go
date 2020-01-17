@@ -134,7 +134,8 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, store *cassandra.Cas
 	queryTpl := fmt.Sprintf("SELECT token(key), ts, data FROM %s where key=? AND ts>=? AND ts<?", tableIn)
 
 	for key := range jobs {
-		iter := store.Session.Query(queryTpl, key, startTime, endTime).Iter()
+		session := store.Session.CurrentSession()
+		iter := session.Query(queryTpl, key, startTime, endTime).Iter()
 		for iter.Scan(&token, &ts, &data) {
 			newTTL := getTTL(int(time.Now().Unix()), ts, ttlOut)
 			if tableIn == tableOut {
@@ -146,7 +147,7 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, store *cassandra.Cas
 				log.Infof("id=%d processing rownum=%d table=%q key=%q ts=%d query=%q data='%x'\n", id, atomic.LoadUint64(&doneRows)+1, tableIn, key, ts, query, data)
 			}
 
-			err := store.Session.Query(query, data, key, ts).Exec()
+			err := session.Query(query, data, key, ts).Exec()
 			if err != nil {
 				log.Errorf("id=%d failed updating %s %s %d: %q", id, tableOut, key, ts, err)
 			}
@@ -178,7 +179,8 @@ func worker(id int, jobs <-chan string, wg *sync.WaitGroup, store *cassandra.Cas
 
 func update(store *cassandra.CassandraStore, ttlOut int, tableIn, tableOut string) {
 
-	keyItr := store.Session.Query(fmt.Sprintf("SELECT distinct key FROM %s", tableIn)).Iter()
+	session := store.Session.CurrentSession()
+	keyItr := session.Query(fmt.Sprintf("SELECT distinct key FROM %s", tableIn)).Iter()
 
 	jobs := make(chan string, 100)
 

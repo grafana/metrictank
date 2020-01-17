@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/metrictank/schema"
@@ -77,26 +78,28 @@ type ChunkReadRequest struct {
 }
 
 type CassandraStore struct {
-	Session          *gocql.Session
+	Session          *cassandra.Session
+	cluster          *gocql.ClusterConfig
 	writeQueues      []chan *mdata.ChunkWriteRequest
 	writeQueueMeters []*stats.Range32
 	readQueue        chan *ChunkReadRequest
 	TTLTables        TTLTables
 	omitReadTimeout  time.Duration
 	tracer           opentracing.Tracer
-	timeout          time.Duration
+	shutdown         chan struct{}
+	wg               sync.WaitGroup
 }
 
 // ConvertTimeout provides backwards compatibility for values that used to be specified as integers,
 // while also allowing them to be specified as durations.
 func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 	if timeoutI, err := strconv.Atoi(timeout); err == nil {
-		log.Warn("cassandra_store: specifying the timeout as integer is deprecated, please use a duration value")
+		log.Warn("cassandra-store: specifying the timeout as integer is deprecated, please use a duration value")
 		return time.Duration(timeoutI) * defaultUnit
 	}
 	timeoutD, err := time.ParseDuration(timeout)
 	if err != nil {
-		log.Fatalf("cassandra_store: invalid duration value %q", timeout)
+		log.Fatalf("cassandra-store: invalid duration value %q", timeout)
 	}
 	return timeoutD
 }
@@ -129,7 +132,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 	var err error
 	tmpSession, err := cluster.CreateSession()
 	if err != nil {
-		log.Errorf("cassandra_store: failed to create cassandra session. %s", err.Error())
+		log.Errorf("cassandra-store: failed to create cassandra session. %s", err.Error())
 		return nil, err
 	}
 
@@ -140,13 +143,13 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 
 	// create or verify the metrictank keyspace
 	if config.CreateKeyspace {
-		log.Infof("cassandra_store: ensuring that keyspace %s exists.", config.Keyspace)
+		log.Infof("cassandra-store: ensuring that keyspace %s exists.", config.Keyspace)
 		err = tmpSession.Query(fmt.Sprintf(schemaKeyspace, config.Keyspace)).Exec()
 		if err != nil {
 			return nil, err
 		}
 		for _, table := range ttlTables {
-			log.Infof("cassandra_store: ensuring that table %s exists.", table.Name)
+			log.Infof("cassandra-store: ensuring that table %s exists.", table.Name)
 			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)).Exec()
 			if err != nil {
 				return nil, err
@@ -215,29 +218,34 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		return nil, fmt.Errorf("unknown HostSelectionPolicy '%q'", config.HostSelectionPolicy)
 	}
 
-	session, err := cluster.CreateSession()
+	cs, err := cassandra.NewSession(cluster, config.ConnectionCheckTimeout, config.ConnectionCheckInterval, config.Addrs, "cassandra-store")
+
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("CS: created session with config %+v", config)
+
+	log.Debugf("cassandra-store: created session with config %+v", config)
 	c := &CassandraStore{
-		Session:          session,
+		Session:          cs,
+		cluster:          cluster,
 		writeQueues:      make([]chan *mdata.ChunkWriteRequest, config.WriteConcurrency),
 		writeQueueMeters: make([]*stats.Range32, config.WriteConcurrency),
 		readQueue:        make(chan *ChunkReadRequest, config.ReadQueueSize),
 		omitReadTimeout:  ConvertTimeout(config.OmitReadTimeout, time.Second),
 		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
-		timeout:          cluster.Timeout,
+		shutdown:         make(chan struct{}),
 	}
 
 	for i := 0; i < config.WriteConcurrency; i++ {
 		c.writeQueues[i] = make(chan *mdata.ChunkWriteRequest, config.WriteQueueSize)
 		c.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.cassandra.write_queue.%d.items", i+1))
+		c.wg.Add(1)
 		go c.processWriteQueue(c.writeQueues[i], c.writeQueueMeters[i])
 	}
 
 	for i := 0; i < config.ReadConcurrency; i++ {
+		c.wg.Add(1)
 		go c.processReadQueue()
 	}
 
@@ -254,7 +262,8 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 //   so remember the TTL might have been up to twice as much
 func (c *CassandraStore) FindExistingTables(keyspace string) error {
 
-	meta, err := c.Session.KeyspaceMetadata(keyspace)
+	session := c.Session.CurrentSession()
+	meta, err := session.KeyspaceMetadata(keyspace)
 	if err != nil {
 		return err
 	}
@@ -301,15 +310,24 @@ func (c *CassandraStore) Add(cwr *mdata.ChunkWriteRequest) {
 /* process writeQueue.
  */
 func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, meter *stats.Range32) {
-	tick := time.Tick(time.Duration(1) * time.Second)
+	defer c.wg.Done()
+
+	ticker := time.NewTicker(time.Second)
+
 	for {
 		select {
-		case <-tick:
+		case <-c.shutdown:
+			log.Info("cassandra-store: received shutdown, exiting processWriteQueue")
+			ticker.Stop()
+			return
+		case <-ticker.C:
 			meter.Value(len(queue))
 		case cwr := <-queue:
 			meter.Value(len(queue))
 			keyStr := cwr.Key.String()
-			log.Debugf("CS: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("cassandra-store: starting to save %s:%d %v", keyStr, cwr.T0, cwr.Data)
+			}
 			//log how long the chunk waited in the queue before we attempted to save to cassandra
 			cassPutWaitDuration.Value(time.Now().Sub(cwr.Timestamp))
 
@@ -317,27 +335,36 @@ func (c *CassandraStore) processWriteQueue(queue chan *mdata.ChunkWriteRequest, 
 			success := false
 			attempts := 0
 			for !success {
-				err := c.insertChunk(keyStr, cwr.T0, cwr.TTL, cwr.Data)
+				select {
+				case <-c.shutdown:
+					log.Info("cassandra-store: received shutdown, exiting processWriteQueue")
+					ticker.Stop()
+					return
+				default:
+					err := c.insertChunk(keyStr, cwr.T0, cwr.TTL, cwr.Data)
 
-				if err == nil {
-					success = true
-					if cwr.Callback != nil {
-						cwr.Callback()
+					if err == nil {
+						success = true
+						if cwr.Callback != nil {
+							cwr.Callback()
+						}
+						if log.IsLevelEnabled(log.DebugLevel) {
+							log.Debugf("cassandra-store: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
+						}
+						chunkSaveOk.Inc()
+					} else {
+						errmetrics.Inc(err)
+						if (attempts % 20) == 0 {
+							log.Warnf("cassandra-store: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
+						}
+						chunkSaveFail.Inc()
+						sleepTime := 100 * attempts
+						if sleepTime > 2000 {
+							sleepTime = 2000
+						}
+						time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+						attempts++
 					}
-					log.Debugf("CS: save complete. %s:%d %v", keyStr, cwr.T0, cwr.Data)
-					chunkSaveOk.Inc()
-				} else {
-					errmetrics.Inc(err)
-					if (attempts % 20) == 0 {
-						log.Warnf("CS: failed to save chunk to cassandra after %d attempts. %v, %s", attempts+1, cwr.Data, err)
-					}
-					chunkSaveFail.Inc()
-					sleepTime := 100 * attempts
-					if sleepTime > 2000 {
-						sleepTime = 2000
-					}
-					time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-					attempts++
 				}
 			}
 		}
@@ -382,8 +409,9 @@ func (c *CassandraStore) insertChunk(key string, t0, ttl uint32, data []byte) er
 
 	row_key := fmt.Sprintf("%s_%d", key, t0/Month_sec) // "month number" based on unix timestamp (rounded down)
 	pre := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	ret := c.Session.Query(table.QueryWrite, row_key, t0, data, uint32(relativeTtl)).WithContext(ctx).Exec()
+	ctx, cancel := context.WithTimeout(context.Background(), c.cluster.Timeout)
+	session := c.Session.CurrentSession()
+	ret := session.Query(table.QueryWrite, row_key, t0, data, uint32(relativeTtl)).WithContext(ctx).Exec()
 	cancel()
 	cassPutExecDuration.Value(time.Now().Sub(pre))
 	return ret
@@ -395,30 +423,39 @@ type readResult struct {
 }
 
 func (c *CassandraStore) processReadQueue() {
-	for crr := range c.readQueue {
-		// check to see if the request has been canceled, if so abort now.
-		select {
-		case <-crr.ctx.Done():
-			//request canceled
-			crr.out <- readResult{err: errCtxCanceled}
-			continue
-		default:
-		}
-		waitDuration := time.Since(crr.timestamp)
-		cassGetWaitDuration.Value(waitDuration)
-		if waitDuration > c.omitReadTimeout {
-			cassOmitOldRead.Inc()
-			crr.out <- readResult{err: errReadTooOld}
-			continue
-		}
+	defer c.wg.Done()
 
-		pre := time.Now()
-		iter := readResult{
-			i:   c.Session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
-			err: nil,
+	for {
+		select {
+		case crr := <-c.readQueue:
+			// check to see if the request has been canceled, if so abort now.
+			select {
+			case <-crr.ctx.Done():
+				//request canceled
+				crr.out <- readResult{err: errCtxCanceled}
+				continue
+			default:
+			}
+			waitDuration := time.Since(crr.timestamp)
+			cassGetWaitDuration.Value(waitDuration)
+			if waitDuration > c.omitReadTimeout {
+				cassOmitOldRead.Inc()
+				crr.out <- readResult{err: errReadTooOld}
+				continue
+			}
+
+			pre := time.Now()
+			session := c.Session.CurrentSession()
+			iter := readResult{
+				i:   session.Query(crr.q, crr.p...).WithContext(crr.ctx).Iter(),
+				err: nil,
+			}
+			cassGetExecDuration.Value(time.Since(pre))
+			crr.out <- iter
+		case <-c.shutdown:
+			log.Info("cassandra-store: received shutdown, exiting processReadQueue")
+			return
 		}
-		cassGetExecDuration.Value(time.Since(pre))
-		crr.out <- iter
 	}
 }
 
@@ -482,7 +519,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	endMonth := (end - 1) / Month_sec // ending row has to include the last point we might need (end-1)
 	rowKeys := make([]string, endMonth-startMonth+1)
 	i := 0
-	for num := startMonth; num <= endMonth; num += 1 {
+	for num := startMonth; num <= endMonth; num++ {
 		rowKeys[i] = fmt.Sprintf("%s_%d", key, num)
 		i++
 	}
@@ -562,5 +599,7 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 }
 
 func (c *CassandraStore) Stop() {
-	c.Session.Close()
+	close(c.shutdown)
+	c.wg.Wait()
+	c.Session.Stop()
 }

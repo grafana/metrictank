@@ -126,6 +126,10 @@ cass config flags:
     	enable cassandra user authentication
   -ca-path string
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+  -connection-check-interval duration
+    	interval at which to perform a connection check to cassandra, set to 0 to disable. (default 5s)
+  -connection-check-timeout duration
+    	maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval. (default 30s)
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
@@ -277,6 +281,10 @@ cass config flags:
     	enable cassandra user authentication
   -ca-path string
     	cassandra CA certficate path when using SSL (default "/etc/metrictank/ca.pem")
+  -connection-check-interval duration
+    	interval at which to perform a connection check to cassandra, set to 0 to disable. (default 5s)
+  -connection-check-timeout duration
+    	maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval. (default 30s)
   -consistency string
     	write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one (default "one")
   -create-keyspace
