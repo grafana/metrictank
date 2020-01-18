@@ -1,30 +1,37 @@
-Considerations when writing function:
-make sure to return pointer, so that properties can be set, and we get a consistent PNGroup through the pipeline (if applicable)
+# Considerations when writing a Graphite processing function in metrictank
+
+## constructors should return a pointer
+
+* so that properties can be set
+* we get a consistent PNGroup through the pipeline (if applicable)
+
 (the exception here is the data loading function FuncGet() which doesn't need to set any properties)
-consider whether the function is GR, IA, a transparant or opaque aggregation. because those require special options. see https://github.com/grafana/metrictank/issues/926#issuecomment-559596384
-make sure to do the right things wrt getting slicepools, adding them to the cache for cleanup, not modifying tags, etc. (see below re memory management)
 
+## consider whether the function is GR, IA, a transparent or opaque aggregation, or combine different series together somehow
 
-## MDP-optimization
+Such functions require special options.
+see https://github.com/grafana/metrictank/issues/926#issuecomment-559596384
 
-MDP at the leaf of the expr tree (fetch request) 0 means don't optimize, set it to >0 means, can be optimized.
-When the data may be subjected to a GR-function, we set it to 0.
-How do we achieve this?
-* MDP at the root is set 0 if request came from graphite or to MaxDataPoints otherwise.
-* as the context flows from root through the processing functions to the data requests, if we hit a GR function, we set to MDP to 0 on the context (and thus also on any subsequent requests)
+## implement our copy-o-write approach when dealing with modifying series
 
-## Pre-normalization
+See section 'Considerations around Series changes and reuse and why we chose copy-on-write' below.
 
-Any data requested (checked at the leaf node of the expr tree) should have its own independent interval.
-However, multiple series getting fetched that then get aggregated together, may be pre-normalized if they are part of the same pre-normalization-group. ( have a common PNGroup that is > 0 )
-(for more details see devdocs/alignrequests-too-course-grained.txt)
-The mechanics here are:
-* we set PNGroup to 0 by default on the context, which gets inherited down the tree
-* as we traverse down tree: transparant aggregations set PNGroups to the pointer value of that function, to uniquely identify any further data requests that will be fed into the same transparant aggregation.
-* as we traverse down, any opaque aggregation functions and IA-functions reset PNGroup back to 0. Note that currently all known IA functions are also GR functions and vice versa. Meaning,
-  as we pass functions like smartSummarize which should undo MDP-optimization, they also undo pre-normalization.
+* must not modify existing data that the fields of any pre-existing `models.Series` point to. At the time of writing it's only the Datapoints, Tags and Meta fields, but this may change.
+  (exception: FuncGet)
+* should use the pool to get new slices in which to store their new/modified datapoints.
+* should add said new slices into the cache so that when the plan has run, and the caller calls plan.Clean(), we can return its datapoints slice to the pool.
+* the other purpose of the cache is to add processed data to the set of available data such that other functions could reuse it, but this mechanism is not implemented yet.
+  That's why we always add to the cache without bothering to set the right request key (`cache[Req{}]`).
 
-## Management of point slices
+example: an averageSeries() of 3 series:
+* will create an output series value.
+* it will use a new datapoints slice, retrieved from pool, because the points will be different. also it will allocate a new meta section and tags map because they are different from the input series also.
+* won't put the 3 inputs back in the pool or cache, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
+* It will however store the newly created series into the cache such that that during plan cleanup time, the series' datapoints slice will be moved back to the pool.
+
+# Considerations around Series changes and reuse and why we chose copy-on-write.
+
+## introduction
 
 The `models.Series` type, even when passed by value, has a few fields that need special attention:
 * `Datapoints []schema.Point`
@@ -34,11 +41,14 @@ The `models.Series` type, even when passed by value, has a few fields that need 
 Many processing functions will want to return an output series that differs from the input, in terms of (some of the) datapoints may have changed value, tags or metadata.
 They need a place to store their output but we cannot simply operate on the input series, or even a copy of it, as the underlying datastructures are shared.
 
-Goals:
+## Goals
+
 * processing functions should not modify data if that data needs to remain original (e.g. because of re-use of the same input data elsewhere)
 * minimize allocations of new structures foremost
 * minimize data copying as a smaller concern
 * simple code
+
+# Implementation
 
 there's 2 main choices:
 
@@ -58,11 +68,11 @@ there's 2 main choices:
 - means we cannot cache intermediate results, unless we also make deep copies anny time we want to cache and hand off for further processing.
 
 
-for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach, so we chose COW.
+for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach, so we chose **the copy on write approach**
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
-Note that the expr library can be called by different clients (MT, grafana, graphite-ng, ...)
+Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this lirbrary to be easily embeddable in other programs. 
 It's up to the client to instantiate the pool, and set up the default allocation to return point slices of desired point capacity.
 The client can then of course use this pool to store series, which it then feeds to expr.
 expr library does the rest.  It manages the series/pointslices and gets new ones as a basis for the COW.
@@ -70,19 +80,7 @@ Once the data is returned to the client, and the client is done using the return
 which returns all data back to the pool  (both input data or newly generated series, whether they made it into the final output or not).
 
 
-function implementations:
-
-* must not modify existing slices or maps or other composite datastructures (at the time of writing, it's only slices/maps), with the exception of FuncGet.
-* should use the pool to get new slices in which to store their new/modified datapoints.
-* should add said new slices into the cache so it can later be cleaned
-
-example: an averageSeries() of 3 series:
-* will create an output series value.
-* it will use a new datapoints slice, retrieved from pool, because the points will be different. also it will allocate a new meta section and tags map because they are different from the input series also.
-* won't put the 3 inputs back in the pool, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
-* It will however store the newly created series into the pool such that it can later be reclaimed.
-
-## consolidateBy
+# consolidateBy
 
 consolidateBy(<foo>, "fun") defines a consolidation function to be applied to "<foo>". there are some subtle behaviors we have to cater to, and we do it like so:
 
@@ -139,7 +137,7 @@ see also https://github.com/grafana/metrictank/issues/463#issuecomment-275199880
 
 
 
-## naming
+# naming
 
 when requesting series directly, we want to show the target (to uniquely identify each series), not the queryPattern
 thus the output returned by plan.Run must always use Target attribute to show the proper name
