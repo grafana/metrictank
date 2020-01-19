@@ -79,7 +79,7 @@ func (smp SeriesMetaProperties) Export() SeriesMetaPropertiesExport {
 	}
 }
 
-// Merge merges SeriesMeta b into a
+// Merge merges SeriesMeta b into a and returns the modified a
 // counts for identical properties get added together
 func (a SeriesMeta) Merge(b SeriesMeta) SeriesMeta {
 	// note: to see which properties are equivalent we should not consider the count
