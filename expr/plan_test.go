@@ -545,7 +545,7 @@ func TestConsolidateBy(t *testing.T) {
 	for i, c := range cases {
 		// for the purpose of this test, we assume ParseMany works fine.
 		exprs, _ := ParseMany([]string{c.in})
-		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
+		plan, err := NewPlan(exprs, from, to, 800, stable, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -715,7 +715,7 @@ func TestNamingChains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
+		plan, err := NewPlan(exprs, from, to, 800, stable, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -820,7 +820,7 @@ func TestTargetErrors(t *testing.T) {
 		if err != c.expectedParseError {
 			t.Fatalf("case %q: expected parse error %q but got %q", c.testDescription, c.expectedParseError, err)
 		}
-		_, err = NewPlan(exprs, from, to, 800, stable, nil)
+		_, err = NewPlan(exprs, from, to, 800, stable, false)
 		if err != c.expectedPlanError {
 			t.Fatalf("case %q: expected plan error %q but got %q", c.testDescription, c.expectedPlanError, err)
 		}
