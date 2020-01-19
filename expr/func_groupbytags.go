@@ -57,7 +57,9 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		if tag == "name" {
 			// We handle name explicitly, remove it from tags
 			useName = true
-			groupTags = append(groupTags[:i], groupTags[i+1:]...)
+			groupTags = make([]string, len(s.tags)-1)
+			copy(groupTags, s.tags[:i])
+			copy(groupTags[i:], s.tags[i+1:])
 			break
 		}
 	}
