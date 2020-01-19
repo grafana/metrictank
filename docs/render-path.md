@@ -56,6 +56,10 @@ Continuing the example again, it could be another series that had a raw interval
 a pre-canonical series is simply a series that after normalizing, will be canonical.
 I.O.W. is a series that is fetched in such a way that when it is fed to Consolidate(), will produce a canonical series.
 See above for more details.
+Note: this can only be done to the extent we know what the normalization looks like.
+(by setting up req.AggNum and req.OutInterval for normalization). For series that get (further) normalized at runtime,
+we can't predict this at fetch time and have to remove points to make the output canonical.
+
 
 ## nudging
 
