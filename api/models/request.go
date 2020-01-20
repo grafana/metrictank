@@ -14,6 +14,9 @@ import (
 	"github.com/opentracing/opentracing-go/log"
 )
 
+//go:generate msgp
+//msgp:ignore Req
+
 // Req is a request for data by MKey and parameters such as consolidator, max points, etc
 type Req struct {
 	// these fields can be set straight away:
