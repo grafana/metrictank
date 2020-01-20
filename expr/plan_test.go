@@ -564,21 +564,25 @@ func TestConsolidateBy(t *testing.T) {
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Avg, // emulate the fact that a by default will use avg
+				Interval:     10,
 			}},
 			NewReq("a", from, to, consolidation.Min): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Min,
+				Interval:     10,
 			}},
 			NewReq("a", from, to, consolidation.Sum): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Sum,
+				Interval:     10,
 			}},
 			NewReq("b", from, to, consolidation.Max): {{
 				QueryPatt:    "b",
 				Target:       "b",
 				Consolidator: consolidation.Max,
+				Interval:     10,
 			}},
 		}
 		out, err := plan.Run(input)
