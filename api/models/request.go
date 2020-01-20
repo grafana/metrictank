@@ -52,6 +52,25 @@ type Req struct {
 // PNGroup is an identifier for a pre-normalization group: data that can be pre-normalized together
 type PNGroup uint64
 
+// NewReq creates a new request. It sets all properties minus the ones that need request planning
+func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, pngroup PNGroup, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
+	return Req{
+		MKey:         key,
+		Target:       target,
+		Pattern:      patt,
+		From:         from,
+		To:           to,
+		MaxPoints:    maxPoints,
+		PNGroup:      pngroup,
+		RawInterval:  rawInterval,
+		Consolidator: cons,
+		ConsReq:      consReq,
+		Node:         node,
+		SchemaId:     schemaId,
+		AggId:        aggId,
+	}
+}
+
 // Init initializes a request based on the metadata that we know of.
 // It sets all properties minus the ones that need request planning
 func (r *Req) Init(archive idx.Archive, cons consolidation.Consolidator, node cluster.Node) {
