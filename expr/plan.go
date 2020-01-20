@@ -9,6 +9,11 @@ import (
 	"github.com/grafana/metrictank/errors"
 )
 
+type Optimizations struct {
+	PreNormalization bool
+	MDP              bool
+}
+
 // Req represents a request for one/more series
 type Req struct {
 	Query   string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
@@ -37,8 +42,10 @@ func NewReqFromContext(query string, c Context) Req {
 		To:    c.to,
 		Cons:  c.consol,
 	}
-	if c.fetchOptimizations {
+	if c.optimizations.PreNormalization {
 		r.PNGroup = c.PNGroup
+	}
+	if c.optimizations.MDP {
 		r.MDP = c.MDP
 	}
 	return r
@@ -117,7 +124,7 @@ func (p Plan) Dump(w io.Writer) {
 // * validation of arguments
 // * allow functions to modify the Context (change data range or consolidation)
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
-func NewPlan(exprs []*expr, from, to, mdp uint32, stable, fetchOptimizations bool) (Plan, error) {
+func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, optimizations Optimizations) (Plan, error) {
 	plan := Plan{
 		exprs:         exprs,
 		MaxDataPoints: mdp,
@@ -126,11 +133,11 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable, fetchOptimizations boo
 	}
 	for _, e := range exprs {
 		context := Context{
-			from:               from,
-			to:                 to,
-			MDP:                mdp,
-			PNGroup:            0, // making this explicit here for easy code grepping
-			fetchOptimizations: fetchOptimizations,
+			from:          from,
+			to:            to,
+			MDP:           mdp,
+			PNGroup:       0, // making this explicit here for easy code grepping
+			optimizations: optimizations,
 		}
 		fn, reqs, err := newplan(e, context, stable, plan.Reqs)
 		if err != nil {

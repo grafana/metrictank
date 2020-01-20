@@ -25,7 +25,9 @@ func main() {
 	to := flag.String("to", "now", "get data until (exclusive)")
 	mdp := flag.Int("mdp", 800, "max data points to return")
 	timeZoneStr := flag.String("time-zone", "local", "time-zone to use for interpreting from/to when needed. (check your config)")
-	fetchOptimizations := flag.Bool("fetch-optimization", false, "enable MaxDataPoints optimization and pre-normalization optimizations")
+	var optimizations expr.Optimizations
+	flag.BoolVar(&optimizations.PreNormalization, "pre-normalization", true, "enable pre-normalization optimization")
+	flag.BoolVar(&optimizations.MDP, "mdp-optimization", false, "enable MaxDataPoints optimization (experimental)")
 
 	flag.Usage = func() {
 		fmt.Println("mt-explain")
@@ -78,7 +80,7 @@ func main() {
 		return
 	}
 
-	plan, err := expr.NewPlan(exps, fromUnix, toUnix, uint32(*mdp), *stable, *fetchOptimizations)
+	plan, err := expr.NewPlan(exps, fromUnix, toUnix, uint32(*mdp), *stable, optimizations)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
 			fmt.Printf("Unsupported function %q: must defer query to graphite\n", string(fun))

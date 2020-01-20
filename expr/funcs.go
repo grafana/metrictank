@@ -7,12 +7,12 @@ import (
 
 // Context describes a series timeframe and consolidator
 type Context struct {
-	from               uint32
-	to                 uint32
-	consol             consolidation.Consolidator // can be 0 to mean undefined
-	PNGroup            models.PNGroup             // pre-normalization group. if the data can be safely pre-normalized
-	MDP                uint32                     // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise
-	fetchOptimizations bool                       // disable PNGroups and MDP
+	from          uint32
+	to            uint32
+	consol        consolidation.Consolidator // can be 0 to mean undefined
+	PNGroup       models.PNGroup             // pre-normalization group. if the data can be safely pre-normalized
+	MDP           uint32                     // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise
+	optimizations Optimizations
 }
 
 // GraphiteFunc defines a graphite processing function
