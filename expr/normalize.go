@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
@@ -45,49 +46,45 @@ func normalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Ser
 }
 
 // normalizeTo normalizes the given series to the desired interval
-// also, any points that would lead to a non-canonical result are removed.
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
 func normalizeTo(cache map[Req][]models.Series, in models.Series, interval uint32) models.Series {
 	// we need to copy the datapoints first because the consolidater will reuse the input slice
+	// also, the input may not be pre-canonical. so add nulls in front and at the back to make it pre-canonical.
+	// this may make points in front and at the back less accurate when consolidated (e.g. summing when some of the points are null results in a lower value)
+	// but this is what graphite does....
 	datapoints := pointSlicePool.Get().([]schema.Point)
 
-	// scroll to the first point for which ts-in.Interval % interval = 0
-	// (e.g. if in.Interval 10, interval 30, and series [60,70,80,90,...] we want to start at 70, such that (70,80,90) forms the first point with ts=90
-
-	i := 0
-	var found bool
-	for i <= len(in.Datapoints) {
-		if in.Datapoints[i].Ts-in.Interval%interval == 0 {
-			found = true
-			break
-		}
-		i++
-	}
-	if !found {
-		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is too short. please request a longer timeframe", in.Target, in.Interval, interval))
+	if len(in.Datapoints) == 0 {
+		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is empty", in.Target, in.Interval, interval))
 	}
 
-	// scroll back to the last point for which ts-in.Interval % interval = 0, which would be the first point to exclude.
-	// (e.g. if in.Interval 10, interval 30, and series [...,110,120,130,140] we want to exclude 130 and end at 120, such that (100,110,120) forms the last point with ts=120.
+	// example of how this works:
+	// if in.Interval is 5, and interval is 15, then for example, to generate point 15, you want inputs 5, 10 and 15.
+	// or more generally (you can follow any example vertically):
+	//  5 10 15 20 25 30 35 40 45 50 <-- if any of these timestamps are your first point in `in`
+	//  5  5  5 20 20 20 35 35 35 50 <-- then these are the corresponding timestamps of the first values we want as input for the consolidator
+	// 15 15 15 30 30 30 45 45 45 60 <-- which, when fed through alignForward(), result in these numbers
+	//  5  5  5 20 20 20 35 35 35 50 <-- subtract (aggnum-1)* in.interval or equivalent -interval + in.Interval = -15 + 5 = -10. these are our desired numbers!
 
-	j := len(in.Datapoints) - 1
-	found = false
-	for j >= 0 {
-		if in.Datapoints[j].Ts-in.Interval%interval == 0 {
-			found = true
-			break
-		}
-		j--
-	}
-	if !found || j == i {
-		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is too short. please request a longer timeframe", in.Target, in.Interval, interval))
+	for ts := alignForward(in.Datapoints[0].Ts, interval) - interval + in.Interval; ts < in.Datapoints[0].Ts; ts += interval {
+		datapoints = append(datapoints, schema.Point{Val: math.NaN(), Ts: ts})
 	}
 
-	datapoints = append(datapoints, in.Datapoints[i:j]...)
+	datapoints = append(datapoints, in.Datapoints...)
+
 	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
-	in.Interval = interval / in.Interval
+	in.Interval = interval
 	cache[Req{}] = append(cache[Req{}], in)
 	return in
+}
+
+// alignForward aligns ts to the next timestamp that divides by the interval, except if it is already aligned
+func alignForward(ts, interval uint32) uint32 {
+	remain := ts % interval
+	if remain == 0 {
+		return ts
+	}
+	return ts + interval - remain
 }
