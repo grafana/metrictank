@@ -12,8 +12,16 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-// testAlign verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
-func testAlign(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
+func getReqMap(reqs []models.Req) *ReqMap {
+	rm := NewReqMap()
+	for _, r := range reqs {
+		rm.Add(r)
+	}
+	return rm
+}
+
+// testPlan verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
+func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
 	var schemas []conf.Schema
 	oriMaxPointsPerReqSoft := maxPointsPerReqSoft
 	oriMaxPointsPerHardReq := maxPointsPerReqHard
@@ -32,16 +40,17 @@ func testAlign(reqs []models.Req, retentions []conf.Retentions, outReqs []models
 	maxPointsPerReqHard = maxPointsPerReqSoft * 10
 
 	mdata.Schemas = conf.NewSchemas(schemas)
-	out, _, _, err := alignRequests(now, reqs[0].From, reqs[0].To, reqs)
+	out, err := planRequests(now, reqs[0].From, reqs[0].To, getReqMap(reqs), 0)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
 	}
-	if len(out) != len(outReqs) {
-		t.Errorf("different number of requests expected: %v, got: %v", len(outReqs), len(out))
+	if int(out.cnt) != len(outReqs) {
+		t.Errorf("different number of requests expected: %v, got: %v", len(outReqs), out.cnt)
 	} else {
+		got := out.List()
 		for r, exp := range outReqs {
-			if !exp.Equals(out[r]) {
-				t.Errorf("request %d:\nexpected: %v\n     got: %v", r, exp.DebugString(), out[r].DebugString())
+			if !exp.Equals(got[r]) {
+				t.Errorf("request %d:\nexpected: %v\n     got: %v", r, exp.DebugString(), got[r].DebugString())
 			}
 		}
 	}
@@ -51,8 +60,8 @@ func testAlign(reqs []models.Req, retentions []conf.Retentions, outReqs []models
 }
 
 // 2 series requested with equal raw intervals. req 0-30. now 1200. one archive of ttl=1200 does it
-func TestAlignRequestsBasic(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsBasic(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 60, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 0, 0),
 	},
@@ -72,8 +81,8 @@ func TestAlignRequestsBasic(t *testing.T) {
 }
 
 // 2 series requested with equal raw intervals from different schemas. req 0-30. now 1200. their archives of ttl=1200 do it
-func TestAlignRequestsBasicDiff(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsBasicDiff(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 60, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
@@ -97,8 +106,8 @@ func TestAlignRequestsBasicDiff(t *testing.T) {
 
 // 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. their archives of ttl=1200 do it, but needs normalizing
 // (real example seen with alerting queries)
-func TestAlignRequestsAlerting(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsAlerting(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
@@ -121,8 +130,8 @@ func TestAlignRequestsAlerting(t *testing.T) {
 }
 
 // 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. neither has long enough archive. no rollups, so best effort from raw
-func TestAlignRequestsBasicBestEffort(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsBasicBestEffort(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
@@ -145,8 +154,8 @@ func TestAlignRequestsBasicBestEffort(t *testing.T) {
 }
 
 // 2 series requested with different raw intervals from the same schemas. Both requests should use the 60second rollups
-func TestAlignRequestsMultipleIntervalsPerSchema(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
@@ -167,8 +176,8 @@ func TestAlignRequestsMultipleIntervalsPerSchema(t *testing.T) {
 }
 
 // 2 series requested with different raw intervals from the same schemas. Both requests should use raw
-func TestAlignRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 30, consolidation.Avg, 0, 0),
 	},
@@ -189,8 +198,8 @@ func TestAlignRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
 }
 
 // 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. one has short raw. other has short raw + good rollup
-func TestAlignRequestsHalfGood(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsHalfGood(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 1, 0),
 	},
@@ -214,8 +223,8 @@ func TestAlignRequestsHalfGood(t *testing.T) {
 }
 
 // 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. both have short raw + good rollup
-func TestAlignRequestsGoodRollup(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsGoodRollup(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
@@ -240,8 +249,8 @@ func TestAlignRequestsGoodRollup(t *testing.T) {
 }
 
 // 2 series requested with different raw intervals, and rollup intervals from different schemas. req 0-30. now 1200. both have short raw + good rollup
-func TestAlignRequestsDiffGoodRollup(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsDiffGoodRollup(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
@@ -266,8 +275,8 @@ func TestAlignRequestsDiffGoodRollup(t *testing.T) {
 }
 
 // now raw is short and we have a rollup we can use instead, at same interval as one of the raws
-func TestAlignRequestsWeird(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsWeird(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
@@ -291,8 +300,8 @@ func TestAlignRequestsWeird(t *testing.T) {
 }
 
 // now TTL of first rollup is *just* enough
-func TestAlignRequestsWeird2(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsWeird2(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
@@ -317,8 +326,8 @@ func TestAlignRequestsWeird2(t *testing.T) {
 }
 
 // now TTL of first rollup is not enough but we have no other choice but to use it
-func TestAlignRequestsNoOtherChoice(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsNoOtherChoice(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 2, 0),
 	},
@@ -343,8 +352,8 @@ func TestAlignRequestsNoOtherChoice(t *testing.T) {
 }
 
 // now TTL of first rollup is not enough and we have a 3rd band to use
-func TestAlignRequests3rdBand(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequests3rdBand(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
@@ -370,8 +379,8 @@ func TestAlignRequests3rdBand(t *testing.T) {
 }
 
 // now TTL of raw/first rollup is not enough but the two rollups are disabled, so must use raw
-func TestAlignRequests2RollupsDisabled(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequests2RollupsDisabled(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
@@ -395,8 +404,8 @@ func TestAlignRequests2RollupsDisabled(t *testing.T) {
 		t,
 	)
 }
-func TestAlignRequestsHuh(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsHuh(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 800, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 800, 60, consolidation.Avg, 3, 0),
 	},
@@ -421,8 +430,8 @@ func TestAlignRequestsHuh(t *testing.T) {
 	)
 }
 
-func TestAlignRequestsDifferentReadyStates(t *testing.T) {
-	testAlign([]models.Req{
+func TestPlanRequestsDifferentReadyStates(t *testing.T) {
+	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 100, 300, 800, 1, consolidation.Avg, 0, 0),
 	},
 		[]conf.Retentions{
@@ -461,10 +470,10 @@ func testMaxPointsPerReq(maxPointsSoft, maxPointsHard int, reqs []models.Req, t 
 		),
 	}})
 
-	out, _, _, err := alignRequests(30*day, reqs[0].From, reqs[0].To, reqs)
+	out, err := planRequests(30*day, reqs[0].From, reqs[0].To, getReqMap(reqs), 0)
 	maxPointsPerReqSoft = origMaxPointsPerReqSoft
 	maxPointsPerReqHard = origMaxPointsPerReqHard
-	return out, err
+	return out.List(), err
 }
 
 func TestGettingOneNextBiggerAgg(t *testing.T) {
@@ -511,15 +520,14 @@ func TestMaxPointsPerReqHardLimit(t *testing.T) {
 	}
 }
 
-var result []models.Req
+var result *ReqsPlan
 
-func BenchmarkAlignRequests(b *testing.B) {
-	var res []models.Req
-	reqs := []models.Req{
-		reqRaw(test.GetMKey(1), 0, 3600*24*7, 1000, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 3600*24*7, 1000, 30, consolidation.Avg, 4, 0),
-		reqRaw(test.GetMKey(3), 0, 3600*24*7, 1000, 60, consolidation.Avg, 8, 0),
-	}
+func BenchmarkPlanRequestsSamePNGroup(b *testing.B) {
+	var res *ReqsPlan
+	reqs := NewReqMap()
+	reqs.Add(reqRaw(test.GetMKey(1), 0, 3600*24*7, 1000, 10, consolidation.Avg, 0, 0))
+	reqs.Add(reqRaw(test.GetMKey(2), 0, 3600*24*7, 1000, 30, consolidation.Avg, 4, 0))
+	reqs.Add(reqRaw(test.GetMKey(3), 0, 3600*24*7, 1000, 60, consolidation.Avg, 8, 0))
 	mdata.Schemas = conf.NewSchemas([]conf.Schema{
 		{
 			Pattern: regexp.MustCompile("a"),
@@ -551,7 +559,7 @@ func BenchmarkAlignRequests(b *testing.B) {
 	})
 
 	for n := 0; n < b.N; n++ {
-		res, _, _, _ = alignRequests(14*24*3600, 0, 3600*24*7, reqs)
+		res, _ = planRequests(14*24*3600, 0, 3600*24*7, reqs, 0)
 	}
 	result = res
 }
