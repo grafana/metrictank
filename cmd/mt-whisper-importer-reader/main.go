@@ -137,6 +137,10 @@ func main() {
 
 	getFileListIntoChan(pos, fileChan)
 	wg.Wait()
+
+	processed := atomic.LoadUint32(&processedCount)
+	skipped := atomic.LoadUint32(&skippedCount)
+	log.Infof("All done. Processed %d files, %d skipped", processed, skipped)
 }
 
 func processFromChan(pos *posTracker, files chan string, wg *sync.WaitGroup) {
