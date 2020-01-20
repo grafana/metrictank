@@ -264,3 +264,14 @@ func getTargetSeries(target string, data []schema.Point) models.Series {
 		Interval:   10,
 	}
 }
+
+func getModel(name string, data []schema.Point) models.Series {
+	series := models.Series{
+		Target:     name,
+		QueryPatt:  name,
+		Datapoints: getCopy(data),
+		Interval:   10,
+	}
+	series.SetTags()
+	return series
+}
