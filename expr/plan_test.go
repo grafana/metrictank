@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
 )
@@ -440,6 +441,9 @@ func TestArgInIntKeyword(t *testing.T) {
 
 // TestConsolidateBy tests for a variety of input targets, wether consolidateBy settings are correctly
 // propagated down the tree (to fetch requests) and up the tree (to runtime consolidation of the output)
+// with PN-optimization enabled/disabled.
+// (enabling MDP leads to MDP being set on the reqs which means we would have to do all test twice basically
+// and MDP is experimental, so we don't check for it here)
 func TestConsolidateBy(t *testing.T) {
 	from := uint32(1000)
 	to := uint32(2000)
@@ -545,15 +549,15 @@ func TestConsolidateBy(t *testing.T) {
 	for i, c := range cases {
 		// for the purpose of this test, we assume ParseMany works fine.
 		exprs, _ := ParseMany([]string{c.in})
-		plan, err := NewPlan(exprs, from, to, 800, stable, false)
+		plan, err := NewPlan(exprs, from, to, 800, stable, Optimizations{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(err, c.expErr) {
 			t.Errorf("case %d: %q, expected error %v - got %v", i, c.in, c.expErr, err)
 		}
-		if !reflect.DeepEqual(plan.Reqs, c.expReq) {
-			t.Errorf("case %d: %q, expected req %v - got %v", i, c.in, c.expReq, plan.Reqs)
+		if diff := cmp.Diff(c.expReq, plan.Reqs); diff != "" {
+			t.Errorf("case %d: %q (-want +got):\n%s", i, c.in, diff)
 		}
 		input := map[Req][]models.Series{
 			NewReq("a", from, to, 0): {{
@@ -715,7 +719,7 @@ func TestNamingChains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		plan, err := NewPlan(exprs, from, to, 800, stable, false)
+		plan, err := NewPlan(exprs, from, to, 800, stable, Optimizations{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -726,6 +730,7 @@ func TestNamingChains(t *testing.T) {
 			series[j] = models.Series{
 				QueryPatt: plan.Reqs[0].Query,
 				Target:    key,
+				Interval:  10,
 			}
 		}
 		input := map[Req][]models.Series{
@@ -820,7 +825,7 @@ func TestTargetErrors(t *testing.T) {
 		if err != c.expectedParseError {
 			t.Fatalf("case %q: expected parse error %q but got %q", c.testDescription, c.expectedParseError, err)
 		}
-		_, err = NewPlan(exprs, from, to, 800, stable, false)
+		_, err = NewPlan(exprs, from, to, 800, stable, Optimizations{})
 		if err != c.expectedPlanError {
 			t.Fatalf("case %q: expected plan error %q but got %q", c.testDescription, c.expectedPlanError, err)
 		}
