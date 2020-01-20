@@ -5,7 +5,7 @@ Metrictank implements tag ingestion, storage, and querying to be compatible with
 # Meta Tags
 
 Metrictank has a feature called "Meta Tags" which allows a user to dynamically assign virtual tags to metrics based on given criteria. 
-To use it the following two feature flags need to be turned on: `memory-idx.meta-tag-support`, `memory-idx.tag-support`
+To use it the following two feature flags need to be turned on: `memory-idx.meta-tag-support`, `memory-idx.tag-support` (default)
 
 The necessary API calls to setup meta records are documented [here](https://github.com/grafana/metrictank/blob/master/docs/http-api.md#get-meta-records).
 
