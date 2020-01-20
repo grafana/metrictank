@@ -15,6 +15,7 @@ import (
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/idx/metatags"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
@@ -63,7 +64,7 @@ type CasIdx struct {
 	Config           *IdxConfig
 	cluster          *gocql.ClusterConfig
 	Session          *cassandra.Session
-	metaRecords      metaRecordStatusByOrg
+	metaRecords      metatags.MetaRecordStatusByOrg
 	writeQueue       chan writeReq
 	shutdown         chan struct{}
 	wg               sync.WaitGroup

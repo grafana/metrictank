@@ -8,6 +8,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx/memory"
+	"github.com/grafana/metrictank/idx/metatags"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,78 +23,15 @@ var (
 		Max:        time.Second * time.Duration(20),
 	}
 
-	// this batch id is used if we handle an upsert request for an org that has
-	// no current batch
-	defaultBatchId = gocql.UUID{}
-
-	errIdxUpdatesDisabled     = fmt.Errorf("Cassandra index updates are disabled")
-	errMetaTagSupportDisabled = fmt.Errorf("Meta tag support is not enabled")
+	errIdxUpdatesDisabled = fmt.Errorf("Cassandra index updates are disabled")
 )
-
-type metaRecordStatusByOrg struct {
-	byOrg map[uint32]metaRecordStatus
-}
-
-func newMetaRecordStatusByOrg() metaRecordStatusByOrg {
-	return metaRecordStatusByOrg{byOrg: make(map[uint32]metaRecordStatus)}
-}
-
-type metaRecordStatus struct {
-	batchId    gocql.UUID
-	createdAt  uint64
-	lastUpdate uint64
-}
-
-// update takes the properties describing a batch of meta records and updates its internal status if necessary
-// it returns a boolean indicating whether a reload of the meta records is necessary and
-// if it is then the second returned value is the batch id that needs to be loaded
-func (m *metaRecordStatusByOrg) update(orgId uint32, newBatch gocql.UUID, newCreatedAt, newLastUpdate uint64) (bool, gocql.UUID) {
-	status, ok := m.byOrg[orgId]
-	if !ok {
-		m.byOrg[orgId] = metaRecordStatus{
-			batchId:    newBatch,
-			createdAt:  newCreatedAt,
-			lastUpdate: newLastUpdate,
-		}
-		return true, newBatch
-	}
-
-	// if the current batch has been created at a time before the new batch,
-	// then we want to make the new batch the current one and load its records
-	if status.batchId != newBatch && status.createdAt < newCreatedAt {
-		status.batchId = newBatch
-		status.createdAt = newCreatedAt
-		status.lastUpdate = newLastUpdate
-		m.byOrg[orgId] = status
-		return true, status.batchId
-	}
-
-	// if the current batch is the same as the new batch, but their last update times
-	// differ, then we want to reload that batch
-	if status.batchId == newBatch && status.lastUpdate != newLastUpdate {
-		status.lastUpdate = newLastUpdate
-		m.byOrg[orgId] = status
-		return true, status.batchId
-	}
-
-	return false, defaultBatchId
-}
-
-func (m *metaRecordStatusByOrg) getStatus(orgId uint32) (gocql.UUID, uint64, uint64) {
-	status, ok := m.byOrg[orgId]
-	if !ok {
-		return defaultBatchId, 0, 0
-	}
-
-	return status.batchId, status.createdAt, status.lastUpdate
-}
 
 func (c *CasIdx) initMetaRecords(session *gocql.Session) error {
 	if !memory.MetaTagSupport || !memory.TagSupport {
 		return nil
 	}
 
-	c.metaRecords = newMetaRecordStatusByOrg()
+	c.metaRecords = metatags.NewMetaRecordStatusByOrg()
 
 	err := c.EnsureTableExists(session, c.Config.SchemaFile, "schema_meta_record_table", c.Config.MetaRecordTable)
 	if err != nil {
@@ -125,9 +63,9 @@ func (c *CasIdx) loadMetaRecords() {
 	var createdAt, lastUpdate uint64
 	toLoad := make(map[uint32]gocql.UUID)
 	for iter.Scan(&batchId, &orgId, &createdAt, &lastUpdate) {
-		load, batchId := c.metaRecords.update(orgId, batchId, createdAt, lastUpdate)
+		load, batchId := c.metaRecords.Update(orgId, metatags.UUID(batchId), createdAt, lastUpdate)
 		if load {
-			toLoad[orgId] = batchId
+			toLoad[orgId] = gocql.UUID(batchId)
 		}
 	}
 
@@ -195,8 +133,8 @@ func (c *CasIdx) pruneMetaRecords() {
 					continue
 				}
 
-				currentBatchId, _, _ := c.metaRecords.getStatus(orgId)
-				if batchId != currentBatchId {
+				currentBatchId, _, _ := c.metaRecords.GetStatus(orgId)
+				if batchId != gocql.UUID(currentBatchId) {
 					err := c.pruneBatch(orgId, batchId)
 					if err != nil {
 						log.Errorf("Error when pruning batch %d/%s: %s", orgId, batchId.String(), err)
@@ -231,7 +169,7 @@ func (c *CasIdx) pruneBatch(orgId uint32, batchId gocql.UUID) error {
 
 func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error {
 	if !memory.MetaTagSupport || !memory.TagSupport {
-		return errMetaTagSupportDisabled
+		return metatags.ErrMetaTagSupportDisabled
 	}
 	if !c.Config.updateCassIdx {
 		return errIdxUpdatesDisabled
@@ -239,7 +177,7 @@ func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord
 
 	var err error
 
-	batchId, _, _ := c.metaRecords.getStatus(orgId)
+	batchId, _, _ := c.metaRecords.GetStatus(orgId)
 
 	// if a record has no meta tags associated with it, then we delete it
 	if len(record.MetaTags) > 0 {
@@ -262,15 +200,15 @@ func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord
 	return nil
 }
 
-func (c *CasIdx) markMetaRecordBatchUpdated(orgId uint32, batchId gocql.UUID) error {
+func (c *CasIdx) markMetaRecordBatchUpdated(orgId uint32, batchId metatags.UUID) error {
 	session := c.Session.CurrentSession()
 	now := time.Now().UnixNano() / 1000000
-	if batchId == defaultBatchId {
+	if batchId == metatags.DefaultBatchId {
 		qry := fmt.Sprintf("INSERT INTO %s (orgid, batchid, createdat, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordBatchTable)
 		return session.Query(
 			qry,
 			orgId,
-			batchId,
+			gocql.UUID(batchId),
 			0,
 			now,
 		).RetryPolicy(&metaRecordRetryPolicy).Exec()
@@ -280,20 +218,20 @@ func (c *CasIdx) markMetaRecordBatchUpdated(orgId uint32, batchId gocql.UUID) er
 	return session.Query(
 		qry,
 		orgId,
-		batchId,
+		gocql.UUID(batchId),
 		now,
 	).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
 func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error {
 	if !memory.MetaTagSupport || !memory.TagSupport {
-		return errMetaTagSupportDisabled
+		return metatags.ErrMetaTagSupportDisabled
 	}
 	if !c.Config.updateCassIdx {
 		return errIdxUpdatesDisabled
 	}
 
-	newBatchId, err := gocql.RandomUUID()
+	newBatchId, err := metatags.RandomUUID()
 	if err != nil {
 		return fmt.Errorf("Failed to generate new batch id")
 	}
@@ -315,7 +253,7 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 		session := c.Session.CurrentSession()
 		err = session.Query(
 			qry,
-			newBatchId,
+			gocql.UUID(newBatchId),
 			orgId,
 			expressions,
 			metaTags,
@@ -328,20 +266,20 @@ func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecor
 	return c.createNewBatch(orgId, newBatchId)
 }
 
-func (c *CasIdx) createNewBatch(orgId uint32, batchId gocql.UUID) error {
+func (c *CasIdx) createNewBatch(orgId uint32, batchId metatags.UUID) error {
 	session := c.Session.CurrentSession()
 	now := time.Now().UnixNano() / 1000000
 	qry := fmt.Sprintf("INSERT INTO %s (orgid, batchid, createdat, lastupdate) VALUES (?, ?, ?, ?)", c.Config.MetaRecordBatchTable)
 	return session.Query(
 		qry,
 		orgId,
-		batchId,
+		gocql.UUID(batchId),
 		now,
 		now,
 	).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
-func (c *CasIdx) persistMetaRecord(orgId uint32, batchId gocql.UUID, record tagquery.MetaTagRecord) error {
+func (c *CasIdx) persistMetaRecord(orgId uint32, batchId metatags.UUID, record tagquery.MetaTagRecord) error {
 	expressions, err := record.Expressions.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("Failed to marshal expressions: %s", err)
@@ -355,13 +293,13 @@ func (c *CasIdx) persistMetaRecord(orgId uint32, batchId gocql.UUID, record tagq
 	qry := fmt.Sprintf("INSERT INTO %s (batchid, orgid, expressions, metatags) VALUES (?, ?, ?, ?)", c.Config.MetaRecordTable)
 	return session.Query(
 		qry,
-		batchId,
+		gocql.UUID(batchId),
 		orgId,
 		expressions,
 		metaTags).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
-func (c *CasIdx) deleteMetaRecord(orgId uint32, batchId gocql.UUID, record tagquery.MetaTagRecord) error {
+func (c *CasIdx) deleteMetaRecord(orgId uint32, batchId metatags.UUID, record tagquery.MetaTagRecord) error {
 	expressions, err := record.Expressions.MarshalJSON()
 	if err != nil {
 		return fmt.Errorf("Failed to marshal record expressions: %s", err)
@@ -371,7 +309,7 @@ func (c *CasIdx) deleteMetaRecord(orgId uint32, batchId gocql.UUID, record tagqu
 	qry := fmt.Sprintf("DELETE FROM %s WHERE batchid=? AND orgid=? AND expressions=?", c.Config.MetaRecordTable)
 	return session.Query(
 		qry,
-		batchId,
+		gocql.UUID(batchId),
 		orgId,
 		expressions,
 	).RetryPolicy(&metaRecordRetryPolicy).Exec()
