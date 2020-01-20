@@ -390,7 +390,7 @@ func TestGetSeriesFixed(t *testing.T) {
 				metric.Add(20+offset, 30) // this point will always be quantized to 30, so it should be selected
 				metric.Add(30+offset, 40) // this point will always be quantized to 40
 				metric.Add(40+offset, 50) // this point will always be quantized to 50
-				req := models.NewReq(id, "", "", from, to, 1000, 10, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
+				req := models.NewReq(id, "", "", from, to, 1000, 10, 0, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
 				req.Archive = 0
 				req.ArchInterval = 10
 				points, err := srv.getSeriesFixed(test.NewContext(), &models.StorageStats{}, req, consolidation.None)
@@ -582,7 +582,7 @@ func TestGetSeriesFixedVariableOutInterval(t *testing.T) {
 			metric.Add(dataPoint.Ts, dataPoint.Val)
 		}
 
-		req := models.NewReq(id, "", "", testCase.from, testCase.to, 1000, testCase.archInterval, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
+		req := models.NewReq(id, "", "", testCase.from, testCase.to, 1000, testCase.archInterval, 0, consolidation.Avg, 0, cluster.Manager.ThisNode(), 0, 0)
 		req.Archive = 0
 		req.ArchInterval = testCase.archInterval
 		req.OutInterval = testCase.outInterval
@@ -598,12 +598,12 @@ func TestGetSeriesFixedVariableOutInterval(t *testing.T) {
 }
 
 func reqRaw(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16) models.Req {
-	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
+	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, 0, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
 	req.Archive = 0
 	return req
 }
 func reqOut(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive uint8, archInterval, ttl, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
+	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, 0, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
 	req.Archive = archive
 	req.ArchInterval = archInterval
 	req.TTL = ttl
