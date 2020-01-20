@@ -166,6 +166,16 @@ type GraphiteTagDelSeriesResp struct {
 	Peers map[string]int `json:"peers"`
 }
 
+type GraphiteTagTerms struct {
+	Tags []string `json:"tags"`
+	Expr []string `json:"expressions"`
+}
+
+type GraphiteTagTermsResp struct {
+	TotalSeries uint32                       `json:"totalSeries"`
+	Terms       map[string]map[string]uint32 `json:"terms"`
+}
+
 type GraphiteFind struct {
 	FromTo
 	Query  string `json:"query" form:"query" binding:"Required"`

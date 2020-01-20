@@ -304,6 +304,38 @@ func (p *PartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) []i
 	return response
 }
 
+func (p *PartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query tagquery.Query) (uint32, map[string]map[string]uint32) {
+	g, _ := errgroup.WithContext(context.Background())
+	var total uint32
+	results := make([]map[string]map[string]uint32, len(p.Partition))
+	var i int
+	for _, m := range p.Partition {
+		pos, m := i, m
+		g.Go(func() error {
+			numSeries, terms := m.FindTerms(orgID, tags, query)
+			atomic.AddUint32(&total, numSeries)
+			results[pos] = terms
+			return nil
+		})
+		i++
+	}
+	g.Wait()
+
+	response := make(map[string]map[string]uint32)
+	for _, terms := range results {
+		for tag, term := range terms {
+			if _, ok := response[tag]; !ok {
+				response[tag] = make(map[string]uint32)
+			}
+			for val, count := range term {
+				response[tag][val] += count
+			}
+		}
+	}
+
+	return total, response
+}
+
 // Tags returns a list of all tag keys associated with the metrics of a given
 // organization. The return values are filtered by the regex in the second parameter.
 func (p *PartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []string {

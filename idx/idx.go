@@ -102,6 +102,13 @@ type MetricIndex interface {
 	// that duplicate entries will be returned.
 	FindByTag(orgId uint32, query tagquery.Query) []Node
 
+	// FindTerms takes a query object and executes the query on the index. The query
+	// is composed of one or many query expressions. From the matching series, a count
+	// is kept for each value of the requested tags.
+	// The series are not deduplicated and in certain cases it is possible that some
+	// entries will be double counted.
+	FindTerms(orgID uint32, tags []string, query tagquery.Query) (uint32, map[string]map[string]uint32)
+
 	// Tags returns a list of all tag keys associated with the metrics of a given
 	// organization. The return values are filtered by the regex in the second parameter.
 	Tags(orgId uint32, filter *regexp.Regexp) []string

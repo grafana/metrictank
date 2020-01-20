@@ -128,6 +128,23 @@ func (t IndexAutoCompleteTagValues) Trace(span opentracing.Span) {
 func (i IndexAutoCompleteTagValues) TraceDebug(span opentracing.Span) {
 }
 
+type IndexTagTerms struct {
+	OrgId uint32   `json:"orgId" binding:"Required"`
+	Tags  []string `json:"tags"`
+	Expr  []string `json:"expressions"`
+}
+
+func (t IndexTagTerms) Trace(span opentracing.Span) {
+	span.SetTag("orgId", t.OrgId)
+	span.LogFields(
+		traceLog.String("tags", fmt.Sprintf("%q", t.Expr)),
+		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
+	)
+}
+
+func (i IndexTagTerms) TraceDebug(span opentracing.Span) {
+}
+
 type IndexTagDelSeries struct {
 	OrgId uint32   `json:"orgId" binding:"Required"`
 	Paths []string `json:"path" form:"path"`
