@@ -4119,7 +4119,7 @@
         "msResolution": false,
         "shared": true,
         "sort": 1,
-        "value_type": "cumulative"
+        "value_type": "individual"
       },
       "type": "graph",
       "xaxis": {
