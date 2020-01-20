@@ -2,19 +2,19 @@
 
 ## quantized form
 
-a raw is quantized when the timestamps are adjusted to be regular.
+a raw series is quantized when the timestamps are adjusted to be regular (at fixed intervals).
+Note that some points may be null (have no data), but they should be included.
 E.g. an input stream that has:
 * an interval of 10
 * points with timestamps 58, 67, 75, 95 
 
-is quantized to a series with points with timestamps 60, 70, 80, 90 (this one has no data), 100.
+is quantized to a series with points with timestamps 60, 70, 80, 90 (null), 100.
 
 ## fixed form
 
 a series is fixed, with respect to a query with from/to time, when
 * it is quantized.
-* contains a point for each interval (possibly null).
-* contains only timestamps such that `from <= timestams < to`.
+* contains only timestamps such that `from <= timestamps < to`.
 
 ## canonical form
 
@@ -25,7 +25,7 @@ with respect to how many points it contains and which timestamps they have.
 It is important here to keep in mind that consolidated points get the timestamp of the last of its input points.
 
 Continuing the above example, if we need to normalize the above series with aggNum 3 (OutInterval is 30s)
-We would normally get a series of (60,70,80), (90, 100, 110 - this one has no data), so 80, 110.
+we would normally get a series of (60,70,80), (90, 100, 110 - null), so the 30-second timestamps become 80 and 110.
 But this is not the quantized form of a series with an interval of 30.
 
 So, what typically happens to make a series canonical, is at fetch time, also fetch some extra earlier data.
@@ -58,6 +58,7 @@ I.O.W. is a series that is fetched in such a way that when it is fed to Consolid
 See above for more details.
 
 ## nudging
+
 in graphite, nudging happens when doing MDP-based consolidation:
 after determining the post-consolidation interval (here referred to as postInterval)
 it removes a few points from the beginning of the series (if needed),
@@ -66,18 +67,18 @@ such that:
   (i.o.w. the first point in the series is the first point for an aggregation bucket)
 * across different requests, where points arrive on the right and leave the window on the left,
   the same timestamps are always aggregated together, and the timestamp is always consistent
-  and diviseble by the postInterval.
+  and divisible by the postInterval.
 
 
 
 In metrictank we do the same, via nudge(), invoked when doing MDP-based consolidation.
-Except, when we have only few points, strict applicating of nudging may result in confusing,
+Except, when we have only few points, strict application of nudging may result in confusing,
 strongly altered results. We only nudge when we have points > 2 * postAggInterval's worth.
 This means that in cases of few points and a low MDP value, where we don't nudge,
 we do not provide the above 2 guarantees, but a more useful result.
 
 
-## normalizing
+## normalization
 
 given multiple series being fetched of different resolution, normalizing is runtime consolidation
 but only for the purpose of bringing series of different resolutions to a common, lower resolution
