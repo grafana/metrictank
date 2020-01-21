@@ -20,6 +20,16 @@ func getReqMap(reqs []models.Req) *ReqMap {
 	return rm
 }
 
+// different tests
+// * one or both may need to be pushed to rollup to meet TTL
+// * regardless of TTL, rollup may or may not be available
+// * use different native resolution within schemas (e.g. skip archives)
+// * ready or not, based on ts
+// within a test:
+// * whether they have equivalent rules or use exact same rule -> abstract out
+// * one or more groups may form due to PNGroup
+// * soft limit breach
+
 // testPlan verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
 func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
 	var schemas []conf.Schema
@@ -59,97 +69,89 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 	maxPointsPerReqHard = oriMaxPointsPerHardReq
 }
 
-// 2 series with equal schema of 1 raw archive. tsRange within TTL of raw.return the raw data
-func TestPlanRequestsBasic(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 60, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 0, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
+func TestPlanRequests_SameInt_SameTTL_RawOnly_RawMatches(t *testing.T) {
+	in, out := generate(0, 30, []reqProp{
+		NewReqProp(60, 0, 0),
+		NewReqProp(60, 0, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("60s:1200s:60s:2:true"),
+	}
+	adjust(&out[0], 0, 60, 60, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
+	testPlan(in, rets, out, nil, 1200, t)
+
+	// also test what happens when two series use distinct, but equal schemas
+	rets = append(rets, rets[0])
+	in[1].AggId, out[1].AggId = 1, 1
+	testPlan(in, rets, out, nil, 1200, t)
 }
 
-// 2 series with distinct but equal schemas of 1 raw archive. tsRange within TTL for both. return the raw data.
-func TestPlanRequestsBasicDiff(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 60, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 60, consolidation.Avg, 0, 0, 0, 60, 1200, 60, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
+func TestPlanRequests_DifferentInt_SameTTL_RawOnly_RawMatches(t *testing.T) {
+	in, out := generate(0, 30, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(60, 1, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:1200s:60s:2:true"),
+		conf.MustParseRetentions("60s:1200s:60s:2:true"),
+	}
+	adjust(&out[0], 0, 10, 10, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
+	testPlan(in, rets, out, nil, 1200, t)
 }
 
-// 2 series with distinct schemas of different raw archive. tsRange within TTL for both. return them at their native intervals
-func TestPlanRequestsDifferentIntervals(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1200, 0, 0, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 1200, 10, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
+//IDEA: similar: but have rollups for both: only 1 serie needs to degrade due to TTL
+func TestPlanRequests_DifferentInt_DifferentTTL_RawOnly_1RawShort(t *testing.T) {
+	in, out := generate(0, 1000, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(60, 1, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true"),
+		conf.MustParseRetentions("60s:1100s:60s:2:true"),
+	}
+	adjust(&out[0], 0, 10, 10, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
+	testPlan(in, rets, out, nil, 1200, t)
 }
 
-// 2 series with distinct schemas of 1 raw archive with different interval and TTL . tsRange within TTL for only one of them. return them at their native intervals, because there is no rollup
-func TestPlanRequestsBasicBestEffort(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 10, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
+func TestPlanRequests_DifferentInt_DifferentTTL_1RawOnly1RawAndRollups_1RawShort(t *testing.T) {
+	in, out := generate(0, 1000, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(60, 1, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true,30s:1000s:60s:2:true"),
+		conf.MustParseRetentions("60s:1100s:60s:2:true"),
+	}
+	adjust(&out[0], 1, 30, 30, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
+	testPlan(in, rets, out, nil, 1200, t)
+
+	// now let's try the same but the archive we need is not ready
+
+	rets2 := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true,30s:1000s:60s:2:false"),
+		conf.MustParseRetentions("60s:1100s:60s:2:true"),
+	}
+	adjust(&out[0], 0, 10, 10, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
+	testPlan(in, rets2, out, nil, 1200, t)
+}
+
+func TestPlanRequests_DifferentInt_DifferentTTL_1RawOnly1RawAndRollups_1RawMatch1RollupMatch(t *testing.T) {
+	in, out := generate(0, 1000, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(60, 1, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true"),
+		conf.MustParseRetentions("60s:1100s:60s:2:true,5m:2000s:5min:2:true"), // extra rollup that we don't care for
+	}
+	adjust(&out[0], 0, 10, 10, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
+	testPlan(in, rets, out, nil, 1200, t)
 }
 
 // 2 series with different raw intervals from the same schemas. Both requests should use raw
@@ -175,6 +177,7 @@ func TestPlanRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
 }
 
 // 2 series with different raw intervals from the same schemas. TTL causes both to go to first rollup
+// IDEA: similar but only one has a TTL problem
 func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
 	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
