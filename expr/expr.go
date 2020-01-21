@@ -101,15 +101,34 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		return 0, ErrBadArgumentStr{strings.Join(expStr, ","), got.etype.String()}
 	case ArgInt:
-		if got.etype != etInt {
+		switch got.etype {
+		case etInt:
+			for _, va := range v.validator {
+				if err := va(got); err != nil {
+					return 0, generateValidatorError(v.key, err)
+				}
+			}
+			*v.val = got.int
+		case etString:
+			// allow "2", '5', etc. some people put quotes around their ints.
+			i, ok := strToInt(got.str)
+			if !ok {
+				return 0, ErrBadArgumentStr{"int", got.etype.String()}
+			}
+			gotFake := expr{
+				str:   got.str,
+				int:   int64(i),
+				etype: etInt,
+			}
+			for _, va := range v.validator {
+				if err := va(&gotFake); err != nil {
+					return 0, generateValidatorError(v.key, err)
+				}
+			}
+			*v.val = int64(i)
+		default:
 			return 0, ErrBadArgumentStr{"int", got.etype.String()}
 		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, generateValidatorError(v.key, err)
-			}
-		}
-		*v.val = got.int
 	case ArgInts:
 		// consume all args (if any) in args that will yield an integer
 		for ; pos < len(e.args) && e.args[pos].etype == etInt; pos++ {
@@ -122,20 +141,40 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		return pos, nil
 	case ArgFloat:
+		switch got.etype {
 		// integer is also a valid float, just happened to have no decimals
-		if got.etype != etFloat && got.etype != etInt {
+		case etInt, etFloat:
+			for _, va := range v.validator {
+				if err := va(got); err != nil {
+					return 0, generateValidatorError(v.key, err)
+				}
+			}
+			if got.etype == etInt {
+				*v.val = float64(got.int)
+			} else {
+				*v.val = got.float
+			}
+		case etString:
+			// allow "2.5", '5.4', etc. some people put quotes around their floats.
+			f, ok := strToFloat(got.str)
+			if !ok {
+				return 0, ErrBadArgumentStr{"int", got.etype.String()}
+			}
+			gotFake := expr{
+				str:   got.str,
+				float: f,
+				etype: etFloat,
+			}
+			for _, va := range v.validator {
+				if err := va(&gotFake); err != nil {
+					return 0, generateValidatorError(v.key, err)
+				}
+			}
+			*v.val = f
+		default:
 			return 0, ErrBadArgumentStr{"float", got.etype.String()}
 		}
-		for _, va := range v.validator {
-			if err := va(got); err != nil {
-				return 0, generateValidatorError(v.key, err)
-			}
-		}
-		if got.etype == etInt {
-			*v.val = float64(got.int)
-		} else {
-			*v.val = got.float
-		}
+
 	case ArgRegex:
 		if got.etype != etString {
 			return 0, ErrBadArgumentStr{"string (regex)", got.etype.String()}

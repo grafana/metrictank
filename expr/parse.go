@@ -190,6 +190,38 @@ func strToBool(val string) (bool, bool) {
 	return false, false
 }
 
+func strToInt(val string) (int, bool) {
+	if len(val) <= 2 {
+		return 0, false
+	}
+	if val[0] == '"' && val[len(val)-1] == '"' {
+		val = val[1 : len(val)-1]
+	} else if val[0] == '\'' && val[len(val)-1] == '\'' {
+		val = val[1 : len(val)-1]
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, false
+	}
+	return i, true
+}
+
+func strToFloat(val string) (float64, bool) {
+	if len(val) <= 2 {
+		return 0, false
+	}
+	if val[0] == '"' && val[len(val)-1] == '"' {
+		val = val[1 : len(val)-1]
+	} else if val[0] == '\'' && val[len(val)-1] == '\'' {
+		val = val[1 : len(val)-1]
+	}
+	f, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
+}
+
 // caller must assure s starts with opening paren
 func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 
