@@ -95,6 +95,7 @@ func init() {
 		"multiplySeries":        {NewAggregateConstructor("multiply", crossSeriesMultiply), true},
 		"movingAverage":         {NewMovingAverage, false},
 		"nonNegativeDerivative": {NewNonNegativeDerivative, true},
+		"offset":                {NewOffset, true},
 		"perSecond":             {NewPerSecond, true},
 		"rangeOfSeries":         {NewAggregateConstructor("rangeOf", crossSeriesRange), true},
 		"removeAbovePercentile": {NewRemoveAboveBelowPercentileConstructor(true), true},
