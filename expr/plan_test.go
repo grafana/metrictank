@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 )
 
+// TestArgs tests that after planning the given args against smartSummarize, the right error or requests come out
 // here we use smartSummarize because it has multiple optional arguments which allows us to test some interesting things
 func TestArgs(t *testing.T) {
 
@@ -202,6 +203,64 @@ func TestArgs(t *testing.T) {
 		}
 		if !reflect.DeepEqual(req, c.expReq) {
 			t.Errorf("case %d: %q, expected req %v - got %v", i, c.name, c.expReq, req)
+		}
+	}
+}
+
+// TestArgQuotedInt tests that a function (perSecond in this case) can be given a quoted integer argument
+func TestArgQuotedInt(t *testing.T) {
+	cases := []expr{
+		{etype: etInt, int: 5},
+		{etype: etString, str: "'5'"},
+		{etype: etString, str: "\"5\""},
+	}
+	for _, ourArg := range cases {
+		fn := NewPerSecond()
+		e := &expr{
+			etype: etFunc,
+			str:   "perSecond",
+			args: []*expr{
+				{etype: etName, str: "in.*"},
+				&ourArg,
+			},
+			namedArgs: nil,
+		}
+		_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ap := fn.(*FuncPerSecond)
+		if ap.maxValue != 5 {
+			t.Fatalf("maxValue should be 5. got %d", ap.maxValue)
+		}
+	}
+}
+
+// TestArgQuotedFloat tests that a function (asPercent in this case) can be given a quoted floating point argument
+func TestArgQuotedFloat(t *testing.T) {
+	cases := []expr{
+		{etype: etFloat, float: 5.0},
+		{etype: etString, str: "'5.0'"},
+		{etype: etString, str: "\"5.0\""},
+	}
+	for _, ourArg := range cases {
+		fn := NewAsPercent()
+		e := &expr{
+			etype: etFunc,
+			str:   "asPercent",
+			args: []*expr{
+				{etype: etName, str: "in.*"},
+				&ourArg,
+			},
+			namedArgs: nil,
+		}
+		_, err := newplanFunc(e, fn, Context{from: 0, to: 1000}, true, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ap := fn.(*FuncAsPercent)
+		if ap.totalFloat != 5 {
+			t.Fatalf("totalFloat should be 5. got %f", ap.totalFloat)
 		}
 	}
 }
