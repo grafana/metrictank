@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
@@ -20,18 +21,12 @@ type Api struct {
 //Constructs a new Api based on the passed in URLS
 func NewApi(urls Urls) Api {
 	api := Api{}
-	api.ingestHandler = withMiddleware("ingest", ingestHandlerStub)
+	api.ingestHandler = withMiddleware("ingest", http.HandlerFunc(ingest.Metrics))
 	api.graphiteHandler = withMiddleware("graphite", httputil.NewSingleHostReverseProxy(urls.graphite))
 	api.metrictankHandler = withMiddleware("metrictank", httputil.NewSingleHostReverseProxy(urls.metrictank))
 	api.bulkImportHandler = withMiddleware("bulk-importer", bulkImportHandler(urls))
 	return api
 }
-
-//TODO replace this with an actual implementation
-var ingestHandlerStub = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	_, _ = fmt.Fprintln(w, "http ingest not yet implemented")
-})
 
 //Returns a proxy to the bulk importer if one is configured, otherwise a handler that always returns a 503
 func bulkImportHandler(urls Urls) http.Handler {
