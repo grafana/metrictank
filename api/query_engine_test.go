@@ -59,7 +59,7 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 	maxPointsPerReqHard = oriMaxPointsPerHardReq
 }
 
-// 2 series requested with equal raw intervals. req 0-30. now 1200. one archive of ttl=1200 does it
+// 2 series with equal schema of 1 raw archive. tsRange within TTL of raw.return the raw data
 func TestPlanRequestsBasic(t *testing.T) {
 	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 0, 60, consolidation.Avg, 0, 0),
@@ -80,7 +80,7 @@ func TestPlanRequestsBasic(t *testing.T) {
 	)
 }
 
-// 2 series requested with equal raw intervals from different schemas. req 0-30. now 1200. their archives of ttl=1200 do it
+// 2 series with distinct but equal schemas of 1 raw archive. tsRange within TTL for both. return the raw data.
 func TestPlanRequestsBasicDiff(t *testing.T) {
 	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 0, 60, consolidation.Avg, 0, 0),
@@ -104,9 +104,8 @@ func TestPlanRequestsBasicDiff(t *testing.T) {
 	)
 }
 
-// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. their archives of ttl=1200 do it, but needs normalizing
-// (real example seen with alerting queries)
-func TestPlanRequestsAlerting(t *testing.T) {
+// 2 series with distinct schemas of different raw archive. tsRange within TTL for both. return them at their native intervals
+func TestPlanRequestsDifferentIntervals(t *testing.T) {
 	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
 		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0),
@@ -120,7 +119,7 @@ func TestPlanRequestsAlerting(t *testing.T) {
 			),
 		},
 		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 1200, 60, 6),
+			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 1200, 10, 1),
 			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 0, 60, 1200, 60, 1),
 		},
 		nil,
@@ -129,7 +128,7 @@ func TestPlanRequestsAlerting(t *testing.T) {
 	)
 }
 
-// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. neither has long enough archive. no rollups, so best effort from raw
+// 2 series with distinct schemas of 1 raw archive with different interval and TTL . tsRange within TTL for only one of them. return them at their native intervals, because there is no rollup
 func TestPlanRequestsBasicBestEffort(t *testing.T) {
 	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
@@ -144,7 +143,7 @@ func TestPlanRequestsBasicBestEffort(t *testing.T) {
 			),
 		},
 		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 60, 6),
+			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 10, 1),
 			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
 		},
 		nil,
@@ -153,7 +152,29 @@ func TestPlanRequestsBasicBestEffort(t *testing.T) {
 	)
 }
 
-// 2 series requested with different raw intervals from the same schemas. Both requests should use the 60second rollups
+// 2 series with different raw intervals from the same schemas. Both requests should use raw
+func TestPlanRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
+	testPlan([]models.Req{
+		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
+		reqRaw(test.GetMKey(2), 0, 30, 0, 30, consolidation.Avg, 0, 0),
+	},
+		[]conf.Retentions{
+			conf.BuildFromRetentions(
+				conf.NewRetentionMT(10, 800, 0, 0, 0),
+				conf.NewRetentionMT(60, 1200, 0, 0, 0),
+			),
+		},
+		[]models.Req{
+			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 10, 1),
+			reqOut(test.GetMKey(2), 0, 30, 0, 30, consolidation.Avg, 0, 0, 0, 30, 800, 30, 1),
+		},
+		nil,
+		800,
+		t,
+	)
+}
+
+// 2 series with different raw intervals from the same schemas. TTL causes both to go to first rollup
 func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
 	testPlan([]models.Req{
 		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
@@ -175,28 +196,6 @@ func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
 	)
 }
 
-// 2 series requested with different raw intervals from the same schemas. Both requests should use raw
-func TestPlanRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 30, consolidation.Avg, 0, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 30, 3),
-			reqOut(test.GetMKey(2), 0, 30, 0, 30, consolidation.Avg, 0, 0, 0, 30, 800, 30, 1),
-		},
-		nil,
-		800,
-		t,
-	)
-}
-
 // 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. one has short raw. other has short raw + good rollup
 func TestPlanRequestsHalfGood(t *testing.T) {
 	testPlan([]models.Req{
@@ -213,7 +212,7 @@ func TestPlanRequestsHalfGood(t *testing.T) {
 			),
 		},
 		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 120, 12),
+			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 10, 1),
 			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
 		},
 		nil,
