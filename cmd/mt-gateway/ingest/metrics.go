@@ -48,17 +48,18 @@ func getMetricsTimestampStat(org int) *stats.Range32 {
 	return metricTimestamp
 }
 
-func Metrics(ctx *models.Context) {
-	contentType := ctx.Req.Header.Get("Content-Type")
+func Metrics(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
 	switch contentType {
 	case "rt-metric-binary":
-		metricsBinary(ctx, false)
+		metricsBinary(w, r, false)
 	case "rt-metric-binary-snappy":
-		metricsBinary(ctx, true)
+		metricsBinary(w, r, true)
 	case "application/json":
-		metricsJson(ctx)
+		metricsJson(w, r)
 	default:
-		ctx.JSON(400, fmt.Sprintf("unknown content-type: %s", contentType))
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "unknown content-type: %s", contentType)
 	}
 }
 
@@ -116,27 +117,31 @@ func prepareIngest(ctx *models.Context, in []*schema.MetricData, toPublish []*sc
 	return toPublish, resp
 }
 
-func metricsJson(ctx *models.Context) {
-	if ctx.Req.Request.Body == nil {
-		ctx.JSON(400, "no data included in request.")
+func metricsJson(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "no data included in request.")
 		return
 	}
-	defer ctx.Req.Request.Body.Close()
-	body, err := ioutil.ReadAll(ctx.Req.Request.Body)
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		select {
-		case <-ctx.Req.Context().Done():
-			ctx.Error(499, "request canceled")
+		case <-r.Context().Done():
+			w.WriteHeader(499)
+			fmt.Fprintf(w, "request canceled")
 		default:
 			log.Errorf("unable to read request body. %s", err)
-			ctx.JSON(500, err)
+			w.WriteHeader(500)
+			fmt.Fprintf(w,"unable to read request body. %s", err)
 		}
 		return
 	}
 	metrics := make([]*schema.MetricData, 0)
 	err = json.Unmarshal(body, &metrics)
 	if err != nil {
-		ctx.JSON(400, fmt.Sprintf("unable to parse request body. %s", err))
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "unable to parse request body. %s", err)
 		return
 	}
 
@@ -144,8 +149,9 @@ func metricsJson(ctx *models.Context) {
 	toPublish, resp := prepareIngest(ctx, metrics, toPublish)
 
 	select {
-	case <-ctx.Req.Context().Done():
-		ctx.Error(499, "request canceled")
+	case <-r.Context().Done():
+		w.WriteHeader(499)
+		fmt.Fprintf(w, "request canceled")
 		return
 	default:
 	}
@@ -153,36 +159,41 @@ func metricsJson(ctx *models.Context) {
 	err = publish.Publish(toPublish)
 	if err != nil {
 		log.Errorf("failed to publish metrics. %s", err)
-		ctx.JSON(500, err)
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "failed to publish metrics. %s", err)
 		return
 	}
 
 	// track published in the response (it already has discards)
 	resp.Published = len(toPublish)
-	ctx.JSON(200, resp)
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(resp)
 }
 
-func metricsBinary(ctx *models.Context, compressed bool) {
-	if ctx.Req.Request.Body == nil {
-		ctx.JSON(400, "no data included in request.")
+func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
+	if r.Body == nil {
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "no data included in request.")
 		return
 	}
 	var bodyReadCloser io.ReadCloser
 	if compressed {
-		bodyReadCloser = ioutil.NopCloser(snappy.NewReader(ctx.Req.Request.Body))
+		bodyReadCloser = ioutil.NopCloser(snappy.NewReader(r.Body))
 	} else {
-		bodyReadCloser = ctx.Req.Request.Body
+		bodyReadCloser = r.Body
 	}
 	defer bodyReadCloser.Close()
 
 	body, err := ioutil.ReadAll(bodyReadCloser)
 	if err != nil {
 		select {
-		case <-ctx.Req.Context().Done():
-			ctx.Error(499, "request canceled")
+		case <-r.Context().Done():
+			w.WriteHeader(499)
+			fmt.Fprintf(w, "request canceled")
 		default:
 			log.Errorf("unable to read request body. %s", err)
-			ctx.JSON(500, err)
+			w.WriteHeader(500)
+			fmt.Fprintf(w, "unable to read request body. %s", err)
 		}
 		return
 	}
@@ -190,14 +201,16 @@ func metricsBinary(ctx *models.Context, compressed bool) {
 	err = metricData.InitFromMsg(body)
 	if err != nil {
 		log.Errorf("payload not metricData. %s", err)
-		ctx.JSON(400, err)
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "payload not metricData. %s", err)
 		return
 	}
 
 	err = metricData.DecodeMetricData()
 	if err != nil {
 		log.Errorf("failed to unmarshal metricData. %s", err)
-		ctx.JSON(400, err)
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "failed to unmarshal metricData. %s", err)
 		return
 	}
 
@@ -205,8 +218,9 @@ func metricsBinary(ctx *models.Context, compressed bool) {
 	toPublish, resp := prepareIngest(ctx, metricData.Metrics, toPublish)
 
 	select {
-	case <-ctx.Req.Context().Done():
-		ctx.Error(499, "request canceled")
+	case <-r.Context().Done():
+		w.WriteHeader(499)
+		fmt.Fprintf(w, "request canceled")
 		return
 	default:
 	}
@@ -214,11 +228,13 @@ func metricsBinary(ctx *models.Context, compressed bool) {
 	err = publish.Publish(toPublish)
 	if err != nil {
 		log.Errorf("failed to publish metrics. %s", err)
-		ctx.JSON(500, err)
+		w.WriteHeader(500)
+		fmt.Fprintf(w,"failed to publish metrics. %s", err)
 		return
 	}
 
 	// track published in the response (it already has discards)
 	resp.Published = len(toPublish)
-	ctx.JSON(200, resp)
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(resp)
 }
