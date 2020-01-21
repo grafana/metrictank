@@ -6,14 +6,6 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-type archive struct {
-	i           uint8
-	interval    uint32
-	ttl         uint32
-	outInterval uint32
-	aggNum      uint32
-}
-
 type reqProp struct {
 	raw      uint32
 	schemaID uint16

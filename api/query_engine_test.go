@@ -1,8 +1,8 @@
 package api
 
 import (
-	"math"
 	"regexp"
+	"sort"
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
@@ -19,16 +19,6 @@ func getReqMap(reqs []models.Req) *ReqMap {
 	}
 	return rm
 }
-
-// different tests
-// * one or both may need to be pushed to rollup to meet TTL
-// * regardless of TTL, rollup may or may not be available
-// * use different native resolution within schemas (e.g. skip archives)
-// * ready or not, based on ts
-// within a test:
-// * whether they have equivalent rules or use exact same rule -> abstract out
-// * one or more groups may form due to PNGroup
-// * soft limit breach
 
 // testPlan verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
 func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
@@ -49,18 +39,24 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 	}
 	maxPointsPerReqHard = maxPointsPerReqSoft * 10
 
+	// Note that conf.Schemas is "expanded" to create a new rule for each rollup
+	// thus SchemasID must accommodate for this!
 	mdata.Schemas = conf.NewSchemas(schemas)
+	//spew.Dump(mdata.Schemas)
 	out, err := planRequests(now, reqs[0].From, reqs[0].To, getReqMap(reqs), 0)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
 	}
-	if int(out.cnt) != len(outReqs) {
-		t.Errorf("different number of requests expected: %v, got: %v", len(outReqs), out.cnt)
-	} else {
-		got := out.List()
-		for r, exp := range outReqs {
-			if !exp.Equals(got[r]) {
-				t.Errorf("request %d:\nexpected: %v\n     got: %v", r, exp.DebugString(), got[r].DebugString())
+	if err == nil {
+		if int(out.cnt) != len(outReqs) {
+			t.Errorf("different number of requests expected: %v, got: %v", len(outReqs), out.cnt)
+		} else {
+			got := out.List()
+			sort.Slice(got, func(i, j int) bool { return test.KeyToInt(got[i].MKey) < test.KeyToInt(got[j].MKey) })
+			for r, exp := range outReqs {
+				if !exp.Equals(got[r]) {
+					t.Errorf("request %d:\nexpected: %v\n     got: %v", r, exp.DebugString(), got[r].DebugString())
+				}
 			}
 		}
 	}
@@ -69,8 +65,20 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 	maxPointsPerReqHard = oriMaxPointsPerHardReq
 }
 
-func TestPlanRequests_SameInt_SameTTL_RawOnly_RawMatches(t *testing.T) {
-	in, out := generate(0, 30, []reqProp{
+// There are a lot of factors to consider. I haven't found a practical way to test all combinations of every factor
+// but the approach taken in the functions below should be close enough.
+// different test functions:
+// * one or both may need to be pushed to rollup to meet TTL
+// * use different native resolution within schemas (e.g. skip archives)
+// within a test:
+// * whether reqs use the exact same schema or different schemas that happen to be identical
+// * zero, one or more PNGroups
+// * soft limit breach
+// * retention ready status
+// * whether both need upping interval or not
+
+func TestPlanRequests_SameInterval_SameTTL_RawOnly_RawMatches(t *testing.T) {
+	in, out := generate(30, 60, []reqProp{
 		NewReqProp(60, 0, 0),
 		NewReqProp(60, 0, 0),
 	})
@@ -83,375 +91,189 @@ func TestPlanRequests_SameInt_SameTTL_RawOnly_RawMatches(t *testing.T) {
 
 	// also test what happens when two series use distinct, but equal schemas
 	rets = append(rets, rets[0])
-	in[1].AggId, out[1].AggId = 1, 1
+	in[1].SchemaId, out[1].SchemaId = 1, 1
 	testPlan(in, rets, out, nil, 1200, t)
+
+	// also test what happens when one of them hasn't been ready long enough or is not ready at all
+	for _, r := range []conf.Retentions{
+		conf.MustParseRetentions("60s:1200s:60s:2:31"),
+		conf.MustParseRetentions("60s:1200s:60s:2:false"),
+	} {
+		rets[0] = r
+		//spew.Dump(rets)
+		//spew.Dump(in)
+		//spew.Dump(out)
+		testPlan(in, rets, out, errUnSatisfiable, 1200, t)
+	}
+	// but to be clear, when it is ready, it is satisfiable
+	for _, r := range []conf.Retentions{
+		conf.MustParseRetentions("60s:1200s:60s:2:30"),
+		conf.MustParseRetentions("60s:1200s:60s:2:29"),
+		conf.MustParseRetentions("60s:1200s:60s:2:true"),
+	} {
+		rets[0] = r
+		testPlan(in, rets, out, nil, 1200, t)
+	}
 }
 
-func TestPlanRequests_DifferentInt_SameTTL_RawOnly_RawMatches(t *testing.T) {
+/*
+func copy2(a, b []models.Req) ([]models.Req, []models.Req) {
+	a2 := make([]models.Req, len(a))
+	b2 := make([]models.Req, len(b))
+	copy(a2, a)
+	copy(b2, b)
+	return a2, b2
+}
+*/
+
+func TestPlanRequests_DifferentInterval_SameTTL_RawOnly_RawMatches(t *testing.T) {
 	in, out := generate(0, 30, []reqProp{
 		NewReqProp(10, 0, 0),
 		NewReqProp(60, 1, 0),
 	})
+	adjust(&out[0], 0, 10, 10, 1200)
+	adjust(&out[1], 0, 60, 60, 1200)
 	rets := []conf.Retentions{
 		conf.MustParseRetentions("10s:1200s:60s:2:true"),
 		conf.MustParseRetentions("60s:1200s:60s:2:true"),
 	}
-	adjust(&out[0], 0, 10, 10, 1200)
-	adjust(&out[1], 0, 60, 60, 1200)
-	testPlan(in, rets, out, nil, 1200, t)
+	t.Run("NoPNGroups", func(t *testing.T) {
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+
+	t.Run("DifferentPNGroups", func(t *testing.T) {
+		// nothing should change
+		in[0].PNGroup, out[0].PNGroup = 123, 123
+		in[1].PNGroup, out[1].PNGroup = 124, 124
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+	t.Run("SamePNGroups", func(t *testing.T) {
+		// should be normalized to the same interval
+		in[0].PNGroup, out[0].PNGroup = 123, 123
+		in[1].PNGroup, out[1].PNGroup = 123, 123
+		adjust(&out[0], 0, 10, 60, 1200)
+		testPlan(in, rets, out, nil, 1200, t)
+	})
 }
 
-//IDEA: similar: but have rollups for both: only 1 serie needs to degrade due to TTL
-func TestPlanRequests_DifferentInt_DifferentTTL_RawOnly_1RawShort(t *testing.T) {
+func TestPlanRequests_DifferentInterval_DifferentTTL_RawOnly_1RawShort(t *testing.T) {
 	in, out := generate(0, 1000, []reqProp{
 		NewReqProp(10, 0, 0),
 		NewReqProp(60, 1, 0),
 	})
 	rets := []conf.Retentions{
 		conf.MustParseRetentions("10s:800s:60s:2:true"),
-		conf.MustParseRetentions("60s:1100s:60s:2:true"),
+		conf.MustParseRetentions("60s:1080s:60s:2:true"),
 	}
-	adjust(&out[0], 0, 10, 10, 1200)
-	adjust(&out[1], 0, 60, 60, 1200)
-	testPlan(in, rets, out, nil, 1200, t)
+	adjust(&out[0], 0, 10, 10, 800)
+	adjust(&out[1], 0, 60, 60, 1080)
+	t.Run("NoPNGroups", func(t *testing.T) {
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+
+	t.Run("DifferentPNGroups", func(t *testing.T) {
+		// nothing should change
+		in[0].PNGroup, out[0].PNGroup = 123, 123
+		in[1].PNGroup, out[1].PNGroup = 124, 124
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+	t.Run("SamePNGroups", func(t *testing.T) {
+		// should be normalized to the same interval
+		in[0].PNGroup, out[0].PNGroup = 123, 123
+		in[1].PNGroup, out[1].PNGroup = 123, 123
+		adjust(&out[0], 0, 10, 60, 800)
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+
 }
 
+func TestPlanRequests_DifferentInterval_DifferentTTL_1RawOnly1RawAndRollups_1Raw1Rollup(t *testing.T) {
+	in, out := generate(0, 1000, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(60, 2, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:1080s:60s:2:true,30s:1500s:60s:2:true"),
+		conf.MustParseRetentions("60s:1320s:60s:2:true"),
+	}
+	adjust(&out[0], 1, 30, 30, 1500)
+	adjust(&out[1], 0, 60, 60, 1320)
+	t.Run("Base", func(t *testing.T) {
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+
+	t.Run("SameButTTLsNotLongEnough", func(t *testing.T) {
+		rets = []conf.Retentions{
+			conf.MustParseRetentions("10s:1080s:60s:2:true,30s:1140s:60s:2:true"),
+			conf.MustParseRetentions("60s:1020s:60s:2:true"),
+		}
+		adjust(&out[0], 1, 30, 30, 1140)
+		adjust(&out[1], 0, 60, 60, 1020)
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+
+	t.Run("ArchiveWeNeedIsNotReady", func(t *testing.T) {
+		rets[0] = conf.MustParseRetentions("10s:1080s:60s:2:true,30s:1500s:60s:2:false")
+		rets[1] = conf.MustParseRetentions("60s:1320s:60s:2:true")
+		adjust(&out[0], 0, 10, 10, 1080)
+		adjust(&out[1], 0, 60, 60, 1320)
+		//spew.Dump(rets)
+		testPlan(in, rets, out, nil, 1200, t)
+	})
+
+}
+
+// like the above test, except the one that was already long enough has a rollup (that we don't use)
+// and the short one only has raw.
 func TestPlanRequests_DifferentInt_DifferentTTL_1RawOnly1RawAndRollups_1RawShort(t *testing.T) {
 	in, out := generate(0, 1000, []reqProp{
 		NewReqProp(10, 0, 0),
 		NewReqProp(60, 1, 0),
 	})
 	rets := []conf.Retentions{
-		conf.MustParseRetentions("10s:800s:60s:2:true,30s:1000s:60s:2:true"),
-		conf.MustParseRetentions("60s:1100s:60s:2:true"),
+		conf.MustParseRetentions("10s:800s:60s:2:true"),
+		conf.MustParseRetentions("60s:1200s:60s:2:true,5m:3000s:5min:2:true"), // extra rollup that we don't care for
 	}
-	adjust(&out[0], 1, 30, 30, 1200)
+	adjust(&out[0], 0, 10, 10, 800)
 	adjust(&out[1], 0, 60, 60, 1200)
 	testPlan(in, rets, out, nil, 1200, t)
 
-	// now let's try the same but the archive we need is not ready
-
-	rets2 := []conf.Retentions{
-		conf.MustParseRetentions("10s:800s:60s:2:true,30s:1000s:60s:2:false"),
-		conf.MustParseRetentions("60s:1100s:60s:2:true"),
-	}
-	adjust(&out[0], 0, 10, 10, 1200)
-	adjust(&out[1], 0, 60, 60, 1200)
-	testPlan(in, rets2, out, nil, 1200, t)
+	t.Run("RawArchiveNotReady", func(t *testing.T) {
+		// should switch to rollup
+		rets[1] = conf.MustParseRetentions("60s:1200s:60s:2:false,5m:3000s:5min:2:true")
+		adjust(&out[1], 1, 300, 300, 3000)
+		testPlan(in, rets, out, nil, 3000, t)
+	})
 }
 
-func TestPlanRequests_DifferentInt_DifferentTTL_1RawOnly1RawAndRollups_1RawMatch1RollupMatch(t *testing.T) {
+// 2 series with different raw intervals from the same schemas. Both requests should use the raw archive
+func TestPlanRequestsMultiIntervalsUseRaw(t *testing.T) {
 	in, out := generate(0, 1000, []reqProp{
 		NewReqProp(10, 0, 0),
+		NewReqProp(30, 1, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true,60s:1200s:5min:2:true"),
+	}
+	adjust(&out[0], 0, 10, 10, 800)
+	adjust(&out[1], 0, 30, 30, 1200)
+	testPlan(in, rets, out, nil, 800, t)
+}
+
+// 3 series with different raw intervals from the same schemas. TTL causes both to go to first rollup, which for one of them is raw
+func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
+	in, out := generate(0, 1000, []reqProp{
+		NewReqProp(1, 0, 0),
+		NewReqProp(10, 1, 0),
 		NewReqProp(60, 1, 0),
 	})
 	rets := []conf.Retentions{
-		conf.MustParseRetentions("10s:800s:60s:2:true"),
-		conf.MustParseRetentions("60s:1100s:60s:2:true,5m:2000s:5min:2:true"), // extra rollup that we don't care for
+		conf.MustParseRetentions("1s:800s:2h:2:true,60s:1140s:1h:2:true"),
 	}
-	adjust(&out[0], 0, 10, 10, 1200)
-	adjust(&out[1], 0, 60, 60, 1200)
+	adjust(&out[0], 1, 60, 60, 1140)
+	adjust(&out[1], 0, 10, 10, 1140) // note how it has archive 10
+	adjust(&out[2], 0, 60, 60, 1140)
 	testPlan(in, rets, out, nil, 1200, t)
-}
-
-// 2 series with different raw intervals from the same schemas. Both requests should use raw
-func TestPlanRequestsMultiIntervalsWithRuntimeConsolidation(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 30, consolidation.Avg, 0, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 10, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 30, consolidation.Avg, 0, 0, 0, 30, 800, 30, 1),
-		},
-		nil,
-		800,
-		t,
-	)
-}
-
-// 2 series with different raw intervals from the same schemas. TTL causes both to go to first rollup
-// IDEA: similar but only one has a TTL problem
-func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(1, 800, 0, 0, 0),
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 60, 800, 60, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 0, 60, 1100, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. one has short raw. other has short raw + good rollup
-func TestPlanRequestsHalfGood(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 800, 0, 0, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 800, 10, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 1, 0, 1, 120, 1200, 120, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// 2 series requested with different raw intervals from different schemas. req 0-30. now 1200. both have short raw + good rollup
-func TestPlanRequestsGoodRollup(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0, 1, 120, 1200, 120, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// 2 series requested with different raw intervals, and rollup intervals from different schemas. req 0-30. now 1200. both have short raw + good rollup
-func TestPlanRequestsDiffGoodRollup(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(100, 1200, 600, 2, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1199, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(600, 1200, 600, 2, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 100, 1200, 600, 6),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0, 1, 600, 1200, 600, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// now raw is short and we have a rollup we can use instead, at same interval as one of the raws
-func TestPlanRequestsWeird(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1199, 0, 0, 0),
-				conf.NewRetentionMT(60, 1200, 600, 2, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1200, 0, 0, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 60, 1200, 60, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0, 0, 60, 1200, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// now TTL of first rollup is *just* enough
-func TestPlanRequestsWeird2(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1200, 600, 2, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 120, 1200, 120, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0, 1, 120, 1200, 120, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// now TTL of first rollup is not enough but we have no other choice but to use it
-func TestPlanRequestsNoOtherChoice(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1199, 600, 2, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1199, 600, 2, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 120, 1199, 120, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 2, 0, 1, 120, 1199, 120, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// now TTL of first rollup is not enough and we have a 3rd band to use
-func TestPlanRequests3rdBand(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 3, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(1, 1100, 0, 0, 0),
-				conf.NewRetentionMT(120, 1199, 600, 2, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, 0),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, 0),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 2, 240, 1200, 240, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 3, 0, 1, 240, 1200, 240, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-// now TTL of raw/first rollup is not enough but the two rollups are disabled, so must use raw
-func TestPlanRequests2RollupsDisabled(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 3, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(10, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(120, 1199, 600, 2, math.MaxUint32),
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0), // just not long enough
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 0, 10, 1100, 60, 6),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 3, 0, 0, 60, 1100, 60, 1),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-func TestPlanRequestsHuh(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0),
-		reqRaw(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 3, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(1, 1000, 0, 0, 0),
-				conf.NewRetentionMT(120, 1080, 600, 2, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			),
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(60, 1100, 0, 0, 0),
-				conf.NewRetentionMT(240, 1200, 600, 2, math.MaxUint32),
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 0, 30, 0, 10, consolidation.Avg, 0, 0, 1, 120, 1080, 120, 1),
-			reqOut(test.GetMKey(2), 0, 30, 0, 60, consolidation.Avg, 3, 0, 0, 60, 1100, 120, 2),
-		},
-		nil,
-		1200,
-		t,
-	)
-}
-
-func TestPlanRequestsDifferentReadyStates(t *testing.T) {
-	testPlan([]models.Req{
-		reqRaw(test.GetMKey(1), 100, 300, 0, 1, consolidation.Avg, 0, 0),
-	},
-		[]conf.Retentions{
-			conf.BuildFromRetentions(
-				conf.NewRetentionMT(1, 300, 120, 5, 0),              // TTL not good enough
-				conf.NewRetentionMT(5, 450, 600, 4, math.MaxUint32), // TTL good, but not ready
-				conf.NewRetentionMT(10, 460, 600, 3, 150),           // TTL good, but not ready since long enough
-				conf.NewRetentionMT(20, 470, 600, 2, 101),           // TTL good, but not ready since long enough
-				conf.NewRetentionMT(60, 480, 600, 1, 100),           // TTL good and ready since long enough
-			),
-		},
-		[]models.Req{
-			reqOut(test.GetMKey(1), 100, 300, 0, 1, consolidation.Avg, 0, 0, 4, 60, 480, 60, 1),
-		},
-		nil,
-		500,
-		t,
-	)
 }
 
 var hour uint32 = 60 * 60
@@ -475,10 +297,14 @@ func testMaxPointsPerReq(maxPointsSoft, maxPointsHard int, reqs []models.Req, t 
 	out, err := planRequests(30*day, reqs[0].From, reqs[0].To, getReqMap(reqs), 0)
 	maxPointsPerReqSoft = origMaxPointsPerReqSoft
 	maxPointsPerReqHard = origMaxPointsPerReqHard
+	if err != nil {
+		return []models.Req{}, err
+	}
 	return out.List(), err
 }
 
 func TestGettingOneNextBiggerAgg(t *testing.T) {
+	// we ask for 1 day worth, arch & out interval of 1s, ttl of 1h
 	reqs := []models.Req{
 		reqOut(test.GetMKey(1), 29*day, 30*day, 0, 1, consolidation.Avg, 0, 0, 0, 1, hour, 1, 1),
 	}
