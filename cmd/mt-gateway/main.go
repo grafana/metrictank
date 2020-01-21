@@ -18,12 +18,14 @@ var (
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
 	addr          = flag.String("addr", ":80", "http service address")
 	defaultOrgId  = flag.Int("default-org-id", -1, "default org ID to send to downstream services if none is provided")
+	brokers       = flag.String("kafka-tcp-addr", "localhost:9092", "kafka tcp address(es) for metrics, in csv host[:port] format")
 )
 
 type Urls struct {
 	metrictank   *url.URL
 	graphite     *url.URL
 	bulkImporter *url.URL
+	kafkaBrokers string
 }
 
 func init() {
@@ -54,6 +56,7 @@ func main() {
 
 	var err error
 	urls := Urls{}
+	urls.kafkaBrokers = *brokers
 
 	urls.metrictank, err = url.Parse(*metrictankUrl)
 	if err != nil {
