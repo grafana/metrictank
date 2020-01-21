@@ -10,13 +10,12 @@ import (
 	"sync"
 
 	"github.com/golang/snappy"
+	"github.com/grafana/metrictank/publish"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
 	"github.com/grafana/metrictank/stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/publish"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -75,19 +74,13 @@ func (dbo discardsByOrg) Add(org int, reason string) {
 	dbo[org] = dbr
 }
 
-func prepareIngest(ctx *models.Context, in []*schema.MetricData, toPublish []*schema.MetricData) ([]*schema.MetricData, MetricsResponse) {
+func prepareIngest(in []*schema.MetricData, toPublish []*schema.MetricData) ([]*schema.MetricData, MetricsResponse) {
 	resp := NewMetricsResponse()
 	promDiscards := make(discardsByOrg)
 
 	var metricTimestamp *stats.Range32
-	if !ctx.IsAdmin {
-		metricTimestamp = getMetricsTimestampStat(ctx.ID)
-	}
 
 	for i, m := range in {
-		if !ctx.IsAdmin {
-			m.OrgId = ctx.ID
-		}
 		if m.Mtype == "" {
 			m.Mtype = "gauge"
 		}
@@ -97,11 +90,7 @@ func prepareIngest(ctx *models.Context, in []*schema.MetricData, toPublish []*sc
 			promDiscards.Add(m.OrgId, err.Error())
 			continue
 		}
-		if ctx.IsAdmin {
-			metricTimestamp = getMetricsTimestampStat(m.OrgId)
-		} else {
-			m.SetId()
-		}
+		metricTimestamp = getMetricsTimestampStat(m.OrgId)
 		metricTimestamp.ValueUint32(uint32(m.Time))
 		toPublish = append(toPublish, m)
 	}
@@ -146,7 +135,7 @@ func metricsJson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	toPublish := make([]*schema.MetricData, 0, len(metrics))
-	toPublish, resp := prepareIngest(ctx, metrics, toPublish)
+	toPublish, resp := prepareIngest(metrics, toPublish)
 
 	select {
 	case <-r.Context().Done():
@@ -215,7 +204,7 @@ func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 	}
 
 	toPublish := make([]*schema.MetricData, 0, len(metricData.Metrics))
-	toPublish, resp := prepareIngest(ctx, metricData.Metrics, toPublish)
+	toPublish, resp := prepareIngest(metricData.Metrics, toPublish)
 
 	select {
 	case <-r.Context().Done():
