@@ -15,13 +15,13 @@ The full startup procedure has many details, but here we cover the main steps if
 | log startup             | logs "Metrictank starting" message                                                                 | no                                  |
 | start sending stats     | starts connecting and writing to graphite endpoint                                                 | no                                  |
 | create Store            | create keyspace, tables, write queues, etc                                                         | minor RAM increase ~ queue size     |
-| create Input(s)         | open connections (kafka) or listening sockets (carbon, prometheus)                                 | no                                  |
+| create Input(s)         | open connections (kafka) or listening sockets (carbon)                                 | no                                  |
 | start cluster           | starts gossip, joins cluster                                                                       | no                                  |
 | create Index            | creates instance and starts write queues                                                           | minor RAM increase ~ queue size     |
 | start API server        | opens listening socket and starts handling requests in not-ready mode                              | no                                  |
 | init Index              | creates session, keyspace, tables, write queues, etc and loads in-memory index from persisted data | reasonable RAM and CPU increase                    |
 | create cluster notifier | optional: connects to Kafka, starts backfilling persistence message and waits until done or timeout| if backfilling: above-normal CPU, normal RAM usage |
-| start input plugin(s)   | starts backfill (kafka) or listening (carbon, prometheus) and maintain priority based on input lag | if backfilling: above-normal CPU and RAM usage     |
+| start input plugin(s)   | starts backfill (kafka) or listening (carbon) and maintain priority based on input lag | if backfilling: above-normal CPU and RAM usage     |
 | mark ready state        | immediately (primary) / after warmup (secondary) [details](clustering.md#priority-and-ready-state) | no                                                 |
 
 We recommend provisioning a cluster such that it can backfill a 7 hour backlog in half on hour or less. This means:

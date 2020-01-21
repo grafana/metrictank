@@ -112,7 +112,6 @@ Priority is a measure of how in-sync a metrictank process is, expressed in secon
 | input plugin  | priority                 |
 | ------------- | ------------------------ |
 | carbon-in     | 0                        |
-| prometheus-in | 0                        |
 | kafka-mdm-in  | estimate of consumer lag |
 
 When the input plugin is not sure, or not started yet priority is 10k (2.8 hours)
