@@ -122,7 +122,7 @@ func metricsJson(w http.ResponseWriter, r *http.Request) {
 		default:
 			log.Errorf("unable to read request body. %s", err)
 			w.WriteHeader(500)
-			fmt.Fprintf(w,"unable to read request body. %s", err)
+			fmt.Fprintf(w, "unable to read request body. %s", err)
 		}
 		return
 	}
@@ -218,7 +218,7 @@ func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 	if err != nil {
 		log.Errorf("failed to publish metrics. %s", err)
 		w.WriteHeader(500)
-		fmt.Fprintf(w,"failed to publish metrics. %s", err)
+		fmt.Fprintf(w, "failed to publish metrics. %s", err)
 		return
 	}
 
