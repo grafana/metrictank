@@ -15,8 +15,8 @@ import (
 	"github.com/grafana/metrictank/stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/raintank/tsdb-gw/api/models"
-	"github.com/raintank/tsdb-gw/publish"
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/publish"
 	log "github.com/sirupsen/logrus"
 )
 
