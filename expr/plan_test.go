@@ -211,8 +211,7 @@ func TestArgs(t *testing.T) {
 func TestArgQuotedInt(t *testing.T) {
 	cases := []expr{
 		{etype: etInt, int: 5},
-		{etype: etString, str: "'5'"},
-		{etype: etString, str: "\"5\""},
+		{etype: etString, str: "5"},
 	}
 	for _, ourArg := range cases {
 		fn := NewPerSecond()
@@ -240,10 +239,17 @@ func TestArgQuotedInt(t *testing.T) {
 func TestArgQuotedFloat(t *testing.T) {
 	cases := []expr{
 		{etype: etFloat, float: 5.0},
-		{etype: etString, str: "'5.0'"},
-		{etype: etString, str: "\"5.0\""},
+		{etype: etString, str: "5.0"},
+		{etype: etFloat, float: -5.0},
+		{etype: etString, str: "-5.0"},
 	}
-	for _, ourArg := range cases {
+	results := []float64{
+		5,
+		5,
+		-5,
+		-5,
+	}
+	for i, ourArg := range cases {
 		fn := NewAsPercent()
 		e := &expr{
 			etype: etFunc,
@@ -259,8 +265,8 @@ func TestArgQuotedFloat(t *testing.T) {
 			t.Fatal(err)
 		}
 		ap := fn.(*FuncAsPercent)
-		if ap.totalFloat != 5 {
-			t.Fatalf("totalFloat should be 5. got %f", ap.totalFloat)
+		if ap.totalFloat != results[i] {
+			t.Fatalf("totalFloat should be %f. got %f", results[i], ap.totalFloat)
 		}
 	}
 }
