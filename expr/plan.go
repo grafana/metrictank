@@ -26,12 +26,14 @@ type Req struct {
 
 // NewReq creates a new Req. pass cons=0 to leave consolidator undefined,
 // leaving up to the caller (in graphite's case, it would cause a lookup into storage-aggregation.conf)
-func NewReq(query string, from, to uint32, cons consolidation.Consolidator) Req {
+func NewReq(query string, from, to uint32, cons consolidation.Consolidator, PNGroup models.PNGroup, MDP uint32) Req {
 	return Req{
-		Query: query,
-		From:  from,
-		To:    to,
-		Cons:  cons,
+		Query:   query,
+		From:    from,
+		To:      to,
+		Cons:    cons,
+		PNGroup: PNGroup,
+		MDP:     MDP,
 	}
 }
 

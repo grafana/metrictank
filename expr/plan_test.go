@@ -33,7 +33,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -47,7 +47,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -61,7 +61,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -76,7 +76,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -91,7 +91,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etString, str: "true"},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -106,7 +106,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -148,7 +148,7 @@ func TestArgs(t *testing.T) {
 				"func": {etype: etString, str: "sum"},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -162,7 +162,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -457,7 +457,7 @@ func TestConsolidateBy(t *testing.T) {
 		{
 			"a",
 			[]Req{
-				NewReq("a", from, to, 0),
+				NewReq("a", from, to, 0, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -468,7 +468,7 @@ func TestConsolidateBy(t *testing.T) {
 			// consolidation flows both up and down the tree
 			`consolidateBy(a, "sum")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -479,7 +479,7 @@ func TestConsolidateBy(t *testing.T) {
 			// wrap with regular function -> consolidation goes both up and down
 			`scale(consolidateBy(a, "sum"),1)`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -490,7 +490,7 @@ func TestConsolidateBy(t *testing.T) {
 			// wrapping by a special function does not affect fetch consolidation, but resets output consolidation
 			`perSecond(consolidateBy(a, "sum"))`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -501,7 +501,7 @@ func TestConsolidateBy(t *testing.T) {
 			// consolidation setting streams down and up unaffected by scale
 			`consolidateBy(scale(a, 1), "sum")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -512,7 +512,7 @@ func TestConsolidateBy(t *testing.T) {
 			// perSecond changes data semantics, fetch consolidation should be reset to default
 			`consolidateBy(perSecond(a), "sum")`,
 			[]Req{
-				NewReq("a", from, to, 0),
+				NewReq("a", from, to, 0, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -524,8 +524,8 @@ func TestConsolidateBy(t *testing.T) {
 			// TODO: I think it can be argued that the max here is only intended for the output, not to the inputs
 			`consolidateBy(divideSeries(consolidateBy(a, "min"), b), "max")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Min),
-				NewReq("b", from, to, consolidation.Max),
+				NewReq("a", from, to, consolidation.Min, 0, 0),
+				NewReq("b", from, to, consolidation.Max, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -536,8 +536,8 @@ func TestConsolidateBy(t *testing.T) {
 			// data should be requested with fetch consolidation min, but runtime consolidation max
 			`consolidateBy(sumSeries(consolidateBy(a, "min"), b), "max")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Min),
-				NewReq("b", from, to, consolidation.Max),
+				NewReq("a", from, to, consolidation.Min, 0, 0),
+				NewReq("b", from, to, consolidation.Max, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -560,25 +560,25 @@ func TestConsolidateBy(t *testing.T) {
 			t.Errorf("case %d: %q (-want +got):\n%s", i, c.in, diff)
 		}
 		input := map[Req][]models.Series{
-			NewReq("a", from, to, 0): {{
+			NewReq("a", from, to, 0, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Avg, // emulate the fact that a by default will use avg
 				Interval:     10,
 			}},
-			NewReq("a", from, to, consolidation.Min): {{
+			NewReq("a", from, to, consolidation.Min, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Min,
 				Interval:     10,
 			}},
-			NewReq("a", from, to, consolidation.Sum): {{
+			NewReq("a", from, to, consolidation.Sum, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Sum,
 				Interval:     10,
 			}},
-			NewReq("b", from, to, consolidation.Max): {{
+			NewReq("b", from, to, consolidation.Max, 0, 0): {{
 				QueryPatt:    "b",
 				Target:       "b",
 				Consolidator: consolidation.Max,
