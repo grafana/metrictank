@@ -57,8 +57,7 @@ func Metrics(w http.ResponseWriter, r *http.Request) {
 	case "application/json":
 		metricsJson(w, r)
 	default:
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "unknown content-type: %s", contentType)
+		writeErrorResponse(w, 400, "unknown content-type: %s", contentType)
 	}
 }
 
@@ -108,8 +107,7 @@ func prepareIngest(in []*schema.MetricData, toPublish []*schema.MetricData) ([]*
 
 func metricsJson(w http.ResponseWriter, r *http.Request) {
 	if r.Body == nil {
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "no data included in request.")
+		writeErrorResponse(w, 400, "no data included in request.")
 		return
 	}
 	defer r.Body.Close()
@@ -117,20 +115,16 @@ func metricsJson(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		select {
 		case <-r.Context().Done():
-			w.WriteHeader(499)
-			fmt.Fprintf(w, "request canceled")
+			writeErrorResponse(w, 499, "request canceled")
 		default:
-			log.Errorf("unable to read request body. %s", err)
-			w.WriteHeader(500)
-			fmt.Fprintf(w, "unable to read request body. %s", err)
+			writeErrorResponse(w, 500, "unable to read request body. %s", err)
 		}
 		return
 	}
 	metrics := make([]*schema.MetricData, 0)
 	err = json.Unmarshal(body, &metrics)
 	if err != nil {
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "unable to parse request body. %s", err)
+		writeErrorResponse(w, 400, "unable to parse request body. %s", err)
 		return
 	}
 
@@ -139,17 +133,14 @@ func metricsJson(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case <-r.Context().Done():
-		w.WriteHeader(499)
-		fmt.Fprintf(w, "request canceled")
+		writeErrorResponse(w, 499, "request canceled")
 		return
 	default:
 	}
 
 	err = publish.Publish(toPublish)
 	if err != nil {
-		log.Errorf("failed to publish metrics. %s", err)
-		w.WriteHeader(500)
-		fmt.Fprintf(w, "failed to publish metrics. %s", err)
+		writeErrorResponse(w, 500, "failed to publish metrics. %s", err)
 		return
 	}
 
@@ -161,8 +152,7 @@ func metricsJson(w http.ResponseWriter, r *http.Request) {
 
 func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 	if r.Body == nil {
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "no data included in request.")
+		writeErrorResponse(w, 400, "no data included in request.")
 		return
 	}
 	var bodyReadCloser io.ReadCloser
@@ -177,29 +167,22 @@ func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 	if err != nil {
 		select {
 		case <-r.Context().Done():
-			w.WriteHeader(499)
-			fmt.Fprintf(w, "request canceled")
+			writeErrorResponse(w, 499, "request canceled")
 		default:
-			log.Errorf("unable to read request body. %s", err)
-			w.WriteHeader(500)
-			fmt.Fprintf(w, "unable to read request body. %s", err)
+			writeErrorResponse(w, 500, "unable to read request body. %s", err)
 		}
 		return
 	}
 	metricData := new(msg.MetricData)
 	err = metricData.InitFromMsg(body)
 	if err != nil {
-		log.Errorf("payload not metricData. %s", err)
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "payload not metricData. %s", err)
+		writeErrorResponse(w, 400, "payload not metricData. %s", err)
 		return
 	}
 
 	err = metricData.DecodeMetricData()
 	if err != nil {
-		log.Errorf("failed to unmarshal metricData. %s", err)
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "failed to unmarshal metricData. %s", err)
+		writeErrorResponse(w, 400, "failed to unmarshal metricData. %s", err)
 		return
 	}
 
@@ -208,17 +191,14 @@ func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 
 	select {
 	case <-r.Context().Done():
-		w.WriteHeader(499)
-		fmt.Fprintf(w, "request canceled")
+		writeErrorResponse(w, 499, "request canceled")
 		return
 	default:
 	}
 
 	err = publish.Publish(toPublish)
 	if err != nil {
-		log.Errorf("failed to publish metrics. %s", err)
-		w.WriteHeader(500)
-		fmt.Fprintf(w, "failed to publish metrics. %s", err)
+		writeErrorResponse(w, 500, "failed to publish metrics. %s", err)
 		return
 	}
 
@@ -226,4 +206,11 @@ func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 	resp.Published = len(toPublish)
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func writeErrorResponse(w http.ResponseWriter, status int, msg string, fmtArgs ...interface{}) {
+	w.WriteHeader(status)
+	formatted := fmt.Sprint(msg, fmtArgs)
+	log.Error(formatted)
+	fmt.Fprintf(w, formatted)
 }
