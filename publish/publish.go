@@ -65,7 +65,3 @@ func (*nullPublisher) Publish(metrics []*schema.MetricData) error {
 func (*nullPublisher) Type() string {
 	return "nullPublisher"
 }
-
-func Persist(metrics []*schema.MetricData) error {
-	return publisher.Publish(metrics)
-}
