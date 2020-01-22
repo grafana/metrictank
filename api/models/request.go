@@ -184,12 +184,7 @@ func (r Req) TraceLog(span opentracing.Span) {
 }
 
 // Equals compares all fields of a to b for equality.
-// Except
-// * TTL (because planRequests may change it)
-//   for 100% correctness we may want to fix this in the future
-//   but for now, should be harmless since the field is not
-//   that important for archive fetching
-// * For the Node field we just compare the node.Name
+// Except the Node field: we just compare the node.Name
 // rather then doing a deep comparison.
 func (a Req) Equals(b Req) bool {
 	if a.MKey != b.MKey {
@@ -238,6 +233,9 @@ func (a Req) Equals(b Req) bool {
 		return false
 	}
 	if a.OutInterval != b.OutInterval {
+		return false
+	}
+	if a.TTL != b.TTL {
 		return false
 	}
 	if a.AggNum != b.AggNum {
