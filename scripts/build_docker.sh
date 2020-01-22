@@ -14,6 +14,10 @@ then
     docker tag grafana/metrictank grafana/metrictank:$tag
     docker tag grafana/metrictank grafana/metrictank:$version
 
+    docker build -t grafana/mt-gateway --target=mt-gateway -f ${DIR}/Dockerfile .
+    docker tag grafana/mt-gateway grafana/mt-gateway:$tag
+    docker tag grafana/mt-gateway grafana/mt-gateway:$version
+
     # k8s image
     cd ${DIR}/k8s
     docker build -t us.gcr.io/metrictank-gcr/metrictank .

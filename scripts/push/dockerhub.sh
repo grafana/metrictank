@@ -16,3 +16,16 @@ echo "### docker push grafana/metrictank:$tag"
 echo
 
 docker push grafana/metrictank:$tag
+
+
+echo
+echo "### docker push grafana/mt-gateway:$version"
+echo
+
+docker push grafana/mt-gateway:$version
+
+echo
+echo "### docker push grafana/mt-gateway:$tag"
+echo
+
+docker push grafana/mt-gateway:$tag

@@ -1,3 +1,6 @@
+#############################
+# unpublished builder image #
+#############################
 FROM golang:1.11.4-alpine AS gobase
 RUN apk add --no-cache git bash
 
@@ -8,7 +11,22 @@ ADD . $MT_SRC_DIR
 RUN $MT_SRC_DIR/scripts/build.sh
 RUN cp -r $MT_SRC_DIR/build /tmp/build
 
+####################
+# mt-gateway image #
+####################
+FROM alpine:3.10.0 AS mt-gateway
 
+RUN mkdir -p /etc/gw
+COPY scripts/config/storage-schemas.conf /etc/gw/storage-schemas.conf
+COPY --from=gobase /tmp/build/mt-gateway /usr/bin/
+
+EXPOSE 80
+
+ENTRYPOINT ["/usr/bin/mt-gateway"]
+
+#########################
+# main metrictank image #
+#########################
 FROM alpine:3.10.0
 MAINTAINER Dieter Plaetinck dieter@grafana.com
 
