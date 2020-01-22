@@ -70,6 +70,9 @@ and then normalizing (consolidating) at runtime - and thus spend less resources 
 However, if the query is `sum(A, summarize(B,...))` we cannot safely do this as we don't have a prediction of what the output interval of `summarize(B,...)` will be.
 Likewise, if the query is `groupByNode(group(A,B), 2, callback='sum')` we cannot predict whether A and B will end up in the same group, and thus should be normalized.
 
+The other benefit of pre-normalization is that it assures data will be fetched in a pre-canonical way. If we don't set up normalization for fetching, data may not be pre-canonical, such that
+when it eventually needs to be normalized at runtime, points at the beginning or end of the series may be less accurate.
+
 
 ## Proposed changes
 
