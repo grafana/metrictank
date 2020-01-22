@@ -602,15 +602,6 @@ func reqRaw(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidat
 	req.Archive = 0
 	return req
 }
-func reqOut(key schema.MKey, from, to, maxPoints, rawInterval uint32, consolidator consolidation.Consolidator, schemaId, aggId uint16, archive uint8, archInterval, ttl, outInterval, aggNum uint32) models.Req {
-	req := models.NewReq(key, "", "", from, to, maxPoints, rawInterval, 0, consolidator, 0, cluster.Manager.ThisNode(), schemaId, aggId)
-	req.Archive = archive
-	req.ArchInterval = archInterval
-	req.TTL = ttl
-	req.OutInterval = outInterval
-	req.AggNum = aggNum
-	return req
-}
 
 func TestMergeSeries(t *testing.T) {
 	out := make([]models.Series, 0)
