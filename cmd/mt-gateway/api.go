@@ -34,10 +34,10 @@ func NewApi(urls Urls) Api {
 func ingestHandler(urls Urls) http.Handler {
 	publisher := kafka.New(strings.Split(urls.kafkaBrokers, ","), true)
 	if publisher == nil {
-		log.Info("metrics ingestion not enabled")
+		log.Info("metrics ingestion not enabled (no kafka brokers configured)")
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = fmt.Fprintln(w, "no url configured for bulk importer service")
+			_, _ = fmt.Fprintln(w, "metrics ingestion not enabled (no kafka brokers configured)")
 		})
 	} else {
 		publish.Init(publisher)
