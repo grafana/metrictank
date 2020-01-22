@@ -2,6 +2,7 @@ package api
 
 import (
 	"math"
+	"net/http"
 	"reflect"
 
 	"github.com/grafana/metrictank/api/models"
@@ -22,8 +23,8 @@ var (
 	// best effort: not aware of summarize(), aggregation functions, runtime normalization. but does account for runtime consolidation
 	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
 
-	errUnSatisfiable   = response.NewError(404, "request cannot be satisfied due to lack of available retentions")
-	errMaxPointsPerReq = response.NewError(413, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
+	errUnSatisfiable   = response.NewError(http.StatusNotFound, "request cannot be satisfied due to lack of available retentions")
+	errMaxPointsPerReq = response.NewError(http.StatusRequestEntityTooLarge, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
 )
 
 func getRetentions(req models.Req) []conf.Retention {
