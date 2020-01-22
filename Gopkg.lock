@@ -535,11 +535,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:27d40615ecb8e8156811a3b13a5644d2893d2b0ecd16757944db902a6b9fb17e"
+  digest = "1:41d1e93e43e7e941b970ebc720cc428a2a74fcc13eff306c44a42883cd99f433"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
     "prometheus/promauto",
+    "prometheus/promhttp",
   ]
   pruneopts = "NUT"
   revision = "676eaf6b948046fcd9dbbcf5cc9ff5077921aa81"
@@ -1078,6 +1079,7 @@
     "github.com/pelletier/go-toml",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promauto",
+    "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/procfs",
     "github.com/raintank/dur",
     "github.com/raintank/gziper",
