@@ -65,7 +65,7 @@ func getRetentions(req models.Req) []conf.Retention {
 //
 // note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
-func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) (*ReqsPlan, error) {
+func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard int) (*ReqsPlan, error) {
 
 	ok, rp := false, NewReqsPlan(*reqs)
 
@@ -97,7 +97,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) (*ReqsPlan
 		}
 	}
 
-	if maxPointsPerReqSoft > 0 {
+	if mpprSoft > 0 {
 		// at this point, all MDP-optimizable series have already been optimized
 		// we can try to reduce the resolution of non-MDP-optimizable series
 		// if metrictank is already handling all, or most of your queries, then we have been able to determine
@@ -109,7 +109,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) (*ReqsPlan
 		// impact of big queries
 		// we could do two approaches: gradually reduce the interval of all series/groups being read, or just aggressively
 		// adjust one group at a time. The latter seems simpler, so for now we do just that.
-		if rp.PointsFetch() > uint32(maxPointsPerReqSoft) {
+		if rp.PointsFetch() > uint32(mpprSoft) {
 			for group, split := range rp.pngroups {
 				if len(split.mdpno) > 0 {
 					split.mdpno, ok = planLowestResForMDPMulti(now, from, to, split.mdpno)
@@ -117,7 +117,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) (*ReqsPlan
 						return nil, errUnSatisfiable
 					}
 					rp.pngroups[group] = split
-					if rp.PointsFetch() <= uint32(maxPointsPerReqSoft) {
+					if rp.PointsFetch() <= uint32(mpprSoft) {
 						goto HonoredSoft
 					}
 				}
@@ -130,7 +130,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) (*ReqsPlan
 				// for every 10 requests we adjusted, check if we honor soft now.
 				// note that there may be thousands of requests
 				if i%10 == 9 {
-					if rp.PointsFetch() <= uint32(maxPointsPerReqSoft) {
+					if rp.PointsFetch() <= uint32(mpprSoft) {
 						goto HonoredSoft
 					}
 				}
@@ -139,7 +139,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32) (*ReqsPlan
 	}
 HonoredSoft:
 
-	if maxPointsPerReqHard > 0 && int(rp.PointsFetch()) > maxPointsPerReqHard {
+	if mpprHard > 0 && int(rp.PointsFetch()) > mpprHard {
 		return nil, errMaxPointsPerReq
 
 	}

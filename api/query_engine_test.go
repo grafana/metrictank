@@ -21,29 +21,35 @@ func getReqMap(reqs []models.Req) *ReqMap {
 }
 
 // testPlan verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
-func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, t *testing.T) {
+// passing mpprSoft/mpprHard 0 means we will set them automatically such that they will never be hit
+func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, mpprSoft, mpprHard int, t *testing.T) {
 	var schemas []conf.Schema
-	oriMaxPointsPerReqSoft := maxPointsPerReqSoft
-	oriMaxPointsPerHardReq := maxPointsPerReqHard
+
+	maxPointsPerReqSoft := mpprSoft
 
 	for _, ret := range retentions {
 		schemas = append(schemas, conf.Schema{
 			Pattern:    regexp.MustCompile(".*"),
 			Retentions: ret,
 		})
-		// make sure maxPointsPerReqSoft is high enough
-		points := (int(reqs[0].To-reqs[0].From) / ret.Rets[0].SecondsPerPoint) * len(reqs)
-		if points > maxPointsPerReqSoft {
-			maxPointsPerReqSoft = points
+		if mpprSoft == 0 {
+			// make sure maxPointsPerReqSoft is high enough
+			points := (int(reqs[0].To-reqs[0].From) / ret.Rets[0].SecondsPerPoint) * len(reqs)
+			if points > maxPointsPerReqSoft {
+				maxPointsPerReqSoft = points
+			}
 		}
 	}
-	maxPointsPerReqHard = maxPointsPerReqSoft * 10
+	maxPointsPerReqHard = mpprHard
+	if mpprHard == 0 {
+		maxPointsPerReqHard = maxPointsPerReqSoft * 10
+	}
 
 	// Note that conf.Schemas is "expanded" to create a new rule for each rollup
 	// thus SchemasID must accommodate for this!
 	mdata.Schemas = conf.NewSchemas(schemas)
 	//spew.Dump(mdata.Schemas)
-	out, err := planRequests(now, reqs[0].From, reqs[0].To, getReqMap(reqs), 0)
+	out, err := planRequests(now, reqs[0].From, reqs[0].To, getReqMap(reqs), 0, maxPointsPerReqSoft, maxPointsPerReqHard)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
 	}
@@ -60,9 +66,6 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 			}
 		}
 	}
-
-	maxPointsPerReqSoft = oriMaxPointsPerReqSoft
-	maxPointsPerReqHard = oriMaxPointsPerHardReq
 }
 
 // There are a lot of factors to consider. I haven't found a practical way to test all combinations of every factor
@@ -87,12 +90,12 @@ func TestPlanRequests_SameInterval_SameTTL_RawOnly_RawMatches(t *testing.T) {
 	}
 	adjust(&out[0], 0, 60, 60, 1200)
 	adjust(&out[1], 0, 60, 60, 1200)
-	testPlan(in, rets, out, nil, 1200, t)
+	testPlan(in, rets, out, nil, 1200, 0, 0, t)
 
 	// also test what happens when two series use distinct, but equal schemas
 	rets = append(rets, rets[0])
 	in[1].SchemaId, out[1].SchemaId = 1, 1
-	testPlan(in, rets, out, nil, 1200, t)
+	testPlan(in, rets, out, nil, 1200, 0, 0, t)
 
 	// also test what happens when one of them hasn't been ready long enough or is not ready at all
 	for _, r := range []conf.Retentions{
@@ -103,7 +106,7 @@ func TestPlanRequests_SameInterval_SameTTL_RawOnly_RawMatches(t *testing.T) {
 		//spew.Dump(rets)
 		//spew.Dump(in)
 		//spew.Dump(out)
-		testPlan(in, rets, out, errUnSatisfiable, 1200, t)
+		testPlan(in, rets, out, errUnSatisfiable, 1200, 0, 0, t)
 	}
 	// but to be clear, when it is ready, it is satisfiable
 	for _, r := range []conf.Retentions{
@@ -112,7 +115,7 @@ func TestPlanRequests_SameInterval_SameTTL_RawOnly_RawMatches(t *testing.T) {
 		conf.MustParseRetentions("60s:1200s:60s:2:true"),
 	} {
 		rets[0] = r
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	}
 }
 
@@ -138,21 +141,21 @@ func TestPlanRequests_DifferentInterval_SameTTL_RawOnly_RawMatches(t *testing.T)
 		conf.MustParseRetentions("60s:1200s:60s:2:true"),
 	}
 	t.Run("NoPNGroups", func(t *testing.T) {
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 
 	t.Run("DifferentPNGroups", func(t *testing.T) {
 		// nothing should change
 		in[0].PNGroup, out[0].PNGroup = 123, 123
 		in[1].PNGroup, out[1].PNGroup = 124, 124
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 	t.Run("SamePNGroups", func(t *testing.T) {
 		// should be normalized to the same interval
 		in[0].PNGroup, out[0].PNGroup = 123, 123
 		in[1].PNGroup, out[1].PNGroup = 123, 123
 		adjust(&out[0], 0, 10, 60, 1200)
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 }
 
@@ -168,21 +171,21 @@ func TestPlanRequests_DifferentInterval_DifferentTTL_RawOnly_1RawShort(t *testin
 	adjust(&out[0], 0, 10, 10, 800)
 	adjust(&out[1], 0, 60, 60, 1080)
 	t.Run("NoPNGroups", func(t *testing.T) {
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 
 	t.Run("DifferentPNGroups", func(t *testing.T) {
 		// nothing should change
 		in[0].PNGroup, out[0].PNGroup = 123, 123
 		in[1].PNGroup, out[1].PNGroup = 124, 124
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 	t.Run("SamePNGroups", func(t *testing.T) {
 		// should be normalized to the same interval
 		in[0].PNGroup, out[0].PNGroup = 123, 123
 		in[1].PNGroup, out[1].PNGroup = 123, 123
 		adjust(&out[0], 0, 10, 60, 800)
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 
 }
@@ -199,7 +202,7 @@ func TestPlanRequests_DifferentInterval_DifferentTTL_1RawOnly1RawAndRollups_1Raw
 	adjust(&out[0], 1, 30, 30, 1500)
 	adjust(&out[1], 0, 60, 60, 1320)
 	t.Run("Base", func(t *testing.T) {
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 
 	t.Run("SameButTTLsNotLongEnough", func(t *testing.T) {
@@ -209,7 +212,7 @@ func TestPlanRequests_DifferentInterval_DifferentTTL_1RawOnly1RawAndRollups_1Raw
 		}
 		adjust(&out[0], 1, 30, 30, 1140)
 		adjust(&out[1], 0, 60, 60, 1020)
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 
 	t.Run("ArchiveWeNeedIsNotReady", func(t *testing.T) {
@@ -218,7 +221,7 @@ func TestPlanRequests_DifferentInterval_DifferentTTL_1RawOnly1RawAndRollups_1Raw
 		adjust(&out[0], 0, 10, 10, 1080)
 		adjust(&out[1], 0, 60, 60, 1320)
 		//spew.Dump(rets)
-		testPlan(in, rets, out, nil, 1200, t)
+		testPlan(in, rets, out, nil, 1200, 0, 0, t)
 	})
 
 }
@@ -236,13 +239,13 @@ func TestPlanRequests_DifferentInt_DifferentTTL_1RawOnly1RawAndRollups_1RawShort
 	}
 	adjust(&out[0], 0, 10, 10, 800)
 	adjust(&out[1], 0, 60, 60, 1200)
-	testPlan(in, rets, out, nil, 1200, t)
+	testPlan(in, rets, out, nil, 1200, 0, 0, t)
 
 	t.Run("RawArchiveNotReady", func(t *testing.T) {
 		// should switch to rollup
 		rets[1] = conf.MustParseRetentions("60s:1200s:60s:2:false,5m:3000s:5min:2:true")
 		adjust(&out[1], 1, 300, 300, 3000)
-		testPlan(in, rets, out, nil, 3000, t)
+		testPlan(in, rets, out, nil, 3000, 0, 0, t)
 	})
 }
 
@@ -257,7 +260,7 @@ func TestPlanRequestsMultiIntervalsUseRaw(t *testing.T) {
 	}
 	adjust(&out[0], 0, 10, 10, 800)
 	adjust(&out[1], 0, 30, 30, 1200)
-	testPlan(in, rets, out, nil, 800, t)
+	testPlan(in, rets, out, nil, 800, 0, 0, t)
 }
 
 // 3 series with different raw intervals from the same schemas. TTL causes both to go to first rollup, which for one of them is raw
@@ -387,7 +390,7 @@ func BenchmarkPlanRequestsSamePNGroup(b *testing.B) {
 	})
 
 	for n := 0; n < b.N; n++ {
-		res, _ = planRequests(14*24*3600, 0, 3600*24*7, reqs, 0)
+		res, _ = planRequests(14*24*3600, 0, 3600*24*7, reqs, 0, 0, 0)
 	}
 	result = res
 }
