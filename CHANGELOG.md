@@ -11,6 +11,24 @@
   the metric `tank.sample-too-far-ahead` can be used, this metric counts the data points which
   would be dropped if the enforcement were turned on while it is off.
   #1572 
+* Prometheus integration removal. As of v0.13.1-97-gd77c5a31, it is no longer possible to use metrictank
+  to scrape prometheus data, or query data via Promql.  There was not enough usage (or customer interest)
+  to keep maintaining this functionality.
+  #1613
+
+## other
+
+* dashboard tweaks. #1557, #1618
+* performance improvement meta tags #1541, #1542
+* docs improvements #1559 , #1620
+* bigtable index fix: only load current metricdefs. #1564
+* Fix deadlock when write queue full. #1569
+* tags/findSeries - add lastts-json format. #1580
+* add catastrophe recovery for cassandra (re-resolve when all IP's have changed). #1579
+* mt-whisper-importer-reader: print message when everything done with the final stats. #1617
+* Add `/tags/terms` query to get counts of tag values #1582 
+* add function offset() #1621
+* expr: be more lenient: allow quoted ints and floats #1622
   
 # v0.13.1: Meta tag and http api improvements, lineage metadata, per partition metrics and more. Nov 28, 2019.
 
