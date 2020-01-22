@@ -158,7 +158,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			// allow "2.5", '5.4', etc. some people put quotes around their floats.
 			f, ok := strToFloat(got.str)
 			if !ok {
-				return 0, ErrBadArgumentStr{"int", got.etype.String()}
+				return 0, ErrBadArgumentStr{"float", got.etype.String()}
 			}
 			gotFake := expr{
 				str:   got.str,
