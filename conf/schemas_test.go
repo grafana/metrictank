@@ -1,10 +1,12 @@
 package conf
 
 import (
+	"math"
 	"reflect"
 	"regexp"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -320,5 +322,42 @@ func TestReadSchemas(t *testing.T) {
 				t.Errorf("ReadSchemas() =\n %v\n want\n %v", got, tt.want)
 			}
 		})
+	}
+}
+func TestSub(t *testing.T) {
+	in := Retentions{
+		Orig: "10s:600s:60s:2:true,30s:1h:60s:2:false",
+		Rets: []Retention{
+			{
+				SecondsPerPoint: 10,
+				NumberOfPoints:  60,
+				ChunkSpan:       60,
+				NumChunks:       2,
+				Ready:           0,
+			},
+			{
+				SecondsPerPoint: 30,
+				NumberOfPoints:  120,
+				ChunkSpan:       60,
+				NumChunks:       2,
+				Ready:           uint32(math.MaxUint32),
+			},
+		},
+	}
+	want := Retentions{
+		Orig: "30s:1h:60s:2:false",
+		Rets: []Retention{
+			{
+				SecondsPerPoint: 30,
+				NumberOfPoints:  120,
+				ChunkSpan:       60,
+				NumChunks:       2,
+				Ready:           uint32(math.MaxUint32),
+			},
+		},
+	}
+	got := in.Sub(1)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("TestSub() mismatch (-want +got):\n%s", diff)
 	}
 }
