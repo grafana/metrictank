@@ -36,6 +36,20 @@ Explains the execution plan for a given query / set of targets
 Usage:
 
   mt-explain
+  -from string
+    	get data from (inclusive) (default "-24h")
+  -mdp int
+    	max data points to return (default 800)
+  -mdp-optimization
+    	enable MaxDataPoints optimization (experimental)
+  -pre-normalization
+    	enable pre-normalization optimization (default true)
+  -stable
+    	whether to use only functionality marked as stable (default true)
+  -time-zone string
+    	time-zone to use for interpreting from/to when needed. (check your config) (default "local")
+  -to string
+    	get data until (exclusive) (default "now")
 
 Example:
 
