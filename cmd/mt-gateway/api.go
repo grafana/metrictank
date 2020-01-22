@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
-	"github.com/grafana/metrictank/publish"
-	"github.com/grafana/metrictank/publish/kafka"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
 	"strings"
+
+	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
+	"github.com/grafana/metrictank/publish"
+	"github.com/grafana/metrictank/publish/kafka"
+	log "github.com/sirupsen/logrus"
 )
 
 //Maintains a set of `http.Handlers` for the different API endpoints.
