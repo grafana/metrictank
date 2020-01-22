@@ -439,11 +439,153 @@ func TestArgInIntKeyword(t *testing.T) {
 	}
 }
 
+// TestOptimizationFlags tests that the optimization (PNGroups and MDP for MDP-optimization) flags are
+// set in line with the optimization settings passed to the planner.
+func TestOptimizationFlags(t *testing.T) {
+	from := uint32(1000)
+	to := uint32(2000)
+	stable := true
+
+	// note, use the number 1 to mean "a PNGroup". these tests currently don't support multiple PNGroups.
+	type testCase struct {
+		in      string
+		wantReq []Req
+	}
+
+	compare := func(i int, opts Optimizations, c testCase, plan Plan, err error) {
+		// for simplicity, test cases declare 1 to mean "a PNGroup"
+		for i, req := range plan.Reqs {
+			if req.PNGroup > 0 {
+				plan.Reqs[i].PNGroup = 1
+			}
+		}
+
+		if diff := cmp.Diff(c.wantReq, plan.Reqs); diff != "" {
+			t.Errorf("case %d: %q with opts %+v (-want +got):\n%s", i, c.in, opts, diff)
+		}
+	}
+
+	cases := []testCase{
+		{
+			// no transparent aggregation so don't align the data. Though, could be MDP optimized
+			"a",
+			[]Req{
+				NewReq("a", from, to, 0, 0, 800),
+			},
+		},
+		{
+			"summarize(a,'1h')", // greedy resolution function. disables MDP optimizations
+			[]Req{
+				NewReq("a", from, to, 0, 0, 0),
+			},
+		},
+		{
+			"sum(a)", // transparent aggregation. enables PN-optimization
+			[]Req{
+				NewReq("a", from, to, 0, 1, 800),
+			},
+		},
+		{
+			"summarize(sum(a),'1h')",
+			[]Req{
+				NewReq("a", from, to, 0, 1, 0),
+			},
+		},
+		{
+			// a will go through some functions that don't matter, then hits a transparent aggregation
+			"summarize(sum(perSecond(min(scale(a,1)))),'1h')",
+			[]Req{
+				NewReq("a", from, to, 0, 1, 0),
+			},
+		},
+		{
+			// a is not PN-optimizable due to the opaque aggregation, whereas b is thanks to the transparent aggregation, that they hit first.
+			"sum(group(groupByTags(a,'sum','foo'), avg(b)))",
+			[]Req{
+				NewReq("a", from, to, 0, 0, 800),
+				NewReq("b", from, to, 0, 1, 800),
+			},
+		},
+		{
+			// a is not PN-optimizable because it doesn't go through a transparent aggregation
+			// b is, because it hits a transparent aggregation before it hits the opaque aggregation
+			// c is neither PN-optimizable, nor MDP-optimizable, because it hits an interval altering + GR function, before it hits anything else
+			"groupByTags(group(groupByTags(a,'sum','tag'), avg(b), avg(summarize(c,'1h'))),'sum','tag2')",
+			[]Req{
+				NewReq("a", from, to, 0, 0, 800),
+				NewReq("b", from, to, 0, 1, 800),
+				NewReq("c", from, to, 0, 0, 0),
+			},
+		},
+	}
+	for i, c := range cases {
+		// make a pristine copy of the data such that we can tweak it for different scenarios
+		origWantReqs := make([]Req, len(c.wantReq))
+		copy(origWantReqs, c.wantReq)
+
+		// first, try with all optimizations:
+		opts := Optimizations{
+			PreNormalization: true,
+			MDP:              true,
+		}
+		exprs, err := ParseMany([]string{c.in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan, err := NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+
+		// now, disable MDP. This should result simply in disabling all MDP flags on all requests
+		opts.MDP = false
+		c.wantReq = make([]Req, len(origWantReqs))
+		copy(c.wantReq, origWantReqs)
+		for j := range c.wantReq {
+			c.wantReq[j].MDP = 0
+		}
+
+		plan, err = NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+
+		// now disable (only) PN-optimizations. This should result simply in turning off all PNGroups
+		opts.MDP = true
+		opts.PreNormalization = false
+		c.wantReq = make([]Req, len(origWantReqs))
+		copy(c.wantReq, origWantReqs)
+		for j := range c.wantReq {
+			c.wantReq[j].PNGroup = 0
+		}
+		plan, err = NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+
+		// now disable both optimizations at the same time
+		opts.MDP = false
+		opts.PreNormalization = false
+		c.wantReq = make([]Req, len(origWantReqs))
+		copy(c.wantReq, origWantReqs)
+		for j := range c.wantReq {
+			c.wantReq[j].MDP = 0
+			c.wantReq[j].PNGroup = 0
+		}
+
+		plan, err = NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+	}
+}
+
 // TestConsolidateBy tests for a variety of input targets, wether consolidateBy settings are correctly
 // propagated down the tree (to fetch requests) and up the tree (to runtime consolidation of the output)
-// with PN-optimization enabled/disabled.
-// (enabling MDP leads to MDP being set on the reqs which means we would have to do all test twice basically
-// and MDP is experimental, so we don't check for it here)
 func TestConsolidateBy(t *testing.T) {
 	from := uint32(1000)
 	to := uint32(2000)
