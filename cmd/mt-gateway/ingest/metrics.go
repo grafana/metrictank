@@ -212,5 +212,5 @@ func writeErrorResponse(w http.ResponseWriter, status int, msg string, fmtArgs .
 	w.WriteHeader(status)
 	formatted := fmt.Sprint(msg, fmtArgs)
 	log.Error(formatted)
-	fmt.Fprintf(w, formatted)
+	fmt.Fprint(w, formatted)
 }
