@@ -75,7 +75,7 @@ var (
 func ConfigSetup() *flag.FlagSet {
 	memoryIdx := flag.NewFlagSet("memory-idx", flag.ExitOnError)
 	memoryIdx.BoolVar(&Enabled, "enabled", false, "")
-	memoryIdx.BoolVar(&TagSupport, "tag-support", false, "enables/disables querying based on tags")
+	memoryIdx.BoolVar(&TagSupport, "tag-support", true, "enables/disables querying based on tags")
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 5, "number of workers to spin up to evaluate tag queries")
 	memoryIdx.IntVar(&metaTagEnricherQueueSize, "meta-tag-enricher-queue-size", 100, "size of event queue in the meta tag enricher")
