@@ -18,7 +18,10 @@
 * as of v0.13.1-76-g235ecb29 tag support is enabled by default, it can still be disabled though.
   This means if previously metrics with tags have been ingested while tag support was disabled,
   then those tags would have been treated as a normal part of the metric name, when tag support
-  now gets enabled due to this change then the tags would be treated as tags.
+  now gets enabled due to this change then the tags would be treated as tags and they wouldn't
+  be part of the metric name anymore. As a result there is a very unlikely scenario in which some
+  queries don't return the same results as before, if they query for tags as part of the metric
+  name.
   #1619
 
 ## other
