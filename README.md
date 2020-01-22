@@ -22,12 +22,11 @@ Most notably, the heavily compressed chunks dramatically lower cpu, memory and s
 * Writeback RAM cache, serving most data out of memory.
 * Graphite is a first class citizen. As of graphite-1.0.1, metrictank can be used as a graphite CLUSTER_SERVER.
 * Can also act as a Graphite server itself, though the functions processing library is only partially implemented, metrictank proxies requests to Graphite if it can't handle the required processing (for those requests it will degrade to just being the backend storage)
-* Can also be used with Prometheus (but the experience won't be as good as something built just for prometheus, which we're also working on)
 * Accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 * Flexible tenancy: can be used as single tenant or multi tenant. Selected data can be shared across all tenants.
-* Input options: carbon, metrics2.0, kafka, Prometheus (soon: json or msgpack over http)
+* Input options: carbon, metrics2.0, kafka (soon: json or msgpack over http)
 * Guards against excessive data requests
 * Data backfill/import from whisper
 

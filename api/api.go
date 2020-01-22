@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/prometheus/promql"
-
 	_ "net/http/pprof"
 
 	"github.com/grafana/metrictank/idx"
@@ -43,7 +41,6 @@ type Server struct {
 	MetricIndex     idx.MetricIndex
 	MemoryStore     mdata.Metrics
 	BackendStore    mdata.Store
-	PromQueryEngine *promql.Engine
 	Cache           cache.Cache
 	shutdown        chan struct{}
 	Tracer          opentracing.Tracer
@@ -66,10 +63,6 @@ func (s *Server) BindCache(cache cache.Cache) {
 
 func (s *Server) BindTracer(tracer opentracing.Tracer) {
 	s.Tracer = tracer
-}
-
-func (s *Server) BindPromQueryEngine() {
-	s.PromQueryEngine = promql.NewEngine(s, nil)
 }
 
 type PrioritySetter interface {
