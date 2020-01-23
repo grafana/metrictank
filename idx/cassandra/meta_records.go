@@ -110,7 +110,7 @@ func (c *CasIdx) loadMetaRecords() {
 			continue
 		}
 
-		if err = c.MemoryIndex.MetaTagRecordSwap(orgId, records); err != nil {
+		if err = c.metaRecordMemIdx.MetaTagRecordSwap(orgId, records); err != nil {
 			log.Errorf("Error when swapping batch of meta records: %s", err.Error())
 			continue
 		}
@@ -171,10 +171,11 @@ func (c *CasIdx) pruneBatch(orgId uint32, batchId gocql.UUID) error {
 	).RetryPolicy(&metaRecordRetryPolicy).Exec()
 }
 
+func (c *CasIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
+	return c.metaRecordMemIdx.MetaTagRecordList(orgId)
+}
+
 func (c *CasIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error {
-	if !memory.MetaTagSupport || !memory.TagSupport {
-		return metatags.ErrMetaTagSupportDisabled
-	}
 	if !c.Config.updateCassIdx {
 		return errIdxUpdatesDisabled
 	}
@@ -228,9 +229,6 @@ func (c *CasIdx) markMetaRecordBatchUpdated(orgId uint32, batchId metatags.UUID)
 }
 
 func (c *CasIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error {
-	if !memory.MetaTagSupport || !memory.TagSupport {
-		return metatags.ErrMetaTagSupportDisabled
-	}
 	if !c.Config.updateCassIdx {
 		return errIdxUpdatesDisabled
 	}

@@ -58,13 +58,12 @@ type writeReq struct {
 
 type BigtableIdx struct {
 	memory.MemoryIndex
-	metaRecords *MetaRecordIdx
-	cfg         *IdxConfig
-	tbl         *bigtable.Table
-	client      *bigtable.Client
-	writeQueue  chan writeReq
-	shutdown    chan struct{}
-	wg          sync.WaitGroup
+	cfg        *IdxConfig
+	tbl        *bigtable.Table
+	client     *bigtable.Client
+	writeQueue chan writeReq
+	shutdown   chan struct{}
+	wg         sync.WaitGroup
 }
 
 func New(cfg *IdxConfig) *BigtableIdx {
@@ -81,7 +80,12 @@ func New(cfg *IdxConfig) *BigtableIdx {
 	if cfg.UpdateBigtableIdx {
 		idx.writeQueue = make(chan writeReq, cfg.WriteQueueSize-cfg.WriteMaxFlushSize)
 	}
+
 	return idx
+}
+
+func NewMetaRecordIdx(cfg MetaRecordIdxConfig, memIdx idx.MetaRecordIdx) *MetaRecordIdx {
+	return NewBigTableMetaRecordIdx(cfg, memIdx)
 }
 
 // InitBare creates the client and makes sure the tables and columFamilies exist.
@@ -109,26 +113,6 @@ func (b *BigtableIdx) InitBare() error {
 
 	b.client = client
 	b.tbl = client.Open(b.cfg.TableName)
-
-	if memory.TagSupport && memory.MetaTagSupport {
-		b.metaRecords, err = NewBigTableMetaRecordIdx(MetaRecordIdxConfig{
-			gcpProject:        b.cfg.GcpProject,
-			bigtableInstance:  b.cfg.BigtableInstance,
-			pollInterval:      b.cfg.MetaRecordPollInterval,
-			pruneInterval:     b.cfg.MetaRecordPruneInterval,
-			pruneAge:          b.cfg.MetaRecordPruneAge,
-			tableName:         b.cfg.MetaRecordTable,
-			batchTableName:    b.cfg.MetaRecordBatchTable,
-			metaRecordCf:      "mr",
-			metaRecordBatchCf: "mrb",
-			updateRecords:     b.cfg.UpdateBigtableIdx,
-			createCf:          b.cfg.CreateCF,
-		}, b.MemoryIndex)
-		if err != nil {
-			log.Errorf("bigtable-idx: failed to initialize meta tag tables: %s", err)
-			return err
-		}
-	}
 
 	return nil
 }
@@ -159,10 +143,6 @@ func (b *BigtableIdx) Init() error {
 		go b.prune()
 	}
 
-	if memory.TagSupport && memory.MetaTagSupport {
-		b.metaRecords.start()
-	}
-
 	return nil
 }
 
@@ -173,11 +153,6 @@ func (b *BigtableIdx) Stop() {
 		close(b.writeQueue)
 	}
 	b.wg.Wait()
-
-	if memory.TagSupport && memory.MetaTagSupport {
-		b.metaRecords.stop()
-		b.metaRecords = nil
-	}
 
 	err := b.client.Close()
 	if err != nil {

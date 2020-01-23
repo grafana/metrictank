@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
 	macaron "gopkg.in/macaron.v1"
 
@@ -1373,7 +1374,14 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 		response.Write(ctx, response.NewJson(200, []tagquery.MetaTagRecord{}, ""))
 		return
 	}
-	metaTagRecords := s.MetricIndex.MetaTagRecordList(ctx.OrgId)
+
+	if s.MetaRecords == nil || !memory.TagSupport || !memory.MetaTagSupport {
+		// meta tag support is disabled
+		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
+		return
+	}
+
+	metaTagRecords := s.MetaRecords.MetaTagRecordList(ctx.OrgId)
 	response.Write(ctx, response.NewJson(200, metaTagRecords, ""))
 }
 
@@ -1389,7 +1397,13 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 		return
 	}
 
-	err = s.MetricIndex.MetaTagRecordUpsert(ctx.OrgId, record)
+	if s.MetaRecords == nil || !memory.TagSupport || !memory.MetaTagSupport {
+		// meta tag support is disabled
+		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
+		return
+	}
+
+	err = s.MetaRecords.MetaTagRecordUpsert(ctx.OrgId, record)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -1414,7 +1428,13 @@ func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.M
 		}
 	}
 
-	err = s.MetricIndex.MetaTagRecordSwap(ctx.OrgId, metaTagRecords)
+	if s.MetaRecords == nil || !memory.TagSupport || !memory.MetaTagSupport {
+		// meta tag support is disabled
+		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
+		return
+	}
+
+	err = s.MetaRecords.MetaTagRecordSwap(ctx.OrgId, metaTagRecords)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return

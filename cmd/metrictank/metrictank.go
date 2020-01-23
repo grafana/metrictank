@@ -51,6 +51,7 @@ var (
 	apiServer   *api.Server
 	inputs      []input.Plugin
 	store       mdata.Store
+	metaRecords idx.MetaRecordIdx
 
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
@@ -348,19 +349,46 @@ func main() {
 	}
 
 	if memory.Enabled {
-		metricIndex = memory.New()
+		memIndex := memory.New()
+		metricIndex = memIndex
+
+		if memory.TagSupport && memory.MetaTagSupport {
+			metaRecords = memIndex
+		}
 	}
 	if cassandra.CliConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
-		metricIndex = cassandra.New(cassandra.CliConfig)
+		cassIndex := cassandra.New(cassandra.CliConfig)
+		metricIndex = cassIndex
+
+		if memory.TagSupport && memory.MetaTagSupport {
+			metaRecords = cassIndex
+		}
 	}
 	if bigtable.CliConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
-		metricIndex = bigtable.New(bigtable.CliConfig)
+		btIndex := bigtable.New(bigtable.CliConfig)
+		metricIndex = btIndex
+
+		if memory.TagSupport && memory.MetaTagSupport {
+			metaRecords = bigtable.NewMetaRecordIdx(bigtable.MetaRecordIdxConfig{
+				GcpProject:        bigtable.CliConfig.GcpProject,
+				BigtableInstance:  bigtable.CliConfig.BigtableInstance,
+				PollInterval:      bigtable.CliConfig.MetaRecordPollInterval,
+				PruneInterval:     bigtable.CliConfig.MetaRecordPruneInterval,
+				PruneAge:          bigtable.CliConfig.MetaRecordPruneAge,
+				TableName:         bigtable.CliConfig.MetaRecordTable,
+				BatchTableName:    bigtable.CliConfig.MetaRecordBatchTable,
+				MetaRecordCf:      "mr",
+				MetaRecordBatchCf: "mrb",
+				UpdateRecords:     bigtable.CliConfig.UpdateBigtableIdx,
+				CreateCf:          bigtable.CliConfig.CreateCF,
+			}, btIndex.MemoryIndex)
+		}
 	}
 
 	/***********************************
@@ -374,6 +402,7 @@ func main() {
 	apiServer.BindMetricIndex(metricIndex)
 	apiServer.BindMemoryStore(metrics)
 	apiServer.BindBackendStore(store)
+	apiServer.BindMetaRecords(metaRecords)
 	apiServer.BindCache(ccache)
 	apiServer.BindTracer(tracer)
 	cluster.Tracer = tracer

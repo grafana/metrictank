@@ -66,6 +66,7 @@ type CasIdx struct {
 	cluster          *gocql.ClusterConfig
 	Session          *cassandra.Session
 	metaRecords      metatags.MetaRecordStatusByOrg
+	metaRecordMemIdx idx.MetaRecordIdx
 	writeQueue       chan writeReq
 	shutdown         chan struct{}
 	wg               sync.WaitGroup
@@ -101,8 +102,10 @@ func New(cfg *IdxConfig) *CasIdx {
 		}
 	}
 
+	memoryIdx := memory.New()
 	idx := &CasIdx{
-		MemoryIndex:      memory.New(),
+		MemoryIndex:      memoryIdx,
+		metaRecordMemIdx: memoryIdx,
 		Config:           cfg,
 		cluster:          cluster,
 		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),

@@ -11,8 +11,6 @@ var (
 	// this batch id is used if we handle an upsert request for an org that has
 	// no current batch
 	DefaultBatchId UUID
-
-	ErrMetaTagSupportDisabled = fmt.Errorf("Meta tag support is not enabled")
 )
 
 type MetaRecordStatusByOrg struct {
