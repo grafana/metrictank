@@ -60,7 +60,7 @@ Flags:
   -default-org-id int
     	default org ID to send to downstream services if none is provided (default -1)
   -discard-prefixes string
-    	discard data points starting with one of the given prefixes separated by | (may be given multiple times, once per topic, as a comma-separated list)
+    	discard data points starting with one of the given prefixes separated by | (may be given multiple times, once per topic specified in 'metrics-topic', as a comma-separated list)
   -graphite-url string
     	graphite-api address (default "http://localhost:8080")
   -importer-url string
@@ -84,9 +84,9 @@ Flags:
   -metrictank-url string
     	metrictank address (default "http://localhost:6060")
   -only-org-id value
-    	restrict publishing data belonging to org id; 0 means no restriction (may be given multiple times, once per topic, as a comma-separated list)
+    	restrict publishing data belonging to org id; 0 means no restriction (may be given multiple times, once per topic specified in 'metrics-topic', as a comma-separated list)
   -schemas-file string
-    	path to carbon storage-schemas.conf file (default "/etc/gw/storage-schemas.conf")
+    	path to carbon storage-schemas.conf file (default "/etc/metrictank/storage-schemas.conf")
   -v2
     	enable optimized MetricPoint payload (default true)
   -v2-clear-interval duration
