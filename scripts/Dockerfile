@@ -16,7 +16,7 @@ RUN cp -r $MT_SRC_DIR/build /tmp/build
 ####################
 FROM alpine:3.10.0 AS mt-gateway
 
-RUN mkdir -p /etc/gw
+RUN mkdir -p /etc/metrictank
 COPY scripts/config/storage-schemas.conf /etc/metrictank/storage-schemas.conf
 COPY --from=gobase /tmp/build/mt-gateway /usr/bin/
 
