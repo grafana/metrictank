@@ -10,18 +10,23 @@ import (
 )
 
 type IdxConfig struct {
-	Enabled           bool
-	GcpProject        string
-	BigtableInstance  string
-	TableName         string
-	WriteQueueSize    int
-	WriteMaxFlushSize int
-	WriteConcurrency  int
-	UpdateBigtableIdx bool
-	UpdateInterval    time.Duration
-	updateInterval32  uint32
-	PruneInterval     time.Duration
-	CreateCF          bool
+	Enabled                 bool
+	GcpProject              string
+	BigtableInstance        string
+	TableName               string
+	MetaRecordTable         string
+	MetaRecordBatchTable    string
+	MetaRecordPollInterval  time.Duration
+	MetaRecordPruneInterval time.Duration
+	MetaRecordPruneAge      time.Duration
+	WriteQueueSize          int
+	WriteMaxFlushSize       int
+	WriteConcurrency        int
+	UpdateBigtableIdx       bool
+	UpdateInterval          time.Duration
+	updateInterval32        uint32
+	PruneInterval           time.Duration
+	CreateCF                bool
 }
 
 func (cfg *IdxConfig) Validate() error {
@@ -41,17 +46,22 @@ func (cfg *IdxConfig) Validate() error {
 // return StoreConfig with default values set.
 func NewIdxConfig() *IdxConfig {
 	return &IdxConfig{
-		Enabled:           false,
-		GcpProject:        "default",
-		BigtableInstance:  "default",
-		TableName:         "metrics",
-		WriteQueueSize:    100000,
-		WriteMaxFlushSize: 10000,
-		WriteConcurrency:  5,
-		UpdateBigtableIdx: true,
-		UpdateInterval:    time.Hour * 3,
-		PruneInterval:     time.Hour * 3,
-		CreateCF:          true,
+		Enabled:                 false,
+		GcpProject:              "default",
+		BigtableInstance:        "default",
+		TableName:               "metrics",
+		MetaRecordTable:         "meta_records",
+		MetaRecordBatchTable:    "meta_record_batches",
+		MetaRecordPollInterval:  time.Second * 10,
+		MetaRecordPruneInterval: time.Hour * 24,
+		MetaRecordPruneAge:      time.Hour * 72,
+		WriteQueueSize:          100000,
+		WriteMaxFlushSize:       10000,
+		WriteConcurrency:        5,
+		UpdateBigtableIdx:       true,
+		UpdateInterval:          time.Hour * 3,
+		PruneInterval:           time.Hour * 3,
+		CreateCF:                true,
 	}
 }
 
@@ -64,6 +74,11 @@ func ConfigSetup() {
 	btIdx.StringVar(&CliConfig.GcpProject, "gcp-project", CliConfig.GcpProject, "Name of GCP project the bigtable cluster resides in")
 	btIdx.StringVar(&CliConfig.BigtableInstance, "bigtable-instance", CliConfig.BigtableInstance, "Name of bigtable instance")
 	btIdx.StringVar(&CliConfig.TableName, "table-name", CliConfig.TableName, "Name of bigtable table used for metricDefs")
+	btIdx.StringVar(&CliConfig.MetaRecordTable, "meta-record-table", CliConfig.MetaRecordTable, "Bigtable table to store meta records.")
+	btIdx.StringVar(&CliConfig.MetaRecordBatchTable, "meta-record-batch-table", CliConfig.MetaRecordBatchTable, "Bigtable table to store meta data of meta record batches.")
+	btIdx.DurationVar(&CliConfig.MetaRecordPollInterval, "meta-record-poll-interval", CliConfig.MetaRecordPollInterval, "Interval at which to poll store for meta record updates.")
+	btIdx.DurationVar(&CliConfig.MetaRecordPruneInterval, "meta-record-prune-interval", CliConfig.MetaRecordPruneInterval, "Interval at which meta records of old batches get pruned.")
+	btIdx.DurationVar(&CliConfig.MetaRecordPruneAge, "meta-record-prune-age", CliConfig.MetaRecordPruneAge, "The minimum age a batch of meta records must have to be pruned.")
 	btIdx.IntVar(&CliConfig.WriteQueueSize, "write-queue-size", CliConfig.WriteQueueSize, "Max number of metricDefs allowed to be unwritten to bigtable. Must be larger then write-max-flush-size")
 	btIdx.IntVar(&CliConfig.WriteMaxFlushSize, "write-max-flush-size", CliConfig.WriteMaxFlushSize, "Max number of metricDefs in each batch write to bigtable")
 	btIdx.IntVar(&CliConfig.WriteConcurrency, "write-concurrency", CliConfig.WriteConcurrency, "Number of writer threads to use")
