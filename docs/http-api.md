@@ -186,6 +186,7 @@ POST /render
   - none: always defer to graphite for processing.
 
   If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
+* optimizations: can override http.pre-normalization and http.mdp-optimization options. empty (default) : no override. either "none" to force no optimizations, or a csv list with either of both of "pn", "mdp" to enable those options.
 
 Data queried for must be stored under the given org or be public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 

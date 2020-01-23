@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
@@ -12,6 +13,27 @@ import (
 type Optimizations struct {
 	PreNormalization bool
 	MDP              bool
+}
+
+func (o Optimizations) ApplyUserPrefs(s string) Optimizations {
+	if s == "" {
+		return o
+	}
+	o.PreNormalization = false
+	o.MDP = false
+	if s == "none" {
+		return o
+	}
+	prefs := strings.Split(s, ",")
+	for _, pref := range prefs {
+		if pref == "pn" {
+			o.PreNormalization = true
+		}
+		if pref == "mdp" {
+			o.MDP = true
+		}
+	}
+	return o
 }
 
 // Req represents a request for one/more series
