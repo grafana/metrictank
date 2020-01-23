@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	btUtils "github.com/grafana/metrictank/bigtable"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
@@ -86,72 +87,19 @@ func New(cfg *IdxConfig) *BigtableIdx {
 // It also opens the table for reads/writes.
 func (b *BigtableIdx) InitBare() error {
 	ctx := context.Background()
-	if b.cfg.CreateCF {
-		adminClient, err := bigtable.NewAdminClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
-		if err != nil {
-			log.Errorf("bigtable-idx: failed to create bigtable admin client: %s", err)
-			return err
-		}
-		tables, err := adminClient.Tables(ctx)
-		if err != nil {
-			log.Errorf("bigtable-idx: failed to list tables: %s", err)
-			return err
-		}
-		found := false
-		for _, t := range tables {
-			if t == b.cfg.TableName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Infof("bigtable-idx: table %q does not yet exist. Creating it.", b.cfg.TableName)
-			table := bigtable.TableConf{
-				TableID: b.cfg.TableName,
-				Families: map[string]bigtable.GCPolicy{
-					COLUMN_FAMILY: bigtable.MaxVersionsPolicy(1),
-				},
-			}
-			err := adminClient.CreateTableFromConf(ctx, &table)
-			if err != nil {
-				log.Errorf("bigtable-idx: failed to create table %q: %s", b.cfg.TableName, err)
-				return err
-			}
-		} else {
-			log.Infof("bigtable-idx: table %s exists.", b.cfg.TableName)
-			// table exists.  Lets make sure that it has all of the CF's we need.
-			table, err := adminClient.TableInfo(ctx, b.cfg.TableName)
-			if err != nil {
-				log.Errorf("bigtable-idx: failed to get tableInfo of %q: %s", b.cfg.TableName, err)
-				return err
-			}
-			existingFamilies := make(map[string]string)
-			for _, cf := range table.FamilyInfos {
-				existingFamilies[cf.Name] = cf.GCPolicy
-			}
-			policy, ok := existingFamilies[COLUMN_FAMILY]
-			if !ok {
-				log.Infof("bigtable-idx: column family %s/%s does not exist. Creating it.", b.cfg.TableName, COLUMN_FAMILY)
-				err = adminClient.CreateColumnFamily(ctx, b.cfg.TableName, COLUMN_FAMILY)
-				if err != nil {
-					log.Errorf("bigtable-idx: failed to create cf %s/%s: %s", b.cfg.TableName, COLUMN_FAMILY, err)
-					return err
-				}
-				err = adminClient.SetGCPolicy(ctx, b.cfg.TableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
-				if err != nil {
-					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s: %s", b.cfg.TableName, COLUMN_FAMILY, err)
-					return err
-				}
-			} else if policy == "" {
-				log.Infof("bigtable-idx: column family %s/%s exists but has no GCPolicy. Creating it.", b.cfg.TableName, COLUMN_FAMILY)
-				err = adminClient.SetGCPolicy(ctx, b.cfg.TableName, COLUMN_FAMILY, bigtable.MaxVersionsPolicy(1))
-				if err != nil {
-					log.Errorf("bigtable-idx: failed to set GCPolicy of %s/%s: %s", b.cfg.TableName, COLUMN_FAMILY, err)
-					return err
-				}
-			}
-		}
+	adminClient, err := bigtable.NewAdminClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
+	if err != nil {
+		log.Errorf("bigtable-idx: failed to create bigtable admin client: %s", err)
+		return err
 	}
+	err = btUtils.EnsureTableExists(ctx, b.cfg.CreateCF, adminClient, b.cfg.TableName, map[string]bigtable.GCPolicy{
+		COLUMN_FAMILY: bigtable.MaxVersionsPolicy(1),
+	})
+	if err != nil {
+		log.Errorf("bigtable-idx: failed to ensure that table %q exists: %s", b.cfg.TableName, err)
+		return err
+	}
+
 	client, err := bigtable.NewClient(ctx, b.cfg.GcpProject, b.cfg.BigtableInstance)
 	if err != nil {
 		log.Errorf("bigtable-idx: failed to create bigtable client: %s", err)

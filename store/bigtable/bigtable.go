@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	btUtils "github.com/grafana/metrictank/bigtable"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/schema"
@@ -93,68 +94,20 @@ func NewStore(cfg *StoreConfig, ttls []uint32, schemaMaxChunkSpan uint32) (*Stor
 	if err := cfg.Validate(schemaMaxChunkSpan); err != nil {
 		return nil, err
 	}
+
 	ctx := context.Background()
-	if cfg.CreateCF {
-		adminClient, err := bigtable.NewAdminClient(ctx, cfg.GcpProject, cfg.BigtableInstance)
-		if err != nil {
-			return nil, fmt.Errorf("btStore: failed to create bigtable admin client. %s", err)
-		}
-		tables, err := adminClient.Tables(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("btStore: failed to list tables. %s", err)
-		}
-		found := false
-		for _, t := range tables {
-			if t == cfg.TableName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Infof("btStore: table %s does not exist. Creating it.", cfg.TableName)
-			table := bigtable.TableConf{
-				TableID:  cfg.TableName,
-				Families: make(map[string]bigtable.GCPolicy),
-			}
-			for _, ttl := range ttls {
-				table.Families[formatFamily(ttl)] = bigtable.MaxAgePolicy(time.Duration(ttl) * time.Second)
-			}
-			err := adminClient.CreateTableFromConf(ctx, &table)
-			if err != nil {
-				return nil, fmt.Errorf("btStore: failed to create %s table. %s", cfg.TableName, err)
-			}
-		} else {
-			log.Infof("btStore: table %s exists.", cfg.TableName)
-			// table exists.  Lets make sure that it has all of the CF's we need.
-			table, err := adminClient.TableInfo(ctx, cfg.TableName)
-			if err != nil {
-				return nil, fmt.Errorf("btStore: failed to get tableInfo of %s. %s", cfg.TableName, err)
-			}
-			existingFamilies := make(map[string]string)
-			for _, cf := range table.FamilyInfos {
-				existingFamilies[cf.Name] = cf.GCPolicy
-			}
-			for _, ttl := range ttls {
-				policy, ok := existingFamilies[formatFamily(ttl)]
-				if !ok {
-					log.Infof("btStore: column family %s/%s does not exist. creating it", cfg.TableName, formatFamily(ttl))
-					err = adminClient.CreateColumnFamily(ctx, cfg.TableName, formatFamily(ttl))
-					if err != nil {
-						return nil, fmt.Errorf("btStore: failed to create cf %s/%s. %s", cfg.TableName, formatFamily(ttl), err)
-					}
-					err = adminClient.SetGCPolicy(ctx, cfg.TableName, formatFamily(ttl), bigtable.MaxAgePolicy(time.Duration(ttl)*time.Second))
-					if err != nil {
-						return nil, fmt.Errorf("btStore: failed to set GCPolicy of %s/%s. %s", cfg.TableName, formatFamily(ttl), err)
-					}
-				} else if policy == "" {
-					log.Infof("btStore: column family %s/%s exists but has no GCPolicy. creating it", cfg.TableName, formatFamily(ttl))
-					err = adminClient.SetGCPolicy(ctx, cfg.TableName, formatFamily(ttl), bigtable.MaxAgePolicy(time.Duration(ttl)*time.Second))
-					if err != nil {
-						return nil, fmt.Errorf("btStore: failed to set GCPolicy of %s/%s. %s", cfg.TableName, formatFamily(ttl), err)
-					}
-				}
-			}
-		}
+	adminClient, err := bigtable.NewAdminClient(ctx, cfg.GcpProject, cfg.BigtableInstance)
+	if err != nil {
+		return nil, fmt.Errorf("btStore: failed to create bigtable admin client. %s", err)
+	}
+
+	columnFamilies := make(map[string]bigtable.GCPolicy, len(ttls))
+	for _, ttl := range ttls {
+		columnFamilies[formatFamily(ttl)] = bigtable.MaxAgePolicy(time.Duration(ttl) * time.Second)
+	}
+	err = btUtils.EnsureTableExists(ctx, cfg.CreateCF, adminClient, cfg.TableName, columnFamilies)
+	if err != nil {
+		return nil, fmt.Errorf("btStore: failed to initialize tables: %s", err)
 	}
 
 	client, err := bigtable.NewClient(ctx, cfg.GcpProject, cfg.BigtableInstance)
