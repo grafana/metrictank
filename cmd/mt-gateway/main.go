@@ -3,17 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/grafana/metrictank/logger"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"
+	"os"
 	"runtime"
+
+	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/logger"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
 	version       = "(none)"
 	showVersion   = flag.Bool("version", false, "print version string")
 	addr          = flag.String("addr", ":6059", "http service address")
+	confFile      = flag.String("config", "/etc/metrictank/mt-gateway.ini", "configuration file path")
 	metrictankUrl = flag.String("metrictank-url", "http://localhost:6060", "metrictank address")
 	graphiteURL   = flag.String("graphite-url", "http://localhost:8080", "graphite-api address")
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
@@ -47,14 +51,27 @@ func main() {
 		fmt.Println("Flags:")
 		flag.PrintDefaults()
 	}
-	flag.Parse()
+
+	// Only try and parse the conf file if it exists
+	path := ""
+	if _, err := os.Stat(*confFile); err == nil {
+		path = *confFile
+	}
+	conf, err := globalconf.NewWithOptions(&globalconf.Options{
+		Filename:  path,
+		EnvPrefix: "MT_",
+	})
+	if err != nil {
+		log.Fatalf("error with configuration file: %s", err)
+		os.Exit(1)
+	}
+	conf.ParseAll()
 
 	if *showVersion {
 		fmt.Printf("mt-gateway (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
 	}
 
-	var err error
 	urls := Urls{}
 	urls.kafkaBrokers = *brokers
 
