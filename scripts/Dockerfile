@@ -20,7 +20,7 @@ RUN mkdir -p /etc/gw
 COPY scripts/config/storage-schemas.conf /etc/metrictank/storage-schemas.conf
 COPY --from=gobase /tmp/build/mt-gateway /usr/bin/
 
-EXPOSE 80
+EXPOSE 6059
 
 ENTRYPOINT ["/usr/bin/mt-gateway"]
 

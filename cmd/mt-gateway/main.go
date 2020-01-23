@@ -13,10 +13,10 @@ import (
 var (
 	version       = "(none)"
 	showVersion   = flag.Bool("version", false, "print version string")
+	addr          = flag.String("addr", ":6059", "http service address")
 	metrictankUrl = flag.String("metrictank-url", "http://localhost:6060", "metrictank address")
 	graphiteURL   = flag.String("graphite-url", "http://localhost:8080", "graphite-api address")
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
-	addr          = flag.String("addr", ":80", "http service address")
 	defaultOrgId  = flag.Int("default-org-id", -1, "default org ID to send to downstream services if none is provided")
 	brokers       = flag.String("kafka-tcp-addr", "localhost:9092", "kafka tcp address(es) for metrics, in csv host[:port] format")
 )
