@@ -59,12 +59,40 @@ Flags:
     	http service address (default ":80")
   -default-org-id int
     	default org ID to send to downstream services if none is provided (default -1)
+  -discard-prefixes string
+    	discard data points starting with one of the given prefixes separated by | (may be given multiple times, once per topic, as a comma-separated list)
   -graphite-url string
     	graphite-api address (default "http://localhost:8080")
   -importer-url string
     	mt-whisper-importer-writer address
+  -kafka-tcp-addr string
+    	kafka tcp address(es) for metrics, in csv host[:port] format (default "localhost:9092")
+  -kafka-version string
+    	Kafka version in semver format. All brokers must be this version or newer. (default "0.10.0.0")
+  -metrics-flush-freq duration
+    	The best-effort frequency of flushes to kafka (default 50ms)
+  -metrics-kafka-comp string
+    	compression: none|gzip|snappy (default "snappy")
+  -metrics-max-messages int
+    	The maximum number of messages the producer will send in a single request (default 5000)
+  -metrics-partition-scheme string
+    	method used for partitioning metrics. (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv) (may be given multiple times, once per topic, as a comma-separated list) (default "bySeries")
+  -metrics-publish
+    	enable metric publishing
+  -metrics-topic string
+    	topic for metrics (may be given multiple times as a comma-separated list) (default "mdm")
   -metrictank-url string
     	metrictank address (default "http://localhost:6060")
+  -only-org-id value
+    	restrict publishing data belonging to org id; 0 means no restriction (may be given multiple times, once per topic, as a comma-separated list)
+  -schemas-file string
+    	path to carbon storage-schemas.conf file (default "/etc/gw/storage-schemas.conf")
+  -v2
+    	enable optimized MetricPoint payload (default true)
+  -v2-clear-interval duration
+    	interval after which we always resend a full MetricData (default 1h0m0s)
+  -v2-org
+    	encode org-id in messages (default true)
   -version
     	print version string
 ```

@@ -2,10 +2,15 @@ package main
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
+	"strings"
+
+	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
+	"github.com/grafana/metrictank/publish"
+	"github.com/grafana/metrictank/publish/kafka"
+	log "github.com/sirupsen/logrus"
 )
 
 //Maintains a set of `http.Handlers` for the different API endpoints.
@@ -20,18 +25,27 @@ type Api struct {
 //Constructs a new Api based on the passed in URLS
 func NewApi(urls Urls) Api {
 	api := Api{}
-	api.ingestHandler = withMiddleware("ingest", ingestHandlerStub)
+	api.ingestHandler = withMiddleware("ingest", ingestHandler(urls))
 	api.graphiteHandler = withMiddleware("graphite", httputil.NewSingleHostReverseProxy(urls.graphite))
 	api.metrictankHandler = withMiddleware("metrictank", httputil.NewSingleHostReverseProxy(urls.metrictank))
 	api.bulkImportHandler = withMiddleware("bulk-importer", bulkImportHandler(urls))
 	return api
 }
 
-//TODO replace this with an actual implementation
-var ingestHandlerStub = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-	_, _ = fmt.Fprintln(w, "http ingest not yet implemented")
-})
+func ingestHandler(urls Urls) http.Handler {
+	publisher := kafka.New(strings.Split(urls.kafkaBrokers, ","), true)
+	if publisher == nil {
+		log.Info("metrics ingestion not enabled (no kafka brokers configured)")
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = fmt.Fprintln(w, "metrics ingestion not enabled (no kafka brokers configured)")
+		})
+	} else {
+		publish.Init(publisher)
+		return http.HandlerFunc(ingest.Metrics)
+	}
+
+}
 
 //Returns a proxy to the bulk importer if one is configured, otherwise a handler that always returns a 503
 func bulkImportHandler(urls Urls) http.Handler {
