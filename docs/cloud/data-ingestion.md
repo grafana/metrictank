@@ -24,7 +24,7 @@ We also have Grafana Labs engineers ready to advise further on set up, if needed
 
 ## Using carbon-relay-ng as a replacement for carbon-relay or carbon-cache
 
-The most simple way to send your carbon traffic to GrafanaCloud is to use carbon-relay-ng as a replacement for your current carbon-relay or carbon-cache. Carbon-relay-ng has a carbon input which supports the plain text and the pickle protocols, just like carbon-relay and carbon-cache. 
+The most simple way to send your carbon traffic to GrafanaCloud is to use carbon-relay-ng as a replacement for your current carbon-relay or carbon-cache. Carbon-relay-ng has a carbon input which supports the plain text and the pickle protocols, just like carbon-relay and carbon-cache. Note that the consistent-hashing implementation in carbon-relay-ng is different from the one in carbon-relay, so if you're using consistent-hashing then switching from carbon-relay to carbon-relay-ng would re-distribute the metrics among the destinations.
 
 An example configuration to do that can be downloaded from your Hosted Metrics instance's "Details" page. It contains a `grafanaNet` route pointing at your instance.
 
