@@ -23,9 +23,7 @@ var (
 )
 
 // MetaRecordIdxConfig contains all the configurations related to storing the
-// meta records in bigtable. this gets its own config struct to later make it
-// easier to move all the meta record indexes into their own package hierarchy
-// which will be independent of the indexes.
+// meta records in bigtable.
 type MetaRecordIdxConfig struct {
 	GcpProject        string
 	BigtableInstance  string

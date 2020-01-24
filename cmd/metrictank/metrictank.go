@@ -24,6 +24,7 @@ import (
 	"github.com/grafana/metrictank/idx/bigtable"
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
+	metatagsBt "github.com/grafana/metrictank/idx/metatags/bigtable"
 	"github.com/grafana/metrictank/input"
 	inCarbon "github.com/grafana/metrictank/input/carbon"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
@@ -375,7 +376,7 @@ func main() {
 		metricIndex = btIndex
 
 		if memory.TagSupport && memory.MetaTagSupport {
-			metaRecords = bigtable.NewMetaRecordIdx(bigtable.MetaRecordIdxConfig{
+			metaRecords = metatagsBt.NewBigTableMetaRecordIdx(metatagsBt.MetaRecordIdxConfig{
 				GcpProject:        bigtable.CliConfig.GcpProject,
 				BigtableInstance:  bigtable.CliConfig.BigtableInstance,
 				PollInterval:      bigtable.CliConfig.MetaRecordPollInterval,

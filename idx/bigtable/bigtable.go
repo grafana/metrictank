@@ -84,10 +84,6 @@ func New(cfg *IdxConfig) *BigtableIdx {
 	return idx
 }
 
-func NewMetaRecordIdx(cfg MetaRecordIdxConfig, memIdx idx.MetaRecordIdx) *MetaRecordIdx {
-	return NewBigTableMetaRecordIdx(cfg, memIdx)
-}
-
 // InitBare creates the client and makes sure the tables and columFamilies exist.
 // It also opens the table for reads/writes.
 func (b *BigtableIdx) InitBare() error {
