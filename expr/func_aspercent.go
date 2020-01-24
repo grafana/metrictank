@@ -43,16 +43,20 @@ func (s *FuncAsPercent) Context(context Context) Context {
 	// if we only combine some series with some other series, we don't want coarse series to needlessly coarsen higher resolution data
 
 	// 1) nodes-nil, total single-series -> align all to same interval
-	// 2) nodes-nil, total multi-series -> match up in pairs
+	// 2) nodes-nil, total multi-series -> match up in pairs (can't be aligned up front)
 	// 3) nodes-nil, total nil (and not a float) -> align all together
-	// 4) nodes-non-nil, total nil -> divides groupwise
-	// 5) nodes non-nil, total serieslist -> divides groupwise
+	// 4) nodes-nil, total float -> no alignment needed. but pre-existing alignment can remain.
+	// 5) nodes-non-nil, total nil -> divides groupwise
+	// 6) nodes non-nil, total serieslist -> divides groupwise
 
-	// note: we can't tell the difference between 1/2 up front, so we play it safe and don't align up front
-	// the only scenario where PNGroup is safe, is case 3
 	if s.totalSeries == nil && s.nodes == nil {
-		context.PNGroup = models.PNGroup(uintptr(unsafe.Pointer(s)))
+		// the only scenario where we should introduce a PNGroup is case 3
+		if math.IsNaN(s.totalFloat) {
+			context.PNGroup = models.PNGroup(uintptr(unsafe.Pointer(s)))
+		}
+		// in case 4, we can keep a pre-existing PNGroup
 	} else {
+		// note: we can't tell the difference between case 1 and 2 up front, so we play it safe and don't align up front
 		context.PNGroup = 0
 	}
 	return context
