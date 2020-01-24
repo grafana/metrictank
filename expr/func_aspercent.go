@@ -57,13 +57,14 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 
 	if s.nodes != nil {
 		if !math.IsNaN(s.totalFloat) {
-			return nil, errors.NewBadRequest("total must be None or a seriesList")
+			return nil, errors.NewBadRequest("if nodes specified, total must be None or a seriesList")
 		}
 		return s.execWithNodes(in, totals, cache)
 	}
 
+	// totals may be nil and totalFloat NaN, or totalFloat may be set, but here we only need to check for the cases where totals is set but the wrong length
 	if totals != nil && len(totals) != 1 && len(totals) != len(in) {
-		return nil, errors.NewBadRequest("if nodes specified, asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
+		return nil, errors.NewBadRequest("if nodes not specified, asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 	}
 	return s.execWithoutNodes(in, totals, cache)
 }
@@ -152,11 +153,11 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 }
 
 // execWithoutNodes returns the asPercent output series for each input series.
-// the total (divisor) we use for each input series is based on the totals parameter, which cane be:
-// * a number
-// * a single series -> used as divisor consistently
-// * multiple series -> must match len(series) and matched up in pairs
-// * nil -> generate total by summing the inputs
+// the total (divisor) we use for each input series is based on the totals parameter, which can be:
+// * a number        -> used as divisor
+// * a single series -> used as divisor for all input series
+// * multiple series -> must match len(series), sort and match up in pairs to input series
+// * nil             -> generate total by summing the inputs
 func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[Req][]models.Series) ([]models.Series, error) {
 	var outSeries []models.Series
 	var totalsSerie models.Series
