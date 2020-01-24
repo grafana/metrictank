@@ -23,7 +23,7 @@ jobs:
         host: github.com
         github_pat: '${{ secrets.GH_BOT_ACCESS_TOKEN }}'
         source_folder: docs/cloud
-        target_folder: content/docs/cloud-graphite
+        target_folder: content/docs/grafana-cloud/hosted-metrics/graphite
     - shell: bash
       run: |
         test -n "${{ steps.publish.outputs.commit_hash }}"
