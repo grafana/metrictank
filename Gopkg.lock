@@ -1067,6 +1067,7 @@
     "github.com/docker/docker/client",
     "github.com/go-macaron/binding",
     "github.com/gocql/gocql",
+    "github.com/golang/snappy",
     "github.com/google/go-cmp/cmp",
     "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
