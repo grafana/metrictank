@@ -57,7 +57,7 @@ func init() {
 		"aliasByTags":           {NewAliasByNode, true},
 		"aliasByNode":           {NewAliasByNode, true},
 		"aliasSub":              {NewAliasSub, true},
-		"asPercent":             {NewAsPercent, false}, // disabled because it needs an update for runtime normalization and possibly MDP/pre-normalization
+		"asPercent":             {NewAsPercent, true},
 		"avg":                   {NewAggregateConstructor("average", crossSeriesAvg), true},
 		"averageAbove":          {NewFilterSeriesConstructor("average", ">"), true},
 		"averageBelow":          {NewFilterSeriesConstructor("average", "<="), true},
