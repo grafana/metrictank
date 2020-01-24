@@ -258,13 +258,20 @@ func planLowestResForMDPMulti(now, from, to uint32, reqs []models.Req) ([]models
 
 	var validIntervalss [][]uint32
 
-	for i := range reqs {
-		req := &reqs[i]
+	// first, find the unique set of retentions we're dealing with.
+	retentions := make(map[uint16]struct{})
+	for _, req := range reqs {
+		retentions[req.SchemaId] = struct{}{}
+	}
+
+	// now, extract the set of valid intervals from each retention
+	// if a retention has no valid intervals, we can't satisfy the request
+	for schemaID := range retentions {
 		var ok bool
-		rets := getRetentions(*req)
+		rets := mdata.Schemas.Get(schemaID).Retentions.Rets
 		var validIntervals []uint32
 		for _, ret := range rets {
-			if ret.Ready <= from && req.TTL >= minTTL {
+			if ret.Ready <= from && ret.MaxRetention() >= int(minTTL) {
 				ok = true
 				validIntervals = append(validIntervals, uint32(ret.SecondsPerPoint))
 			}
@@ -285,6 +292,12 @@ func planLowestResForMDPMulti(now, from, to uint32, reqs []models.Req) ([]models
 		}
 	}
 
+	// now, we need to pick a combination of intervals from each interval set.
+	// for each possibly combination of intervals, we compute the LCM interval.
+	// if if the LCM interval honors maxInterval, we compute the score
+	// the interval with the highest score wins.
+	// note : we can probably make this more performant by iterating over
+	// the retentions, instead of over individual requests
 	combos := util.AllCombinationsUint32(validIntervalss)
 	var maxScore int
 

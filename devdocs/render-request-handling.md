@@ -12,7 +12,7 @@
   * finds all series by fanning out the query patterns to all other shards. 
     this gives basically idx.Node back. has the path, leaf, metricdefinition, schema/aggregation(rollup) settings, for each series, as well as on which node it can be found.
   * construct models.Req objects for each serie. this uses the MKey to identify series, also sets from/to, maxdatapoints, etc.
-  * `planRequests`: this plans at all models.Req objects, which means decide which archive to read from, whether to apply normalization, etc
+  * `planRequests`: this plans all models.Req objects, deciding which archive to read from, whether to apply normalization, etc.
     (see NOTES in expr directory for more info)
   * `getTargets`: gets the data from the local node and peer nodes based on the models.Req objects
   * `mergeSeries`: if there's multiple series with same name/tags, from, to and consolidator (e.g. because there's multiple series because users switched intervals), merge them together into one series
