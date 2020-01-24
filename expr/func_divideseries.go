@@ -61,7 +61,7 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 	// and we'll possibly need to normalize it to different intervals (if the dividends have differing intervals)
 	// (we also need to normalize if there's only 1 dividend but it has a different interval than the divisor)
 	// so let's keep track of the different "versions" of the divisor that we have available.
-	// (the dividend(s) may also need to be normalized but we only use them once so the require no special attention)
+	// (the dividend(s) may also need to be normalized but we only use them once so they don't require special attention)
 	divisorsByRes := make(map[uint32]models.Series)
 	divisorsByRes[divisors[0].Interval] = divisors[0]
 	for _, dividend := range dividends {

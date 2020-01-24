@@ -15,27 +15,29 @@ type Optimizations struct {
 	MDP              bool
 }
 
-func (o Optimizations) ApplyUserPrefs(s string) Optimizations {
+func (o Optimizations) ApplyUserPrefs(s string) (Optimizations, error) {
 	// no user override. stick to what we have
 	if s == "" {
-		return o
+		return o, nil
 	}
 	// user passed an override. it's either 'none' (no optimizations) or a list of the ones that should be enabled
 	o.PreNormalization = false
 	o.MDP = false
 	if s == "none" {
-		return o
+		return o, nil
 	}
 	prefs := strings.Split(s, ",")
 	for _, pref := range prefs {
-		if pref == "pn" {
+		switch pref {
+		case "pn":
 			o.PreNormalization = true
-		}
-		if pref == "mdp" {
+		case "mdp":
 			o.MDP = true
+		default:
+			return o, fmt.Errorf("unrecognized optimization %q", pref)
 		}
 	}
-	return o
+	return o, nil
 }
 
 // Req represents a request for one/more series

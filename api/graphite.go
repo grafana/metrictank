@@ -226,7 +226,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		mdp = 0
 	}
 
-	opts := optimizations.ApplyUserPrefs(request.Optimizations)
+	opts, err := optimizations.ApplyUserPrefs(request.Optimizations)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
 	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, opts)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
@@ -1422,7 +1426,11 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 	stable := request.Process == "stable"
 	mdp := request.MaxDataPoints
 
-	opts := optimizations.ApplyUserPrefs(request.Optimizations)
+	opts, err := optimizations.ApplyUserPrefs(request.Optimizations)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
 	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, opts)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))

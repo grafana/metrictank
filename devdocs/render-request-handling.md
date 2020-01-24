@@ -21,16 +21,16 @@
 
 ## MDP-optimization
 
-MDP at the leaf of the expr tree (fetch request) 0 means don't optimize, set it to >0 means, can be optimized.
+MDP at the leaf of the expr tree (fetch request) of 0 means don't optimize.  If set it to >0 it means the request can be optimized.
 When the data may be subjected to a GR-function, we set it to 0.
 How do we achieve this?
-* MDP at the root is set 0 if request came from graphite or to MaxDataPoints otherwise.
-* as the context flows from root through the processing functions to the data requests, if we hit a GR function, we set to MDP to 0 on the context (and thus also on any subsequent requests)
+* MDP at the root is set 0 if the request came from graphite or to MaxDataPoints otherwise.
+* as the context flows from root through the processing functions to the data requests, if we hit a GR function, we set MDP to 0 on the context (and thus also on any subsequent requests)
 
 ## Pre-normalization
 
 Any data requested (checked at the leaf node of the expr tree) should have its own independent interval.
-However, multiple series getting fetched that then get aggregated together, may be pre-normalized if they are part of the same pre-normalization-group. ( have a common PNGroup that is > 0 )
+However, multiple series getting fetched that then get aggregated together may be pre-normalized if they are part of the same pre-normalization-group (have a common PNGroup that is > 0).
 (for more details see devdocs/alignrequests-too-course-grained.txt)
 The mechanics here are:
 * we set PNGroup to 0 by default on the context, which gets inherited down the tree

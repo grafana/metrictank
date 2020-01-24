@@ -52,7 +52,7 @@ type Req struct {
 // PNGroup is an identifier for a pre-normalization group: data that can be pre-normalized together
 type PNGroup uint64
 
-// NewReq creates a new request. It sets all properties minus the ones that need request planning
+// NewReq creates a new request. It sets all properties except the ones that need request planning
 func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterval uint32, pngroup PNGroup, cons, consReq consolidation.Consolidator, node cluster.Node, schemaId, aggId uint16) Req {
 	return Req{
 		MKey:         key,
@@ -72,7 +72,7 @@ func NewReq(key schema.MKey, target, patt string, from, to, maxPoints, rawInterv
 }
 
 // Init initializes a request based on the metadata that we know of.
-// It sets all properties minus the ones that need request planning
+// It sets all properties except the ones that need request planning
 func (r *Req) Init(archive idx.Archive, cons consolidation.Consolidator, node cluster.Node) {
 	r.MKey = archive.Id
 	r.Target = archive.NameWithTags()
@@ -97,6 +97,7 @@ func (r *Req) Plan(i int, ret conf.Retention) {
 	r.AggNum = 1
 }
 
+// PlanNormalization updates the planning parameters to accommodate normalization to the specified interval
 func (r *Req) PlanNormalization(interval uint32) {
 	r.OutInterval = interval
 	r.AggNum = interval / r.ArchInterval
@@ -130,6 +131,7 @@ func (r *Req) AdjustTo(interval, from uint32, rets []conf.Retention) {
 	r.PlanNormalization(interval)
 }
 
+// PointsFetch returns how many points this request will fetch when executed
 func (r Req) PointsFetch() uint32 {
 	return (r.To - r.From) / r.ArchInterval
 }

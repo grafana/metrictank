@@ -21,6 +21,7 @@ func NewReqMap() *ReqMap {
 	}
 }
 
+// Add adds a models.Req to the ReqMap
 func (r *ReqMap) Add(req models.Req) {
 	r.cnt++
 	if req.PNGroup == 0 {
@@ -29,6 +30,8 @@ func (r *ReqMap) Add(req models.Req) {
 	}
 	r.pngroups[req.PNGroup] = append(r.pngroups[req.PNGroup], req)
 }
+
+// Dump provides a human readable string representation of the ReqsMap
 func (r ReqMap) Dump() string {
 	out := fmt.Sprintf("ReqsMap (%d entries):\n", r.cnt)
 	out += "  Groups:\n"
@@ -51,13 +54,14 @@ type PNGroupSplit struct {
 	mdpno  []models.Req // not MDP-optimizable reqs
 }
 
-// ReqsPlan holds requests that have been planned
+// ReqsPlan holds requests that have been planned, broken down by PNGroup and MDP-optimizability
 type ReqsPlan struct {
 	pngroups map[models.PNGroup]PNGroupSplit
 	single   PNGroupSplit
 	cnt      uint32
 }
 
+// NewReqsPlan generates a ReqsPlan based on the provided ReqMap.
 func NewReqsPlan(reqs ReqMap) ReqsPlan {
 	rp := ReqsPlan{
 		pngroups: make(map[models.PNGroup]PNGroupSplit),
@@ -84,6 +88,7 @@ func NewReqsPlan(reqs ReqMap) ReqsPlan {
 	return rp
 }
 
+// PointsFetch returns how many points this plan will fetch when executed
 func (rp ReqsPlan) PointsFetch() uint32 {
 	var cnt uint32
 	for _, r := range rp.single.mdpyes {
@@ -103,6 +108,7 @@ func (rp ReqsPlan) PointsFetch() uint32 {
 	return cnt
 }
 
+// Dump provides a human readable string representation of the ReqsPlan
 func (rp ReqsPlan) Dump() string {
 	out := fmt.Sprintf("ReqsPlan (%d entries):\n", rp.cnt)
 	out += "  Groups:\n"
@@ -148,6 +154,7 @@ func (rp ReqsPlan) PointsReturn(planMDP uint32) uint32 {
 	return cnt
 }
 
+// List returns the requests contained within the plan as a slice
 func (rp ReqsPlan) List() []models.Req {
 	l := make([]models.Req, 0, rp.cnt)
 	l = append(l, rp.single.mdpno...)
