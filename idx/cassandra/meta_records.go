@@ -46,13 +46,15 @@ func (c *CasIdx) initMetaRecords(session *gocql.Session) error {
 
 func (c *CasIdx) pollStore() {
 	defer c.wg.Done()
+
+	ticker := time.NewTicker(c.Config.MetaRecordPollInterval)
 	for {
 		select {
 		case <-c.shutdown:
+			ticker.Stop()
 			return
-		default:
+		case <-ticker.C:
 			c.loadMetaRecords()
-			time.Sleep(c.Config.MetaRecordPollInterval)
 		}
 	}
 }
@@ -119,11 +121,14 @@ func (c *CasIdx) loadMetaRecords() {
 
 func (c *CasIdx) pruneMetaRecords() {
 	defer c.wg.Done()
+
+	ticker := time.NewTicker(c.Config.MetaRecordPruneInterval)
 	for {
 		select {
 		case <-c.shutdown:
+			ticker.Stop()
 			return
-		default:
+		case <-ticker.C:
 			q := fmt.Sprintf("SELECT batchid, orgid, createdat FROM %s", c.Config.MetaRecordBatchTable)
 
 			session := c.Session.CurrentSession()
@@ -145,7 +150,6 @@ func (c *CasIdx) pruneMetaRecords() {
 					}
 				}
 			}
-			time.Sleep(c.Config.MetaRecordPruneInterval)
 		}
 	}
 }

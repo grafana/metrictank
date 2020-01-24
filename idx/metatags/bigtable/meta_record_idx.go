@@ -120,13 +120,15 @@ func (m *MetaRecordIdx) Stop() {
 
 func (m *MetaRecordIdx) pollBigtable() {
 	defer m.wg.Done()
+
+	ticker := time.NewTicker(m.cfg.PollInterval)
 	for {
 		select {
 		case <-m.shutdown:
+			ticker.Stop()
 			return
-		default:
+		case <-ticker.C:
 			m.loadMetaRecords()
-			time.Sleep(m.cfg.PollInterval)
 		}
 	}
 }
@@ -165,12 +167,14 @@ func (m *MetaRecordIdx) loadMetaRecords() {
 
 func (m *MetaRecordIdx) pruneMetaRecords() {
 	defer m.wg.Done()
+
+	ticker := time.NewTicker(m.cfg.PruneInterval)
 	for {
 		select {
 		case <-m.shutdown:
+			ticker.Stop()
 			return
-		default:
-			time.Sleep(m.cfg.PruneInterval)
+		case <-ticker.C:
 			log.Infof("bt-meta-record-idx: Pruning meta record tables")
 
 			batches, err := m.readMetaRecordBatches()
