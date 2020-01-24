@@ -16,9 +16,11 @@ type Optimizations struct {
 }
 
 func (o Optimizations) ApplyUserPrefs(s string) Optimizations {
+	// no user override. stick to what we have
 	if s == "" {
 		return o
 	}
+	// user passed an override. it's either 'none' (no optimizations) or a list of the ones that should be enabled
 	o.PreNormalization = false
 	o.MDP = false
 	if s == "none" {

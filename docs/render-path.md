@@ -113,7 +113,7 @@ First, let's look at some definitions.
 Certain functions will return output series in an interval different from the input interval.
 For example summarize() and smartSummarize(). We refer to these as IA-functions below.
 In principle we can predict what the output interval will be during the plan phase, because we can parse the function arguments.
-However, for simplicty, we don't implement this and treat all IA functions as functions that may change the interval of series in unpredicatable ways.
+However, for simplicity, we don't implement this and treat all IA functions as functions that may change the interval of series in unpredicatable ways.
 
 ### Transparent aggregation
 
@@ -133,9 +133,16 @@ Generally, if series have different intervals, they can keep those and we return
 However, when data will be used together (e.g. aggregating multiple series together, or certain functions like divideSeries, asPercent, etc) they will need to have the same interval.
 An aggregation can be opaque or transparent as defined above.
 
-Pre-normalizing is when we can safely - during planning - set up normalization to happen right after fetching (or better: set up the fetch parameters such that normalizing is not needed) and wen we know the normalization won't affect anything else.
-This is the case when series go from fetching to transparent aggregation, possibly with some processing functions - except opaque aggregation(s) or IA-function(s) - in between, and
-with asPercent in a certain mode (where it has to normalize all inputs), but not with divideSeries where it applies the same divisor to multiple dividend inputs, for example.
+Pre-normalizing is when we can safely - during planning - set up normalization to happen right after fetching (or better: set up the fetch parameters such that normalizing is not needed) and when we know the normalization won't affect anything else.
+
+This is the case when series go from fetching to a processing function like:
+* a transparent aggregation
+* asPercent in a certain mode (where it has to normalize all inputs)
+
+possibly with some processing functions in between the fetching and the above function, except opaque aggregation(s) or IA-function(s).
+
+Some functions also have to normalize (some of) their inputs, but yet cannot have their inputs pre-normalized. For example,
+divideSeries because it applies the same divisor to multiple distinct dividend inputs (of possibly different intervals).
 
 For example if we have these schemas:
 ```
@@ -152,13 +159,12 @@ Likewise, if the query is `groupByNode(group(A,B), 2, callback='sum')` we cannot
 
 Benefits of this optimization:
 1) less work spent consolidating at runtime, less data to fetch
-2) it assures data will be fetched in a pre-canonical way. If we don't set up normalization for fetching, data may not be pre-canonical, such that
+2) it assures data will be fetched in a pre-canonical way. If we don't set up normalization for fetching, data may not be pre-canonical, which means we may have to add null points to normalize it to canonical data, lowering the accuracy of the first or last point.
 3) pre-normalized data reduces a request's chance of breaching max-points-per-req-soft and thus makes it less likely that other data that should be high-resolution gets fetched in a coarser way.
 when it eventually needs to be normalized at runtime, points at the beginning or end of the series may be less accurate.
 
 Downsides of this optimization:
-1) if you already have the raw data cached, and the rollup data is not cached yet, it may result in a slower query.  But this is an edge case
-2) uses slightly more of the chunk cache.
+1) if you already have the raw data cached, and the rollup data is not cached yet, it may result in a slower query, and you'd use slightly more chunk cache after the fetch.  But this is an edge case
 
 ## MDP-optimizable
 

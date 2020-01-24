@@ -12,7 +12,7 @@
 Such functions require special options.
 see https://github.com/grafana/metrictank/issues/926#issuecomment-559596384
 
-## implement our copy-o-write approach when dealing with modifying series
+## implement our copy-on-write approach when dealing with modifying series
 
 See section 'Considerations around Series changes and reuse and why we chose copy-on-write' below.
 
@@ -27,7 +27,7 @@ example: an averageSeries() of 3 series:
 * will create an output series value.
 * it will use a new datapoints slice, retrieved from pool, because the points will be different. also it will allocate a new meta section and tags map because they are different from the input series also.
 * won't put the 3 inputs back in the pool or cache, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
-* It will however store the newly created series into the cache such that that during plan cleanup time, the series' datapoints slice will be moved back to the pool.
+* It will however store the newly created series into the cache such that during plan cleanup time, the series' datapoints slice will be moved back to the pool.
 
 # Considerations around Series changes and reuse and why we chose copy-on-write.
 
@@ -72,7 +72,7 @@ for now we assume that multi-steps in a row is not that common, and COW seems mo
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
-Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this lirbrary to be easily embeddable in other programs. 
+Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this library to be easily embeddable in other programs. 
 It's up to the client to instantiate the pool, and set up the default allocation to return point slices of desired point capacity.
 The client can then of course use this pool to store series, which it then feeds to expr.
 expr library does the rest.  It manages the series/pointslices and gets new ones as a basis for the COW.

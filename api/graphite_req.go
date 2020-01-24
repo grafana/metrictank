@@ -8,7 +8,7 @@ import (
 
 // ReqMap is a map of requests of data,
 // it has single requests for which no pre-normalization effort will be performed, and
-// requests are that can be pre-normalized together to the same resolution, bundled by their PNGroup
+// requests that can be pre-normalized together to the same resolution, bundled by their PNGroup
 type ReqMap struct {
 	single   []models.Req
 	pngroups map[models.PNGroup][]models.Req

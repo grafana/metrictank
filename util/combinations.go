@@ -11,31 +11,31 @@ func AllCombinationsUint32(parts [][]uint32) (out [][]uint32) {
 	out = make([][]uint32, 0, num)
 
 	// will contain idx of which one to pick for each part
-	idexes := make([]int, len(parts))
+	indexes := make([]int, len(parts))
 
 mainloop:
 	for {
-		// update idexes:
+		// update indexes:
 		// travel backwards. whenever we encounter an index that "overflowed"
 		// reset it back to 0 and bump the previous one, until they are all maxed out
-		for i := len(idexes) - 1; i >= 0; i-- {
-			if idexes[i] >= len(parts[i]) {
+		for i := len(indexes) - 1; i >= 0; i-- {
+			if indexes[i] >= len(parts[i]) {
 				if i == 0 {
 					break mainloop
 				}
-				idexes[i] = 0
-				idexes[i-1]++
+				indexes[i] = 0
+				indexes[i-1]++
 			}
 		}
 
 		combo := make([]uint32, len(parts))
 		for i, part := range parts {
-			combo[i] = part[idexes[i]]
+			combo[i] = part[indexes[i]]
 		}
 		out = append(out, combo)
 
 		// always bump idx of the last one
-		idexes[len(parts)-1]++
+		indexes[len(parts)-1]++
 	}
 	return out
 }
