@@ -32,11 +32,6 @@ type IdxConfig struct {
 	Keyspace                 string
 	Table                    string
 	ArchiveTable             string
-	MetaRecordTable          string
-	MetaRecordBatchTable     string
-	MetaRecordPollInterval   time.Duration
-	MetaRecordPruneInterval  time.Duration
-	MetaRecordPruneAge       time.Duration
 	Hosts                    string
 	CaPath                   string
 	Username                 string
@@ -59,11 +54,6 @@ func NewIdxConfig() *IdxConfig {
 		Keyspace:                 "metrictank",
 		Table:                    "metric_idx",
 		ArchiveTable:             "metric_idx_archive",
-		MetaRecordTable:          "meta_records",
-		MetaRecordBatchTable:     "meta_record_batches",
-		MetaRecordPollInterval:   time.Second * 10,
-		MetaRecordPruneInterval:  time.Hour * 24,
-		MetaRecordPruneAge:       time.Hour * 72,
 		Consistency:              "one",
 		Timeout:                  time.Second,
 		ConnectionCheckInterval:  time.Second * 5,
@@ -107,11 +97,6 @@ func ConfigSetup() *flag.FlagSet {
 	casIdx.StringVar(&CliConfig.Keyspace, "keyspace", CliConfig.Keyspace, "Cassandra keyspace to store metricDefinitions in.")
 	casIdx.StringVar(&CliConfig.Table, "table", CliConfig.Table, "Cassandra table to store metricDefinitions in.")
 	casIdx.StringVar(&CliConfig.ArchiveTable, "archive-table", CliConfig.ArchiveTable, "Cassandra table to archive metricDefinitions in.")
-	casIdx.StringVar(&CliConfig.MetaRecordTable, "meta-record-table", CliConfig.MetaRecordTable, "Cassandra table to store meta records.")
-	casIdx.StringVar(&CliConfig.MetaRecordBatchTable, "meta-record-batch-table", CliConfig.MetaRecordBatchTable, "Cassandra table to store meta data of meta record batches.")
-	casIdx.DurationVar(&CliConfig.MetaRecordPollInterval, "meta-record-poll-interval", CliConfig.MetaRecordPollInterval, "Interval at which to poll store for meta record updates.")
-	casIdx.DurationVar(&CliConfig.MetaRecordPruneInterval, "meta-record-prune-interval", CliConfig.MetaRecordPruneInterval, "Interval at which meta records of old batches get pruned.")
-	casIdx.DurationVar(&CliConfig.MetaRecordPruneAge, "meta-record-prune-age", CliConfig.MetaRecordPruneAge, "The minimum age a batch of meta records must have to be pruned.")
 	casIdx.StringVar(&CliConfig.Consistency, "consistency", CliConfig.Consistency, "write consistency (any|one|two|three|quorum|all|local_quorum|each_quorum|local_one")
 	casIdx.DurationVar(&CliConfig.Timeout, "timeout", CliConfig.Timeout, "cassandra request timeout")
 	casIdx.DurationVar(&CliConfig.ConnectionCheckInterval, "connection-check-interval", CliConfig.ConnectionCheckInterval, "interval at which to perform a connection check to cassandra, set to 0 to disable.")

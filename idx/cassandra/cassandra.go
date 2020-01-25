@@ -16,7 +16,6 @@ import (
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/idx/metatags"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
@@ -65,8 +64,6 @@ type CasIdx struct {
 	Config           *IdxConfig
 	cluster          *gocql.ClusterConfig
 	Session          *cassandra.Session
-	metaRecords      metatags.MetaRecordStatusByOrg
-	metaRecordMemIdx idx.MetaRecordIdx
 	writeQueue       chan writeReq
 	shutdown         chan struct{}
 	wg               sync.WaitGroup
@@ -102,10 +99,8 @@ func New(cfg *IdxConfig) *CasIdx {
 		}
 	}
 
-	memoryIdx := memory.New()
 	idx := &CasIdx{
-		MemoryIndex:      memoryIdx,
-		metaRecordMemIdx: memoryIdx,
+		MemoryIndex:      memory.New(),
 		Config:           cfg,
 		cluster:          cluster,
 		updateInterval32: uint32(cfg.updateInterval.Nanoseconds() / int64(time.Second)),
@@ -150,11 +145,6 @@ func (c *CasIdx) InitBare() error {
 		return err
 	}
 
-	err = c.initMetaRecords(tmpSession)
-	if err != nil {
-		return err
-	}
-
 	tmpSession.Close()
 	c.cluster.Keyspace = c.Config.Keyspace
 
@@ -193,15 +183,6 @@ func (c *CasIdx) Init() error {
 	if memory.IndexRules.Prunable() {
 		c.wg.Add(1)
 		go c.prune()
-	}
-
-	if memory.MetaTagSupport {
-		c.wg.Add(1)
-		go c.pollStore()
-		if c.Config.updateCassIdx {
-			c.wg.Add(1)
-			go c.pruneMetaRecords()
-		}
 	}
 
 	return nil
@@ -354,12 +335,6 @@ func (c *CasIdx) rebuildIndex() {
 	}
 
 	wg.Wait()
-
-	if memory.TagSupport && memory.MetaTagSupport {
-		// should only get called after the metric index has been initialized
-		// if metrics get added first and meta records second then startup is faster
-		c.loadMetaRecords()
-	}
 
 	log.Infof("cassandra-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/idx/memory"
 	metatagsBt "github.com/grafana/metrictank/idx/metatags/bigtable"
+	metatagsCass "github.com/grafana/metrictank/idx/metatags/cassandra"
 	"github.com/grafana/metrictank/input"
 	inCarbon "github.com/grafana/metrictank/input/carbon"
 	inKafkaMdm "github.com/grafana/metrictank/input/kafkamdm"
@@ -135,6 +136,9 @@ func main() {
 	// bigtable store
 	bigtableStore.ConfigSetup()
 
+	// meta tag indexes
+	metatagsCass.ConfigSetup()
+
 	jaeger.ConfigSetup()
 
 	config.ParseAll()
@@ -189,6 +193,7 @@ func main() {
 	bigtable.ConfigProcess()
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 	jaeger.ConfigProcess()
+	metatagsCass.ConfigProcess()
 
 	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled
 	wantInput := cluster.Mode == cluster.ModeDev || cluster.Mode == cluster.ModeShard
@@ -349,31 +354,28 @@ func main() {
 		log.Fatal("you should not have an index plugin enabled in 'query' cluster mode")
 	}
 
+	var memIndex memory.MemoryIndex
 	if memory.Enabled {
-		memIndex := memory.New()
+		memIndex = memory.New()
 		metricIndex = memIndex
-
-		if memory.TagSupport && memory.MetaTagSupport {
-			metaRecords = memIndex
-		}
 	}
+
 	if cassandra.CliConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
-		cassIndex := cassandra.New(cassandra.CliConfig)
-		metricIndex = cassIndex
-
-		if memory.TagSupport && memory.MetaTagSupport {
-			metaRecords = cassIndex
-		}
+		cassIdx := cassandra.New(cassandra.CliConfig)
+		metricIndex = cassIdx
+		memIndex = cassIdx.MemoryIndex
 	}
+
 	if bigtable.CliConfig.Enabled {
 		if metricIndex != nil {
 			log.Fatal("Only 1 metricIndex handler can be enabled.")
 		}
 		btIndex := bigtable.New(bigtable.CliConfig)
 		metricIndex = btIndex
+		memIndex = btIndex.MemoryIndex
 
 		if memory.TagSupport && memory.MetaTagSupport {
 			metaRecords = metatagsBt.NewBigTableMetaRecordIdx(metatagsBt.MetaRecordIdxConfig{
@@ -389,6 +391,22 @@ func main() {
 				UpdateRecords:     bigtable.CliConfig.UpdateBigtableIdx,
 				CreateCf:          bigtable.CliConfig.CreateCF,
 			}, btIndex.MemoryIndex)
+		}
+	}
+
+	if memory.TagSupport && memory.MetaTagSupport {
+		if memory.Enabled {
+			metaRecords = memIndex
+		}
+
+		if metatagsCass.CliConfig.Enabled {
+			metatagsCassIdx := metatagsCass.NewCassandraMetaRecordIdx(metatagsCass.CliConfig, memIndex)
+			err = metatagsCassIdx.Init()
+			if err != nil {
+				log.Fatalf("Failed to initialize cassandra meta tag index: %s", err)
+			}
+			metatagsCassIdx.Start()
+			metaRecords = metatagsCassIdx
 		}
 	}
 
