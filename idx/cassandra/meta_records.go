@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	cassUtils "github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/idx/metatags"
+	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,11 +35,13 @@ func (c *CasIdx) initMetaRecords(session *gocql.Session) error {
 
 	c.metaRecords = metatags.NewMetaRecordStatusByOrg()
 
-	err := c.EnsureTableExists(session, c.Config.SchemaFile, "schema_meta_record_table", c.Config.MetaRecordTable)
+	schema := fmt.Sprintf(util.ReadEntry(c.Config.SchemaFile, "schema_meta_record_table").(string), c.Config.Keyspace, c.Config.MetaRecordTable)
+	err := cassUtils.EnsureTableExists(session, c.Config.CreateKeyspace, c.Config.Keyspace, schema, c.Config.MetaRecordTable)
 	if err != nil {
 		return err
 	}
-	return c.EnsureTableExists(session, c.Config.SchemaFile, "schema_meta_record_batch_table", c.Config.MetaRecordBatchTable)
+	schema = fmt.Sprintf(util.ReadEntry(c.Config.SchemaFile, "schema_meta_record_batch_table").(string), c.Config.Keyspace, c.Config.MetaRecordBatchTable)
+	return cassUtils.EnsureTableExists(session, c.Config.CreateKeyspace, c.Config.Keyspace, schema, c.Config.MetaRecordBatchTable)
 }
 
 func (c *CasIdx) pollStore() {
