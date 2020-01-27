@@ -147,7 +147,7 @@ type GraphiteTagFindSeriesMetaResp struct {
 }
 
 type GraphiteTagDelSeries struct {
-	Paths     []string `json:"path" form:"path"`
+	Paths []string `json:"path" form:"path"`
 }
 
 func (g GraphiteTagDelSeries) Trace(span opentracing.Span) {
