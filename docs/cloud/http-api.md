@@ -198,7 +198,7 @@ Deletes metrics which match the `path` parameter(s).
 ##### Example
 
 ```sh
-curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/tags/delSeries -d path=some.series;key=value -d another.series;tag=value
+curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/tags/delSeries -d path=some.series;key=value -d path=another.series;tag=value
 ```
 
 ### Finding Metrics
