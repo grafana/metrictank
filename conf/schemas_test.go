@@ -361,3 +361,55 @@ func TestSub(t *testing.T) {
 		t.Errorf("TestSub() mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestSubMulti(t *testing.T) {
+	in := Retentions{
+		Orig: "10s:600s:60s:2,30s:1h:60s:2,1h:30d:6h:2",
+		Rets: []Retention{
+			{
+				SecondsPerPoint: 10,
+				NumberOfPoints:  60,
+				ChunkSpan:       60,
+				NumChunks:       2,
+				Ready:           0,
+			},
+			{
+				SecondsPerPoint: 30,
+				NumberOfPoints:  120,
+				ChunkSpan:       60,
+				NumChunks:       2,
+				Ready:           0,
+			},
+			{
+				SecondsPerPoint: 3600,
+				NumberOfPoints:  720,
+				ChunkSpan:       21600,
+				NumChunks:       2,
+				Ready:           0,
+			},
+		},
+	}
+	want := Retentions{
+		Orig: "30s:1h:60s:2,1h:30d:6h:2",
+		Rets: []Retention{
+			{
+				SecondsPerPoint: 30,
+				NumberOfPoints:  120,
+				ChunkSpan:       60,
+				NumChunks:       2,
+				Ready:           0,
+			},
+			{
+				SecondsPerPoint: 3600,
+				NumberOfPoints:  720,
+				ChunkSpan:       21600,
+				NumChunks:       2,
+				Ready:           0,
+			},
+		},
+	}
+	got := in.Sub(1)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("TestSub() mismatch (-want +got):\n%s", diff)
+	}
+}
