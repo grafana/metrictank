@@ -56,7 +56,7 @@ Usage:
 
 Flags:
   -addr string
-    	http service address (default ":80")
+    	http service address (default ":6059")
   -default-org-id int
     	default org ID to send to downstream services if none is provided (default -1)
   -discard-prefixes string
