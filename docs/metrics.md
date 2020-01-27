@@ -392,7 +392,7 @@ this is subject to backpressure from the store when the store's queue runs full
 count of points with a timestamp which is too far in the future,
 beyond the limitation of the future tolerance window defined via the retention.future-tolerance-ratio
 parameter. it also gets increased if the enforcement of the future tolerance is disabled, this is
-useful for prediciting whether data points would get rejected once enforcement gets turned on.
+useful for predicting whether data points would get rejected once enforcement gets turned on.
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
 * `version.%s`:  
