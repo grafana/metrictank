@@ -284,7 +284,7 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 		}
 
 		deleted := s.MetricIndex.DeleteTagged(request.OrgId, query)
-		res.Count = len(deleted)
+		res.Count += len(deleted)
 	}
 
 	response.Write(ctx, response.NewMsgp(200, res))
