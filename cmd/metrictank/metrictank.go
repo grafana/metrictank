@@ -138,6 +138,7 @@ func main() {
 
 	// meta tag indexes
 	metatagsCass.ConfigSetup()
+	metatagsBt.ConfigSetup()
 
 	jaeger.ConfigSetup()
 
@@ -194,6 +195,7 @@ func main() {
 	bigtableStore.ConfigProcess(mdata.MaxChunkSpan())
 	jaeger.ConfigProcess()
 	metatagsCass.ConfigProcess()
+	metatagsBt.ConfigProcess()
 
 	inputEnabled := inCarbon.Enabled || inKafkaMdm.Enabled
 	wantInput := cluster.Mode == cluster.ModeDev || cluster.Mode == cluster.ModeShard
@@ -376,22 +378,6 @@ func main() {
 		btIndex := bigtable.New(bigtable.CliConfig)
 		metricIndex = btIndex
 		memIndex = btIndex.MemoryIndex
-
-		if memory.TagSupport && memory.MetaTagSupport {
-			metaRecords = metatagsBt.NewBigTableMetaRecordIdx(metatagsBt.MetaRecordIdxConfig{
-				GcpProject:        bigtable.CliConfig.GcpProject,
-				BigtableInstance:  bigtable.CliConfig.BigtableInstance,
-				PollInterval:      bigtable.CliConfig.MetaRecordPollInterval,
-				PruneInterval:     bigtable.CliConfig.MetaRecordPruneInterval,
-				PruneAge:          bigtable.CliConfig.MetaRecordPruneAge,
-				TableName:         bigtable.CliConfig.MetaRecordTable,
-				BatchTableName:    bigtable.CliConfig.MetaRecordBatchTable,
-				MetaRecordCf:      "mr",
-				MetaRecordBatchCf: "mrb",
-				UpdateRecords:     bigtable.CliConfig.UpdateBigtableIdx,
-				CreateCf:          bigtable.CliConfig.CreateCF,
-			}, btIndex.MemoryIndex)
-		}
 	}
 
 	if memory.TagSupport && memory.MetaTagSupport {
@@ -407,6 +393,16 @@ func main() {
 			}
 			metatagsCassIdx.Start()
 			metaRecords = metatagsCassIdx
+		}
+
+		if metatagsBt.CliConfig.Enabled {
+			metarecordBtIdx := metatagsBt.NewBigTableMetaRecordIdx(metatagsBt.CliConfig, memIndex)
+			err = metarecordBtIdx.Init()
+			if err != nil {
+				log.Fatalf("Failed to initialize bigtable meta tag index: %s", err)
+			}
+			metarecordBtIdx.Start()
+			metaRecords = metarecordBtIdx
 		}
 	}
 

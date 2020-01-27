@@ -22,26 +22,10 @@ var (
 	errIdxUpdatesDisabled = fmt.Errorf("BigTable index updates are disabled")
 )
 
-// MetaRecordIdxConfig contains all the configurations related to storing the
-// meta records in bigtable.
-type MetaRecordIdxConfig struct {
-	GcpProject        string
-	BigtableInstance  string
-	PollInterval      time.Duration
-	PruneInterval     time.Duration
-	PruneAge          time.Duration
-	TableName         string
-	BatchTableName    string
-	MetaRecordCf      string
-	MetaRecordBatchCf string
-	UpdateRecords     bool
-	CreateCf          bool
-}
-
 type MetaRecordIdx struct {
 	wg                   sync.WaitGroup
 	shutdown             chan struct{}
-	cfg                  MetaRecordIdxConfig
+	cfg                  *Config
 	status               metatags.MetaRecordStatusByOrg
 	memoryIdx            idx.MetaRecordIdx
 	client               *bigtable.Client
@@ -50,7 +34,7 @@ type MetaRecordIdx struct {
 	metaRecordBatchTable *bigtable.Table
 }
 
-func NewBigTableMetaRecordIdx(cfg MetaRecordIdxConfig, memoryIdx idx.MetaRecordIdx) *MetaRecordIdx {
+func NewBigTableMetaRecordIdx(cfg *Config, memoryIdx idx.MetaRecordIdx) *MetaRecordIdx {
 	return &MetaRecordIdx{
 		shutdown:  make(chan struct{}),
 		cfg:       cfg,
@@ -66,35 +50,35 @@ func (m *MetaRecordIdx) Init() error {
 		return err
 	}
 
-	err = btUtils.EnsureTableExists(ctx, m.cfg.CreateCf, m.adminClient, "meta_records", map[string]bigtable.GCPolicy{
-		m.cfg.MetaRecordCf: bigtable.MaxVersionsPolicy(1),
+	err = btUtils.EnsureTableExists(ctx, m.cfg.createCf, m.adminClient, "meta_records", map[string]bigtable.GCPolicy{
+		m.cfg.metaRecordCf: bigtable.MaxVersionsPolicy(1),
 	})
 	if err != nil {
 		return err
 	}
 
-	err = btUtils.EnsureTableExists(ctx, m.cfg.CreateCf, m.adminClient, "meta_record_batches", map[string]bigtable.GCPolicy{
-		m.cfg.MetaRecordBatchCf: bigtable.MaxVersionsPolicy(1),
+	err = btUtils.EnsureTableExists(ctx, m.cfg.createCf, m.adminClient, "meta_record_batches", map[string]bigtable.GCPolicy{
+		m.cfg.metaRecordBatchCf: bigtable.MaxVersionsPolicy(1),
 	})
 	if err != nil {
 		return err
 	}
 
-	m.metaRecordBatchTable = m.client.Open(m.cfg.BatchTableName)
-	m.metaRecordTable = m.client.Open(m.cfg.TableName)
+	m.metaRecordBatchTable = m.client.Open(m.cfg.batchTableName)
+	m.metaRecordTable = m.client.Open(m.cfg.tableName)
 
 	return nil
 }
 
 func (m *MetaRecordIdx) connect(ctx context.Context) error {
 	var err error
-	m.client, err = bigtable.NewClient(ctx, m.cfg.GcpProject, m.cfg.BigtableInstance)
+	m.client, err = bigtable.NewClient(ctx, m.cfg.gcpProject, m.cfg.bigtableInstance)
 	if err != nil {
 		log.Errorf("bt-meta-record-idx: failed to create bigtable client: %s", err)
 		return err
 	}
 
-	m.adminClient, err = bigtable.NewAdminClient(ctx, m.cfg.GcpProject, m.cfg.BigtableInstance)
+	m.adminClient, err = bigtable.NewAdminClient(ctx, m.cfg.gcpProject, m.cfg.bigtableInstance)
 	if err != nil {
 		log.Errorf("bt-meta-record-idx: failed to create bigtable admin client: %s", err)
 	}
@@ -105,7 +89,7 @@ func (m *MetaRecordIdx) connect(ctx context.Context) error {
 func (m *MetaRecordIdx) Start() {
 	m.wg.Add(1)
 	go m.pollBigtable()
-	if m.cfg.UpdateRecords {
+	if m.cfg.updateRecords {
 		m.wg.Add(1)
 		go m.pruneMetaRecords()
 	}
@@ -121,7 +105,7 @@ func (m *MetaRecordIdx) Stop() {
 func (m *MetaRecordIdx) pollBigtable() {
 	defer m.wg.Done()
 
-	ticker := time.NewTicker(m.cfg.PollInterval)
+	ticker := time.NewTicker(m.cfg.pollInterval)
 	for {
 		select {
 		case <-m.shutdown:
@@ -168,7 +152,7 @@ func (m *MetaRecordIdx) loadMetaRecords() {
 func (m *MetaRecordIdx) pruneMetaRecords() {
 	defer m.wg.Done()
 
-	ticker := time.NewTicker(m.cfg.PruneInterval)
+	ticker := time.NewTicker(m.cfg.pruneInterval)
 	for {
 		select {
 		case <-m.shutdown:
@@ -184,7 +168,7 @@ func (m *MetaRecordIdx) pruneMetaRecords() {
 			}
 			for batchId, properties := range batches {
 				now := time.Now().Unix()
-				if uint64(now)-uint64(m.cfg.PruneAge.Seconds()) <= uint64(properties.createdAt/1000) {
+				if uint64(now)-uint64(m.cfg.pruneAge.Seconds()) <= uint64(properties.createdAt/1000) {
 					continue
 				}
 
@@ -222,9 +206,9 @@ func (m *MetaRecordIdx) readMetaRecordBatches() (metaRecordBatches, error) {
 			return false
 		}
 
-		columns, ok := row[m.cfg.MetaRecordBatchCf]
+		columns, ok := row[m.cfg.metaRecordBatchCf]
 		if !ok {
-			log.Errorf("bt-meta-record-idx: Row from meta record batch table was missing expected column family %s", m.cfg.MetaRecordBatchCf)
+			log.Errorf("bt-meta-record-idx: Row from meta record batch table was missing expected column family %s", m.cfg.metaRecordBatchCf)
 			return false
 		}
 
@@ -247,7 +231,7 @@ func (m *MetaRecordIdx) readMetaRecordBatches() (metaRecordBatches, error) {
 
 		res[uuid] = properties
 		return true
-	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(m.cfg.MetaRecordBatchCf), bigtable.LatestNFilter(1))))
+	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(m.cfg.metaRecordBatchCf), bigtable.LatestNFilter(1))))
 
 	if err != nil {
 		log.Errorf("bt-meta-record-idx: Failed to load meta record batches: %s", err)
@@ -269,9 +253,9 @@ func (m *MetaRecordIdx) readMetaRecordsOfBatch(orgId uint32, batchId metatags.UU
 			return false
 		}
 
-		columns, ok := row[m.cfg.MetaRecordCf]
+		columns, ok := row[m.cfg.metaRecordCf]
 		if !ok {
-			log.Errorf("bt-meta-record-idx: Row from meta record table was missing expected column family %s", m.cfg.MetaRecordCf)
+			log.Errorf("bt-meta-record-idx: Row from meta record table was missing expected column family %s", m.cfg.metaRecordCf)
 			return false
 		}
 
@@ -288,7 +272,7 @@ func (m *MetaRecordIdx) readMetaRecordsOfBatch(orgId uint32, batchId metatags.UU
 
 		res = append(res, record)
 		return true
-	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(m.cfg.MetaRecordCf), bigtable.LatestNFilter(1))))
+	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(m.cfg.metaRecordCf), bigtable.LatestNFilter(1))))
 
 	if err != nil {
 		log.Errorf("bt-meta-record-idx: Failed to load meta records of batch (%d/%s):%s", orgId, batchId.String(), err)
@@ -300,7 +284,7 @@ func (m *MetaRecordIdx) readMetaRecordsOfBatch(orgId uint32, batchId metatags.UU
 
 func (m *MetaRecordIdx) pruneBatch(orgId uint32, batchId metatags.UUID) error {
 	// unfortunately dropping a row range requires using the admin client
-	err := m.adminClient.DropRowRange(context.Background(), m.cfg.TableName, formatMetaRecordRowKey(orgId, batchId, ""))
+	err := m.adminClient.DropRowRange(context.Background(), m.cfg.tableName, formatMetaRecordRowKey(orgId, batchId, ""))
 	if err != nil {
 		log.Errorf("bt-meta-record-idx: Failed to drop row range by prefix %s: %s", formatMetaRecordRowKey(orgId, batchId, ""), err)
 	}
@@ -316,7 +300,7 @@ func (m *MetaRecordIdx) pruneBatch(orgId uint32, batchId metatags.UUID) error {
 }
 
 func (m *MetaRecordIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error {
-	if !m.cfg.UpdateRecords {
+	if !m.cfg.updateRecords {
 		return errIdxUpdatesDisabled
 	}
 
@@ -370,13 +354,13 @@ func (m *MetaRecordIdx) markMetaRecordBatchUpdated(orgId uint32, batchId metatag
 	now := make([]byte, 8)
 	binary.PutVarint(now, time.Now().UnixNano()/1000000)
 	mut := bigtable.NewMutation()
-	mut.Set(m.cfg.MetaRecordBatchCf, "lastupdate", bigtable.Now(), now)
+	mut.Set(m.cfg.metaRecordBatchCf, "lastupdate", bigtable.Now(), now)
 
 	if batchId == metatags.DefaultBatchId {
 		// if the current batch id is the default batch id, then this batch has most likely not
 		// been persisted yet and we're going to persist it for the first time now. since this
 		// is the default batch which always exists, we set "createdat" to 0.
-		mut.Set(m.cfg.MetaRecordBatchCf, "createdat", bigtable.Now(), make([]byte, 8))
+		mut.Set(m.cfg.metaRecordBatchCf, "createdat", bigtable.Now(), make([]byte, 8))
 	}
 
 	err := m.metaRecordBatchTable.Apply(context.Background(), formatMetaRecordBatchRowKey(orgId, batchId), mut)
@@ -387,7 +371,7 @@ func (m *MetaRecordIdx) markMetaRecordBatchUpdated(orgId uint32, batchId metatag
 }
 
 func (m *MetaRecordIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error {
-	if !m.cfg.UpdateRecords {
+	if !m.cfg.updateRecords {
 		return errIdxUpdatesDisabled
 	}
 
@@ -413,7 +397,7 @@ func (m *MetaRecordIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaT
 
 		rowKeys[i] = formatMetaRecordRowKey(orgId, newBatchId, string(expressions))
 		muts[i] = bigtable.NewMutation()
-		muts[i].Set(m.cfg.MetaRecordCf, "metatags", bigtable.Now(), metaTags)
+		muts[i].Set(m.cfg.metaRecordCf, "metatags", bigtable.Now(), metaTags)
 	}
 
 	select {
@@ -448,8 +432,8 @@ func (m *MetaRecordIdx) createNewBatch(orgId uint32, batchId metatags.UUID) erro
 	now := make([]byte, 8)
 	binary.PutVarint(now, time.Now().UnixNano()/1000000)
 	mut := bigtable.NewMutation()
-	mut.Set(m.cfg.MetaRecordBatchCf, "lastupdate", bigtable.Now(), now)
-	mut.Set(m.cfg.MetaRecordBatchCf, "createdat", bigtable.Now(), now)
+	mut.Set(m.cfg.metaRecordBatchCf, "lastupdate", bigtable.Now(), now)
+	mut.Set(m.cfg.metaRecordBatchCf, "createdat", bigtable.Now(), now)
 
 	rowKey := formatMetaRecordBatchRowKey(orgId, batchId)
 	err := m.metaRecordBatchTable.Apply(context.Background(), rowKey, mut)
@@ -499,7 +483,7 @@ func (m *MetaRecordIdx) persistMetaRecord(orgId uint32, batchId metatags.UUID, r
 	}
 
 	mut := bigtable.NewMutation()
-	mut.Set(m.cfg.MetaRecordCf, "metatags", bigtable.Now(), metaTags)
+	mut.Set(m.cfg.metaRecordCf, "metatags", bigtable.Now(), metaTags)
 
 	err = m.metaRecordTable.Apply(context.Background(), formatMetaRecordRowKey(orgId, batchId, string(expressions)), mut)
 	if err != nil {
