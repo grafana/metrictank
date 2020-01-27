@@ -8,5 +8,6 @@ datasources:
   isDefault: true
   jsonData:
      graphiteVersion: "1.1"
+     graphiteType: "metrictank"
   version: 1
   editable: true
