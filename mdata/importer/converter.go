@@ -112,24 +112,24 @@ func (c *converter) getPoints(retIdx int, spp, nop uint32) map[schema.Method][]w
 }
 
 func (c *converter) findSmallestLargestArchive(spp, nop uint32) (int, int) {
-	// find smallest archive that still contains enough data to satisfy requested range
-	largestArchiveIdx := len(c.archives) - 1
-	for i := largestArchiveIdx; i >= 0; i-- {
-		arch := c.archives[i]
-		if arch.Points*arch.SecondsPerPoint < nop*spp {
-			break
-		}
-		largestArchiveIdx = i
-	}
-
 	// find largest archive that still has a higher or equal resolution than requested
-	smallestArchiveIdx := 0
+	var smallestArchiveIdx, largestArchiveIdx int
 	for i := 0; i < len(c.archives); i++ {
 		arch := c.archives[i]
 		if arch.SecondsPerPoint > spp {
 			break
 		}
 		smallestArchiveIdx = i
+	}
+
+	// find smallest archive that still contains enough data to satisfy requested range,
+	// check archives in increasing order starting from previously chosen largest
+	for i := smallestArchiveIdx; i < len(c.archives); i++ {
+		largestArchiveIdx = i
+		arch := c.archives[largestArchiveIdx]
+		if arch.Points*arch.SecondsPerPoint >= nop*spp {
+			break
+		}
 	}
 
 	return smallestArchiveIdx, largestArchiveIdx
