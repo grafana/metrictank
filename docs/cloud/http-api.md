@@ -182,6 +182,25 @@ So if the delete query matches a branch, **every** series under that branch will
 curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/metrics/delete -d query=some.series.to.delete.*
 ```
 
+#### Tagged With `/tags/delSeries`
+
+Deletes metrics which match the `path` parameter(s).
+
+* Method: POST
+* API key type:
+
+##### Parameters
+
+* user name: `api_key`
+* password: Your Grafana.com API Key
+* path (required, multiple allowed): A single Graphite series
+
+##### Example
+
+```sh
+curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/tags/delSeries -d path=some.series;key=value -d another.series;tag=value
+```
+
 ### Finding Metrics
 #### Non-tagged With `/metrics/find`
 
