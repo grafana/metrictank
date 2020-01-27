@@ -1059,6 +1059,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	case "series-json":
 		seriesNames := make([]string, 0, len(series))
 		for _, serie := range series {
+			// note: for findByTag the "Pattern" is the full metric nameWithTags
 			seriesNames = append(seriesNames, serie.Pattern)
 		}
 
