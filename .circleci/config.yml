@@ -46,7 +46,6 @@ jobs:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
     machine:
       image: ubuntu-1604:201903-01
-    resource_class: large
     steps:
       - checkout
       - attach_workspace:
