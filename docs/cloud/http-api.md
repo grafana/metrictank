@@ -362,7 +362,7 @@ Graphite-web-like api. It can return JSON, pickle or messagepack output
 * target: mandatory. one or more metric names or [patterns](#graphite-patterns).
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
-* format: json, msgp, pickle, or msgpack (default: json)
+* format: json, msgp, pickle, or msgpack (default: json) (note: msgp and msgpack are similar, but msgpack is for use with graphite)
 * meta: use 'meta=true' to enable metadata in response (performance measurements)
 * process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
   (as opposed to proxying to the fallback graphite).

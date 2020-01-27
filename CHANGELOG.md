@@ -15,7 +15,7 @@
   to scrape prometheus data, or query data via Promql.  There was not enough usage (or customer interest)
   to keep maintaining this functionality.
   #1613
-* as of v0.13.1-108-g9f8d3c29 tag support is enabled by default, it can still be disabled though.
+* as of v0.13.1-110-g6b6f475a tag support is enabled by default, it can still be disabled though.
   This means if previously metrics with tags have been ingested while tag support was disabled,
   then those tags would have been treated as a normal part of the metric name, when tag support
   now gets enabled due to this change then the tags would be treated as tags and they wouldn't
