@@ -170,7 +170,7 @@ Note that the data stays in the datastore until it expires.
 Should the metrics enter the system again with the same metadata, the data will show up again.
 
 * Method: POST
-* API key type:
+* API key type: Editor
 
 ##### Parameters
 
@@ -192,7 +192,7 @@ Should the metrics enter the system again with the same metadata, the data will 
 
 
 * Method: POST
-* API key type:
+* API key type: Editor
 
 ##### Parameters
 
