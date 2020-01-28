@@ -57,6 +57,8 @@ Usage:
 Flags:
   -addr string
     	http service address (default ":6059")
+  -config string
+    	configuration file path (default "/etc/metrictank/mt-gateway.ini")
   -default-org-id int
     	default org ID to send to downstream services if none is provided (default -1)
   -discard-prefixes string

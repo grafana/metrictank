@@ -18,6 +18,7 @@ FROM alpine:3.10.0 AS mt-gateway
 
 RUN mkdir -p /etc/metrictank
 COPY scripts/config/storage-schemas.conf /etc/metrictank/storage-schemas.conf
+COPY scripts/config/mt-gateway.ini /etc/metrictank/mt-gateway.ini
 COPY --from=gobase /tmp/build/mt-gateway /usr/bin/
 
 EXPOSE 6059
