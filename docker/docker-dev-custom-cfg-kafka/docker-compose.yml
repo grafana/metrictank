@@ -150,14 +150,27 @@ services:
     hostname: tsdb-gw
     image: raintank/tsdb-gw
     ports:
-     - "9000:80"
+      - "9000:80"
     volumes:
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./gw:/etc/gw/
     environment:
-     WAIT_HOSTS: kafka:9092
-     WAIT_TIMEOUT: 60
+      WAIT_HOSTS: kafka:9092
+      WAIT_TIMEOUT: 60
     links:
-     - metrictank
-     - graphite
-     - kafka
+      - metrictank
+      - graphite
+      - kafka
+
+  mt-gateway:
+    hostname: mt-gateway
+    image: grafana/mt-gateway
+    ports:
+      - "6059:6059"
+    volumes:
+      - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
+      - ./gw/mt-gateway.ini:/etc/metrictank/mt-gateway.ini
+    links:
+      - metrictank
+      - graphite
+      - kafka
