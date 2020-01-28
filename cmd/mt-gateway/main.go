@@ -63,7 +63,6 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("error with configuration file: %s", err)
-		os.Exit(1)
 	}
 	conf.ParseAll()
 
