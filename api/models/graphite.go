@@ -147,14 +147,12 @@ type GraphiteTagFindSeriesMetaResp struct {
 }
 
 type GraphiteTagDelSeries struct {
-	Paths     []string `json:"path" form:"path"`
-	Propagate bool     `json:"propagate" form:"propagate" binding:"Default(true)"`
+	Paths []string `json:"path" form:"path"`
 }
 
 func (g GraphiteTagDelSeries) Trace(span opentracing.Span) {
 	span.LogFields(
 		traceLog.String("paths", fmt.Sprintf("%q", g.Paths)),
-		traceLog.Bool("propagate", g.Propagate),
 	)
 }
 

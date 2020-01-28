@@ -2,6 +2,8 @@
 
 ## breaking changes
 
+* as of `$VERSION` the `/tags/delSeries` no longer accepts a `propagate` parameter.
+  It is no longer possible to send the request to only a single node, it now always propagates to all nodes, bringing this method in line with `/metrics/delete`.
 * as of v0.13.1-38-gb88c3b84 by default we reject data points with a timestamp far in the future.
   By default the cutoff is at 10% of the raw retention's TTL, so for example with the default
   storage schema `1s:35d:10min:7` the cutoff is at `35d*0.1=3.5d`. 

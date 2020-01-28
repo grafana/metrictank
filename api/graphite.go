@@ -1349,11 +1349,6 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 		}
 	}
 
-	if !request.Propagate {
-		response.Write(ctx, response.NewJson(200, res, ""))
-		return
-	}
-
 	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
 	responses, errors := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
 
