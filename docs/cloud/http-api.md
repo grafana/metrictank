@@ -166,6 +166,8 @@ Deletes metrics which match the `query` and all child nodes.
 
 Note that unlike the find and render patterns, these queries are recursive.
 So if the delete query matches a branch, **every** series under that branch will be deleted.
+Note that the data stays in the datastore until it expires.
+Should the metrics enter the system again with the same metadata, the data will show up again.
 
 * Method: POST
 * API key type:
@@ -185,6 +187,9 @@ curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/metrics/delete -d 
 #### Tagged With `/tags/delSeries`
 
 Deletes metrics which match the `path` parameter(s).
+Note that the data stays in the datastore until it expires.
+Should the metrics enter the system again with the same metadata, the data will show up again.
+
 
 * Method: POST
 * API key type:
