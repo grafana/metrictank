@@ -11,7 +11,6 @@ import (
 	cassUtils "github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/idx/metatags"
 	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
@@ -76,10 +75,6 @@ func NewCassandraMetaRecordIdx(cfg *Config, memoryIdx idx.MetaRecordIdx) *MetaRe
 }
 
 func (m *MetaRecordIdx) Init() error {
-	if !memory.MetaTagSupport || !memory.TagSupport {
-		return nil
-	}
-
 	var err error
 	m.session, err = cassUtils.NewSession(m.cluster, m.cfg.connectionCheckTimeout, m.cfg.connectionCheckInterval, m.cfg.hosts, "cass-meta-record-idx")
 	if err != nil {

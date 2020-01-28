@@ -380,7 +380,7 @@ func main() {
 		memIndex = btIndex.MemoryIndex
 	}
 
-	if memory.TagSupport && memory.MetaTagSupport {
+	if memory.MetaTagSupport && cluster.Mode != cluster.ModeQuery {
 		if memory.Enabled {
 			metaRecords = memIndex
 		}
@@ -544,6 +544,16 @@ func shutdown() {
 		store.Stop()
 		log.Info("closing index")
 		metricIndex.Stop()
+
+		if memory.MetaTagSupport {
+			switch concrete := metaRecords.(type) {
+			case *metatagsBt.MetaRecordIdx:
+				concrete.Stop()
+			case *metatagsCass.MetaRecordIdx:
+				concrete.Stop()
+			}
+		}
 	}
+
 	log.Info("terminating.")
 }
