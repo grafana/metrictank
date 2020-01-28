@@ -15,7 +15,7 @@ Additionally there is an optional parameter called `-name-prefix` which allows t
 
 ### Schema conversion
 
-The whisper importer reader requires the user to provide the path to the storage schemas used at the import destination (not the one on the source graphite installation), it then reads and parses those schemas. During the import it iterates over all the whisper files that need to be imported and processes each of them as following:
+The whisper importer reader requires the user to provide the path to the storage schemas used at the import destination (**not the one on the source graphite installation**), it then reads and parses those schemas. During the import it iterates over all the whisper files that need to be imported and processes each of them as following:
 
 * Reads all the headers and points
 * Generates the MetricData, interval gets set to the raw interval of the destination schema
