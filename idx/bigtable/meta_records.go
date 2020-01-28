@@ -78,13 +78,13 @@ func (b *MetaRecordIdx) connect(ctx context.Context) error {
 	var err error
 	b.client, err = bigtable.NewClient(ctx, b.cfg.gcpProject, b.cfg.bigtableInstance)
 	if err != nil {
-		log.Errorf("meta-record-idx: failed to create bigtable client: %s", err)
+		log.Errorf("bt-meta-record-idx: failed to create bigtable client: %s", err)
 		return err
 	}
 
 	b.adminClient, err = bigtable.NewAdminClient(ctx, b.cfg.gcpProject, b.cfg.bigtableInstance)
 	if err != nil {
-		log.Errorf("meta-record-idx: failed to create bigtable admin client: %s", err)
+		log.Errorf("bt-meta-record-idx: failed to create bigtable admin client: %s", err)
 	}
 
 	return err
@@ -143,7 +143,7 @@ func (b *MetaRecordIdx) pollBigtable() {
 func (b *MetaRecordIdx) loadMetaRecords() {
 	batches, err := b.readMetaRecordBatches()
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to load meta records from idx: %s", err)
+		log.Errorf("bt-meta-record-idx: Failed to load meta records from idx: %s", err)
 		return
 	}
 
@@ -156,17 +156,17 @@ func (b *MetaRecordIdx) loadMetaRecords() {
 	}
 
 	for orgId, batchId := range toLoad {
-		log.Infof("meta-record-idx: Loading meta record batch %s of org %d", batchId.String(), orgId)
+		log.Infof("bt-meta-record-idx: Loading meta record batch %s of org %d", batchId.String(), orgId)
 
 		records, err := b.readMetaRecordsOfBatch(orgId, batchId)
 		if err != nil {
-			log.Errorf("meta-record-idx: Failed to read meta records of batch (%d/%s): %s", orgId, batchId.String(), err)
+			log.Errorf("bt-meta-record-idx: Failed to read meta records of batch (%d/%s): %s", orgId, batchId.String(), err)
 			continue
 		}
 
 		err = b.memoryIdx.MetaTagRecordSwap(orgId, records)
 		if err != nil {
-			log.Errorf("meta-record-idx: Error when trying to swap batch of meta records in memory index (%d/%s): %s", orgId, batchId.String(), err)
+			log.Errorf("bt-meta-record-idx: Error when trying to swap batch of meta records in memory index (%d/%s): %s", orgId, batchId.String(), err)
 			continue
 		}
 	}
@@ -183,7 +183,7 @@ func (b *MetaRecordIdx) pruneMetaRecords() {
 
 			batches, err := b.readMetaRecordBatches()
 			if err != nil {
-				log.Errorf("meta-record-idx: Skipping pruning because couldn't load meta record batches: %s", err)
+				log.Errorf("bt-meta-record-idx: Skipping pruning because couldn't load meta record batches: %s", err)
 				continue
 			}
 			for batchId, properties := range batches {
@@ -196,7 +196,7 @@ func (b *MetaRecordIdx) pruneMetaRecords() {
 				if batchId != currentBatchId {
 					err := b.pruneBatch(properties.orgId, batchId)
 					if err != nil {
-						log.Errorf("meta-record-idx: Error when pruning batch %d/%s: %s", properties.orgId, batchId.String(), err)
+						log.Errorf("bt-meta-record-idx: Error when pruning batch %d/%s: %s", properties.orgId, batchId.String(), err)
 					}
 				}
 			}
@@ -221,13 +221,13 @@ func (b *MetaRecordIdx) readMetaRecordBatches() (metaRecordBatches, error) {
 		var properties metaRecordBatchProperties
 		properties.orgId, uuid, err = decodeMetaRecordBatchRowKey(row.Key())
 		if err != nil {
-			log.Errorf("meta-record-idx: Failed to decode meta record batch row key %q: %s", row.Key(), err)
+			log.Errorf("bt-meta-record-idx: Failed to decode meta record batch row key %q: %s", row.Key(), err)
 			return false
 		}
 
 		columns, ok := row[b.cfg.metaRecordBatchCf]
 		if !ok {
-			log.Errorf("meta-record-idx: Row from meta record batch table was missing expected column family %s", b.cfg.metaRecordBatchCf)
+			log.Errorf("bt-meta-record-idx: Row from meta record batch table was missing expected column family %s", b.cfg.metaRecordBatchCf)
 			return false
 		}
 
@@ -236,13 +236,13 @@ func (b *MetaRecordIdx) readMetaRecordBatches() (metaRecordBatches, error) {
 			case "lastupdate":
 				properties.lastUpdate, err = binary.ReadVarint(bytes.NewReader(col.Value))
 				if err != nil {
-					log.Errorf("meta-record-idx: Row from meta record batch table contained invalid lastupdate value %x: %s", col.Value, err)
+					log.Errorf("bt-meta-record-idx: Row from meta record batch table contained invalid lastupdate value %x: %s", col.Value, err)
 					return false
 				}
 			case "createdat":
 				properties.createdAt, err = binary.ReadVarint(bytes.NewReader(col.Value))
 				if err != nil {
-					log.Errorf("meta-record-idx: Row from meta record batch table contained invalid createdat value %x: %s", col.Value, err)
+					log.Errorf("bt-meta-record-idx: Row from meta record batch table contained invalid createdat value %x: %s", col.Value, err)
 					return false
 				}
 			}
@@ -253,7 +253,7 @@ func (b *MetaRecordIdx) readMetaRecordBatches() (metaRecordBatches, error) {
 	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(b.cfg.metaRecordBatchCf), bigtable.LatestNFilter(1))))
 
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to load meta record batches: %s", err)
+		log.Errorf("bt-meta-record-idx: Failed to load meta record batches: %s", err)
 		return nil, err
 	}
 
@@ -268,13 +268,13 @@ func (b *MetaRecordIdx) readMetaRecordsOfBatch(orgId uint32, batchId metatags.UU
 		var err error
 		_, _, record.Expressions, err = decodeMetaRecordRowKey(row.Key())
 		if err != nil {
-			log.Errorf("meta-record-idx: Failed to decode meta record row key %q: %s", row.Key(), err)
+			log.Errorf("bt-meta-record-idx: Failed to decode meta record row key %q: %s", row.Key(), err)
 			return false
 		}
 
 		columns, ok := row[b.cfg.metaRecordCf]
 		if !ok {
-			log.Errorf("meta-record-idx: Row from meta record table was missing expected column family %s", b.cfg.metaRecordCf)
+			log.Errorf("bt-meta-record-idx: Row from meta record table was missing expected column family %s", b.cfg.metaRecordCf)
 			return false
 		}
 
@@ -283,7 +283,7 @@ func (b *MetaRecordIdx) readMetaRecordsOfBatch(orgId uint32, batchId metatags.UU
 			case "metatags":
 				err = record.MetaTags.UnmarshalJSON([]byte(col.Value))
 				if err != nil {
-					log.Errorf("meta-record-idx: Row from meta record table contained invalid metatags value %q: %s", col.Value, err)
+					log.Errorf("bt-meta-record-idx: Row from meta record table contained invalid metatags value %q: %s", col.Value, err)
 					return false
 				}
 			}
@@ -294,7 +294,7 @@ func (b *MetaRecordIdx) readMetaRecordsOfBatch(orgId uint32, batchId metatags.UU
 	}, bigtable.RowFilter(bigtable.ChainFilters(bigtable.FamilyFilter(b.cfg.metaRecordCf), bigtable.LatestNFilter(1))))
 
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to load meta records of batch (%d/%s):%s", orgId, batchId.String(), err)
+		log.Errorf("bt-meta-record-idx: Failed to load meta records of batch (%d/%s):%s", orgId, batchId.String(), err)
 		return nil, err
 	}
 
@@ -305,14 +305,14 @@ func (b *MetaRecordIdx) pruneBatch(orgId uint32, batchId metatags.UUID) error {
 	// unfortunately dropping a row range requires using the admin client
 	err := b.adminClient.DropRowRange(context.Background(), b.cfg.tableName, formatMetaRecordRowKey(orgId, batchId, ""))
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to drop row range by prefix %s: %s", formatMetaRecordRowKey(orgId, batchId, ""), err)
+		log.Errorf("bt-meta-record-idx: Failed to drop row range by prefix %s: %s", formatMetaRecordRowKey(orgId, batchId, ""), err)
 	}
 
 	mut := bigtable.NewMutation()
 	mut.DeleteRow()
 	err = b.metaRecordBatchTable.Apply(context.Background(), formatMetaRecordBatchRowKey(orgId, batchId), mut)
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to delete meta record batch (%d/%s): %s", orgId, batchId.String(), err)
+		log.Errorf("bt-meta-record-idx: Failed to delete meta record batch (%d/%s): %s", orgId, batchId.String(), err)
 	}
 
 	return err
@@ -337,13 +337,13 @@ func (b *MetaRecordIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTa
 	}
 
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to update meta records in bigtable: %s", err)
+		log.Errorf("bt-meta-record-idx: Failed to update meta records in bigtable: %s", err)
 		return fmt.Errorf("Failed to update bigtable: %s", err)
 	}
 
 	err = b.markMetaRecordBatchUpdated(orgId, batchId)
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to update meta records in bigtable: %s", err)
+		log.Errorf("bt-meta-record-idx: Failed to update meta records in bigtable: %s", err)
 		return fmt.Errorf("Failed to update bigtable: %s", err)
 	}
 
@@ -387,7 +387,7 @@ func (b *MetaRecordIdx) markMetaRecordBatchUpdated(orgId uint32, batchId metatag
 
 	err := b.metaRecordBatchTable.Apply(context.Background(), formatMetaRecordBatchRowKey(orgId, batchId), mut)
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to mark meta record batch (%d/%s) as updated: %s", orgId, batchId.String(), err)
+		log.Errorf("bt-meta-record-idx: Failed to mark meta record batch (%d/%s) as updated: %s", orgId, batchId.String(), err)
 	}
 	return err
 }
@@ -432,12 +432,12 @@ func (b *MetaRecordIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaT
 
 	errs, err := b.metaRecordTable.ApplyBulk(context.Background(), rowKeys, muts)
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to apply meta records in bulk: %s", err)
+		log.Errorf("bt-meta-record-idx: Failed to apply meta records in bulk: %s", err)
 		return err
 	} else if len(errs) > 0 {
 		for _, err = range errs {
 			if err != nil {
-				log.Errorf("meta-record-idx: One or multiple errors when storing %d records, first error: %s", len(rowKeys), err)
+				log.Errorf("bt-meta-record-idx: One or multiple errors when storing %d records, first error: %s", len(rowKeys), err)
 				return err
 			}
 		}
@@ -511,7 +511,7 @@ func (b *MetaRecordIdx) persistMetaRecord(orgId uint32, batchId metatags.UUID, r
 
 	err = b.metaRecordTable.Apply(context.Background(), formatMetaRecordRowKey(orgId, batchId, string(expressions)), mut)
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to persist meta record (%d/%s/%s/%s): %s", orgId, batchId.String(), expressions, metaTags, err)
+		log.Errorf("bt-meta-record-idx: Failed to persist meta record (%d/%s/%s/%s): %s", orgId, batchId.String(), expressions, metaTags, err)
 	}
 	return err
 }
@@ -527,7 +527,7 @@ func (b *MetaRecordIdx) deleteMetaRecord(orgId uint32, batchId metatags.UUID, re
 
 	err = b.metaRecordTable.Apply(context.Background(), formatMetaRecordRowKey(orgId, batchId, string(expressions)), mut)
 	if err != nil {
-		log.Errorf("meta-record-idx: Failed to delete meta record (%d/%s/%s): %s", orgId, batchId.String(), expressions, err)
+		log.Errorf("bt-meta-record-idx: Failed to delete meta record (%d/%s/%s): %s", orgId, batchId.String(), expressions, err)
 	}
 	return err
 }
