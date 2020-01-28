@@ -76,3 +76,14 @@ services:
       GW_STATS_ENABLED: "true"
       GW_STATS_PREFIX: "tsdb-gw.stats.dev.tsdbgw_tsdb-gw_1"
       GW_STATS_ADDR: "graphite:2003"
+
+  mt-gateway:
+    hostname: mt-gateway
+    image: grafana/mt-gateway
+    ports:
+      - "6059:6059"
+    environment:
+      MT_GRAPHITE_URL: http://metrictank:6060
+      MT_METRICS_PUBLISH: "true"
+      MT_METRICS_KAFKA_COMP: snappy
+      MT_KAFKA_TCP_ADDR: kafka:9092
