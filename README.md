@@ -78,8 +78,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 * [Graphite](https://github.com/grafana/metrictank/blob/master/docs/graphite.md)
 * [Metadata](https://github.com/grafana/metrictank/blob/master/docs/metadata.md)
 * [Tags](https://github.com/grafana/metrictank/blob/master/docs/tags.md)
-* [Whisper data import](https://github.com/grafana/metrictank/blob/master/docs/whisper-data-import.md)
-* [Schema conversion logic](https://github.com/grafana/metrictank/blob/master/docs/schema-conversion-logic.md)
+* [Data importing](https://github.com/grafana/metrictank/blob/master/docs/data-importing.md)
 
 ### Other
 
