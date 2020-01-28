@@ -756,14 +756,13 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	var err error
 	var rp *ReqsPlan
 	rp, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints, maxPointsPerReqSoft, maxPointsPerReqHard)
+	if err != nil {
+		return nil, meta, err
+	}
 	meta.RenderStats.PointsFetch = rp.PointsFetch()
 	meta.RenderStats.PointsReturn = rp.PointsReturn(plan.MaxDataPoints)
 	reqsList := rp.List()
 
-	if err != nil {
-		log.Errorf("HTTP Render planRequests error: %s", err.Error())
-		return nil, meta, err
-	}
 	span := opentracing.SpanFromContext(ctx)
 	span.SetTag("num_reqs", len(reqsList))
 	span.SetTag("points_fetch", meta.RenderStats.PointsFetch)
