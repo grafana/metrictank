@@ -22,7 +22,7 @@ func init() {
 
 //A Query is a set of graphite tag expressions as used by the graphite `seriesByTag` function
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
-//seriesBytTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
+//seriesByTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
 type Query struct {
 	// clause that operates on LastUpdate field
 	From int64
