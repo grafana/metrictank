@@ -29,7 +29,7 @@ var (
 
 	// stats
 	statsEnabled    = flag.Bool("stats-enabled", false, "enable sending graphite messages for instrumentation")
-	statsPrefix     = flag.String("stats-prefix", "tsdb-gw.stats.default.$hostname", "stats prefix (will add trailing dot automatically if needed)")
+	statsPrefix     = flag.String("stats-prefix", "mt-gateway.stats.default.$hostname", "stats prefix (will add trailing dot automatically if needed)")
 	statsAddr       = flag.String("stats-addr", "localhost:2003", "graphite address")
 	statsInterval   = flag.Int("stats-interval", 10, "interval in seconds to send statistics")
 	statsBufferSize = flag.Int("stats-buffer-size", 20000, "how many messages (holding all measurements from one interval) to buffer up in case graphite endpoint is unavailable.")
