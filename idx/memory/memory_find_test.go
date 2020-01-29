@@ -1119,7 +1119,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 			prefix: "",
 			expr:   []string{"host=~.+"},
 			limit:  100,
-			expRes: []string{"read", "write"},
+			expRes: []string{"none", "read", "write"},
 		}, {
 			tag:    "direction",
 			prefix: "wr",
@@ -1131,13 +1131,13 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 			prefix: "no",
 			expr:   []string{"host=~.+"},
 			limit:  100,
-			expRes: []string{},
+			expRes: []string{"none"},
 		}, {
 			tag:    "direction",
 			prefix: "",
 			expr:   []string{"host=~.+"},
-			limit:  1,
-			expRes: []string{"read"},
+			limit:  2,
+			expRes: []string{"none", "read"},
 		}, {
 			tag:    "all",
 			prefix: "",
