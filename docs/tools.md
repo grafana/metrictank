@@ -98,7 +98,7 @@ Flags:
   -stats-interval int
     	interval in seconds to send statistics (default 10)
   -stats-prefix string
-    	stats prefix (will add trailing dot automatically if needed) (default "tsdb-gw.stats.default.$hostname")
+    	stats prefix (will add trailing dot automatically if needed) (default "mt-gateway.stats.default.$hostname")
   -stats-timeout duration
     	timeout after which a write is considered not successful (default 10s)
   -v2
