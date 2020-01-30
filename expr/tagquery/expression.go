@@ -474,8 +474,10 @@ func IsSeriesByTagExpression(query string) bool {
 // ParseSeriesByTagExpression takes a `seriesByTag` query which includes multiple tag query expressions
 // example query: "seriesByTag('a=b', 'c=d', 'e!=~f.*')"
 // it then returns a slice of strings where each string is one of the expressions, and an error
-// which is non-nil if there was an error in the expression parsing and validation
-// all expressions get validated and an error is returned if one or more are invalid
+// which is non-nil if there was an error in the expression parsing and validation.
+// All expressions are validated and an error is returned if one or more are invalid.
+// This method does not validate that the passed in query is a valid `seriesByTag` query.
+// It is assumed that `IsSeriesByTagExpression` has been run (and returned true) before this function is called.
 func ParseSeriesByTagExpression(seriesByTagQuery string) (Expressions, error) {
 	startPos := len(seriesByTagIdent)
 	endPos := len(seriesByTagQuery) - 1
