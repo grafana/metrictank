@@ -684,11 +684,8 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		var err error
 		var series []Series
 		var exprs tagquery.Expressions
-		const SeriesByTagIdent = "seriesByTag("
-		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
-			startPos := len(SeriesByTagIdent)
-			endPos := strings.LastIndex(r.Query, ")")
-			exprs, err = getTagQueryExpressions(r.Query[startPos:endPos])
+		if tagquery.IsSeriesByTagExpression(r.Query) {
+			exprs, err = tagquery.ParseSeriesByTagExpression(r.Query)
 			if err != nil {
 				return nil, meta, err
 			}
@@ -813,79 +810,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
 	return out, meta, err
-}
-
-// getTagQueryExpressions takes a query string which includes multiple tag query expressions
-// example string: "'a=b', 'c=d', 'e!=~f.*'"
-// it then returns a slice of strings where each string is one of the expressions, and an error
-// which is non-nil if there was an error in the expression validation
-// all expressions get validated and an error is returned if one or more are invalid
-func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
-	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
-	var expressionStartPos int
-	var needComma, insideExpression, requiresNonEmptyValue bool
-	var quoteChar byte
-
-	// this might allocate a bit more than we need if a tag or value contains ,
-	// it's still better than having to grow the slice though
-	results := make(tagquery.Expressions, 0, strings.Count(expressions, ",")+1)
-
-	for i := 0; i < len(expressions); i++ {
-		char := expressions[i]
-		if insideExpression {
-			// checking for closing quote
-			if char == quoteChar {
-				insideExpression = false
-				needComma = true
-				expression, err := tagquery.ParseExpression(expressions[expressionStartPos:i])
-				if err != nil {
-					return nil, err
-				}
-
-				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue()
-
-				results = append(results, expression)
-				continue
-			}
-		} else {
-			// outside an expression spaces are ignored
-			if char == ' ' {
-				continue
-			}
-
-			if char == '\'' || char == '"' {
-				if needComma {
-					return nil, fmt.Errorf("Missing comma between quotes: %s", expressions)
-				}
-
-				insideExpression = true
-				quoteChar = char
-				expressionStartPos = i + 1
-				continue
-			}
-
-			if char == ',' {
-				if needComma {
-					needComma = false
-					continue
-				} else {
-					return nil, fmt.Errorf("Too many commas between quotes: %s", expressions)
-				}
-			}
-
-			return nil, fmt.Errorf("Invalid character outside quotes '%c': %s", char, expressions)
-		}
-	}
-
-	if insideExpression {
-		return nil, fmt.Errorf("Unclosed quotes in string: %s", expressions)
-	}
-
-	if !requiresNonEmptyValue {
-		return nil, fmt.Errorf("At least one expression must require a non-empty value")
-	}
-
-	return results, nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
