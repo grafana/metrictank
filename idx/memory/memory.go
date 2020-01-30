@@ -1829,18 +1829,34 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 			}
 		}
 	}()
-	tree, ok := m.tree[orgId]
-	if !ok {
-		return nil, nil
-	}
-	found, err := find(tree, pattern)
-	if err != nil {
-		return nil, err
-	}
 
-	for _, f := range found {
-		deleted := m.delete(orgId, f, true, true)
-		deletedDefs = append(deletedDefs, deleted...)
+	if tagquery.IsSeriesByTagExpression(pattern) {
+		//If they passed in a `seriesByTag` query, we need to DeleteTagged by that query
+		expressions, err := tagquery.ParseSeriesByTagExpression(pattern)
+		if err != nil {
+			return nil, err
+		}
+		tq, err := tagquery.NewQuery(expressions, 0)
+		if err != nil {
+			return nil, err
+		}
+		deletedDefs = append(deletedDefs, m.DeleteTagged(orgId, tq)...)
+	} else {
+		//otherwise it's just a pattern and we do a normal delete
+		tree, ok := m.tree[orgId]
+		if !ok {
+			return nil, nil
+		}
+		found, err := find(tree, pattern)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, f := range found {
+			deleted := m.delete(orgId, f, true, true)
+			deletedDefs = append(deletedDefs, deleted...)
+		}
+
 	}
 
 	statMetricsActive.DecUint32(uint32(len(deletedDefs)))
