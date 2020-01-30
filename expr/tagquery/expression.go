@@ -464,11 +464,11 @@ func (o ExpressionOperator) StringIntoWriter(writer io.Writer) {
 	}
 }
 
-const SeriesByTagIdent = "seriesByTag("
+const seriesByTagIdent = "seriesByTag("
 
 //IsSeriesByTag returns true if the given query is a `seriesByTag` query
 func IsSeriesByTagExpression(query string) bool {
-	return strings.HasPrefix(query, SeriesByTagIdent)
+	return strings.HasPrefix(query, seriesByTagIdent) && query[len(query)-1:] == ")"
 }
 
 // ParseSeriesByTagExpression takes a `seriesByTag` query which includes multiple tag query expressions
@@ -477,8 +477,8 @@ func IsSeriesByTagExpression(query string) bool {
 // which is non-nil if there was an error in the expression parsing and validation
 // all expressions get validated and an error is returned if one or more are invalid
 func ParseSeriesByTagExpression(seriesByTagQuery string) (Expressions, error) {
-	startPos := len(SeriesByTagIdent)
-	endPos := strings.LastIndex(seriesByTagQuery, ")")
+	startPos := len(seriesByTagIdent)
+	endPos := len(seriesByTagQuery) - 1
 	return parseTagExpressions(seriesByTagQuery[startPos:endPos])
 }
 

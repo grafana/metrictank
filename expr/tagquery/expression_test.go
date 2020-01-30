@@ -429,3 +429,23 @@ func TestParseTagExpressions(t *testing.T) {
 		}
 	}
 }
+
+func TestIsSeriesByTagExpression(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  bool
+	}{
+		{"happy path", "seriesByTag('key=value')", true},
+		{"valid", "someOtherQuery('key=value')", false},
+		{"trailing characters", "seriesByTag('key=value')invalid", false},
+		{"unclosed", "seriesByTag('key=value'", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSeriesByTagExpression(tt.query); got != tt.want {
+				t.Errorf("IsSeriesByTagExpression() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
