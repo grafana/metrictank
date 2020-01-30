@@ -78,7 +78,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 			}
 		}
 		if len(split.mdpyes) > 0 {
-			split.mdpyes, ok = planLowestResForMDPMulti(now, from, to, split.mdpyes)
+			split.mdpyes, ok = planLowestResForMDPMulti(now, from, to, planMDP, split.mdpyes)
 			if !ok {
 				return nil, errUnSatisfiable
 			}
@@ -92,7 +92,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		}
 	}
 	for i, req := range rp.single.mdpyes {
-		rp.single.mdpyes[i], ok = planLowestResForMDPSingle(now, from, to, req)
+		rp.single.mdpyes[i], ok = planLowestResForMDPSingle(now, from, to, planMDP, req)
 		if !ok {
 			return nil, errUnSatisfiable
 		}
@@ -113,7 +113,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		if rp.PointsFetch() > uint32(mpprSoft) {
 			for group, split := range rp.pngroups {
 				if len(split.mdpno) > 0 {
-					split.mdpno, ok = planLowestResForMDPMulti(now, from, to, split.mdpno)
+					split.mdpno, ok = planLowestResForMDPMulti(now, from, to, planMDP, split.mdpno)
 					if !ok {
 						return nil, errUnSatisfiable
 					}
@@ -124,7 +124,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 				}
 			}
 			for i, req := range rp.single.mdpno {
-				rp.single.mdpno[i], ok = planLowestResForMDPSingle(now, from, to, req)
+				rp.single.mdpno[i], ok = planLowestResForMDPSingle(now, from, to, planMDP, req)
 				if !ok {
 					return nil, errUnSatisfiable
 				}
@@ -185,7 +185,7 @@ func planHighestResSingle(now, from, to uint32, req models.Req) (models.Req, boo
 	return req, ok
 }
 
-func planLowestResForMDPSingle(now, from, to uint32, req models.Req) (models.Req, bool) {
+func planLowestResForMDPSingle(now, from, to, mdp uint32, req models.Req) (models.Req, bool) {
 	rets := getRetentions(req)
 	var ok bool
 	for i := len(rets) - 1; i >= 0; i-- {
@@ -195,7 +195,7 @@ func planLowestResForMDPSingle(now, from, to uint32, req models.Req) (models.Req
 		}
 		ok = true
 		req.Plan(i, rets[i])
-		if req.PointsFetch() >= req.MaxPoints/2 {
+		if req.PointsFetch() >= mdp/2 {
 			break
 		}
 	}
@@ -243,7 +243,7 @@ func planHighestResMulti(now, from, to uint32, reqs []models.Req) ([]models.Req,
 }
 
 // note: we can assume all reqs have the same MDP.
-func planLowestResForMDPMulti(now, from, to uint32, reqs []models.Req) ([]models.Req, bool) {
+func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]models.Req, bool) {
 	var ok bool
 	minTTL := now - from
 
@@ -251,7 +251,7 @@ func planLowestResForMDPMulti(now, from, to uint32, reqs []models.Req) ([]models
 	// we'd still have to align them to their LCM interval, which may push them in to
 	// "too coarse" territory.
 	// instead, we pick the coarsest allowable artificial interval...
-	maxInterval := (2 * (to - from)) / reqs[0].MaxPoints
+	maxInterval := (2 * (to - from)) / mdp
 	// ...and then we look for the combination of intervals that scores highest.
 	// the bigger the interval the better (load less points), adjusted for number of reqs that
 	// have that interval. but their combined LCM may not exceed maxInterval.
