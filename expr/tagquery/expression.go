@@ -24,6 +24,10 @@ func (i InvalidExpressionError) Code() int {
 
 type Expressions []Expression
 
+//ParseExpressions parses a list of graphite tag expressions (as used by the `seriesByTag` function).
+//tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
+//seriesBytTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
+//Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
 func ParseExpressions(expressions []string) (Expressions, error) {
 	res := make(Expressions, len(expressions))
 	for i := range expressions {
@@ -95,7 +99,8 @@ func (e *Expressions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Expression represents one expression inside a query of one or many expressions.
+// Expression represents a single Graphite tag expression (see documentation for `ParseExpressions`).
+// An expression is part of a query containing one or many expressions.
 // It provides all the necessary methods that are required to do a tag lookup from an index keyed by
 // tags & values, such as the type memory.TagIndex or the type memory.metaTagIndex.
 // It is also comes with a method to generate a filter which decides whether a given MetricDefinition
@@ -113,9 +118,8 @@ type Expression interface {
 	// if an expression has evaluated a metric against all indexes and has not come to a conclusive
 	// decision, then the default decision gets applied.
 	//
-	// Example
-	// metric1 has tags ["name=a.b.c", "some=value"] in the metric tag index, we evaluate the expression
-	// "anothertag!=value":
+	// Example using the expression returned by `ParseExpression("anothertag!=value")`
+	// metric1 has tags ["name=a.b.c", "some=value"] in the metric tag index
 	// 1) expression looks at the metric tag index and it sees that metric1 does not have a tag "anothertag"
 	//    with the value "value", but at this point it doesn't know if another index that will be looked
 	//    at later does, so it returns the decision "none".
