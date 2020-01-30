@@ -32,6 +32,8 @@ func (s *FuncSummarize) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncSummarize) Context(context Context) Context {
+	context.MDP = 0
+	context.PNGroup = 0
 	context.consol = 0
 	return context
 }
@@ -68,14 +70,16 @@ func (s *FuncSummarize) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		out := summarizeValues(serie, aggFunc, interval, newStart, newEnd)
 
 		output := models.Series{
-			Target:     newName(serie.Target),
-			QueryPatt:  newName(serie.QueryPatt),
-			QueryFrom:  serie.QueryFrom,
-			QueryTo:    serie.QueryTo,
-			Tags:       serie.CopyTagsWith("summarize", s.intervalString),
-			Datapoints: out,
-			Interval:   interval,
-			Meta:       serie.Meta,
+			Target:       newName(serie.Target),
+			QueryPatt:    newName(serie.QueryPatt),
+			QueryFrom:    serie.QueryFrom,
+			QueryTo:      serie.QueryTo,
+			QueryMDP:     serie.QueryMDP,
+			QueryPNGroup: serie.QueryPNGroup,
+			Tags:         serie.CopyTagsWith("summarize", s.intervalString),
+			Datapoints:   out,
+			Interval:     interval,
+			Meta:         serie.Meta,
 		}
 		output.Tags["summarizeFunction"] = s.fn
 

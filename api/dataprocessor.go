@@ -329,7 +329,7 @@ LOOP:
 
 }
 
-// getTarget returns the series for the request in canonical form.
+// getTarget returns the series for the request in canonical form with respect to their OutInterval
 // as ConsolidateContext just processes what it's been given (not "stable" or bucket-aligned to the output interval)
 // we simply make sure to pass it the right input such that the output is canonical.
 func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req models.Req) (out models.Series, err error) {
@@ -352,6 +352,8 @@ func (s *Server) getTarget(ctx context.Context, ss *models.StorageStats, req mod
 		QueryTo:      req.To,
 		QueryCons:    req.ConsReq,
 		Consolidator: req.Consolidator,
+		QueryMDP:     req.MaxPoints,
+		QueryPNGroup: req.PNGroup,
 		Meta: []models.SeriesMetaProperties{
 			{
 				// note that for simplicity, we pretend that a read of rollup avg data is a read of 1 "avg series"
@@ -405,7 +407,7 @@ func logLoad(typ string, key schema.AMKey, from, to uint32) {
 	log.Debugf("DP load from %-6s %20s %d - %d (%s - %s) span:%ds", typ, key, from, to, util.TS(from), util.TS(to), to-from-1)
 }
 
-// getSeriesFixed fetches the series and returns it in quantized, pre-canonical form.
+// getSeriesFixed fetches the series and returns it in quantized, pre-canonical form with respect to their OutInterval
 // TODO: we can probably forego Fix if archive > 0, because only raw chunks are not quantized yet.
 // the requested consolidator is the one that will be used for selecting the archive to read from
 func (s *Server) getSeriesFixed(ctx context.Context, ss *models.StorageStats, req models.Req, consolidator consolidation.Consolidator) ([]schema.Point, error) {
@@ -617,17 +619,19 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 	return iters, nil
 }
 
-// check for duplicate series names for the same query. If found merge the results.
+// check for duplicate series names for the same query target. If found merge the results.
 // each first uniquely-identified series's backing datapoints slice is reused
 // any subsequent non-uniquely-identified series is merged into the former and has its
 // datapoints slice returned to the pool. input series must be canonical
 func mergeSeries(in []models.Series) []models.Series {
 	type segment struct {
-		target string
-		query  string
-		from   uint32
-		to     uint32
-		con    consolidation.Consolidator
+		target  string
+		query   string
+		from    uint32
+		to      uint32
+		con     consolidation.Consolidator
+		mdp     uint32
+		pngroup models.PNGroup
 	}
 	seriesByTarget := make(map[segment][]models.Series)
 	for _, series := range in {
@@ -637,6 +641,8 @@ func mergeSeries(in []models.Series) []models.Series {
 			series.QueryFrom,
 			series.QueryTo,
 			series.Consolidator,
+			series.QueryMDP,
+			series.QueryPNGroup,
 		}
 		seriesByTarget[s] = append(seriesByTarget[s], series)
 	}
@@ -767,7 +773,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// if the series has some excess at the end, it may aggregate into a bucket with a timestamp out of the desired range.
 		// for example: imagine we take the case from above, and the user specified a `to` of 115.
 		// a native 30s series would end with point 90. We should not include any points that would go into an aggregation bucket with timestamp higher than 90.
-		// (such as 100 or 110 which would technically be allowed by the `to` specification)
+		// (such as 100 or 110 which would technically be allowed by the `to` specification but land in the bucket with ts=120 which is out of bounds)
 		// so the proper to value is the highest value that does not result in points going into an out-of-bounds bucket.
 
 		// example: for 10s data (note that the 2 last colums should always match!)

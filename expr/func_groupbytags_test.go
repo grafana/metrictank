@@ -12,16 +12,6 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-func getModel(name string, data []schema.Point) models.Series {
-	series := models.Series{
-		Target:     name,
-		QueryPatt:  name,
-		Datapoints: getCopy(data),
-	}
-	series.SetTags()
-	return series
-}
-
 // Test error cases
 func TestNoTags(t *testing.T) {
 	in := []models.Series{

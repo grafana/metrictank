@@ -28,6 +28,7 @@ func (s *FuncGroupByTags) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncGroupByTags) Context(context Context) Context {
+	context.PNGroup = 0
 	return context
 }
 
@@ -124,12 +125,14 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 			QueryCons:    queryCons,
 			QueryFrom:    group.s[0].QueryFrom,
 			QueryTo:      group.s[0].QueryTo,
+			QueryMDP:     group.s[0].QueryMDP,
+			QueryPNGroup: group.s[0].QueryPNGroup,
 			Meta:         group.m,
 		}
 		newSeries.SetTags()
 
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
-
+		group.s = normalize(cache, group.s)
 		aggFunc(group.s, &newSeries.Datapoints)
 		cache[Req{}] = append(cache[Req{}], newSeries)
 

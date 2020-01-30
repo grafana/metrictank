@@ -20,6 +20,10 @@ func GetMKey(suffix int) schema.MKey {
 	}
 }
 
+func KeyToInt(key schema.MKey) int {
+	return int(uint32(key.Key[15]) + uint32(key.Key[14])<<8 + uint32(key.Key[13])<<16 + uint32(key.Key[12])<<24)
+}
+
 func MustMKeyFromString(id string) schema.MKey {
 	mkey, err := schema.MKeyFromString(id)
 	if err != nil {

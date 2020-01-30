@@ -12,9 +12,29 @@
   * finds all series by fanning out the query patterns to all other shards. 
     this gives basically idx.Node back. has the path, leaf, metricdefinition, schema/aggregation(rollup) settings, for each series, as well as on which node it can be found.
   * construct models.Req objects for each serie. this uses the MKey to identify series, also sets from/to, maxdatapoints, etc.
-  * `alignRequests`: this looks at all models.Req objects and aligns them to a common step.
-    it selects the archive to use, consolidator settings etc (see NOTES in expr directory for more info)
+  * `planRequests`: this plans all models.Req objects, deciding which archive to read from, whether to apply normalization, etc.
+    (see NOTES in expr directory for more info)
   * `getTargets`: gets the data from the local node and peer nodes based on the models.Req objects
   * `mergeSeries`: if there's multiple series with same name/tags, from, to and consolidator (e.g. because there's multiple series because users switched intervals), merge them together into one series
   * Sort each merged series so that the output of a function is well-defined and repeatable.
   * `plan.Run`:  invoke all function processing, followed by runtime consolidation as necessary
+
+## MDP-optimization
+
+MDP at the leaf of the expr tree (fetch request) of 0 means don't optimize.  If set it to >0 it means the request can be optimized.
+When the data may be subjected to a GR-function, we set it to 0.
+How do we achieve this?
+* MDP at the root is set 0 if the request came from graphite or to MaxDataPoints otherwise.
+* as the context flows from root through the processing functions to the data requests, if we hit a GR function, we set MDP to 0 on the context (and thus also on any subsequent requests)
+
+## Pre-normalization
+
+Any data requested (checked at the leaf node of the expr tree) should have its own independent interval.
+However, multiple series getting fetched that then get aggregated together may be pre-normalized if they are part of the same pre-normalization-group (have a common PNGroup that is > 0).
+(for more details see devdocs/alignrequests-too-course-grained.txt)
+The mechanics here are:
+* we set PNGroup to 0 by default on the context, which gets inherited down the tree
+* as we traverse down tree: transparent aggregations set PNGroups to the pointer value of that function, to uniquely identify any further data requests that will be fed into the same transparent aggregation.
+* as we traverse down, any opaque aggregation functions and IA-functions reset PNGroup back to 0. Note that currently all known IA functions are also GR functions and vice versa. Meaning,
+  as we pass functions like smartSummarize which should undo MDP-optimization, they also undo pre-normalization.
+

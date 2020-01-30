@@ -40,6 +40,8 @@ func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	name := fmt.Sprintf("countSeries(%s)", strings.Join(queryPatts, ","))
 	out := pointSlicePool.Get().([]schema.Point)
 
+	// note: if series have different intervals, we could try to be clever and pick the one with highest resolution
+	// as it's more likely to be useful when combined with other functions, but that's too much hassle
 	l := float64(len(series))
 	for _, p := range series[0].Datapoints {
 		p.Val = l

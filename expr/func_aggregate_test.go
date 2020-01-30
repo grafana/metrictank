@@ -16,16 +16,10 @@ func TestAggregateIdentity(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				{
-					QueryPatt:  "single",
-					Datapoints: getCopy(a),
-				},
+				getQuerySeries("single", a),
 			},
 		},
-		models.Series{
-			Target:     "averageSeries(single)",
-			Datapoints: getCopy(a),
-		},
+		getTargetSeries("averageSeries(single)", a),
 		t,
 	)
 	testAggregate(
@@ -33,16 +27,10 @@ func TestAggregateIdentity(t *testing.T) {
 		"sum",
 		[][]models.Series{
 			{
-				{
-					QueryPatt:  "single",
-					Datapoints: getCopy(a),
-				},
+				getQuerySeries("single", a),
 			},
 		},
-		models.Series{
-			Target:     "sumSeries(single)",
-			Datapoints: getCopy(a),
-		},
+		getTargetSeries("sumSeries(single)", a),
 		t,
 	)
 }
@@ -52,16 +40,10 @@ func TestAggregateQueryToSingle(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
+				getQuerySeries("foo.*", a),
 			},
 		},
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(a),
-		},
+		getTargetSeries("averageSeries(foo.*)", a),
 		t,
 	)
 }
@@ -71,20 +53,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(b),
-				},
+				getQuerySeries("foo.*", a),
+				getQuerySeries("foo.*", b),
 			},
 		},
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgab),
-		},
+		getTargetSeries("averageSeries(foo.*)", avgab),
 		t,
 	)
 	testAggregate(
@@ -92,20 +65,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"sum",
 		[][]models.Series{
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(b),
-				},
+				getQuerySeries("foo.*", a),
+				getQuerySeries("foo.*", b),
 			},
 		},
-		models.Series{
-			Target:     "sumSeries(foo.*)",
-			Datapoints: getCopy(sumab),
-		},
+		getTargetSeries("sumSeries(foo.*)", sumab),
 		t,
 	)
 	testAggregate(
@@ -113,40 +77,22 @@ func TestAggregateMultiple(t *testing.T) {
 		"max",
 		[][]models.Series{
 			{
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(a),
-				},
-				{
-					QueryPatt:  "foo.*",
-					Datapoints: getCopy(b),
-				},
+				getQuerySeries("foo.*", a),
+				getQuerySeries("foo.*", b),
 			},
 		},
-		models.Series{
-			Target:     "maxSeries(foo.*)",
-			Datapoints: getCopy(maxab),
-		},
+		getTargetSeries("maxSeries(foo.*)", maxab),
 		t,
 	)
 }
 func TestAggregateMultipleDiffQuery(t *testing.T) {
 	input := [][]models.Series{
 		{
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(a),
-			},
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("foo.*", a),
+			getQuerySeries("foo.*", b),
 		},
 		{
-			{
-				QueryPatt:  "movingAverage(bar, '1min')",
-				Datapoints: getCopy(c),
-			},
+			getQuerySeries("movingAverage(bar, '1min')", c),
 		},
 	}
 
@@ -154,30 +100,21 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"avg-multiple-serieslists",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*,movingAverage(bar, '1min'))",
-			Datapoints: getCopy(avgabc),
-		},
+		getTargetSeries("averageSeries(foo.*,movingAverage(bar, '1min'))", avgabc),
 		t,
 	)
 	testAggregate(
 		"sum-multiple-serieslists",
 		"sum",
 		input,
-		models.Series{
-			Target:     "sumSeries(foo.*,movingAverage(bar, '1min'))",
-			Datapoints: getCopy(sumabc),
-		},
+		getTargetSeries("sumSeries(foo.*,movingAverage(bar, '1min'))", sumabc),
 		t,
 	)
 	testAggregate(
 		"max-multiple-serieslists",
 		"max",
 		input,
-		models.Series{
-			Target:     "maxSeries(foo.*,movingAverage(bar, '1min'))",
-			Datapoints: getCopy(maxabc),
-		},
+		getTargetSeries("maxSeries(foo.*,movingAverage(bar, '1min'))", maxabc),
 		t,
 	)
 }
@@ -186,56 +123,32 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 func TestAggregateMultipleTimesSameInput(t *testing.T) {
 	input := [][]models.Series{
 		{
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(a),
-			},
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("foo.*", a),
+			getQuerySeries("foo.*", b),
 		},
 		{
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(a),
-			},
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("foo.*", a),
+			getQuerySeries("foo.*", b),
 		},
 		{
-			{
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("a", a),
 		},
 		{
-			{
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("a", a),
 		},
 	}
 	testAggregate(
 		"avg-multiple-times-same-input",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*,foo.*,a,a)",
-			Datapoints: getCopy(avg4a2b),
-		},
+		getTargetSeries("averageSeries(foo.*,foo.*,a,a)", avg4a2b),
 		t,
 	)
 	testAggregate(
 		"sum-multiple-times-same-input",
 		"sum",
 		input,
-		models.Series{
-			Target:     "sumSeries(foo.*,foo.*,a,a)",
-			Datapoints: getCopy(sum4a2b),
-		},
+		getTargetSeries("sumSeries(foo.*,foo.*,a,a)", sum4a2b),
 		t,
 	)
 }

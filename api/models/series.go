@@ -26,6 +26,8 @@ type Series struct {
 	QueryTo      uint32                     // to tie series back to request it came from
 	QueryCons    consolidation.Consolidator // to tie series back to request it came from (may be 0 to mean use configured default)
 	Consolidator consolidation.Consolidator // consolidator to actually use (for fetched series this may not be 0, default must be resolved. if series created by function, may be 0)
+	QueryMDP     uint32                     // to tie series back to request it came from
+	QueryPNGroup PNGroup                    // to tie series back to request it came from
 	Meta         SeriesMeta                 // note: this series could be a "just fetched" series, or one derived from many other series
 	Datapoints   []schema.Point
 }
@@ -77,7 +79,7 @@ func (smp SeriesMetaProperties) Export() SeriesMetaPropertiesExport {
 	}
 }
 
-// Merge merges SeriesMeta b into a
+// Merge merges SeriesMeta b into a and returns the modified a
 // counts for identical properties get added together
 func (a SeriesMeta) Merge(b SeriesMeta) SeriesMeta {
 	// note: to see which properties are equivalent we should not consider the count
@@ -209,6 +211,8 @@ func (s Series) Copy(emptyDatapoints []schema.Point) Series {
 		QueryTo:      s.QueryTo,
 		QueryCons:    s.QueryCons,
 		Consolidator: s.Consolidator,
+		QueryMDP:     s.QueryMDP,
+		QueryPNGroup: s.QueryPNGroup,
 		Meta:         s.Meta.Copy(),
 	}
 }
