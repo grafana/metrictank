@@ -38,3 +38,21 @@ The mechanics here are:
 * as we traverse down, any opaque aggregation functions and IA-functions reset PNGroup back to 0. Note that currently all known IA functions are also GR functions and vice versa. Meaning,
   as we pass functions like smartSummarize which should undo MDP-optimization, they also undo pre-normalization.
 
+
+## MaxDataPoints
+
+The flow is described below in detail, but basically:
+* we take the incoming MDP value (set it 0 if came from graphite) and put that in the Plan. This value is consulted to know what to MDP optimize against (if applicable), to apply runtime consolidation (if applicable) and to report on the number of points that will be emitted.
+* the MDP value from the plan is passed through the Context into the expr.Req types. (but is cleared if the optimization is disabled or by certain functions. See "MDP-optimization" above)
+This value is used only to control whether or not to apply MDP-optimization when planning the fetching of the request.
+
+mdp set from GET param, but 0 if came from graphite
+    -> NewPlan()
+        -> plan.MaxDatapoints 
+        -> Context.MDP, though GR functions like (smart)Summarize set r.MDP =0
+            -> expr.NewReqFromContext()
+                -> expr.Req.MDP 
+                    -> executePlan() models.NewReq() -> models.Req.MaxPoints
+                        -> planRequests(): used for MDP-optimization
+            -> plan.MaxDatapoints used for final runtime consolidation
+	    -> and also used in planRequests() for reporting

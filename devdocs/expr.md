@@ -9,8 +9,7 @@
 
 ## consider whether the function is GR, IA, a transparent or opaque aggregation, or combine different series together somehow
 
-Such functions require special options.
-see https://github.com/grafana/metrictank/issues/926#issuecomment-559596384
+Such functions require special options. see [the optimizations documentation](../docs/render-path.md#optimizations)
 
 ## implement our copy-on-write approach when dealing with modifying series
 
