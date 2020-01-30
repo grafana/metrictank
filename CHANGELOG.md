@@ -25,6 +25,33 @@
   queries don't return the same results as before, if they query for tags as part of the metric
   name.
   #1619
+* as of v0.13.1-250-g21d1dcd1 metrictank no longer excessively aligns all data to the same
+  lowest comon multiple resolution, but rather keeps data at their native resolution when possible.
+  1. When queries request mixed resolution data, this will now typically result in larger response datasets,
+  with more points, and thus slower responses.
+  Though the max-points-per-req-soft and max-points-per-req-hard settings will still help curb this problem.
+  Note that the hard limit was previously not always applied correctly.
+  Queries may run into this limit (and error) when they did not before.
+  2. This version introduces 2 new optimizations (see pre-normalization and mdp-optimization settings).
+  The latter is experimental and disabled by default, but the former is recommended and enabled by default.
+  It helps with alleviating the extra cost of queries in certain cases
+  (See https://github.com/grafana/metrictank/blob/master/docs/render-path.md#pre-normalization for more details)
+  When upgrading a cluster in which you want to enable pre-normalization (recommended),
+  you must apply caution: pre-normalization requires a PNGroup property to be
+  communicated in intra-cluster data requests, which older peers don't have.
+  The peer receiving the client request, which fans out the query across the cluster, will only set
+  the flag if the optimization is enabled (and applicable).  If the flag is set for the requests,
+  it will need the same flag set in the responses it receives from its peers in order to tie the data back to the initiating requests. 
+  Otherwise, the data won't be included in the response, which may result in missing series, incorrect aggregates, etc.
+  Peers responding to a getdata request will include the field in the response, whether it has the
+  optimization enabled or not.
+
+  Thus, to upgrade an existing cluster, you have 2 options:
+  A) disable pre-normalization, do an in-place upgrade. enable it, do another in-place upgrade.
+     This works regardless of whether you have a separate query peers, and regardless of whether you first
+     upgrade query or shard nodes.
+  B) do a colored deployment: create a new gossip cluster that has the optimization enabled from the get-go,
+     then delete the older deployment.
 
 ## other
 
