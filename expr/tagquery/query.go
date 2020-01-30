@@ -20,7 +20,7 @@ func init() {
 	QueryHash = util.NewFnv32aStringWriter
 }
 
-//A Query is a set of graphite tag expressions as used by the graphite `seriesByTag` function
+//Query is a set of graphite tag expressions as used by the graphite `seriesByTag` function.
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
 //seriesByTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
 type Query struct {
@@ -36,10 +36,10 @@ type Query struct {
 	tagClause int
 }
 
-//Parse the list of graphite tag expressions as used by the seriesByTag function
+//NewQueryFromStrings parses a list of graphite tag expressions as used by the graphite `seriesByTag` function.
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
 //seriesByTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
-//Some possible tag expressions: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name)
+//Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
 func NewQueryFromStrings(expressionStrs []string, from int64) (Query, error) {
 	var res Query
 	expressions, err := ParseExpressions(expressionStrs)

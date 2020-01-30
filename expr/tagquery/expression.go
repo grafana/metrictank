@@ -24,10 +24,10 @@ func (i InvalidExpressionError) Code() int {
 
 type Expressions []Expression
 
-//Parse the list of graphite tag expressions as used by the seriesByTag function
+//ParseExpressions parses a list of graphite tag expressions (as used by the `seriesByTag` function).
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
 //seriesBytTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
-//Some possible tag expressions: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name)
+//Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
 func ParseExpressions(expressions []string) (Expressions, error) {
 	res := make(Expressions, len(expressions))
 	for i := range expressions {
