@@ -508,7 +508,8 @@ func testDeleteTagged(t *testing.T) {
 		So(err, ShouldBeNil)
 		query, err := tagquery.NewQueryFromStrings(tags.Strings(), 0)
 		So(err, ShouldBeNil)
-		ids := ix.DeleteTagged(1, query)
+		ids, err := ix.DeleteTagged(1, query)
+		So(err, ShouldBeNil)
 		So(ids, ShouldHaveLength, 1)
 		So(ids[0].Id.String(), ShouldEqual, org1Series[3].Id)
 		Convey("series should not be present in the metricDef index", func() {

@@ -12,6 +12,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
@@ -668,16 +669,46 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	if err != nil {
 		return defs, err
 	}
+
+	err = c.deleteDefs(defs)
+	if err != nil {
+		return nil, err
+	}
+
+	statDeleteDuration.Value(time.Since(pre))
+	return defs, err
+}
+
+func (c *CasIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+	pre := time.Now()
+	defs, err := c.MemoryIndex.DeleteTagged(orgId, query)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.deleteDefs(defs)
+	if err != nil {
+		return nil, err
+	}
+
+	statDeleteDuration.Value(time.Since(pre))
+	return defs, err
+}
+
+func (c *CasIdx) deleteDefs(defs []idx.Archive) error {
+	var err error
+
 	if c.Config.updateCassIdx {
 		for _, def := range defs {
-			err = c.deleteDef(def.Id, def.Partition)
-			if err != nil {
-				log.Errorf("cassandra-idx: %s", err.Error())
+			delErr := c.deleteDef(def.Id, def.Partition)
+			if delErr != nil {
+				log.Errorf("cassandra-idx: %s", delErr.Error())
+				err = delErr
 			}
 		}
 	}
-	statDeleteDuration.Value(time.Since(pre))
-	return defs, err
+
+	return err
 }
 
 func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {

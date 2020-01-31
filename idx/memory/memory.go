@@ -1755,10 +1755,10 @@ func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	return defs
 }
 
-func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) []idx.Archive {
+func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
-		return nil
+		return nil, nil
 	}
 
 	queryCtx := NewTagQueryContext(query)
@@ -1774,7 +1774,7 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 
 	m.Lock()
 	defer m.Unlock()
-	return m.deleteTaggedByIdSet(orgId, ids)
+	return m.deleteTaggedByIdSet(orgId, ids), nil
 }
 
 // deleteTaggedByIdSet deletes a map of ids from the tag index and also the DefByIds
