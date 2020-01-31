@@ -163,6 +163,26 @@ POST /metrics/delete
 curl -H "X-Org-Id: 12345" --data query=statsd.fakesite.counters.session_start.*.count "http://localhost:6060/metrics/delete"
 ```
 
+
+## Deleting tagged metrics
+
+This will delete the metrics (technically metricdefinitions) matching the `path` parameter(s).
+Note that the data stays in the datastore until it expires.
+Should the metrics enter the system again with the same metadata, the data will show up again.
+
+```
+POST /tags/delSeries
+```
+
+* header `X-Org-Id` required
+* path (required, multiple allowed): A single Graphite series
+
+#### Example
+
+```bash
+curl -H "X-Org-Id: 12345" -d "path=some.series;key=value" -d "path=another.series;tag=value" "http://localhost:6060/tags/delSeries"
+```
+
 ## Graphite query api
 
 Graphite-web-like api. It can return JSON, pickle or messagepack output
