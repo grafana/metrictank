@@ -49,11 +49,12 @@ func Logger() macaron.Handler {
 			return
 		}
 
-		content := fmt.Sprintf("ts=%s", time.Now().Format(time.RFC3339Nano))
+		var content strings.Builder
+		fmt.Fprintf(&content, "ts=%s", time.Now().Format(time.RFC3339Nano))
 
 		traceID, _ := extractTraceID(ctx.Req.Context())
 		if traceID != "" {
-			content += fmt.Sprintf(" traceID=%s", traceID)
+			fmt.Fprintf(&content, " traceID=%s", traceID)
 		}
 
 		err := ctx.Req.ParseForm()
@@ -65,15 +66,15 @@ func Logger() macaron.Handler {
 			paramsAsString += "?"
 			paramsAsString += ctx.Req.Form.Encode()
 		}
-		content += fmt.Sprintf(" msg=\"%s %s%s (%v) %v\" orgID=%d", ctx.Req.Method, ctx.Req.URL.Path, paramsAsString, rw.Status(), time.Since(start), ctx.OrgId)
+		fmt.Fprintf(&content, " msg=\"%s %s%s (%v) %v\" orgID=%d", ctx.Req.Method, ctx.Req.URL.Path, paramsAsString, rw.Status(), time.Since(start), ctx.OrgId)
 
 		referer := ctx.Req.Referer()
 		if referer != "" {
-			content += fmt.Sprintf(" referer=%s", referer)
+			fmt.Fprintf(&content, " referer=%s", referer)
 		}
 		sourceIP := ctx.RemoteAddr()
 		if sourceIP != "" {
-			content += fmt.Sprintf(" sourceIP=\"%s\"", sourceIP)
+			fmt.Fprintf(&content, " sourceIP=\"%s\"", sourceIP)
 		}
 
 		var errorMsg string
@@ -81,7 +82,7 @@ func Logger() macaron.Handler {
 			errorMsg = url.PathEscape(string(rw.errBody))
 		}
 		if errorMsg != "" {
-			content += fmt.Sprintf(" error=\"%s\"", errorMsg)
+			fmt.Fprintf(&content, " error=\"%s\"", errorMsg)
 		}
 
 		if logHeaders {
@@ -90,11 +91,11 @@ func Logger() macaron.Handler {
 				log.Errorf("Could not extract request headers: %v", err)
 			}
 			if headers != "" {
-				content += fmt.Sprintf(" headers=\"%s\"", string(headers))
+				fmt.Fprintf(&content, " headers=\"%s\"", string(headers))
 			}
 		}
 
-		log.Println(colorLog(rw.Status(), content))
+		log.Println(colorLog(rw.Status(), content.String()))
 	}
 }
 
