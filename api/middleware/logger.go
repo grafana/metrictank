@@ -95,17 +95,7 @@ func Logger() macaron.Handler {
 			}
 		}
 
-		log.Println(colorLog(rw.Status(), content.String()))
-	}
-}
-
-func colorLog(statusCode int, log string) string {
-	if statusCode >= 200 && statusCode <= 202 {
-		return fmt.Sprintf("\033[1;32m%s\033[0m", log)
-	} else if statusCode >= 300 {
-		return fmt.Sprintf("\033[1;31m%s\033[0m", log)
-	} else {
-		return log
+		log.Println(content.String())
 	}
 }
 
