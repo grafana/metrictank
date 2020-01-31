@@ -422,30 +422,54 @@ func TestDelete(t *testing.T) {
 }
 
 func testDelete(t *testing.T) {
-	idx.OrgIdPublic = 100
-	defer func() { idx.OrgIdPublic = 0 }()
+	Convey("given series for multiple orgs", t, func() {
+		idx.OrgIdPublic = 100
+		defer func() { idx.OrgIdPublic = 0 }()
 
-	ix := New()
-	ix.Init()
-	defer ix.Stop()
+		ix := New()
+		ix.Init()
+		defer ix.Stop()
 
-	publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
-	org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
+		publicSeries := getMetricData(idx.OrgIdPublic, 2, 5, 10, "metric.public", false)
+		org1Series := getMetricData(1, 2, 5, 10, "metric.org1", false)
 
-	for _, s := range publicSeries {
-		mkey, err := schema.MKeyFromString(s.Id)
-		if err != nil {
-			t.Fatal(err)
+		for _, s := range publicSeries {
+			mkey, err := schema.MKeyFromString(s.Id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ix.AddOrUpdate(mkey, s, getPartition(s))
 		}
-		ix.AddOrUpdate(mkey, s, getPartition(s))
-	}
-	for _, s := range org1Series {
-		mkey, err := schema.MKeyFromString(s.Id)
-		if err != nil {
-			t.Fatal(err)
+		for _, s := range org1Series {
+			mkey, err := schema.MKeyFromString(s.Id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ix.AddOrUpdate(mkey, s, getPartition(s))
 		}
-		ix.AddOrUpdate(mkey, s, getPartition(s))
-	}
+
+		Convey("when a pattern is deleted from an org", func() {
+			archives, err := ix.Delete(idx.OrgIdPublic, "metric.*")
+
+			Convey("the deleted archives should be returned", func() {
+				So(err, ShouldBeNil)
+				So(archives, ShouldHaveLength, 5)
+				So(archives[0].Name, ShouldStartWith, "metric.public")
+			})
+
+			Convey("the deleted metrics should not be in the index", func() {
+				nodes, err := ix.Find(idx.OrgIdPublic, "metric.*", 0)
+				So(err, ShouldBeNil)
+				So(nodes, ShouldHaveLength, 0)
+			})
+
+			Convey("metrics from different orgs should not be impacted", func() {
+				nodes, err := ix.Find(1, "metric.*", 0)
+				So(err, ShouldBeNil)
+				So(nodes, ShouldHaveLength, 1)
+			})
+		})
+	})
 }
 
 func TestDeleteTagged(t *testing.T) {
