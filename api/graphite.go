@@ -625,8 +625,22 @@ func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
 		return 0, nil
 	}
 
-	defs, err := s.MetricIndex.Delete(orgId, query)
-	return len(defs), err
+	if tagquery.IsSeriesByTagExpression(query) {
+		exprs, err := tagquery.ParseSeriesByTagExpression(query)
+		if err != nil {
+			return 0, err
+		}
+		q, err := tagquery.NewQuery(exprs, 0)
+		if err != nil {
+			return 0, err
+		}
+		defs := s.MetricIndex.DeleteTagged(orgId, q)
+		return len(defs), err
+
+	} else {
+		defs, err := s.MetricIndex.Delete(orgId, query)
+		return len(defs), err
+	}
 }
 
 func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query string, peer cluster.Node) (int, error) {
