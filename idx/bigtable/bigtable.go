@@ -483,15 +483,10 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	if err != nil {
 		return defs, err
 	}
-	if b.cfg.UpdateBigtableIdx {
-		for _, def := range defs {
-			delErr := b.deleteDef(&def.MetricDefinition)
-			// the last error encountered will be passed back to the caller
-			if delErr != nil {
-				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinition.Id, err)
-				err = delErr
-			}
-		}
+
+	err = b.deleteDefs(defs)
+	if err != nil {
+		return nil, err
 	}
 
 	statDeleteDuration.Value(time.Since(pre))
@@ -505,6 +500,18 @@ func (b *BigtableIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Ar
 		return nil, err
 	}
 
+	err = b.deleteDefs(defs)
+	if err != nil {
+		return nil, err
+	}
+
+	statDeleteDuration.Value(time.Since(pre))
+	return defs, err
+}
+
+func (b *BigtableIdx) deleteDefs(defs []idx.Archive) error {
+	var err error
+
 	if b.cfg.UpdateBigtableIdx {
 		for _, def := range defs {
 			delErr := b.deleteDef(&def.MetricDefinition)
@@ -516,8 +523,7 @@ func (b *BigtableIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Ar
 		}
 	}
 
-	statDeleteDuration.Value(time.Since(pre))
-	return defs, err
+	return err
 }
 
 func (b *BigtableIdx) deleteDef(def *schema.MetricDefinition) error {
