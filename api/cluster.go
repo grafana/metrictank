@@ -389,7 +389,7 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 		return
 	}
 
-	defs, err := s.metricsDeleteLocal(req.OrgId, req.Query)
+	numDeleted, err := s.metricsDeleteLocal(req.OrgId, req.Query)
 	if err != nil {
 		// errors can only be caused by bad request.
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
@@ -397,7 +397,7 @@ func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
 	}
 
 	resp := models.MetricsDeleteResp{
-		DeletedDefs: defs,
+		DeletedDefs: numDeleted,
 	}
 	response.Write(ctx, response.NewMsgp(200, &resp))
 }

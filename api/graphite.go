@@ -572,7 +572,7 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 		wg.Add(1)
 		if peer.IsLocal() {
 			go func() {
-				result, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
+				numDeleted, err := s.metricsDeleteLocal(ctx.OrgId, req.Query)
 				var e error
 				if err != nil {
 					cancel()
@@ -585,7 +585,7 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 				responses <- struct {
 					deleted int
 					err     error
-				}{result, e}
+				}{numDeleted, e}
 				wg.Done()
 			}()
 		} else {
@@ -633,6 +633,8 @@ func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete
 	response.Write(ctx, response.NewJson(200, resp, ""))
 }
 
+//metricsDeleteLocal deletes any metrics from the server's MetricIndex that match the given orgId and query,
+//returning the number of metrics deleted, or the error if one occurred.
 func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
 
 	// nothing to do on query nodes.
