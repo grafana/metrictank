@@ -77,11 +77,8 @@ func Logger() macaron.Handler {
 			fmt.Fprintf(&content, " sourceIP=\"%s\"", sourceIP)
 		}
 
-		var errorMsg string
 		if rw.Status() < 200 || rw.Status() >= 300 {
-			errorMsg = url.PathEscape(string(rw.errBody))
-		}
-		if errorMsg != "" {
+			errorMsg := url.PathEscape(string(rw.errBody))
 			fmt.Fprintf(&content, " error=\"%s\"", errorMsg)
 		}
 
@@ -90,9 +87,7 @@ func Logger() macaron.Handler {
 			if err != nil {
 				log.Errorf("Could not extract request headers: %v", err)
 			}
-			if headers != "" {
-				fmt.Fprintf(&content, " headers=\"%s\"", string(headers))
-			}
+			fmt.Fprintf(&content, " headers=\"%s\"", string(headers))
 		}
 
 		log.Println(content.String())
