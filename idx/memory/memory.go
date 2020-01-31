@@ -1767,6 +1767,18 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 	resCh := m.idsByTagQuery(orgId, queryCtx)
 	ids := make(IdSet)
 	for id := range resCh {
+		md, ok := m.defById[id]
+		if !ok {
+			corruptIndex.Inc()
+			log.Errorf("memory-idx: md with id %s missing, index corrupt", md.Id.String())
+			continue
+		}
+
+		if len(md.Tags) > len(query.Expressions)-1 {
+			// metric definition must have additional tags, on top of those queried for
+			continue
+		}
+
 		ids[id] = struct{}{}
 	}
 

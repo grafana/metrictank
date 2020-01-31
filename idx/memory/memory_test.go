@@ -526,6 +526,34 @@ func testDeleteTagged(t *testing.T) {
 			})
 		})
 	})
+
+	Convey("when deleting by tag query and there is a similar metric matching the same query", t, func() {
+		similarMd := *org1Series[2]
+		similarMd.Tags = append(similarMd.Tags, "additional=tag")
+		similarMd.SetId()
+
+		amkey, err := schema.AMKeyFromString(similarMd.Id)
+		So(err, ShouldBeNil)
+
+		ix.AddOrUpdate(amkey.MKey, &similarMd, 0)
+
+		testName := schema.MetricDefinitionFromMetricData(org1Series[2]).NameWithTags()
+		tags, err := tagquery.ParseTagsFromMetricName(testName)
+		So(err, ShouldBeNil)
+		query, err := tagquery.NewQueryFromStrings(tags.Strings(), 0)
+		So(err, ShouldBeNil)
+		ids := ix.DeleteTagged(1, query)
+		So(ids, ShouldHaveLength, 1)
+		So(ids[0].Id.String(), ShouldEqual, org1Series[2].Id)
+
+		Convey("but similar metrics matching same query should still be present", func() {
+			query, err := tagquery.NewQueryFromStrings(similarMd.Tags, 0)
+			So(err, ShouldBeNil)
+			nodes := ix.FindByTag(1, query)
+			So(nodes, ShouldHaveLength, 1)
+			So(nodes[0].Defs[0].Id.String(), ShouldEqual, similarMd.Id)
+		})
+	})
 }
 
 func TestDeleteNodeWith100kChildren(t *testing.T) {
