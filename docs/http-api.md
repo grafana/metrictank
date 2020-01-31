@@ -180,7 +180,7 @@ POST /tags/delSeries
 #### Example
 
 ```bash
-curl -H "X-Org-Id: 12345" -d path=some.series;key=value -d path=another.series;tag=value "http://localhost:6060/tags/delSeries"
+curl -H "X-Org-Id: 12345" -d "path=some.series;key=value" -d "path=another.series;tag=value" "http://localhost:6060/tags/delSeries"
 ```
 
 ## Graphite query api
