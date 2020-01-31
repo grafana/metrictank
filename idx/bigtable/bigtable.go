@@ -493,9 +493,9 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 	return defs, err
 }
 
-func (b *BigtableIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+func (b *BigtableIdx) DeleteTagged(orgId uint32, query tagquery.Query, greedy bool) ([]idx.Archive, error) {
 	pre := time.Now()
-	defs, err := b.MemoryIndex.DeleteTagged(orgId, query)
+	defs, err := b.MemoryIndex.DeleteTagged(orgId, query, greedy)
 	if err != nil {
 		return nil, err
 	}

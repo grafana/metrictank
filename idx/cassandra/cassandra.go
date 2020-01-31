@@ -679,9 +679,9 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	return defs, err
 }
 
-func (c *CasIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+func (c *CasIdx) DeleteTagged(orgId uint32, query tagquery.Query, greedy bool) ([]idx.Archive, error) {
 	pre := time.Now()
-	defs, err := c.MemoryIndex.DeleteTagged(orgId, query)
+	defs, err := c.MemoryIndex.DeleteTagged(orgId, query, greedy)
 	if err != nil {
 		return nil, err
 	}

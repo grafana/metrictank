@@ -1278,7 +1278,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 				return
 			}
 
-			deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, query)
+			deleted, err := s.MetricIndex.DeleteTagged(ctx.OrgId, query, false)
 			if err != nil {
 				response.Write(ctx, response.WrapErrorForTagDB(err))
 				return

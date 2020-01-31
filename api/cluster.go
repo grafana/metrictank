@@ -283,7 +283,7 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 			return
 		}
 
-		deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, query)
+		deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, query, false)
 		if err != nil {
 			response.Write(ctx, response.WrapErrorForTagDB(err))
 			return

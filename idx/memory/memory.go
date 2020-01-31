@@ -1755,7 +1755,14 @@ func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
 	return defs
 }
 
-func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+// DeleteTagged deletes the metrics matching the given tag query from the relevant data structures.
+// When greedy is true then all metrics matching the query get deleted, otherwise only those which match
+// it exactly and do not have any un-queried tags get deleted.
+// f.e. with the query "name=abc;tag=value" and greedy "false" it would only delete all metrics which
+// have the given name and the tag "tag=value" *and no other tags*,
+// while with greedy "true" it would delete all metrics which have the name "abc" and the tag "tag=value"
+// and possibly also other tags.
+func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query, greedy bool) ([]idx.Archive, error) {
 	if !TagSupport {
 		log.Warn("memory-idx: received tag query, but tag support is disabled")
 		return nil, nil
@@ -1767,16 +1774,18 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 	resCh := m.idsByTagQuery(orgId, queryCtx)
 	ids := make(IdSet)
 	for id := range resCh {
-		md, ok := m.defById[id]
-		if !ok {
-			corruptIndex.Inc()
-			log.Errorf("memory-idx: md with id %s missing, index corrupt", md.Id.String())
-			continue
-		}
+		if !greedy {
+			md, ok := m.defById[id]
+			if !ok {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: md with id %s missing, index corrupt", md.Id.String())
+				continue
+			}
 
-		if len(md.Tags) > len(query.Expressions)-1 {
-			// metric definition must have additional tags, on top of those queried for
-			continue
+			if len(md.Tags) > len(query.Expressions)-1 {
+				// metric definition must have additional tags, on top of those queried for
+				continue
+			}
 		}
 
 		ids[id] = struct{}{}

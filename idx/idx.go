@@ -149,7 +149,7 @@ type MetricIndex interface {
 
 	// DeleteTagged deletes the series returned by the given query from the tag index
 	// and also the DefById index.
-	DeleteTagged(orgId uint32, query tagquery.Query) ([]Archive, error)
+	DeleteTagged(orgId uint32, query tagquery.Query, greedy bool) ([]Archive, error)
 
 	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
 	// whether it already exists or is new. The identity of a record is determined
