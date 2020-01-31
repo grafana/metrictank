@@ -35,10 +35,10 @@ func (rw *LoggingResponseWriter) Write(b []byte) (int, error) {
 func Logger() macaron.Handler {
 	return func(ctx *Context) {
 		start := time.Now()
-		ctx.Resp = &LoggingResponseWriter{
+		rw := &LoggingResponseWriter{
 			ResponseWriter: ctx.Resp,
 		}
-		rw := ctx.Resp.(*LoggingResponseWriter)
+		ctx.Resp = rw
 		ctx.MapTo(ctx.Resp, (*http.ResponseWriter)(nil))
 		ctx.Next()
 
