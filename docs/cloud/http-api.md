@@ -176,7 +176,8 @@ Should the metrics enter the system again with the same metadata, the data will 
 
 * user name: `api_key`
 * password: Your Grafana.com API Key
-* query (required): [Graphite pattern] (#graphite-patterns)
+* query (required): [Graphite pattern](#graphite-patterns) or a call to the Graphite `seriesByTag` function ([docs](https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag))
+
 
 ##### Example
 

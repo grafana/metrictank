@@ -155,7 +155,7 @@ POST /metrics/delete
 ```
 
 * header `X-Org-Id` required
-* query (required): can be a metric key, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`)
+* query (required): can be a metric key, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`), or a call to the Graphite `seriesByTag` function ([docs](https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag))
 
 #### Example
 
