@@ -43,12 +43,6 @@ func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 					return
 				}
 			}
-		case "Propagate":
-			z.Propagate, err = dc.ReadBool()
-			if err != nil {
-				err = msgp.WrapError(err, "Propagate")
-				return
-			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -62,9 +56,9 @@ func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *GraphiteTagDelSeries) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 2
+	// map header, size 1
 	// write "Paths"
-	err = en.Append(0x82, 0xa5, 0x50, 0x61, 0x74, 0x68, 0x73)
+	err = en.Append(0x81, 0xa5, 0x50, 0x61, 0x74, 0x68, 0x73)
 	if err != nil {
 		return
 	}
@@ -80,32 +74,19 @@ func (z *GraphiteTagDelSeries) EncodeMsg(en *msgp.Writer) (err error) {
 			return
 		}
 	}
-	// write "Propagate"
-	err = en.Append(0xa9, 0x50, 0x72, 0x6f, 0x70, 0x61, 0x67, 0x61, 0x74, 0x65)
-	if err != nil {
-		return
-	}
-	err = en.WriteBool(z.Propagate)
-	if err != nil {
-		err = msgp.WrapError(err, "Propagate")
-		return
-	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *GraphiteTagDelSeries) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 2
+	// map header, size 1
 	// string "Paths"
-	o = append(o, 0x82, 0xa5, 0x50, 0x61, 0x74, 0x68, 0x73)
+	o = append(o, 0x81, 0xa5, 0x50, 0x61, 0x74, 0x68, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Paths)))
 	for za0001 := range z.Paths {
 		o = msgp.AppendString(o, z.Paths[za0001])
 	}
-	// string "Propagate"
-	o = append(o, 0xa9, 0x50, 0x72, 0x6f, 0x70, 0x61, 0x67, 0x61, 0x74, 0x65)
-	o = msgp.AppendBool(o, z.Propagate)
 	return
 }
 
@@ -146,12 +127,6 @@ func (z *GraphiteTagDelSeries) UnmarshalMsg(bts []byte) (o []byte, err error) {
 					return
 				}
 			}
-		case "Propagate":
-			z.Propagate, bts, err = msgp.ReadBoolBytes(bts)
-			if err != nil {
-				err = msgp.WrapError(err, "Propagate")
-				return
-			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -170,7 +145,6 @@ func (z *GraphiteTagDelSeries) Msgsize() (s int) {
 	for za0001 := range z.Paths {
 		s += msgp.StringPrefixSize + len(z.Paths[za0001])
 	}
-	s += 10 + msgp.BoolSize
 	return
 }
 

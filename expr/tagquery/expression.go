@@ -24,6 +24,10 @@ func (i InvalidExpressionError) Code() int {
 
 type Expressions []Expression
 
+//ParseExpressions parses a list of graphite tag expressions (as used by the `seriesByTag` function).
+//tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
+//seriesBytTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
+//Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
 func ParseExpressions(expressions []string) (Expressions, error) {
 	res := make(Expressions, len(expressions))
 	for i := range expressions {
@@ -95,7 +99,8 @@ func (e *Expressions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Expression represents one expression inside a query of one or many expressions.
+// Expression represents a single Graphite tag expression (see documentation for `ParseExpressions`).
+// An expression is part of a query containing one or many expressions.
 // It provides all the necessary methods that are required to do a tag lookup from an index keyed by
 // tags & values, such as the type memory.TagIndex or the type memory.metaTagIndex.
 // It is also comes with a method to generate a filter which decides whether a given MetricDefinition
@@ -113,9 +118,8 @@ type Expression interface {
 	// if an expression has evaluated a metric against all indexes and has not come to a conclusive
 	// decision, then the default decision gets applied.
 	//
-	// Example
-	// metric1 has tags ["name=a.b.c", "some=value"] in the metric tag index, we evaluate the expression
-	// "anothertag!=value":
+	// Example using the expression returned by `ParseExpression("anothertag!=value")`
+	// metric1 has tags ["name=a.b.c", "some=value"] in the metric tag index
 	// 1) expression looks at the metric tag index and it sees that metric1 does not have a tag "anothertag"
 	//    with the value "value", but at this point it doesn't know if another index that will be looked
 	//    at later does, so it returns the decision "none".
@@ -458,4 +462,93 @@ func (o ExpressionOperator) StringIntoWriter(writer io.Writer) {
 	case MATCH_NONE:
 		writer.Write([]byte("!="))
 	}
+}
+
+const seriesByTagIdent = "seriesByTag("
+
+//IsSeriesByTag returns true if the given query is a `seriesByTag` query
+func IsSeriesByTagExpression(query string) bool {
+	return strings.HasPrefix(query, seriesByTagIdent) && query[len(query)-1:] == ")"
+}
+
+// ParseSeriesByTagExpression takes a `seriesByTag` query which includes multiple tag query expressions
+// example query: "seriesByTag('a=b', 'c=d', 'e!=~f.*')"
+// it then returns a slice of strings where each string is one of the expressions, and an error
+// which is non-nil if there was an error in the expression parsing and validation.
+// All expressions are validated and an error is returned if one or more are invalid.
+// This method does not validate that the passed in query is a valid `seriesByTag` query.
+// It is assumed that `IsSeriesByTagExpression` has been run (and returned true) before this function is called.
+func ParseSeriesByTagExpression(seriesByTagQuery string) (Expressions, error) {
+	startPos := len(seriesByTagIdent)
+	endPos := len(seriesByTagQuery) - 1
+	return parseTagExpressions(seriesByTagQuery[startPos:endPos])
+}
+
+func parseTagExpressions(expressions string) (Expressions, error) {
+
+	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
+	var expressionStartPos int
+	var needComma, insideExpression, requiresNonEmptyValue bool
+	var quoteChar byte
+
+	// this might allocate a bit more than we need if a tag or value contains ,
+	// it's still better than having to grow the slice though
+	results := make(Expressions, 0, strings.Count(expressions, ",")+1)
+
+	for i := 0; i < len(expressions); i++ {
+		char := expressions[i]
+		if insideExpression {
+			// checking for closing quote
+			if char == quoteChar {
+				insideExpression = false
+				needComma = true
+				expression, err := ParseExpression(expressions[expressionStartPos:i])
+				if err != nil {
+					return nil, err
+				}
+
+				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue()
+
+				results = append(results, expression)
+				continue
+			}
+		} else {
+			// outside an expression spaces are ignored
+			if char == ' ' {
+				continue
+			}
+
+			if char == '\'' || char == '"' {
+				if needComma {
+					return nil, fmt.Errorf("Missing comma between quotes: %s", expressions)
+				}
+
+				insideExpression = true
+				quoteChar = char
+				expressionStartPos = i + 1
+				continue
+			}
+
+			if char == ',' {
+				if needComma {
+					needComma = false
+					continue
+				} else {
+					return nil, fmt.Errorf("Too many commas between quotes: %s", expressions)
+				}
+			}
+
+			return nil, fmt.Errorf("Invalid character outside quotes '%c': %s", char, expressions)
+		}
+	}
+
+	if insideExpression {
+		return nil, fmt.Errorf("Unclosed quotes in string: %s", expressions)
+	}
+
+	if !requiresNonEmptyValue {
+		return nil, fmt.Errorf("At least one expression must require a non-empty value")
+	}
+
+	return results, nil
 }

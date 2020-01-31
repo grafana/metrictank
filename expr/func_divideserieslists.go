@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
+// FuncDivideSeriesLists divides dividends by divisors, pairwise
 type FuncDivideSeriesLists struct {
 	dividends GraphiteFunc
 	divisors  GraphiteFunc
@@ -26,6 +27,13 @@ func (s *FuncDivideSeriesLists) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncDivideSeriesLists) Context(context Context) Context {
+	// note: like FuncDivideSeries, this is an aggregation function (turning pairs of series into one)
+	// unlike FuncDivideSeries, we don't use any input series more than once,
+	// thus any already proposed pre-normalization can proceed as planned
+	// and hence do not have to reset PNGroup.
+	// if anything, in some exotic cases divisors (and dividends) may have different intervals amongst themselves
+	// but matching intervals when we pair up a divisor with a dividend, in which case we could technically introduce pre-normalization
+	// but we can't really predict that here, so let's not worry about that.
 	return context
 }
 
@@ -43,8 +51,9 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 	}
 
 	var series []models.Series
-	for i, dividend := range dividends {
-		divisor := divisors[i]
+	for i := range dividends {
+		dividend, divisor := normalizeTwo(cache, dividends[i], divisors[i])
+
 		out := pointSlicePool.Get().([]schema.Point)
 		for i := 0; i < len(dividend.Datapoints); i++ {
 			p := schema.Point{
@@ -69,6 +78,8 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 			QueryCons:    dividend.QueryCons,
 			QueryFrom:    dividend.QueryFrom,
 			QueryTo:      dividend.QueryTo,
+			QueryMDP:     dividend.QueryMDP,
+			QueryPNGroup: dividend.QueryPNGroup,
 			Meta:         dividend.Meta.Copy().Merge(divisor.Meta),
 		}
 		cache[Req{}] = append(cache[Req{}], output)

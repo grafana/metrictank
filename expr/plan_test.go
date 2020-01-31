@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
 )
@@ -32,7 +33,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -46,7 +47,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -60,7 +61,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -75,7 +76,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -90,7 +91,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etString, str: "true"},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -105,7 +106,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -147,7 +148,7 @@ func TestArgs(t *testing.T) {
 				"func": {etype: etString, str: "sum"},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -161,7 +162,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			[]Req{
-				NewReq("foo.bar.*", from, to, 0),
+				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
 			nil,
 		},
@@ -438,6 +439,151 @@ func TestArgInIntKeyword(t *testing.T) {
 	}
 }
 
+// TestOptimizationFlags tests that the optimization (PNGroups and MDP for MDP-optimization) flags are
+// set in line with the optimization settings passed to the planner.
+func TestOptimizationFlags(t *testing.T) {
+	from := uint32(1000)
+	to := uint32(2000)
+	stable := true
+
+	// note, use the number 1 to mean "a PNGroup". these tests currently don't support multiple PNGroups.
+	type testCase struct {
+		in      string
+		wantReq []Req
+	}
+
+	compare := func(i int, opts Optimizations, c testCase, plan Plan, err error) {
+		// for simplicity, test cases declare 1 to mean "a PNGroup"
+		for i, req := range plan.Reqs {
+			if req.PNGroup > 0 {
+				plan.Reqs[i].PNGroup = 1
+			}
+		}
+
+		if diff := cmp.Diff(c.wantReq, plan.Reqs); diff != "" {
+			t.Errorf("case %d: %q with opts %+v (-want +got):\n%s", i, c.in, opts, diff)
+		}
+	}
+
+	cases := []testCase{
+		{
+			// no transparent aggregation so don't align the data. Though, could be MDP optimized
+			"a",
+			[]Req{
+				NewReq("a", from, to, 0, 0, 800),
+			},
+		},
+		{
+			"summarize(a,'1h')", // greedy resolution function. disables MDP optimizations
+			[]Req{
+				NewReq("a", from, to, 0, 0, 0),
+			},
+		},
+		{
+			"sum(a)", // transparent aggregation. enables PN-optimization
+			[]Req{
+				NewReq("a", from, to, 0, 1, 800),
+			},
+		},
+		{
+			"summarize(sum(a),'1h')",
+			[]Req{
+				NewReq("a", from, to, 0, 1, 0),
+			},
+		},
+		{
+			// a will go through some functions that don't matter, then hits a transparent aggregation
+			"summarize(sum(perSecond(min(scale(a,1)))),'1h')",
+			[]Req{
+				NewReq("a", from, to, 0, 1, 0),
+			},
+		},
+		{
+			// a is not PN-optimizable due to the opaque aggregation, whereas b is thanks to the transparent aggregation, that they hit first.
+			"sum(group(groupByTags(a,'sum','foo'), avg(b)))",
+			[]Req{
+				NewReq("a", from, to, 0, 0, 800),
+				NewReq("b", from, to, 0, 1, 800),
+			},
+		},
+		{
+			// a is not PN-optimizable because it doesn't go through a transparent aggregation
+			// b is, because it hits a transparent aggregation before it hits the opaque aggregation
+			// c is neither PN-optimizable, nor MDP-optimizable, because it hits an interval altering + GR function, before it hits anything else
+			"groupByTags(group(groupByTags(a,'sum','tag'), avg(b), avg(summarize(c,'1h'))),'sum','tag2')",
+			[]Req{
+				NewReq("a", from, to, 0, 0, 800),
+				NewReq("b", from, to, 0, 1, 800),
+				NewReq("c", from, to, 0, 0, 0),
+			},
+		},
+	}
+	for i, c := range cases {
+		// make a pristine copy of the data such that we can tweak it for different scenarios
+		origWantReqs := make([]Req, len(c.wantReq))
+		copy(origWantReqs, c.wantReq)
+
+		// first, try with all optimizations:
+		opts := Optimizations{
+			PreNormalization: true,
+			MDP:              true,
+		}
+		exprs, err := ParseMany([]string{c.in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan, err := NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+
+		// now, disable MDP. This should result simply in disabling all MDP flags on all requests
+		opts.MDP = false
+		c.wantReq = make([]Req, len(origWantReqs))
+		copy(c.wantReq, origWantReqs)
+		for j := range c.wantReq {
+			c.wantReq[j].MDP = 0
+		}
+
+		plan, err = NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+
+		// now disable (only) PN-optimizations. This should result simply in turning off all PNGroups
+		opts.MDP = true
+		opts.PreNormalization = false
+		c.wantReq = make([]Req, len(origWantReqs))
+		copy(c.wantReq, origWantReqs)
+		for j := range c.wantReq {
+			c.wantReq[j].PNGroup = 0
+		}
+		plan, err = NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+
+		// now disable both optimizations at the same time
+		opts.MDP = false
+		opts.PreNormalization = false
+		c.wantReq = make([]Req, len(origWantReqs))
+		copy(c.wantReq, origWantReqs)
+		for j := range c.wantReq {
+			c.wantReq[j].MDP = 0
+			c.wantReq[j].PNGroup = 0
+		}
+
+		plan, err = NewPlan(exprs, from, to, 800, stable, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(i, opts, c, plan, err)
+	}
+}
+
 // TestConsolidateBy tests for a variety of input targets, wether consolidateBy settings are correctly
 // propagated down the tree (to fetch requests) and up the tree (to runtime consolidation of the output)
 func TestConsolidateBy(t *testing.T) {
@@ -453,7 +599,7 @@ func TestConsolidateBy(t *testing.T) {
 		{
 			"a",
 			[]Req{
-				NewReq("a", from, to, 0),
+				NewReq("a", from, to, 0, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -464,7 +610,7 @@ func TestConsolidateBy(t *testing.T) {
 			// consolidation flows both up and down the tree
 			`consolidateBy(a, "sum")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -475,7 +621,7 @@ func TestConsolidateBy(t *testing.T) {
 			// wrap with regular function -> consolidation goes both up and down
 			`scale(consolidateBy(a, "sum"),1)`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -486,7 +632,7 @@ func TestConsolidateBy(t *testing.T) {
 			// wrapping by a special function does not affect fetch consolidation, but resets output consolidation
 			`perSecond(consolidateBy(a, "sum"))`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -497,7 +643,7 @@ func TestConsolidateBy(t *testing.T) {
 			// consolidation setting streams down and up unaffected by scale
 			`consolidateBy(scale(a, 1), "sum")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Sum),
+				NewReq("a", from, to, consolidation.Sum, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -508,7 +654,7 @@ func TestConsolidateBy(t *testing.T) {
 			// perSecond changes data semantics, fetch consolidation should be reset to default
 			`consolidateBy(perSecond(a), "sum")`,
 			[]Req{
-				NewReq("a", from, to, 0),
+				NewReq("a", from, to, 0, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -520,8 +666,8 @@ func TestConsolidateBy(t *testing.T) {
 			// TODO: I think it can be argued that the max here is only intended for the output, not to the inputs
 			`consolidateBy(divideSeries(consolidateBy(a, "min"), b), "max")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Min),
-				NewReq("b", from, to, consolidation.Max),
+				NewReq("a", from, to, consolidation.Min, 0, 0),
+				NewReq("b", from, to, consolidation.Max, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -532,8 +678,8 @@ func TestConsolidateBy(t *testing.T) {
 			// data should be requested with fetch consolidation min, but runtime consolidation max
 			`consolidateBy(sumSeries(consolidateBy(a, "min"), b), "max")`,
 			[]Req{
-				NewReq("a", from, to, consolidation.Min),
-				NewReq("b", from, to, consolidation.Max),
+				NewReq("a", from, to, consolidation.Min, 0, 0),
+				NewReq("b", from, to, consolidation.Max, 0, 0),
 			},
 			nil,
 			[]models.Series{
@@ -545,36 +691,40 @@ func TestConsolidateBy(t *testing.T) {
 	for i, c := range cases {
 		// for the purpose of this test, we assume ParseMany works fine.
 		exprs, _ := ParseMany([]string{c.in})
-		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
+		plan, err := NewPlan(exprs, from, to, 800, stable, Optimizations{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !reflect.DeepEqual(err, c.expErr) {
 			t.Errorf("case %d: %q, expected error %v - got %v", i, c.in, c.expErr, err)
 		}
-		if !reflect.DeepEqual(plan.Reqs, c.expReq) {
-			t.Errorf("case %d: %q, expected req %v - got %v", i, c.in, c.expReq, plan.Reqs)
+		if diff := cmp.Diff(c.expReq, plan.Reqs); diff != "" {
+			t.Errorf("case %d: %q (-want +got):\n%s", i, c.in, diff)
 		}
 		input := map[Req][]models.Series{
-			NewReq("a", from, to, 0): {{
+			NewReq("a", from, to, 0, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Avg, // emulate the fact that a by default will use avg
+				Interval:     10,
 			}},
-			NewReq("a", from, to, consolidation.Min): {{
+			NewReq("a", from, to, consolidation.Min, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Min,
+				Interval:     10,
 			}},
-			NewReq("a", from, to, consolidation.Sum): {{
+			NewReq("a", from, to, consolidation.Sum, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
 				Consolidator: consolidation.Sum,
+				Interval:     10,
 			}},
-			NewReq("b", from, to, consolidation.Max): {{
+			NewReq("b", from, to, consolidation.Max, 0, 0): {{
 				QueryPatt:    "b",
 				Target:       "b",
 				Consolidator: consolidation.Max,
+				Interval:     10,
 			}},
 		}
 		out, err := plan.Run(input)
@@ -715,7 +865,7 @@ func TestNamingChains(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		plan, err := NewPlan(exprs, from, to, 800, stable, nil)
+		plan, err := NewPlan(exprs, from, to, 800, stable, Optimizations{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -726,6 +876,7 @@ func TestNamingChains(t *testing.T) {
 			series[j] = models.Series{
 				QueryPatt: plan.Reqs[0].Query,
 				Target:    key,
+				Interval:  10,
 			}
 		}
 		input := map[Req][]models.Series{
@@ -820,7 +971,7 @@ func TestTargetErrors(t *testing.T) {
 		if err != c.expectedParseError {
 			t.Fatalf("case %q: expected parse error %q but got %q", c.testDescription, c.expectedParseError, err)
 		}
-		_, err = NewPlan(exprs, from, to, 800, stable, nil)
+		_, err = NewPlan(exprs, from, to, 800, stable, Optimizations{})
 		if err != c.expectedPlanError {
 			t.Fatalf("case %q: expected plan error %q but got %q", c.testDescription, c.expectedPlanError, err)
 		}

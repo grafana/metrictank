@@ -225,7 +225,13 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		// as graphite needs high-res data to perform its processing.
 		mdp = 0
 	}
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
+
+	opts, err := optimizations.ApplyUserPrefs(request.Optimizations)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, opts)
 	if err != nil {
 		if fun, ok := err.(expr.ErrUnknownFunction); ok {
 			if request.NoProxy {
@@ -661,7 +667,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	minFrom := uint32(math.MaxUint32)
 	var maxTo uint32
-	var reqs []models.Req
+	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
 	// note that different patterns to query can have different from / to, so they require different index lookups
@@ -678,15 +684,12 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		var err error
 		var series []Series
 		var exprs tagquery.Expressions
-		const SeriesByTagIdent = "seriesByTag("
-		if strings.HasPrefix(r.Query, SeriesByTagIdent) {
-			startPos := len(SeriesByTagIdent)
-			endPos := strings.LastIndex(r.Query, ")")
-			exprs, err = getTagQueryExpressions(r.Query[startPos:endPos])
+		if tagquery.IsSeriesByTagExpression(r.Query) {
+			exprs, err = tagquery.ParseSeriesByTagExpression(r.Query)
 			if err != nil {
 				return nil, meta, err
 			}
-			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-len(reqs), false)
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-int(reqs.cnt), false)
 		} else {
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
 		}
@@ -718,9 +721,9 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 						cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
 					}
 
-					newReq := models.NewReq(
-						archive.Id, archive.NameWithTags(), r.Query, r.From, r.To, plan.MaxDataPoints, uint32(archive.Interval), cons, consReq, s.Node, archive.SchemaId, archive.AggId)
-					reqs = append(reqs, newReq)
+					newReq := r.ToModel()
+					newReq.Init(archive, cons, s.Node)
+					reqs.Add(newReq)
 				}
 
 				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
@@ -739,31 +742,35 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	default:
 	}
 
-	reqRenderSeriesCount.Value(len(reqs))
-	if len(reqs) == 0 {
+	reqRenderSeriesCount.ValueUint32(reqs.cnt)
+	if reqs.cnt == 0 {
 		return nil, meta, nil
 	}
 
-	meta.RenderStats.SeriesFetch = uint32(len(reqs))
+	meta.RenderStats.SeriesFetch = reqs.cnt
 
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	var err error
-	reqs, meta.RenderStats.PointsFetch, meta.RenderStats.PointsReturn, err = alignRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs)
+	var rp *ReqsPlan
+	rp, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints, maxPointsPerReqSoft, maxPointsPerReqHard)
 	if err != nil {
-		log.Errorf("HTTP Render alignReq error: %s", err.Error())
 		return nil, meta, err
 	}
+	meta.RenderStats.PointsFetch = rp.PointsFetch()
+	meta.RenderStats.PointsReturn = rp.PointsReturn(plan.MaxDataPoints)
+	reqsList := rp.List()
+
 	span := opentracing.SpanFromContext(ctx)
-	span.SetTag("num_reqs", len(reqs))
+	span.SetTag("num_reqs", len(reqsList))
 	span.SetTag("points_fetch", meta.RenderStats.PointsFetch)
 	span.SetTag("points_return", meta.RenderStats.PointsReturn)
 
-	for _, req := range reqs {
+	for _, req := range reqsList {
 		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
 	}
 
 	a := time.Now()
-	out, err := s.getTargets(ctx, &meta.StorageStats, reqs)
+	out, err := s.getTargets(ctx, &meta.StorageStats, reqsList)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
 		return nil, meta, err
@@ -787,7 +794,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	data := make(map[expr.Req][]models.Series)
 	for _, serie := range out {
-		q := expr.NewReq(serie.QueryPatt, serie.QueryFrom, serie.QueryTo, serie.QueryCons)
+		q := expr.NewReqFromSerie(serie)
 		data[q] = append(data[q], serie)
 	}
 
@@ -803,79 +810,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
 	return out, meta, err
-}
-
-// getTagQueryExpressions takes a query string which includes multiple tag query expressions
-// example string: "'a=b', 'c=d', 'e!=~f.*'"
-// it then returns a slice of strings where each string is one of the expressions, and an error
-// which is non-nil if there was an error in the expression validation
-// all expressions get validated and an error is returned if one or more are invalid
-func getTagQueryExpressions(expressions string) (tagquery.Expressions, error) {
-	// expressionStartEndPos is a list of positions where expressions start and end inside the expressions string
-	var expressionStartPos int
-	var needComma, insideExpression, requiresNonEmptyValue bool
-	var quoteChar byte
-
-	// this might allocate a bit more than we need if a tag or value contains ,
-	// it's still better than having to grow the slice though
-	results := make(tagquery.Expressions, 0, strings.Count(expressions, ",")+1)
-
-	for i := 0; i < len(expressions); i++ {
-		char := expressions[i]
-		if insideExpression {
-			// checking for closing quote
-			if char == quoteChar {
-				insideExpression = false
-				needComma = true
-				expression, err := tagquery.ParseExpression(expressions[expressionStartPos:i])
-				if err != nil {
-					return nil, err
-				}
-
-				requiresNonEmptyValue = requiresNonEmptyValue || expression.RequiresNonEmptyValue()
-
-				results = append(results, expression)
-				continue
-			}
-		} else {
-			// outside an expression spaces are ignored
-			if char == ' ' {
-				continue
-			}
-
-			if char == '\'' || char == '"' {
-				if needComma {
-					return nil, fmt.Errorf("Missing comma between quotes: %s", expressions)
-				}
-
-				insideExpression = true
-				quoteChar = char
-				expressionStartPos = i + 1
-				continue
-			}
-
-			if char == ',' {
-				if needComma {
-					needComma = false
-					continue
-				} else {
-					return nil, fmt.Errorf("Too many commas between quotes: %s", expressions)
-				}
-			}
-
-			return nil, fmt.Errorf("Invalid character outside quotes '%c': %s", char, expressions)
-		}
-	}
-
-	if insideExpression {
-		return nil, fmt.Errorf("Unclosed quotes in string: %s", expressions)
-	}
-
-	if !requiresNonEmptyValue {
-		return nil, fmt.Errorf("At least one expression must require a non-empty value")
-	}
-
-	return results, nil
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
@@ -1059,6 +993,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 	case "series-json":
 		seriesNames := make([]string, 0, len(series))
 		for _, serie := range series {
+			// note: for findByTag the "Pattern" is the full metric nameWithTags
 			seriesNames = append(seriesNames, serie.Pattern)
 		}
 
@@ -1348,11 +1283,6 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 		}
 	}
 
-	if !request.Propagate {
-		response.Write(ctx, response.NewJson(200, res, ""))
-		return
-	}
-
 	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
 	responses, errors := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
 
@@ -1414,7 +1344,12 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 	stable := request.Process == "stable"
 	mdp := request.MaxDataPoints
 
-	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, nil)
+	opts, err := optimizations.ApplyUserPrefs(request.Optimizations)
+	if err != nil {
+		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, opts)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

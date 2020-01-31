@@ -36,7 +36,7 @@ This further reduces data at runtime on an as-needed basis.
 It supports min, max, sum, average.
 
 
-## The request alignment algorithm
+## The request planning algorithm. OUT OF DATE AS OF https://github.com/grafana/metrictank/pull/951
 
 Metrictank uses a function called `alignRequests` which will:
 

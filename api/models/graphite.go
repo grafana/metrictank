@@ -55,6 +55,7 @@ type GraphiteRender struct {
 	NoProxy       bool     `json:"local" form:"local"` //this is set to true by graphite-web when it passes request to cluster servers
 	Meta          bool     `json:"meta" form:"meta"`   // request for meta data, which will be returned as long as the format is compatible (json) and we don't have to go via graphite
 	Process       string   `json:"process" form:"process" binding:"In(,none,stable,any);Default(stable)"`
+	Optimizations string   `json:"optimizations" form:"optimizations"`
 }
 
 func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) binding.Errors {
@@ -147,14 +148,12 @@ type GraphiteTagFindSeriesMetaResp struct {
 }
 
 type GraphiteTagDelSeries struct {
-	Paths     []string `json:"path" form:"path"`
-	Propagate bool     `json:"propagate" form:"propagate" binding:"Default(true)"`
+	Paths []string `json:"path" form:"path"`
 }
 
 func (g GraphiteTagDelSeries) Trace(span opentracing.Span) {
 	span.LogFields(
 		traceLog.String("paths", fmt.Sprintf("%q", g.Paths)),
-		traceLog.Bool("propagate", g.Propagate),
 	)
 }
 

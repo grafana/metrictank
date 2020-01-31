@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unsafe"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/errors"
@@ -38,6 +39,26 @@ func (s *FuncAsPercent) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncAsPercent) Context(context Context) Context {
+	// when is passing through a PNGroup (or setting one) the right thing? when all series need to be aligned to the same interval
+	// if we only combine some series with some other series, we don't want coarse series to needlessly coarsen higher resolution data
+
+	// 1) nodes-nil, total single-series -> align all to same interval
+	// 2) nodes-nil, total multi-series -> match up in pairs (can't be aligned up front)
+	// 3) nodes-nil, total nil (and not a float) -> align all together
+	// 4) nodes-nil, total float -> no alignment needed. but pre-existing alignment can remain.
+	// 5) nodes-non-nil, total nil -> divides groupwise
+	// 6) nodes non-nil, total serieslist -> divides groupwise
+
+	if s.totalSeries == nil && s.nodes == nil {
+		// the only scenario where we should introduce a PNGroup is case 3
+		if math.IsNaN(s.totalFloat) {
+			context.PNGroup = models.PNGroup(uintptr(unsafe.Pointer(s)))
+		}
+		// in case 4, we can keep a pre-existing PNGroup
+	} else {
+		// note: we can't tell the difference between case 1 and 2 up front, so we play it safe and don't align up front
+		context.PNGroup = 0
+	}
 	return context
 }
 
@@ -135,8 +156,8 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 				outSeries = append(outSeries, nonesSerie)
 			} else {
 				// key found in both inByKey and totalSerieByKey
+				serie1, serie2 := normalizeTwo(cache, serie1, totalSerieByKey[key])
 				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
-				serie2 := totalSerieByKey[key]
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
 				serie1.Tags = map[string]string{"name": serie1.Target}
@@ -162,7 +183,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[R
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalsSerie = sumSeries(in, cache)
+		totalsSerie = sumSeries(normalize(cache, in), cache)
 		if len(in) == 1 {
 			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.QueryPatt = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
@@ -190,19 +211,21 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[R
 		if len(totals) == len(in) {
 			totalsSerie = totals[i]
 		}
-		serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
+		if len(totalsSerie.Datapoints) > 0 {
+			serie, totalsSerie = normalizeTwo(cache, serie, totalsSerie)
+			serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
+			for i := range serie.Datapoints {
+				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
+			}
+		} else {
+			serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
+			for i := range serie.Datapoints {
+				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, s.totalFloat)
+			}
+		}
 		serie.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie.QueryPatt, totalsSerie.QueryPatt)
 		serie.Target = fmt.Sprintf("asPercent(%s,%s)", serie.Target, totalsSerie.Target)
 		serie.Tags = map[string]string{"name": serie.Target}
-		for i := range serie.Datapoints {
-			var totalVal float64
-			if len(totalsSerie.Datapoints) > 0 {
-				totalVal = totalsSerie.Datapoints[i].Val
-			} else {
-				totalVal = s.totalFloat
-			}
-			serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalVal)
-		}
 		serie.Meta = serie.Meta.Merge(totalsSerie.Meta)
 		outSeries = append(outSeries, serie)
 		cache[Req{}] = append(cache[Req{}], serie)
@@ -245,7 +268,7 @@ func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, cache 
 	totalSerieByKey := make(map[string]models.Series, len(totalSeriesByKey))
 	for key := range totalSeriesByKey {
 		if _, ok := inByKey[key]; ok {
-			totalSerieByKey[key] = sumSeries(totalSeriesByKey[key], cache)
+			totalSerieByKey[key] = sumSeries(normalize(cache, totalSeriesByKey[key]), cache)
 		} else {
 			totalSerieByKey[key] = totalSeriesByKey[key][0]
 		}
@@ -285,6 +308,8 @@ Loop:
 		QueryCons:    queryCons,
 		QueryFrom:    in[0].QueryFrom,
 		QueryTo:      in[0].QueryTo,
+		QueryMDP:     in[0].QueryMDP,
+		QueryPNGroup: in[0].QueryPNGroup,
 		Tags:         map[string]string{"name": name},
 		Meta:         meta,
 	}

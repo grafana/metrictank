@@ -3,6 +3,7 @@ package expr
 import (
 	"math"
 
+	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -246,4 +247,31 @@ func getCopy(in []schema.Point) []schema.Point {
 	out := make([]schema.Point, len(in))
 	copy(out, in)
 	return out
+}
+
+func getQuerySeries(patt string, data []schema.Point) models.Series {
+	return models.Series{
+		QueryPatt:  patt,
+		Datapoints: getCopy(data),
+		Interval:   10,
+	}
+}
+
+func getTargetSeries(target string, data []schema.Point) models.Series {
+	return models.Series{
+		Target:     target,
+		Datapoints: getCopy(data),
+		Interval:   10,
+	}
+}
+
+func getModel(name string, data []schema.Point) models.Series {
+	series := models.Series{
+		Target:     name,
+		QueryPatt:  name,
+		Datapoints: getCopy(data),
+		Interval:   10,
+	}
+	series.SetTags()
+	return series
 }

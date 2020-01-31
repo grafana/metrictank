@@ -2,6 +2,7 @@ package expr
 
 import (
 	"strings"
+	"unsafe"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
@@ -26,6 +27,7 @@ func (s *FuncAggregate) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncAggregate) Context(context Context) Context {
+	context.PNGroup = models.PNGroup(uintptr(unsafe.Pointer(s)))
 	return context
 }
 
@@ -46,6 +48,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
+	series = normalize(cache, series)
 	s.agg.function(series, &out)
 
 	// The tags for the aggregated series is only the tags that are

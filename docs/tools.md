@@ -36,6 +36,20 @@ Explains the execution plan for a given query / set of targets
 Usage:
 
   mt-explain
+  -from string
+    	get data from (inclusive) (default "-24h")
+  -mdp int
+    	max data points to return (default 800)
+  -mdp-optimization
+    	enable MaxDataPoints optimization (experimental)
+  -pre-normalization
+    	enable pre-normalization optimization (default true)
+  -stable
+    	whether to use only functionality marked as stable (default true)
+  -time-zone string
+    	time-zone to use for interpreting from/to when needed. (check your config) (default "local")
+  -to string
+    	get data until (exclusive) (default "now")
 
 Example:
 
@@ -56,7 +70,9 @@ Usage:
 
 Flags:
   -addr string
-    	http service address (default ":80")
+    	http service address (default ":6059")
+  -config string
+    	configuration file path (default "/etc/metrictank/mt-gateway.ini")
   -default-org-id int
     	default org ID to send to downstream services if none is provided (default -1)
   -discard-prefixes string

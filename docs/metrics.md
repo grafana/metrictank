@@ -24,7 +24,8 @@ the archive chosen for the request.
 * `api.request.render.points_fetched`:  
 the number of points that need to be fetched for a /render request.
 * `api.request.render.points_returned`:  
-the number of points the request will return.
+the number of points the request will return
+best effort: not aware of summarize(), aggregation functions, runtime normalization. but does account for runtime consolidation
 * `api.request.render.series`:  
 the number of series a /render request is handling.  This is the number
 of metrics after all of the targets in the request have expanded by searching the index.
@@ -392,7 +393,7 @@ this is subject to backpressure from the store when the store's queue runs full
 count of points with a timestamp which is too far in the future,
 beyond the limitation of the future tolerance window defined via the retention.future-tolerance-ratio
 parameter. it also gets increased if the enforcement of the future tolerance is disabled, this is
-useful for prediciting whether data points would get rejected once enforcement gets turned on.
+useful for predicting whether data points would get rejected once enforcement gets turned on.
 * `tank.total_points`:  
 the number of points currently held in the in-memory ringbuffer
 * `version.%s`:  

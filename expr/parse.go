@@ -441,9 +441,8 @@ func extractMetric(m string) string {
 	return m[start:end]
 }
 
-// aggKey creates a key for a serie based on its target metric as well
-// as a list of nodes which need to be extracted
-// returns a single string
+// aggKey returns a string key by applying the selectors
+// (integers for node positions or strings for tag names) to the given serie
 func aggKey(serie models.Series, nodes []expr) string {
 	metric := extractMetric(serie.Target)
 	if len(metric) == 0 {

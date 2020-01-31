@@ -3,28 +3,105 @@ package expr
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/errors"
 )
 
+type Optimizations struct {
+	PreNormalization bool
+	MDP              bool
+}
+
+func (o Optimizations) ApplyUserPrefs(s string) (Optimizations, error) {
+	// no user override. stick to what we have
+	if s == "" {
+		return o, nil
+	}
+	// user passed an override. it's either 'none' (no optimizations) or a list of the ones that should be enabled
+	o.PreNormalization = false
+	o.MDP = false
+	if s == "none" {
+		return o, nil
+	}
+	prefs := strings.Split(s, ",")
+	for _, pref := range prefs {
+		switch pref {
+		case "pn":
+			o.PreNormalization = true
+		case "mdp":
+			o.MDP = true
+		default:
+			return o, fmt.Errorf("unrecognized optimization %q", pref)
+		}
+	}
+	return o, nil
+}
+
 // Req represents a request for one/more series
 type Req struct {
-	Query string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
-	From  uint32
-	To    uint32
-	Cons  consolidation.Consolidator // can be 0 to mean undefined
+	Query   string // whatever was parsed as the query out of a graphite target. e.g. target=sum(foo.{b,a}r.*) -> foo.{b,a}r.* -> this will go straight to index lookup
+	From    uint32
+	To      uint32
+	Cons    consolidation.Consolidator // can be 0 to mean undefined
+	PNGroup models.PNGroup
+	MDP     uint32 // if we can MDP-optimize, reflects runtime consolidation MaxDataPoints. 0 otherwise.
 }
 
 // NewReq creates a new Req. pass cons=0 to leave consolidator undefined,
 // leaving up to the caller (in graphite's case, it would cause a lookup into storage-aggregation.conf)
-func NewReq(query string, from, to uint32, cons consolidation.Consolidator) Req {
+func NewReq(query string, from, to uint32, cons consolidation.Consolidator, PNGroup models.PNGroup, MDP uint32) Req {
 	return Req{
+		Query:   query,
+		From:    from,
+		To:      to,
+		Cons:    cons,
+		PNGroup: PNGroup,
+		MDP:     MDP,
+	}
+}
+
+func NewReqFromContext(query string, c Context) Req {
+	r := Req{
 		Query: query,
-		From:  from,
-		To:    to,
-		Cons:  cons,
+		From:  c.from,
+		To:    c.to,
+		Cons:  c.consol,
+	}
+	if c.optimizations.PreNormalization {
+		r.PNGroup = c.PNGroup
+	}
+	if c.optimizations.MDP {
+		r.MDP = c.MDP
+	}
+	return r
+}
+
+// NewReqFromSeries generates a Req back from a series
+// a models.Series has all the properties attached to it
+// to find out which Req it came from
+func NewReqFromSerie(serie models.Series) Req {
+	return Req{
+		Query:   serie.QueryPatt,
+		From:    serie.QueryFrom,
+		To:      serie.QueryTo,
+		Cons:    serie.QueryCons,
+		PNGroup: serie.QueryPNGroup,
+		MDP:     serie.QueryMDP,
+	}
+
+}
+
+func (r Req) ToModel() models.Req {
+	return models.Req{
+		Pattern:   r.Query,
+		From:      r.From,
+		To:        r.To,
+		MaxPoints: r.MDP,
+		PNGroup:   r.PNGroup,
+		ConsReq:   r.Cons,
 	}
 }
 
@@ -48,8 +125,20 @@ func (p Plan) Dump(w io.Writer) {
 		fmt.Fprintln(w, e.Print(2))
 	}
 	fmt.Fprintf(w, "* Reqs:\n")
+
+	maxQueryLen := 5
 	for _, r := range p.Reqs {
-		fmt.Fprintln(w, "   ", r)
+		if len(r.Query) > maxQueryLen {
+			maxQueryLen = len(r.Query)
+		}
+	}
+	// ! PNGroups are pointers which can be upto 21 characters long on 64bit
+	headPatt := fmt.Sprintf("%%%ds %%12s %%12s %%25s %%21s %%6s\n", maxQueryLen)
+	linePatt := fmt.Sprintf("%%%ds %%12d %%12d %%25s %%21d %%6d\n", maxQueryLen)
+	fmt.Fprintf(w, headPatt, "query", "from", "to", "consolidator", "PNGroup", "MDP")
+
+	for _, r := range p.Reqs {
+		fmt.Fprintf(w, linePatt, r.Query, r.From, r.To, r.Cons, r.PNGroup, r.MDP)
 	}
 	fmt.Fprintf(w, "MaxDataPoints: %d\n", p.MaxDataPoints)
 	fmt.Fprintf(w, "From: %d\n", p.From)
@@ -63,29 +152,29 @@ func (p Plan) Dump(w io.Writer) {
 // * validation of arguments
 // * allow functions to modify the Context (change data range or consolidation)
 // * future version: allow functions to mark safe to pre-aggregate using consolidateBy or not
-func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, reqs []Req) (Plan, error) {
-	var err error
-	var funcs []GraphiteFunc
-	for _, e := range exprs {
-		var fn GraphiteFunc
-		context := Context{
-			from: from,
-			to:   to,
-		}
-		fn, reqs, err = newplan(e, context, stable, reqs)
-		if err != nil {
-			return Plan{}, err
-		}
-		funcs = append(funcs, fn)
-	}
-	return Plan{
-		Reqs:          reqs,
+func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, optimizations Optimizations) (Plan, error) {
+	plan := Plan{
 		exprs:         exprs,
-		funcs:         funcs,
 		MaxDataPoints: mdp,
 		From:          from,
 		To:            to,
-	}, nil
+	}
+	for _, e := range exprs {
+		context := Context{
+			from:          from,
+			to:            to,
+			MDP:           mdp,
+			PNGroup:       0, // making this explicit here for easy code grepping
+			optimizations: optimizations,
+		}
+		fn, reqs, err := newplan(e, context, stable, plan.Reqs)
+		if err != nil {
+			return Plan{}, err
+		}
+		plan.Reqs = reqs
+		plan.funcs = append(plan.funcs, fn)
+	}
+	return plan, nil
 }
 
 // newplan adds requests as needed for the given expr, resolving function calls as needed
@@ -94,7 +183,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		return nil, nil, errors.NewBadRequest("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
-		req := NewReq(e.str, context.from, context.to, context.consol)
+		req := NewReqFromContext(e.str, context)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	} else if e.etype == etFunc && e.str == "seriesByTag" {
@@ -104,7 +193,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		// string back into the Query member of a new request to be parsed later.
 		// TODO - find a way to prevent this parse/encode/parse/encode loop
 		expressionStr := "seriesByTag(" + e.argsStr + ")"
-		req := NewReq(expressionStr, context.from, context.to, context.consol)
+		req := NewReqFromContext(expressionStr, context)
 		reqs = append(reqs, req)
 		return NewGet(req), reqs, nil
 	}

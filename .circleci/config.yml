@@ -12,6 +12,7 @@ jobs:
       - run: mkdir build_docker
       - run: docker save -o build_docker/metrictank.tar grafana/metrictank
       - run: docker save -o build_docker/metrictank-gcr.tar us.gcr.io/metrictank-gcr/metrictank
+      - run: docker save -o build_docker/mt-gateway.tar grafana/mt-gateway
       - persist_to_workspace:
           root: .
           paths:
@@ -76,6 +77,7 @@ jobs:
               docker login -u $DOCKER_USER -p $DOCKER_PASS
               docker load -i build_docker/metrictank.tar
               docker load -i build_docker/metrictank-gcr.tar
+              docker load -i build_docker/mt-gateway.tar
               scripts/push/dockerhub.sh
               scripts/push/gcr.sh
             fi

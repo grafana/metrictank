@@ -177,7 +177,7 @@ POST /render
 * target: mandatory. one or more metric names or patterns, like graphite.
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
-* format: json, msgp, pickle, or msgpack (default: json)
+* format: json, msgp, pickle, or msgpack (default: json). (note: msgp and msgpack are similar, but msgpack is for use with graphite)
 * meta: use 'meta=true' to enable metadata in response (see below).
 * process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
   (as opposed to proxying to the fallback graphite).
@@ -186,6 +186,7 @@ POST /render
   - none: always defer to graphite for processing.
 
   If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
+* optimizations: can override http.pre-normalization and http.mdp-optimization options. empty (default) : no override. either "none" to force no optimizations, or a csv list with either of both of "pn", "mdp" to enable those options.
 
 Data queried for must be stored under the given org or be public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
 
@@ -234,7 +235,7 @@ Each lineage section has these fields:
 | schema-retentions      | Retentions defined in storage-schemas.conf                                                                     |
 | archive-read           | Which archive was read as defined in the retentions. (0 means raw, 1 first rollup, etc)                        |
 | archive-interval       | The native interval of the archive that was read                                                               |
-| aggnum-norm            | If >1, number of points aggregated together per point, as part of normalization (series alignment)             |
+| aggnum-norm            | If >1, number of points aggregated together per point, as part of normalization                                |
 | aggnum-rc              | If >1, number of points aggregated together per output point, as part of runtime consolidation (MaxDataPoints) |
 | consolidator-normfetch | Consolidator used for normalization (if aggnum-norm > 1) and which rollup was read (if archive-read > 0)       |
 | consolidator-rc        | Consolidator used for runtime consolidation (MaxDataPoints) (if aggnum-rc > 1)                                 |

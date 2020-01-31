@@ -2,6 +2,8 @@
 
 ## breaking changes
 
+* as of v0.13.1-186-gc75005d the `/tags/delSeries` no longer accepts a `propagate` parameter.
+  It is no longer possible to send the request to only a single node, it now always propagates to all nodes, bringing this method in line with `/metrics/delete`.
 * as of v0.13.1-38-gb88c3b84 by default we reject data points with a timestamp far in the future.
   By default the cutoff is at 10% of the raw retention's TTL, so for example with the default
   storage schema `1s:35d:10min:7` the cutoff is at `35d*0.1=3.5d`. 
@@ -15,7 +17,7 @@
   to scrape prometheus data, or query data via Promql.  There was not enough usage (or customer interest)
   to keep maintaining this functionality.
   #1613
-* as of v0.13.1-108-g9f8d3c29 tag support is enabled by default, it can still be disabled though.
+* as of v0.13.1-110-g6b6f475a tag support is enabled by default, it can still be disabled though.
   This means if previously metrics with tags have been ingested while tag support was disabled,
   then those tags would have been treated as a normal part of the metric name, when tag support
   now gets enabled due to this change then the tags would be treated as tags and they wouldn't

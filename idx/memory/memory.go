@@ -1451,20 +1451,11 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	m.RLock()
 	defer m.RUnlock()
 
-	tags, ok := m.tags[orgId]
-	if !ok {
-		return nil
-	}
-
-	// check whether the tag of which we're looking up values is a metric tag
-	// if so we can skip the meta tag enrichment
-	_, isMetricTag := tags[tag]
-
 	resMap := make(map[string]struct{})
 
 	var enricher *metaTagEnricher
 	var mtr *metaTagRecords
-	if MetaTagSupport && !isMetricTag {
+	if MetaTagSupport {
 		mtr, _, enricher = m.getMetaTagDataStructures(orgId, false)
 		if enricher != nil && enricher.countMetricsWithMetaTags() == 0 {
 			// if the enricher is empty we set it back to nil so it doesn't even get called

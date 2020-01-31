@@ -26,7 +26,7 @@ type Retentions struct {
 func (r Retentions) Sub(pos int) Retentions {
 	origSplit := strings.Split(r.Orig, ",")
 	return Retentions{
-		Orig: strings.Join(origSplit[pos:], ":"),
+		Orig: strings.Join(origSplit[pos:], ","),
 		Rets: r.Rets[pos:],
 	}
 }
