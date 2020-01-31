@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
@@ -492,6 +493,29 @@ func (b *BigtableIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error
 			}
 		}
 	}
+
+	statDeleteDuration.Value(time.Since(pre))
+	return defs, err
+}
+
+func (b *BigtableIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+	pre := time.Now()
+	defs, err := b.MemoryIndex.DeleteTagged(orgId, query)
+	if err != nil {
+		return nil, err
+	}
+
+	if b.cfg.UpdateBigtableIdx {
+		for _, def := range defs {
+			delErr := b.deleteDef(&def.MetricDefinition)
+			// the last error encountered will be passed back to the caller
+			if delErr != nil {
+				log.Errorf("bigtable-idx: Failed to delete def %s: %s", def.MetricDefinition.Id, delErr.Error())
+				err = delErr
+			}
+		}
+	}
+
 	statDeleteDuration.Value(time.Since(pre))
 	return defs, err
 }

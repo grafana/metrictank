@@ -485,19 +485,26 @@ func (p *PartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefix 
 
 // DeleteTagged deletes the specified series from the tag index and also the
 // DefById index.
-func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) []idx.Archive {
+func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
 	g, _ := errgroup.WithContext(context.Background())
 	result := make([][]idx.Archive, len(p.Partition))
 	var i int
 	for _, m := range p.Partition {
 		pos, m := i, m
 		g.Go(func() error {
-			result[pos] = m.DeleteTagged(orgId, query)
+			var err error
+			result[pos], err = m.DeleteTagged(orgId, query)
+			if err != nil {
+				return err
+			}
 			return nil
 		})
 		i++
 	}
-	g.Wait()
+	err := g.Wait()
+	if err != nil {
+		return nil, err
+	}
 
 	// get our total count, so we can allocate our response in one go.
 	items := 0
@@ -510,7 +517,7 @@ func (p *PartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query) 
 		response = append(response, r...)
 	}
 
-	return response
+	return response, nil
 }
 
 // Used to rebuild the index from an existing set of metricDefinitions.

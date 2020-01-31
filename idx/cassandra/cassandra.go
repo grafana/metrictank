@@ -12,6 +12,7 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
@@ -676,6 +677,27 @@ func (c *CasIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 			}
 		}
 	}
+	statDeleteDuration.Value(time.Since(pre))
+	return defs, err
+}
+
+func (c *CasIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+	pre := time.Now()
+	defs, err := c.MemoryIndex.DeleteTagged(orgId, query)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.Config.updateCassIdx {
+		for _, def := range defs {
+			delErr := c.deleteDef(def.Id, def.Partition)
+			if delErr != nil {
+				log.Errorf("cassandra-idx: %s", delErr.Error())
+				err = delErr
+			}
+		}
+	}
+
 	statDeleteDuration.Value(time.Since(pre))
 	return defs, err
 }
