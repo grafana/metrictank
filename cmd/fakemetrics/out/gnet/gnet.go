@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/fakemetrics/out"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
 	"github.com/jpillora/backoff"
-	"github.com/grafana/metrictank/cmd/fakemetrics/out"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
 )

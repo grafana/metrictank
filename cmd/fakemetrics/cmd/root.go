@@ -21,8 +21,8 @@ import (
 	"os"
 	"time"
 
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/grafana/metrictank/cmd/fakemetrics/out"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/spf13/cobra"
