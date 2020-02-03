@@ -6,7 +6,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
-	"github.com/raintank/fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out"
 	"github.com/raintank/met"
 )
 

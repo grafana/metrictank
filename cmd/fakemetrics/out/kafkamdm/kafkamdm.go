@@ -10,8 +10,8 @@ import (
 	p "github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
-	"github.com/raintank/fakemetrics/out"
-	"github.com/raintank/fakemetrics/out/kafkamdm/keycache"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out/kafkamdm/keycache"
 	"github.com/raintank/met"
 	log "github.com/sirupsen/logrus"
 )

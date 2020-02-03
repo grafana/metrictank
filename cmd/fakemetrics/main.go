@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/raintank/fakemetrics/cmd"
+import "github.com/grafana/metrictank/cmd/fakemetrics/cmd"
 
 func main() {
 	cmd.Execute()

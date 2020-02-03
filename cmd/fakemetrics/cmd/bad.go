@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/schema"
-	"github.com/raintank/fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

@@ -19,12 +19,12 @@ import (
 
 	"github.com/raintank/worldping-api/pkg/log"
 
-	"github.com/raintank/fakemetrics/out"
-	"github.com/raintank/fakemetrics/out/carbon"
-	"github.com/raintank/fakemetrics/out/gnet"
-	"github.com/raintank/fakemetrics/out/kafkamdam"
-	"github.com/raintank/fakemetrics/out/kafkamdm"
-	"github.com/raintank/fakemetrics/out/stdout"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out/carbon"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out/gnet"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out/kafkamdam"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out/kafkamdm"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out/stdout"
 )
 
 func checkOutputs() {

@@ -22,7 +22,7 @@ import (
 	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
-	"github.com/raintank/fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/fakemetrics/out"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/spf13/cobra"
