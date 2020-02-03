@@ -21,7 +21,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/grafana/metrictank/cmd/fakemetrics/out"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -89,7 +88,6 @@ var (
 	period     int // in s
 
 	// global vars
-	outs          []out.Out
 	stats         met.Backend
 	flushDuration met.Timer
 )
