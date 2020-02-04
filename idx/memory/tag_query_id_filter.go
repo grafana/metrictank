@@ -49,6 +49,8 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		filters: make([]expressionFilter, len(expressions)),
 	}
 
+	useMetaTags := MetaTagSupport && ctx.metaTagIndex != nil && ctx.metaTagRecords != nil
+
 	for i, expr := range expressions {
 		res.filters[i] = expressionFilter{
 			expr:             expr,
@@ -56,7 +58,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			defaultDecision:  expr.GetDefaultDecision(),
 		}
 
-		if !MetaTagSupport {
+		if !useMetaTags {
 			continue
 		}
 
@@ -91,8 +93,8 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		optimizeForOnlyEqualOperators := !invertSetOfMetaRecords
 		var metaRecordFilters []tagquery.MetricDefinitionFilter
 		singleExprPerRecord := true
-		records := make([]tagquery.MetaTagRecord, len(metaRecordIds))
-		for i, id := range metaRecordIds {
+		records := make([]tagquery.MetaTagRecord, 0, len(metaRecordIds))
+		for _, id := range metaRecordIds {
 			record, ok := ctx.metaTagRecords.records[id]
 			if !ok {
 				corruptIndex.Inc()
@@ -108,7 +110,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 					}
 				}
 				if optimizeForOnlyEqualOperators {
-					records[i] = record
+					records = append(records, record)
 					if len(record.Expressions) > 1 {
 						singleExprPerRecord = false
 					}
@@ -154,11 +156,17 @@ func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord) tagque
 	validValues := make(map[string]struct{})
 	validNames := make(map[string]struct{})
 	var builder strings.Builder
-	for i := range records {
-		if records[i].Expressions[0].GetKey() == "name" {
-			validNames[records[i].Expressions[0].GetValue()] = struct{}{}
+	for _, record := range records {
+		if len(record.Expressions) < 1 {
+			corruptIndex.Inc()
+			log.Errorf("meta-record-filter-by-set-of-valid-values: received a meta record without any associated expressions")
+			continue
+		}
+
+		if record.Expressions[0].GetKey() == "name" {
+			validNames[record.Expressions[0].GetValue()] = struct{}{}
 		} else {
-			records[i].Expressions[0].StringIntoWriter(&builder)
+			record.Expressions[0].StringIntoWriter(&builder)
 			validValues[builder.String()] = struct{}{}
 			builder.Reset()
 		}
