@@ -272,7 +272,7 @@ func TestReadSchemas(t *testing.T) {
 			want: NewSchemas([]Schema{
 				{
 					Name:    "raw",
-					Pattern: regexp.MustCompile("mt-fakemetrics.raw"),
+					Pattern: regexp.MustCompile("fakemetrics.raw"),
 					Retentions: Retentions{
 						Orig: "1s:6h:2min:2",
 						Rets: []Retention{
