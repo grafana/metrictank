@@ -58,6 +58,51 @@ Example:
 ```
 
 
+## mt-fakemetrics
+
+```
+Generates fake metrics workload
+
+Usage:
+  mt-fakemetrics [command]
+
+Available Commands:
+  agents           Mimic independent agents
+  agginput         A particular workload good to test performance of carbon-relay-ng aggregators
+  backfill         backfills old data and stops when 'now' is reached
+  bad              Sends out invalid/out-of-order/duplicate metric data
+  feed             Publishes a realtime feed of data
+  help             Help about any command
+  resolutionchange Sends out metric with changing intervals, time range 24hours
+  storageconf      Sends out one or more set of 10 metrics which you can test aggregation and retention rules on
+  version          Print the version number
+
+Flags:
+  -t, --add-tags                     add the built-in tags to generated metrics (default false)
+      --carbon-addr string           carbon TCP address. e.g. localhost:2003
+      --config string                config file (default is $HOME/.mt-fakemetrics.yaml)
+      --custom-tags strings          A list of comma separated tags (i.e. "tag1=value1,tag2=value2")(default empty) conflicts with add-tags
+      --gnet-addr string             gnet address. e.g. http://localhost:8081
+      --gnet-key string              gnet api key
+  -h, --help                         help for mt-fakemetrics
+      --kafka-comp string            compression: none|gzip|snappy (default "snappy")
+      --kafka-mdam-addr string       kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092
+      --kafka-mdm-addr string        kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092
+      --kafka-mdm-topic string       kafka topic for MetricData-Msgp messages (default "mdm")
+      --kafka-mdm-v2                 enable MetricPoint optimization (send MetricData first, then optimized MetricPoint payloads) (default true)
+      --listen string                http listener address for pprof. (default ":6764")
+      --log-level int                log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL (default 2)
+      --num-unique-custom-tags int   a number between 0 and the length of custom-tags. when using custom-tags this will make the tags unique (default 0)
+      --num-unique-tags int          a number between 0 and 10. when using add-tags this will add a unique number to some built-in tags (default 1)
+      --partition-scheme string      method used for partitioning metrics (kafka-mdm-only). (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv|lastNum) (default "bySeries")
+      --statsd-addr string           statsd TCP address. e.g. 'localhost:8125'
+      --statsd-type string           statsd type: standard or datadog (default "standard")
+      --stdout                       enable emitting metrics to stdout
+
+Use "mt-fakemetrics [command] --help" for more information about a command.
+```
+
+
 ## mt-gateway
 
 ```
