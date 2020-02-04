@@ -13,7 +13,7 @@ func initStats(enabled bool, service string) {
 	if err != nil {
 		log.Fatal(4, "failed to lookup hostname. %s", err)
 	}
-	service = "fakemetrics." + service
+	service = "mt-fakemetrics." + service
 	if statsdAddr != "" && enabled {
 		stats, err = helper.New(true, statsdAddr, statsdType, service, strings.Replace(hostname, ".", "_", -1))
 	} else {

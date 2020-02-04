@@ -21,32 +21,32 @@ function wait_time() {
 }
 
 function stop() {
-	docker stop $(docker ps | grep fakemetrics | awk '{print $1}')
+	docker stop $(docker ps | grep mt-fakemetrics | awk '{print $1}')
 }
 
 stop
 
 wait_time
 log "START MDM-OLD"
-docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=snappy --add-tags=false
+docker run -d --rm --name=mt-fakemetrics --net="host" mt-fakemetrics /mt-fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=snappy --add-tags=false
 sleep $duration
 stop
 
 wait_time
 log "START MDM-NEW"
-docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=snappy --add-tags=false
+docker run -d --rm --name=mt-fakemetrics --net="host" mt-fakemetrics /mt-fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=snappy --add-tags=false
 sleep $duration
 stop
 
 wait_time
 log "START MDM-OLD"
-docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=snappy --add-tags=false
+docker run -d --rm --name=mt-fakemetrics --net="host" mt-fakemetrics /mt-fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=false --kafka-comp=snappy --add-tags=false
 sleep $duration
 stop
 
 wait_time
 log "START MDM-NEW"
-docker run -d --rm --name=fakemetrics --net="host" fakemetrics /fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=snappy --add-tags=false
+docker run -d --rm --name=mt-fakemetrics --net="host" mt-fakemetrics /mt-fakemetrics feed --kafka-mdm-addr localhost:9092 --mpo 25000 --kafka-mdm-v2=true --kafka-comp=snappy --add-tags=false
 sleep $duration
 stop
 

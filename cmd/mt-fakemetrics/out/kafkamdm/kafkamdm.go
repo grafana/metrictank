@@ -8,8 +8,8 @@ import (
 
 	"github.com/Shopify/sarama"
 	p "github.com/grafana/metrictank/cluster/partitioner"
-	"github.com/grafana/metrictank/cmd/fakemetrics/out"
-	"github.com/grafana/metrictank/cmd/fakemetrics/out/kafkamdm/keycache"
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/kafkamdm/keycache"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
 	"github.com/raintank/met"

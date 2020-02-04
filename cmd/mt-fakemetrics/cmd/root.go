@@ -29,7 +29,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "fakemetrics",
+	Use:   "mt-fakemetrics",
 	Short: "Generates fake metrics workload",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
@@ -95,7 +95,7 @@ var (
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.fakemetrics.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mt-fakemetrics.yaml)")
 	rootCmd.PersistentFlags().StringVar(&listenAddr, "listen", ":6764", "http listener address for pprof.")
 	rootCmd.PersistentFlags().IntVar(&logLevel, "log-level", 2, "log level. 0=TRACE|1=DEBUG|2=INFO|3=WARN|4=ERROR|5=CRITICAL|6=FATAL")
 	rootCmd.PersistentFlags().StringVar(&statsdAddr, "statsd-addr", "", "statsd TCP address. e.g. 'localhost:8125'")
@@ -131,9 +131,9 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".fakemetrics" (without extension).
+		// Search config in home directory with name ".mt-fakemetrics" (without extension).
 		viper.AddConfigPath(home)
-		viper.SetConfigName(".fakemetrics")
+		viper.SetConfigName(".mt-fakemetrics")
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match

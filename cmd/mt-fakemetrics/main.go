@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/grafana/metrictank/cmd/fakemetrics/cmd"
+import "github.com/grafana/metrictank/cmd/mt-fakemetrics/cmd"
 
 func main() {
 	cmd.Execute()

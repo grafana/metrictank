@@ -10,11 +10,11 @@ trap 'kill $(jobs -p)' EXIT
 
 # first load up some old data, at a high speedup rate, so we don't have to wait too long ( 3 minutes)
 # lower speedup if your computer is too slow.  this is just to populate some old data, and is not what we care about here
-fakemetrics backfill --kafka-mdm-addr localhost:9092 --offset 5h --period 10s --speedup 100 --mpo 10000
+mt-fakemetrics backfill --kafka-mdm-addr localhost:9092 --offset 5h --period 10s --speedup 100 --mpo 10000
 # then continue with a realtime feed. note: new series are being introduced here, because we want a sufficiently high ingest rate and num active series.
 # but we couldn't possibly backfill this many series for a large timeframe in a short period
 # this is realistic anyway. to have more recent data than old (eg. due to series churn and pruning)
-fakemetrics feed --kafka-mdm-addr localhost:9092 --period 10s --mpo 100000 &
+mt-fakemetrics feed --kafka-mdm-addr localhost:9092 --period 10s --mpo 100000 &
 sleep 30
 # now request series:
 # this selects exactly 10k series that will match the regex, out of which we randomly replace 1 char with a wildcard, resulting in queries usually for 1 series, and sometimes for 10 series (depending on whether the replaced char falls within the dynamic part an the end of the name or not)

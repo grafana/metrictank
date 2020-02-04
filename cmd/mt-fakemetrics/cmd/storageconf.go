@@ -19,18 +19,18 @@ import (
 
 	"time"
 
-	"github.com/grafana/metrictank/cmd/fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
-// resolutionchangeCmd represents the resolutionchange command
-var resolutionchangeCmd = &cobra.Command{
-	Use:   "resolutionchange",
-	Short: "Sends out metric with changing intervals, time range 24hours",
+// storageconfCmd represents the storageconf command
+var storageconfCmd = &cobra.Command{
+	Use:   "storageconf",
+	Short: "Sends out one or more set of 10 metrics which you can test aggregation and retention rules on",
 	Run: func(cmd *cobra.Command, args []string) {
-		initStats(true, "resolutionchange")
+		initStats(true, "storageconf")
 		if mpo%10 != 0 {
 			log.Fatal("mpo must divide by 10")
 		}
@@ -43,22 +43,37 @@ var resolutionchangeCmd = &cobra.Command{
 		to := time.Now().Unix()
 		from := to - 24*60*60
 
-		var metrics []*schema.MetricData
-		for i := 0; i < mpo; i++ {
-			metrics = append(metrics, buildResChangeMetric("fakemetrics.reschange.%d", i, 1))
+		names := []string{
+			"mt-fakemetrics.raw.%d.min",
+			"mt-fakemetrics.raw.%d.max",
+			"mt-fakemetrics.raw.%d.sum",
+			"mt-fakemetrics.raw.%d.lst",
+			"mt-fakemetrics.raw.%d.default",
+			"mt-fakemetrics.agg.%d.min",
+			"mt-fakemetrics.agg.%d.max",
+			"mt-fakemetrics.agg.%d.sum",
+			"mt-fakemetrics.agg.%d.lst",
+			"mt-fakemetrics.agg.%d.default",
 		}
-		runResolutionChange(metrics, from, to, outs)
+		var metrics []*schema.MetricData
+		sets := mpo / 10
+		for set := 1; set <= sets; set++ {
+			for _, name := range names {
+				metrics = append(metrics, buildMetric(name, set, 1))
+			}
+		}
+		do(metrics, from, to, outs)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(resolutionchangeCmd)
-	resolutionchangeCmd.Flags().IntVar(&mpo, "mpo", 10, "how many metrics per org to simulate (must be multiple of 10)")
+	rootCmd.AddCommand(storageconfCmd)
+	storageconfCmd.Flags().IntVar(&mpo, "mpo", 10, "how many metrics per org to simulate (must be multiple of 10)")
 }
 
-func buildResChangeMetric(name string, i, org int) *schema.MetricData {
+func buildMetric(name string, set, org int) *schema.MetricData {
 	out := &schema.MetricData{
-		Name:     fmt.Sprintf(name, i),
+		Name:     fmt.Sprintf(name, set),
 		OrgId:    org,
 		Interval: 1,
 		Unit:     "ms",
@@ -68,32 +83,13 @@ func buildResChangeMetric(name string, i, org int) *schema.MetricData {
 	out.SetId()
 	return out
 }
-func runResolutionChange(metrics []*schema.MetricData, from, to int64, outs []out.Out) {
-	ts := from
-	interval := int64(1)
-	for ts <= to {
+func do(metrics []*schema.MetricData, from, to int64, outs []out.Out) {
+	for ts := from; ts < to; ts++ {
 		if ts%3600 == 0 {
 			fmt.Println("doing ts", ts)
 		}
-		// every 6 hours, increase resolution
-		if ts%3600*6 == 0 {
-			switch interval {
-			case 1:
-				interval = 10
-			case 10:
-				interval = 60
-			case 60:
-				interval = 300
-			}
-			fmt.Println("changing interval to", interval)
-			for i := range metrics {
-				metrics[i].Interval = int(interval)
-				metrics[i].SetId()
-			}
-		}
-
 		for i := range metrics {
-			metrics[i].Time = ts
+			metrics[i].Time = int64(ts)
 			metrics[i].Value = float64(ts % 10)
 		}
 		for _, out := range outs {
@@ -102,6 +98,5 @@ func runResolutionChange(metrics []*schema.MetricData, from, to int64, outs []ou
 				log.Error(err.Error())
 			}
 		}
-		ts += interval
 	}
 }

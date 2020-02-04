@@ -64,7 +64,7 @@ func agent(id int) {
 	met := make([]*schema.MetricData, metricsPerAgent)
 	for i := 0; i < metricsPerAgent; i++ {
 		met[i] = &schema.MetricData{
-			Name:     fmt.Sprintf("fakemetrics.agent_%d.metric.%d", id, i),
+			Name:     fmt.Sprintf("mt-fakemetrics.agent_%d.metric.%d", id, i),
 			OrgId:    1,
 			Interval: period,
 			Value:    0,
