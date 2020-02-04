@@ -312,7 +312,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 				rets := getRetentions(req)
 				// we know that every request must have a ready retention with an interval that fits into the candidate LCM
 				// only a matter of finding the best (largest) one
-				for i := len(rets); i >= 0; i-- {
+				for i := len(rets) - 1; i >= 0; i-- {
 					ret := rets[i]
 					if uint32(ret.SecondsPerPoint) <= candidateInterval && candidateInterval%uint32(ret.SecondsPerPoint) == 0 && ret.Ready <= from && req.TTL >= minTTL {
 						score += ret.SecondsPerPoint
@@ -337,7 +337,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 	for i := range reqs {
 		req := &reqs[i]
 		rets := getRetentions(*req)
-		for i := len(rets); i >= 0; i-- {
+		for i := len(rets) - 1; i >= 0; i-- {
 			ret := rets[i]
 			if ret.Ready <= from && req.TTL >= minTTL {
 				if uint32(ret.SecondsPerPoint) == interval {
