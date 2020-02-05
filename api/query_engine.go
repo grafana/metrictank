@@ -244,7 +244,6 @@ func planHighestResMulti(now, from, to uint32, reqs []models.Req) ([]models.Req,
 
 // note: we can assume all reqs have the same MDP.
 func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]models.Req, bool) {
-	var ok bool
 	minTTL := now - from
 
 	// if we were to set each req to their coarsest interval that results in >= MDP/2 points,
@@ -353,5 +352,5 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 		}
 
 	}
-	return reqs, ok
+	return reqs, true
 }
