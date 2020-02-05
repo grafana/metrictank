@@ -737,6 +737,14 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 		// remove all references to the pruned meta records from the meta
 		// tag index and the enricher
 		for recordId, record := range pruned {
+			// keeping the lock time as short as possible because pruning
+			// performance is not important compared to query response times
+			m.Lock()
+			for _, tag := range record.MetaTags {
+				mti.deleteRecord(tag, recordId)
+			}
+			m.Unlock()
+
 			query, err = tagquery.NewQuery(record.Expressions, 0)
 			if err != nil {
 				log.Errorf("Invalid meta record with id %d and expressions/meta tags: %q/%q", recordId, record.Expressions.Strings(), record.MetaTags.Strings())
@@ -744,12 +752,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 			}
 			queryCtx = NewTagQueryContext(query)
 
-			// keeping the lock time as short as possible because pruning
-			// performance is not important compared to query response times
 			m.Lock()
-			for _, tag := range record.MetaTags {
-				mti.deleteRecord(tag, recordId)
-			}
 			idCh := m.idsByTagQuery(orgId, queryCtx)
 			var metricKeys []schema.Key
 			for metricId := range idCh {
