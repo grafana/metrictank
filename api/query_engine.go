@@ -224,9 +224,9 @@ func planHighestResMulti(now, from, to uint32, reqs []models.Req) ([]models.Req,
 			}
 		}
 		if !ok {
-			return nil, ok
+			return nil, false
 		}
-		if _, ok := seenIntervals[req.ArchInterval]; !ok {
+		if _, exists := seenIntervals[req.ArchInterval]; !exists {
 			listIntervals = append(listIntervals, req.ArchInterval)
 			seenIntervals[req.ArchInterval] = struct{}{}
 		}
@@ -276,7 +276,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 			}
 		}
 		if !ok {
-			return nil, ok
+			return nil, false
 		}
 		// add our sequence of valid intervals to the list, unless it's there already
 		var found bool
