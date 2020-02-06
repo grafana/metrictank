@@ -686,7 +686,7 @@ func (m *UnpartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, newRecords []ta
 			// change when we update it
 			recordsModified++
 			enricher.delMetaRecord(existingRecordId, metricKeys)
-			for _, tag := range record.MetaTags {
+			for _, tag := range mtr.getMetaTagsByRecordId(existingRecordId) {
 				mti.deleteRecord(tag, existingRecordId)
 			}
 		} else {
