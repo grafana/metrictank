@@ -81,6 +81,10 @@ func (m *metaTagRecords) getPrunable(toKeep map[recordId]struct{}) map[recordId]
 	return toPrune
 }
 
+func (m *metaTagRecords) getMetaTagsByRecordId(recordId recordId) tagquery.Tags {
+	return m.records[recordId].MetaTags
+}
+
 func (m *metaTagRecords) getMetaTagsByRecordIds(recordIds map[recordId]struct{}) tagquery.Tags {
 	res := make(tagquery.Tags, 0, len(recordIds))
 	for recordId := range recordIds {

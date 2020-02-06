@@ -75,6 +75,28 @@ func queryAndCompareResultsWithMetaTags(t *testing.T, idx *UnpartitionedMemoryId
 	}
 }
 
+func mustParseExpression(t *testing.T, expr string) tagquery.Expression {
+	t.Helper()
+
+	res, err := tagquery.ParseExpression(expr)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing expression %s: %s", expr, err)
+	}
+
+	return res
+}
+
+func mustParseMetaTagRecord(t *testing.T, expressions []string, metaTags []string) tagquery.MetaTagRecord {
+	t.Helper()
+
+	res, err := tagquery.ParseMetaTagRecord(expressions, metaTags)
+	if err != nil {
+		t.Fatalf("Unexpected error when parsing meta tag record (%q/%q): %s", expressions, metaTags, err)
+	}
+
+	return res
+}
+
 func TestSimpleMetaTagQueryWithSingleEqualExpression(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
@@ -288,6 +310,72 @@ func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestMetaTagRecordSwap(t *testing.T) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
+	record1 := mustParseMetaTagRecord(t, []string{"meta1=value1"}, []string{"tag1=iterator0"})
+	record2 := mustParseMetaTagRecord(t, []string{"meta2=value2"}, []string{"tag1=~iterator?"})
+
+	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{record1, record2}, 3, nil)
+	mtr, mti, _ := idx.getMetaTagDataStructures(1, false)
+
+	record1Id, exists, equal := mtr.recordExistsAndIsEqual(record1)
+	if !(exists && equal) {
+		t.Fatalf("Record 1 does not exist in mtr: %t/%t", exists, equal)
+	}
+	record2Id, exists, equal := mtr.recordExistsAndIsEqual(record2)
+	if !(exists && equal) {
+		t.Fatalf("Record 2 does not exist in mtr: %t/%t", exists, equal)
+	}
+
+	gotRecord1Ids := mti.getByTagValue(mustParseExpression(t, record1.MetaTags[0].Key+"="+record1.MetaTags[0].Value), false)
+	if !reflect.DeepEqual(gotRecord1Ids, []recordId{record1Id}) {
+		t.Fatalf("mti.getByTag returned unexpected record ids for meta tag %q of record 1. Got %+v, Expected %+v", record1.MetaTags[0], gotRecord1Ids, []recordId{record1Id})
+	}
+
+	gotRecord2Ids := mti.getByTagValue(mustParseExpression(t, record2.MetaTags[0].Key+"="+record2.MetaTags[0].Value), false)
+	if !reflect.DeepEqual(gotRecord2Ids, []recordId{record2Id}) {
+		t.Fatalf("mti.getByTag returned unexpected record ids for meta tag %q of record 2. Got %+v, Expected %+v", record2.MetaTags[0], gotRecord2Ids, []recordId{record2Id})
+	}
+
+	if len(mti) != 2 {
+		t.Fatalf("Expected metaTagIndex to have 2 keys, but it had %d", len(mti))
+	}
+
+	if len(mti["meta1"]) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti["meta1"]))
+	}
+
+	if len(mti["meta2"]) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta2\", but id had %d", len(mti["meta2"]))
+	}
+
+	record3 := mustParseMetaTagRecord(t, []string{"meta1=newvalue"}, []string{"tag1=iterator0"})
+	err := idx.MetaTagRecordSwap(1, []tagquery.MetaTagRecord{record3})
+	if err != nil {
+		t.Fatalf("Unexpected error when calling meta tag record swap: %s", err)
+	}
+
+	record3Id, exists, equal := mtr.recordExistsAndIsEqual(record3)
+	if !(exists && equal) {
+		t.Fatalf("Record 1 does not exist in mtr: %t/%t", exists, equal)
+	}
+
+	gotRecord3Ids := mti.getByTagValue(mustParseExpression(t, record3.MetaTags[0].Key+"="+record3.MetaTags[0].Value), false)
+	if !reflect.DeepEqual(gotRecord3Ids, []recordId{record3Id}) {
+		t.Fatalf("mti.getByTag returned unexpected record ids for meta tag %q of record 3. Got %+v, Expected %+v", record3.MetaTags[0], gotRecord3Ids, []recordId{record3Id})
+	}
+
+	if len(mti) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 keys, but it had %d", len(mti))
+	}
+
+	if len(mti["meta1"]) != 1 {
+		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti["meta1"]))
 	}
 }
 
