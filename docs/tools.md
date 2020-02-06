@@ -74,6 +74,7 @@ Available Commands:
   feed             Publishes a realtime feed of data
   help             Help about any command
   resolutionchange Sends out metric with changing intervals, time range 24hours
+  schemasbackfill  backfills a sends a set of metrics for each encountered storage-schemas.conf rule. Note: patterns must be a static string + wildcard at the end (e.g. foo.bar.*)!
   storageconf      Sends out one or more set of 10 metrics which you can test aggregation and retention rules on
   version          Print the version number
 
