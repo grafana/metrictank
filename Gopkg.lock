@@ -1216,6 +1216,7 @@
     "github.com/raintank/gziper",
     "github.com/raintank/met",
     "github.com/raintank/met/helper",
+    "github.com/raintank/met/statsd",
     "github.com/raintank/worldping-api/pkg/log",
     "github.com/rs/cors",
     "github.com/sergi/go-diff/diffmatchpatch",

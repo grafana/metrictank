@@ -534,6 +534,27 @@ It prints the MKey
 ```
 
 
+## mt-parrot
+
+```
+generate deterministic metrics for each metrictank partition
+
+Usage:
+  parrot [flags]
+
+Flags:
+      --artificial-metrics-interval duration   interval to send metrics (default 5s)
+      --gateway-address string                 the url of the metrics gateway to publish to (default "http://localhost:6059/metrics")
+      --gateway-key string                     the bearer token to include with gateway requests
+  -h, --help                                   help for parrot
+      --log-level string                       log level. panic|fatal|error|warning|info|debug (default "info")
+      --org-id int                             org id to publish parrot metrics to (default 1)
+      --partition-count int32                  number of partitions to publish parrot metrics to (default 8)
+      --partition-method string                the partition method to use, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
+      --query-interval duration                interval to query to validate metrics (default 10s)
+```
+
+
 ## mt-schemas-explain
 
 ```
