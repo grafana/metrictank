@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/raintank/met"
 	"github.com/raintank/worldping-api/pkg/log"
@@ -86,8 +87,11 @@ var (
 	periodDur  time.Duration
 	flush      int // in ms
 	period     int // in s
+	offset     time.Duration
+	speedup    int
 
 	// global vars
+	outs          []out.Out
 	stats         met.Backend
 	flushDuration met.Timer
 )

@@ -11,9 +11,51 @@ import (
 	"github.com/raintank/worldping-api/pkg/log"
 )
 
-// slice of MetricData's, per orgid
-// with time and value not set yet.
-func buildMetrics(metricName string, orgs, mpo, period int) [][]schema.MetricData {
+type MetricPayloadBuilder interface {
+	Info() string
+	// Build builds a slice of slices of MetricData's( per orgid), with time and value not set yet.
+	Build(orgs, mpo, period int) [][]schema.MetricData
+}
+
+// uses no tags
+type SimpleBuilder struct {
+	metricName string
+}
+
+func (tb SimpleBuilder) Info() string {
+	return "metricName=" + tb.metricName
+}
+
+func (tb SimpleBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
+	out := make([][]schema.MetricData, orgs)
+	for o := 0; o < orgs; o++ {
+		metrics := make([]schema.MetricData, mpo)
+		for m := 0; m < mpo; m++ {
+			name := fmt.Sprintf("%s.%d", tb.metricName, m+1)
+			metrics[m] = schema.MetricData{
+				Name:     name,
+				OrgId:    o + 1,
+				Interval: period,
+				Unit:     "ms",
+				Mtype:    "gauge",
+			}
+			metrics[m].SetId()
+		}
+		out[o] = metrics
+	}
+	return out
+}
+
+// uses tags
+type TaggedBuilder struct {
+	metricName string
+}
+
+func (tb TaggedBuilder) Info() string {
+	return "metricName=" + tb.metricName
+}
+
+func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 	out := make([][]schema.MetricData, orgs)
 	for o := 0; o < orgs; o++ {
 		metrics := make([]schema.MetricData, mpo)
@@ -94,16 +136,16 @@ func buildMetrics(metricName string, orgs, mpo, period int) [][]schema.MetricDat
 // period in seconds
 // flush  in ms
 // offset in seconds
-func dataFeed(outs []out.Out, metricName string, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool) {
+func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
 	if mpo*speedup%period != 0 {
-		panic("not a good fit. mpo*speedup must fit in period, to compute clean rate/s/org")
+		panic("not a good fit. mpo*speedup must divide by period, to compute clean rate/s/org")
 	}
 	ratePerSPerOrg := mpo * speedup / period
 
 	if mpo*speedup*flush%(1000*period) != 0 {
-		panic("not a good fit. mpo*speedup*flush must fit in period, to compute clean rate/flush/org")
+		panic("not a good fit. mpo*speedup*flush must divide by period, to compute clean rate/flush/org")
 	}
 	ratePerFlushPerOrg := ratePerSPerOrg * flush / 1000
 
@@ -122,13 +164,17 @@ func dataFeed(outs []out.Out, metricName string, orgs, mpo, period, flush, offse
 	ratePerS := ratePerSPerOrg * orgs
 	ratePerFlush := ratePerFlushPerOrg * orgs
 
-	fmt.Printf("params: metricname=%s, orgs=%d, mpo=%d, period=%d, flush=%d, offset=%d, speedup=%d, stopAtNow=%t\n", metricName, orgs, mpo, period, flush, offset, speedup, stopAtNow)
-	fmt.Printf("per org:         each %s, flushing %d metrics so rate of %d Hz. (%d total unique series)\n", flushDur, ratePerFlush, ratePerS, orgs*mpo)
-	fmt.Printf("times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique series)\n", orgs, flushDur, ratePerFlush, ratePerS, orgs*mpo)
+	tmpl := `params: %s, orgs=%d, mpo=%d, period=%d, flush=%d, offset=%d, speedup=%d, stopAtNow=%t
+per org:         each %s, flushing %d metrics so rate of %d Hz. (%d total unique series)
+times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique series)
+`
+	fmt.Printf(tmpl, builder.Info(), orgs, mpo, period, flush, offset, speedup, stopAtNow,
+		flushDur, ratePerFlush, ratePerS, orgs*mpo,
+		orgs, flushDur, ratePerFlush, ratePerS, orgs*mpo)
 
 	tick := time.NewTicker(flushDur)
 
-	metrics := buildMetrics(metricName, orgs, mpo, period)
+	metrics := builder.Build(orgs, mpo, period)
 
 	mp := int64(period)
 	ts := time.Now().Unix() - int64(offset) - mp

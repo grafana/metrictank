@@ -20,11 +20,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	offset  time.Duration
-	speedup int
-)
-
 var backfillCmd = &cobra.Command{
 	Use:   "backfill",
 	Short: "backfills old data and stops when 'now' is reached",
@@ -33,7 +28,7 @@ var backfillCmd = &cobra.Command{
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
 		outs := getOutputs()
-		dataFeed(outs, metricName, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true)
+		dataFeed(outs, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, TaggedBuilder{metricName})
 	},
 }
 
