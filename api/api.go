@@ -76,7 +76,6 @@ func (s *Server) BindPrioritySetter(p PrioritySetter) {
 func NewServer() (*Server, error) {
 
 	m := macaron.New()
-	m.Use(macaron.Logger())
 	m.Use(macaron.Recovery())
 	// route pprof to where it belongs, except for our own extensions
 	m.Use(func(ctx *macaron.Context) {
