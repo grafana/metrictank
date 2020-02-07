@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/expr"
 	log "github.com/sirupsen/logrus"
 )
@@ -53,6 +54,7 @@ func ConfigSetup() {
 	apiCfg.Float64Var(&speculationThreshold, "speculation-threshold", 1, "ratio of peer responses after which speculation is used. Set to 1 to disable.")
 	apiCfg.BoolVar(&optimizations.PreNormalization, "pre-normalization", true, "enable pre-normalization optimization")
 	apiCfg.BoolVar(&optimizations.MDP, "mdp-optimization", false, "enable MaxDataPoints optimization (experimental)")
+	apiCfg.BoolVar(&middleware.LogHeaders, "log-headers", false, "output query headers in logs")
 	globalconf.Register("http", apiCfg, flag.ExitOnError)
 }
 

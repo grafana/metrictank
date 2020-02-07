@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	logHeaders = false
+	LogHeaders = false
 )
 
 type LoggingResponseWriter struct {
@@ -82,7 +82,7 @@ func Logger() macaron.Handler {
 			fmt.Fprintf(&content, " error=\"%s\"", errorMsg)
 		}
 
-		if logHeaders {
+		if LogHeaders {
 			headers, err := extractHeaders(ctx.Req.Request)
 			if err != nil {
 				log.Errorf("Could not extract request headers: %v", err)
