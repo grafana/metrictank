@@ -22,7 +22,7 @@
 // stream implements it. `(*fwd.Reader).Next` returns a slice pointing
 // to the next `n` bytes in the read buffer (like `Peek`), but also
 // increments the read position. This allows users to process streams
-// in aribtrary block sizes without having to manage appropriately-sized
+// in arbitrary block sizes without having to manage appropriately-sized
 // slices. Additionally, obviating the need to copy the data from the
 // buffer to another location in memory can improve performance dramatically
 // in CPU-bound applications.
@@ -97,7 +97,11 @@ func (r *Reader) more() {
 	// we can supply the maximum number of
 	// bytes to the reader
 	if r.n != 0 {
-		r.data = r.data[:copy(r.data[0:], r.data[r.n:])]
+		if r.n < len(r.data) {
+			r.data = r.data[:copy(r.data[0:], r.data[r.n:])]
+		} else {
+			r.data = r.data[:0]
+		}
 		r.n = 0
 	}
 	var a int
@@ -105,6 +109,10 @@ func (r *Reader) more() {
 	if a == 0 && r.state == nil {
 		r.state = io.ErrNoProgress
 		return
+	} else if a > 0 && r.state == io.EOF {
+		// discard the io.EOF if we read more than 0 bytes.
+		// the next call to Read should return io.EOF again.
+		r.state = nil
 	}
 	r.data = r.data[:len(r.data)+a]
 }
@@ -168,7 +176,7 @@ func (r *Reader) Peek(n int) ([]byte, error) {
 
 // Skip moves the reader forward 'n' bytes.
 // Returns the number of bytes skipped and any
-// errors encountered. It is analagous to Seek(n, 1).
+// errors encountered. It is analogous to Seek(n, 1).
 // If the underlying reader implements io.Seeker, then
 // that method will be used to skip forward.
 //
