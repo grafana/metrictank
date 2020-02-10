@@ -1,7 +1,5 @@
 package main
 
-
-
 import (
 	"fmt"
 	"net/http"
@@ -11,8 +9,6 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/stats"
-	"github.com/raintank/tsdb-gw/api/models"
-	"gopkg.in/macaron.v1"
 )
 
 //http.ResponseWriter that saves the status code and body size
@@ -34,6 +30,7 @@ func (rec *responseRecorder) Write(data []byte) (int, error) {
 	rec.size += size
 	return size, err
 }
+
 type requestStats struct {
 	sync.Mutex
 	responseCounts    map[string]map[int]*stats.CounterRate32
@@ -41,7 +38,7 @@ type requestStats struct {
 	sizeMeters        map[string]*stats.Meter32
 }
 
-func (r *requestStats) PathStatusCount(ctx *models.Context, path string, status int) {
+func (r *requestStats) PathStatusCount(path string, status int) {
 	metricKey := fmt.Sprintf("api.request.%s.status.%d", path, status)
 	r.Lock()
 	p, ok := r.responseCounts[path]
@@ -58,7 +55,7 @@ func (r *requestStats) PathStatusCount(ctx *models.Context, path string, status 
 	c.Inc()
 }
 
-func (r *requestStats) PathLatency(ctx *models.Context, path string, dur time.Duration) {
+func (r *requestStats) PathLatency(path string, dur time.Duration) {
 	r.Lock()
 	p, ok := r.latencyHistograms[path]
 	if !ok {
@@ -69,7 +66,7 @@ func (r *requestStats) PathLatency(ctx *models.Context, path string, dur time.Du
 	p.Value(dur)
 }
 
-func (r *requestStats) PathSize(ctx *models.Context, path string, size int) {
+func (r *requestStats) PathSize(path string, size int) {
 	r.Lock()
 	p, ok := r.sizeMeters[path]
 	if !ok {
@@ -80,31 +77,29 @@ func (r *requestStats) PathSize(ctx *models.Context, path string, size int) {
 	p.Value(size)
 }
 
-// RequestStats returns a middleware that tracks request metrics.
-func RequestStats() macaron.Handler {
+//add request metrics to the given handler
+func statsMiddleware(base http.Handler) http.Handler {
 	stats := requestStats{
 		responseCounts:    make(map[string]map[int]*stats.CounterRate32),
 		latencyHistograms: make(map[string]*stats.LatencyHistogram15s32),
 		sizeMeters:        make(map[string]*stats.Meter32),
 	}
 
-	return func(ctx *models.Context) {
+	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		start := time.Now()
-		rw := ctx.Resp.(macaron.ResponseWriter)
-		// call next handler. This will return after all handlers
-		// have completed and the request has been sent.
-		ctx.Next()
-		status := rw.Status()
-		path := pathSlug(ctx.Req.URL.Path)
-		stats.PathStatusCount(ctx, path, status)
-		stats.PathLatency(ctx, path, time.Since(start))
+		recorder := responseRecorder{w, -1, 0}
+		base.ServeHTTP(&recorder, request)
+		path := pathSlug(request.URL.Path)
+		stats.PathLatency(path, time.Since(start))
+		stats.PathStatusCount(path, recorder.status)
 		// only record the request size if the request succeeded.
-		if status < 300 {
-			stats.PathSize(ctx, path, rw.Size())
+		if recorder.status < 300 {
+			stats.PathSize(path, recorder.size)
 		}
-	}
+	})
 }
 
+//convert the request path to a metrics-safe slug
 func pathSlug(p string) string {
 	slug := strings.TrimPrefix(path.Clean(p), "/")
 	if slug == "" {
