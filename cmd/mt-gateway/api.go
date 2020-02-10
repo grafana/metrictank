@@ -81,22 +81,10 @@ func withMiddleware(svc string, base http.Handler) http.Handler {
 	return defaultOrgIdMiddleware(loggingMiddleware(svc, base))
 }
 
-//http.ResponseWriter that saves the status code
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-//delegate to the main response writer, but save the code
-func (rec *statusRecorder) WriteHeader(code int) {
-	rec.status = code
-	rec.ResponseWriter.WriteHeader(code)
-}
-
 //add request logging to the given handler
 func loggingMiddleware(svc string, base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		recorder := statusRecorder{w, -1}
+		recorder := responseRecorder{w, -1, 0}
 		base.ServeHTTP(&recorder, request)
 		log.WithField("service", svc).
 			WithField("method", request.Method).

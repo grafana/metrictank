@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"path"
 	"strings"
 	"sync"
@@ -14,6 +15,25 @@ import (
 	"gopkg.in/macaron.v1"
 )
 
+//http.ResponseWriter that saves the status code and body size
+type responseRecorder struct {
+	http.ResponseWriter
+	status int
+	size   int
+}
+
+//delegate to the main response writer, but save the code
+func (rec *responseRecorder) WriteHeader(code int) {
+	rec.status = code
+	rec.ResponseWriter.WriteHeader(code)
+}
+
+//delegate to the main response writer, but record the number of bytes written
+func (rec *responseRecorder) Write(data []byte) (int, error) {
+	size, err := rec.ResponseWriter.Write(data)
+	rec.size += size
+	return size, err
+}
 type requestStats struct {
 	sync.Mutex
 	responseCounts    map[string]map[int]*stats.CounterRate32
