@@ -77,28 +77,6 @@ func (r *requestStats) PathSize(path string, size int) {
 	p.Value(size)
 }
 
-//add request metrics to the given handler
-func statsMiddleware(base http.Handler) http.Handler {
-	stats := requestStats{
-		responseCounts:    make(map[string]map[int]*stats.CounterRate32),
-		latencyHistograms: make(map[string]*stats.LatencyHistogram15s32),
-		sizeMeters:        make(map[string]*stats.Meter32),
-	}
-
-	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		start := time.Now()
-		recorder := responseRecorder{w, -1, 0}
-		base.ServeHTTP(&recorder, request)
-		path := pathSlug(request.URL.Path)
-		stats.PathLatency(path, time.Since(start))
-		stats.PathStatusCount(path, recorder.status)
-		// only record the request size if the request succeeded.
-		if recorder.status < 300 {
-			stats.PathSize(path, recorder.size)
-		}
-	})
-}
-
 //convert the request path to a metrics-safe slug
 func pathSlug(p string) string {
 	slug := strings.TrimPrefix(path.Clean(p), "/")
