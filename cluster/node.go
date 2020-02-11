@@ -255,13 +255,14 @@ func (n *HTTPNode) SetPartitions(part []int32) {
 	n.Updated = time.Now()
 }
 
-func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
+func (n HTTPNode) PostRaw(ctx context.Context, name, path string, body Traceable) (io.ReadCloser, error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
 	tags.PeerService.Set(span, "metrictank")
 	tags.PeerAddress.Set(span, n.RemoteAddr)
 	tags.PeerHostname.Set(span, n.Name)
 	body.Trace(span)
+	var err error
 	defer func(pre time.Time) {
 		if err != nil {
 			tags.Error.Set(span, true)
@@ -276,8 +277,7 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 	if err != nil {
 		return nil, NewError(http.StatusInternalServerError, err)
 	}
-	var reader *bytes.Reader
-	reader = bytes.NewReader(b)
+	reader := bytes.NewReader(b)
 	addr := n.RemoteURL() + path
 	req, err := http.NewRequest("POST", addr, reader)
 	if err != nil {
@@ -306,21 +306,26 @@ func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (
 		log.Errorf("CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
 		return nil, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
 	}
-	return handleResp(rsp)
+	if rsp.StatusCode != 200 {
+		// Read in body so that the connection can be reused
+		io.Copy(ioutil.Discard, rsp.Body)
+		rsp.Body.Close()
+		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
+	}
+	return rsp.Body, nil
+}
+
+func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
+	bodyReader, err := n.PostRaw(ctx, name, path, body)
+	if err != nil || bodyReader == nil {
+		return nil, err
+	}
+	defer bodyReader.Close()
+	return ioutil.ReadAll(bodyReader)
 }
 
 func (n HTTPNode) GetName() string {
 	return n.Name
-}
-
-func handleResp(rsp *http.Response) ([]byte, error) {
-	defer rsp.Body.Close()
-	if rsp.StatusCode != 200 {
-		// Read in body so that the connection can be reused
-		io.Copy(ioutil.Discard, rsp.Body)
-		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
-	}
-	return ioutil.ReadAll(rsp.Body)
 }
 
 type HTTPNodesByName []HTTPNode

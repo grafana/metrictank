@@ -1,7 +1,10 @@
 package cluster
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"io/ioutil"
 	"sort"
 	"time"
 )
@@ -37,6 +40,10 @@ func (n *MockNode) GetPriority() int {
 
 func (n MockNode) Post(ctx context.Context, name, path string, body Traceable) ([]byte, error) {
 	return n.postResponse, nil
+}
+
+func (n MockNode) PostRaw(ctx context.Context, name, path string, body Traceable) (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader(n.postResponse)), nil
 }
 
 func (n *MockNode) GetName() string {
