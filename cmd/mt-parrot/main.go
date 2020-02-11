@@ -96,7 +96,7 @@ func generateMetric(desiredPartition int32) *schema.MetricData {
 		OrgId: orgId,
 		Unit:  "partyparrots",
 		Mtype: "gauge",
-		Tags:  []string{"partition", fmt.Sprintf("%d", desiredPartition)},
+		Tags:     []string{fmt.Sprintf("partition=%d", desiredPartition)},
 	}
 
 	for i := 1; true; i++ {
