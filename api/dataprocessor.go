@@ -21,6 +21,7 @@ import (
 	tags "github.com/opentracing/opentracing-go/ext"
 	traceLog "github.com/opentracing/opentracing-go/log"
 	log "github.com/sirupsen/logrus"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -236,14 +237,19 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 		go func(reqs []models.Req) {
 			defer wg.Done()
 			node := reqs[0].Node
-			buf, err := node.Post(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
+			body, err := node.PostRaw(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
 			if err != nil {
 				cancel()
 				responses <- getTargetsResp{nil, err}
 				return
 			}
+			if body == nil {
+				// Request was canceled
+				return
+			}
 			var resp models.GetDataRespV1
-			_, err = resp.UnmarshalMsg(buf)
+			err = msgp.Decode(body, &resp)
+			body.Close()
 			if err != nil {
 				cancel()
 				log.Errorf("DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err.Error())
