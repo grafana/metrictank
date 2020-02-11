@@ -286,7 +286,6 @@ func (m *mtPublisher) Publish(metrics []*schema.MetricData) error {
 		}
 		metric.SetId()
 
-
 		isMD := false
 		isMP := false
 		isMPNO := false
