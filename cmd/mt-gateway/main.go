@@ -7,9 +7,12 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
+	"time"
 
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -23,6 +26,14 @@ var (
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
 	defaultOrgId  = flag.Int("default-org-id", -1, "default org ID to send to downstream services if none is provided")
 	brokers       = flag.String("kafka-tcp-addr", "localhost:9092", "kafka tcp address(es) for metrics, in csv host[:port] format")
+
+	// stats
+	statsEnabled    = flag.Bool("stats-enabled", false, "enable sending graphite messages for instrumentation")
+	statsPrefix     = flag.String("stats-prefix", "mt-gateway.stats.default.$hostname", "stats prefix (will add trailing dot automatically if needed)")
+	statsAddr       = flag.String("stats-addr", "localhost:2003", "graphite address")
+	statsInterval   = flag.Int("stats-interval", 10, "interval in seconds to send statistics")
+	statsBufferSize = flag.Int("stats-buffer-size", 20000, "how many messages (holding all measurements from one interval) to buffer up in case graphite endpoint is unavailable.")
+	statsTimeout    = flag.Duration("stats-timeout", time.Second*10, "timeout after which a write is considered not successful")
 )
 
 type Urls struct {
@@ -69,6 +80,15 @@ func main() {
 	if *showVersion {
 		fmt.Printf("mt-gateway (version: %s - runtime: %s)\n", version, runtime.Version())
 		return
+	}
+
+	if *statsEnabled {
+		stats.NewMemoryReporter()
+		hostname, _ := os.Hostname()
+		prefix := strings.Replace(*statsPrefix, "$hostname", strings.Replace(hostname, ".", "_", -1), -1)
+		stats.NewGraphite(prefix, *statsAddr, *statsInterval, *statsBufferSize, *statsTimeout)
+	} else {
+		stats.NewDevnull()
 	}
 
 	urls := Urls{}

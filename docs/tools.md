@@ -148,6 +148,18 @@ Flags:
     	restrict publishing data belonging to org id; 0 means no restriction (may be given multiple times, once per topic specified in 'metrics-topic', as a comma-separated list)
   -schemas-file string
     	path to carbon storage-schemas.conf file (default "/etc/metrictank/storage-schemas.conf")
+  -stats-addr string
+    	graphite address (default "localhost:2003")
+  -stats-buffer-size int
+    	how many messages (holding all measurements from one interval) to buffer up in case graphite endpoint is unavailable. (default 20000)
+  -stats-enabled
+    	enable sending graphite messages for instrumentation
+  -stats-interval int
+    	interval in seconds to send statistics (default 10)
+  -stats-prefix string
+    	stats prefix (will add trailing dot automatically if needed) (default "mt-gateway.stats.default.$hostname")
+  -stats-timeout duration
+    	timeout after which a write is considered not successful (default 10s)
   -v2
     	enable optimized MetricPoint payload (default true)
   -v2-clear-interval duration

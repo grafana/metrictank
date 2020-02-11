@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/grafana/metrictank/stats"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
 	"github.com/grafana/metrictank/publish"
@@ -78,25 +80,35 @@ func (api Api) Mux() *http.ServeMux {
 
 //Add logging and default orgId middleware to the http handler
 func withMiddleware(svc string, base http.Handler) http.Handler {
-	return defaultOrgIdMiddleware(loggingMiddleware(svc, base))
+	return defaultOrgIdMiddleware(statsMiddleware(loggingMiddleware(svc, base)))
 }
 
-//http.ResponseWriter that saves the status code
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
+//add request metrics to the given handler
+func statsMiddleware(base http.Handler) http.Handler {
+	stats := requestStats{
+		responseCounts:    make(map[string]map[int]*stats.CounterRate32),
+		latencyHistograms: make(map[string]*stats.LatencyHistogram15s32),
+		sizeMeters:        make(map[string]*stats.Meter32),
+	}
 
-//delegate to the main response writer, but save the code
-func (rec *statusRecorder) WriteHeader(code int) {
-	rec.status = code
-	rec.ResponseWriter.WriteHeader(code)
+	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		start := time.Now()
+		recorder := responseRecorder{w, -1, 0}
+		base.ServeHTTP(&recorder, request)
+		path := pathSlug(request.URL.Path)
+		stats.PathLatency(path, time.Since(start))
+		stats.PathStatusCount(path, recorder.status)
+		// only record the request size if the request succeeded.
+		if recorder.status < 300 {
+			stats.PathSize(path, recorder.size)
+		}
+	})
 }
 
 //add request logging to the given handler
 func loggingMiddleware(svc string, base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		recorder := statusRecorder{w, -1}
+		recorder := responseRecorder{w, -1, 0}
 		base.ServeHTTP(&recorder, request)
 		log.WithField("service", svc).
 			WithField("method", request.Method).
