@@ -96,6 +96,7 @@ func generateMetric(desiredPartition int32) *schema.MetricData {
 		OrgId: orgId,
 		Unit:  "partyparrots",
 		Mtype: "gauge",
+		Interval: int(period.Seconds()),
 		Tags:     []string{fmt.Sprintf("partition=%d", desiredPartition)},
 	}
 
