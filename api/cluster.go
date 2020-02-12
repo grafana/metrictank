@@ -403,11 +403,15 @@ type PeerResponse struct {
 	buf  []byte
 }
 
+type GenericPeerResponse struct {
+	peer cluster.Node
+	resp interface{}
+}
+
 // queryAllPeers takes a request and the path to request it on, then fans it out
 // across the cluster, except to the local peer or peers without data.
 // Note: unlike the other queryAllPeers methods, we include peers that are not ready
-// If any peer fails requests to
-// other peers are aborted.
+// If any peer request fails, requests to other peers are aborted.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
@@ -464,10 +468,9 @@ func (s *Server) queryAllPeers(ctx context.Context, data cluster.Traceable, name
 }
 
 // queryAllShards takes a request and the path to request it on, then fans it out
-// across the cluster. If any peer fails another peer in that shard is queried. If there
-//  are no more peers, the request is aborted. If enough peers have been heard from
-// (based on speculation-threshold configuration), and we are missing the others, try to
-// speculatively query each other member of each shard group.
+// across the cluster. If any peer fails, we try another replica. If enough
+// peers have been heard from (based on speculation-threshold configuration), and we
+// are missing the others, try to speculatively query other members of the shard group.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
@@ -490,15 +493,12 @@ func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, nam
 	return result, err
 }
 
-// queryAllShardGeneric takes a request and the path to request it on, then fans it out
+// queryAllShardsGeneric takes a function and calls it for one peer in each shard
 // across the cluster. If any peer fails, we try another replica. If enough
 // peers have been heard from (based on speculation-threshold configuration), and we
 // are missing the others, try to speculatively query other members of the shard group.
 // ctx:          request context
-// data:         request to be submitted
-// name:         name to be used in logging & tracing
-// path:         path to request on
-// resultChan:   channel to put responses on as they come in
+// fetchFunc:    function to call to fetch the data from a peer
 func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
 	peerGroups, err := cluster.MembersForSpeculativeQuery()
 	if err != nil {
@@ -512,11 +512,13 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(conte
 	return queryPeers(ctx, peerGroups, fetchFunc)
 }
 
-type GenericPeerResponse struct {
-	peer cluster.Node
-	resp interface{}
-}
-
+// queryAllShardsGeneric takes a function and peers grouped by shard. The function
+// is called it for one peer of each shard. If any peer fails, we try another replica.
+// If enough peers have been heard from (based on speculation-threshold configuration),
+// and we are missing the others, try to speculatively query other members of the shard group.
+// ctx:          request context
+// peerGroups:   peers grouped by shard
+// fetchFunc:    function to call to fetch the data from a peer
 func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
 	resultChan := make(chan GenericPeerResponse)
 	errorChan := make(chan error, 1)
