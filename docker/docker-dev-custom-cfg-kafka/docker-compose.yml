@@ -170,6 +170,10 @@ services:
     volumes:
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
       - ./gw/mt-gateway.ini:/etc/metrictank/mt-gateway.ini
+      - ../../build/mt-gateway:/usr/bin/mt-gateway
+    environment:
+      WAIT_HOSTS: kafka:9092
+      WAIT_TIMEOUT: 60
     links:
       - metrictank
       - graphite

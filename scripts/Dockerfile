@@ -21,9 +21,12 @@ COPY scripts/config/storage-schemas.conf /etc/metrictank/storage-schemas.conf
 COPY scripts/config/mt-gateway.ini /etc/metrictank/mt-gateway.ini
 COPY --from=gobase /tmp/build/mt-gateway /usr/bin/
 
+COPY scripts/util/wait_for_endpoint.sh /usr/bin/wait_for_endpoint.sh
+
 EXPOSE 6059
 
-ENTRYPOINT ["/usr/bin/mt-gateway"]
+ENTRYPOINT ["/usr/bin/wait_for_endpoint.sh"]
+CMD ["/usr/bin/mt-gateway"]
 
 #########################
 # main metrictank image #
