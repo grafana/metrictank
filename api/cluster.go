@@ -17,7 +17,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/tracing"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -404,21 +403,16 @@ type PeerResponse struct {
 	buf  []byte
 }
 
-type GenericPeerResponse struct {
-	peer cluster.Node
-	resp interface{}
-}
-
-// peerQuery takes a request and the path to request it on, then fans it out
+// queryAllPeers takes a request and the path to request it on, then fans it out
 // across the cluster, except to the local peer or peers without data.
-// Note: unlike the other peerQuery methods, we include peers that are not ready
+// Note: unlike the other queryAllPeers methods, we include peers that are not ready
 // If any peer fails requests to
 // other peers are aborted.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, map[string]error) {
+func (s *Server) queryAllPeers(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, map[string]error) {
 
 	peers := cluster.Manager.MemberList(false, true)
 	log.Debugf("HTTP %s across %d instances", name, len(peers)-1)
@@ -469,28 +463,34 @@ func (s *Server) peerQuery(ctx context.Context, data cluster.Traceable, name, pa
 	return result, errors
 }
 
-// peerQuerySpeculative takes a request and the path to request it on, then fans it out
-// across the cluster. If any peer fails requests to other peers are aborted. If enough
-// peers have been heard from (based on speculation-threshold configuration), and we
-// are missing the others, try to speculatively query each other member of each shard group.
+// queryAllShards takes a request and the path to request it on, then fans it out
+// across the cluster. If any peer fails another peer in that shard is queried. If there
+//  are no more peers, the request is aborted. If enough peers have been heard from
+// (based on speculation-threshold configuration), and we are missing the others, try to
+// speculatively query each other member of each shard group.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
 // path:         path to request on
-func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
+func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
 	result := make(map[string]PeerResponse)
 
-	responseChan, errorChan := s.peerQuerySpeculativeChan(ctx, data, name, path)
+	responseChan, errorChan := s.queryAllShardsGeneric(ctx, func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
+		return peer.Post(reqCtx, name, path, data)
+	})
 
 	for resp := range responseChan {
-		result[resp.peer.GetName()] = resp
+		result[resp.peer.GetName()] = PeerResponse{
+			peer: resp.peer,
+			buf:  resp.resp.([]byte),
+		}
 	}
 
 	err := <-errorChan
 	return result, err
 }
 
-// peerQuerySpeculativeChan takes a request and the path to request it on, then fans it out
+// queryAllShardGeneric takes a request and the path to request it on, then fans it out
 // across the cluster. If any peer fails, we try another replica. If enough
 // peers have been heard from (based on speculation-threshold configuration), and we
 // are missing the others, try to speculatively query other members of the shard group.
@@ -499,160 +499,31 @@ func (s *Server) peerQuerySpeculative(ctx context.Context, data cluster.Traceabl
 // name:         name to be used in logging & tracing
 // path:         path to request on
 // resultChan:   channel to put responses on as they come in
-func (s *Server) peerQuerySpeculativeChan(ctx context.Context, data cluster.Traceable, name, path string) (<-chan PeerResponse, <-chan error) {
-	resultChan := make(chan PeerResponse)
-	errorChan := make(chan error, 1)
+func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
+	peerGroups, err := cluster.MembersForSpeculativeQuery()
+	if err != nil {
+		log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
+		resultChan := make(chan GenericPeerResponse)
+		errorChan := make(chan error, 1)
+		errorChan <- err
+		return resultChan, errorChan
+	}
 
-	go func() {
-		ctx, peerSpan := tracing.NewSpan(ctx, s.Tracer, name+" peerQuery")
-		defer peerSpan.Finish()
-		defer close(errorChan)
-		defer close(resultChan)
-
-		peerGroups, err := cluster.MembersForSpeculativeQuery()
-		if err != nil {
-			log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
-			errorChan <- err
-			return
-		}
-		peerSpan.SetTag("peerGroups", len(peerGroups))
-		log.Debugf("HTTP %s across %d instances", name, len(peerGroups))
-
-		reqCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-
-		type response struct {
-			shardGroup int32
-			data       PeerResponse
-			err        error
-		}
-
-		responses := make(chan response)
-		originalPeers := make(map[string]struct{}, len(peerGroups))
-		receivedResponses := make(map[int32]struct{}, len(peerGroups))
-
-		askPeer := func(shardGroup int32, peer cluster.Node) {
-			log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
-			buf, err := peer.Post(reqCtx, name, path, data)
-			if err != nil {
-				// log an error, but we will still try other peers for this shardGroup
-				log.Errorf("HTTP Render error querying %s%s: %q", peer.GetName(), path, err)
-			}
-
-			select {
-			case <-reqCtx.Done():
-				return
-			case responses <- response{shardGroup, PeerResponse{peer, buf}, err}:
-				return
-			}
-		}
-
-		for group, peers := range peerGroups {
-			nextPeer := peers[0]
-			// shift nextPeer from the group
-			peerGroups[group] = peers[1:]
-
-			originalPeers[nextPeer.GetName()] = struct{}{}
-			go askPeer(group, nextPeer)
-		}
-
-		var ticker *time.Ticker
-		var tickChan <-chan time.Time
-		if speculationThreshold != 1 {
-			ticker = time.NewTicker(5 * time.Millisecond)
-			tickChan = ticker.C
-			defer ticker.Stop()
-		}
-
-		for len(receivedResponses) < len(peerGroups) {
-			select {
-			case <-reqCtx.Done():
-				//request canceled
-				return
-			case resp := <-responses:
-				if _, ok := receivedResponses[resp.shardGroup]; ok {
-					// already received this response (possibly speculatively)
-					continue
-				}
-
-				if resp.err != nil {
-					// check if there is another peer for this shardGroup. If so try it.
-					if len(peerGroups[resp.shardGroup]) > 0 {
-						speculativeRequests.Inc()
-						nextPeer := peerGroups[resp.shardGroup][0]
-						// shift nextPeer from the group
-						peerGroups[resp.shardGroup] = peerGroups[resp.shardGroup][1:]
-
-						go askPeer(resp.shardGroup, nextPeer)
-						continue
-					}
-					// No more peers to try. Cancel the reqCtx, which will cancel all in-flight
-					// requests.
-					cancel()
-					errorChan <- resp.err
-					return
-				}
-
-				resultChan <- resp.data
-				receivedResponses[resp.shardGroup] = struct{}{}
-				delete(originalPeers, resp.data.peer.GetName())
-
-			case <-tickChan:
-				// Check if it's time to speculate!
-				percentReceived := float64(len(receivedResponses)) / float64(len(peerGroups))
-				if percentReceived >= speculationThreshold {
-					// kick off speculative queries to other members now
-					ticker.Stop()
-					speculativeAttempts.Inc()
-					for shardGroup, peers := range peerGroups {
-						if _, ok := receivedResponses[shardGroup]; ok {
-							continue
-						}
-
-						if len(peers) == 0 {
-							// no more peers to try
-							continue
-						}
-
-						nextPeer := peers[0]
-						// shift nextPeer from the group
-						peerGroups[shardGroup] = peers[1:]
-
-						// send the request to the next peer for the group.
-						speculativeRequests.Inc()
-						go askPeer(shardGroup, nextPeer)
-					}
-				}
-			}
-		}
-
-		if len(originalPeers) > 0 {
-			speculativeWins.Inc()
-		}
-	}()
-
-	return resultChan, errorChan
+	return queryPeers(ctx, peerGroups, fetchFunc)
 }
 
-// TODO - refactor
-func (s *Server) peerQuerySpeculativeChanGeneric(ctx context.Context, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
+type GenericPeerResponse struct {
+	peer cluster.Node
+	resp interface{}
+}
+
+func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
 	resultChan := make(chan GenericPeerResponse)
 	errorChan := make(chan error, 1)
 
 	go func() {
-		//ctx, peerSpan := tracing.NewSpan(ctx, s.Tracer, name+" peerQuery")
-		//defer peerSpan.Finish()
 		defer close(errorChan)
 		defer close(resultChan)
-
-		peerGroups, err := cluster.MembersForSpeculativeQuery()
-		if err != nil {
-			log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
-			errorChan <- err
-			return
-		}
-		//peerSpan.SetTag("peerGroups", len(peerGroups))
-		//log.Debugf("HTTP %s across %d instances", name, len(peerGroups))
 
 		reqCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -670,15 +541,16 @@ func (s *Server) peerQuerySpeculativeChanGeneric(ctx context.Context, fetchFunc 
 		askPeer := func(shardGroup int32, peer cluster.Node) {
 			//log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
 			resp, err := fetchFunc(reqCtx, peer)
-			if err != nil {
-				log.Errorf("Peer %s responded with error = %q", peer.GetName(), err.Error())
-			}
 			select {
 			case <-reqCtx.Done():
 				return
 			case responses <- response{shardGroup, GenericPeerResponse{peer, resp}, err}:
-				return
 			}
+			// Only print if the reqCtx isn't done
+			if err != nil {
+				log.Errorf("Peer %s responded with error = %q", peer.GetName(), err.Error())
+			}
+
 		}
 
 		for group, peers := range peerGroups {
