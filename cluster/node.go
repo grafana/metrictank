@@ -297,6 +297,7 @@ func (n HTTPNode) PostRaw(ctx context.Context, name, path string, body Traceable
 	select {
 	case <-ctx.Done():
 		log.Debugf("CLU HTTPNode: context canceled on request to peer %s", n.Name)
+		err = nil
 		return nil, nil
 	default:
 	}
