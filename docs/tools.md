@@ -130,6 +130,8 @@ Flags:
     	kafka tcp address(es) for metrics, in csv host[:port] format (default "localhost:9092")
   -kafka-version string
     	Kafka version in semver format. All brokers must be this version or newer. (default "0.10.0.0")
+  -log-level string
+    	log level. panic|fatal|error|warning|info|debug (default "info")
   -metrics-flush-freq duration
     	The best-effort frequency of flushes to kafka (default 50ms)
   -metrics-kafka-comp string

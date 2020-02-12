@@ -26,6 +26,7 @@ var (
 	importerURL   = flag.String("importer-url", "", "mt-whisper-importer-writer address")
 	defaultOrgId  = flag.Int("default-org-id", -1, "default org ID to send to downstream services if none is provided")
 	brokers       = flag.String("kafka-tcp-addr", "localhost:9092", "kafka tcp address(es) for metrics, in csv host[:port] format")
+	logLevel      = flag.String("log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
 	// stats
 	statsEnabled    = flag.Bool("stats-enabled", false, "enable sending graphite messages for instrumentation")
@@ -47,7 +48,6 @@ func init() {
 	formatter := &logger.TextFormatter{}
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
 	log.SetFormatter(formatter)
-	log.SetLevel(log.InfoLevel)
 }
 
 func main() {
@@ -76,6 +76,12 @@ func main() {
 		log.Fatalf("error with configuration file: %s", err)
 	}
 	conf.ParseAll()
+
+	lvl, err := log.ParseLevel(*logLevel)
+	if err != nil {
+		log.Fatalf("failed to parse log-level, %s", err.Error())
+	}
+	log.SetLevel(lvl)
 
 	if *showVersion {
 		fmt.Printf("mt-gateway (version: %s - runtime: %s)\n", version, runtime.Version())
