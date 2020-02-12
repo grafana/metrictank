@@ -87,3 +87,6 @@ services:
       MT_METRICS_PUBLISH: "true"
       MT_METRICS_KAFKA_COMP: snappy
       MT_KAFKA_TCP_ADDR: kafka:9092
+      MT_STATS_ENABLED: "true"
+      MT_STATS_PREFIX: "mt-gateway.stats.dev.mt-gateway-gw_1"
+      MT_STATS_ADDR: "graphite:2003"
