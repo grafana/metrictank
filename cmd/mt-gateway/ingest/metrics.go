@@ -210,7 +210,7 @@ func metricsBinary(w http.ResponseWriter, r *http.Request, compressed bool) {
 
 func writeErrorResponse(w http.ResponseWriter, status int, msg string, fmtArgs ...interface{}) {
 	w.WriteHeader(status)
-	formatted := fmt.Sprint(msg, fmtArgs)
+	formatted := fmt.Sprintf(msg, fmtArgs...)
 	log.Error(formatted)
 	fmt.Fprint(w, formatted)
 }
