@@ -69,11 +69,21 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	// 15 15 15 30 30 30 45 45 45 60 <-- which, when fed through alignForward(), result in these numbers
 	//  5  5  5 20 20 20 35 35 35 50 <-- subtract (aggnum-1)* in.interval or equivalent -interval + in.Interval = -15 + 5 = -10. these are our desired numbers!
 
+	// now, for the final value, it's important to be aware of cases like this:
+	// until=47, interval=10, in.Interval = 5
+	// a canonical 10s series would have as last point 40. whereas our input series will have 45, which will consolidate into a point with timestamp 50, which is incorrect
+	// (it breaches `to`, and may have more points than other series it needs to be combined with)
+	// thus, we also need to potentially trim points from the back until the last point has the same Ts as a canonical series would
+
 	for ts := alignForward(in.Datapoints[0].Ts, interval) - interval + in.Interval; ts < in.Datapoints[0].Ts; ts += interval {
 		datapoints = append(datapoints, schema.Point{Val: math.NaN(), Ts: ts})
 	}
 
 	datapoints = append(datapoints, in.Datapoints...)
+
+	canonicalTs := (datapoints[len(datapoints)-1].Ts / interval) * interval
+	numDrop := int((datapoints[len(datapoints)-1].Ts - canonicalTs) / in.Interval)
+	datapoints = datapoints[0 : len(datapoints)-numDrop]
 
 	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
 	in.Interval = interval
