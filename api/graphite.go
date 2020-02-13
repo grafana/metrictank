@@ -779,7 +779,9 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	meta.RenderStats.GetTargetsDuration = b.Sub(a)
 	meta.StorageStats.Trace(span)
 
-	out = mergeSeries(out)
+	dataMap := expr.NewDataMap()
+
+	out = mergeSeries(out, dataMap)
 
 	if len(metaTagEnrichmentData) > 0 {
 		for i := range out {
@@ -792,20 +794,19 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work
 	// if we need to cancel the request due to a fetch error
 
-	data := make(map[expr.Req][]models.Series)
 	for _, serie := range out {
 		q := expr.NewReqFromSerie(serie)
-		data[q] = append(data[q], serie)
+		dataMap.Add(q, serie)
 	}
 
 	// Sort each merged series so that the output of a function is well-defined and repeatable.
-	for k := range data {
-		sort.Sort(models.SeriesByTarget(data[k]))
+	for k := range dataMap {
+		sort.Sort(models.SeriesByTarget(dataMap[k]))
 	}
 	meta.RenderStats.PrepareSeriesDuration = time.Since(b)
 
 	preRun := time.Now()
-	out, err = plan.Run(data)
+	out, err = plan.Run(dataMap)
 
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)

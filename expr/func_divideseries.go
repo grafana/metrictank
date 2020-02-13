@@ -43,12 +43,12 @@ func (s *FuncDivideSeries) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	dividends, err := s.dividend.Exec(cache)
+func (s *FuncDivideSeries) Exec(dataMap DataMap) ([]models.Series, error) {
+	dividends, err := s.dividend.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
-	divisors, err := s.divisor.Exec(cache)
+	divisors, err := s.divisor.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
@@ -73,9 +73,9 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 			if ok {
 				divisor = newDiv
 				// we now have the right divisor but may still need to normalize the dividend
-				dividend, divisor = normalizeTwo(cache, dividend, divisor)
+				dividend, divisor = NormalizeTwo(dataMap, dividend, divisor)
 			} else {
-				dividend, divisor = normalizeTwo(cache, dividend, divisor)
+				dividend, divisor = NormalizeTwo(dataMap, dividend, divisor)
 				divisorsByRes[lcm] = divisor
 			}
 		}
@@ -106,7 +106,7 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 			QueryMDP:     dividend.QueryMDP,
 			Meta:         dividend.Meta.Copy().Merge(divisor.Meta),
 		}
-		cache[Req{}] = append(cache[Req{}], output)
+		dataMap.Add(Req{}, output)
 		series = append(series, output)
 	}
 	return series, nil

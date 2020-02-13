@@ -33,8 +33,8 @@ func (s *FuncGrep) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncGrep) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncGrep) Exec(dataMap DataMap) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}

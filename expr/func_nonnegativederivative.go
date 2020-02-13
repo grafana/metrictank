@@ -31,8 +31,8 @@ func (s *FuncNonNegativeDerivative) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncNonNegativeDerivative) Exec(dataMap DataMap) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (s *FuncNonNegativeDerivative) Exec(cache map[Req][]models.Series) ([]model
 		}
 		series[i].Datapoints = out
 	}
-	cache[Req{}] = append(cache[Req{}], series...)
+	dataMap.Add(Req{}, series...)
 	return series, nil
 }
 

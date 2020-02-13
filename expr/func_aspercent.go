@@ -62,15 +62,15 @@ func (s *FuncAsPercent) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	in, err := s.in.Exec(cache)
+func (s *FuncAsPercent) Exec(dataMap DataMap) ([]models.Series, error) {
+	in, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
 
 	var totals []models.Series
 	if s.totalSeries != nil {
-		totals, err = s.totalSeries.Exec(cache)
+		totals, err = s.totalSeries.Exec(dataMap)
 		if err != nil {
 			return nil, err
 		}
@@ -80,21 +80,21 @@ func (s *FuncAsPercent) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		if !math.IsNaN(s.totalFloat) {
 			return nil, errors.NewBadRequest("if nodes specified, total must be None or a seriesList")
 		}
-		return s.execWithNodes(in, totals, cache)
+		return s.execWithNodes(in, totals, dataMap)
 	}
 
 	// totals may be nil and totalFloat NaN, or totalFloat may be set, but here we only need to check for the cases where totals is set but the wrong length
 	if totals != nil && len(totals) != 1 && len(totals) != len(in) {
 		return nil, errors.NewBadRequest("if nodes not specified, asPercent second argument (total) must be missing, a single digit, reference exactly 1 series or reference the same number of series as the first argument")
 	}
-	return s.execWithoutNodes(in, totals, cache)
+	return s.execWithoutNodes(in, totals, dataMap)
 }
 
 // when nodes are given, totals can be:
 // * nil -> in which case we divide by the sum of all input series in the group
 // * serieslist -> we will sum the series in the group (or not, if we know that the group won't exist in `in` anyway, we don't need to do this work)
 // * NOT a number in this case.
-func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMap) ([]models.Series, error) {
 	var outSeries []models.Series
 
 	keys := make(map[string]struct{}) // will track all aggKeys seen, amongst inputs and totals series
@@ -104,10 +104,10 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 	// calculate the sum
 
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalSerieByKey = getTotalSeries(inByKey, inByKey, cache)
+		totalSerieByKey = getTotalSeries(inByKey, inByKey, dataMap)
 	} else if totals != nil {
 		totalSeriesByKey := groupSeriesByKey(totals, s.nodes, keys)
-		totalSerieByKey = getTotalSeries(totalSeriesByKey, inByKey, cache)
+		totalSerieByKey = getTotalSeries(totalSeriesByKey, inByKey, dataMap)
 	}
 
 	var nones []schema.Point
@@ -126,7 +126,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 					p.Val = math.NaN()
 					nones = append(nones, p)
 				}
-				cache[Req{}] = append(cache[Req{}], nonesSerie)
+				dataMap.Add(Req{}, nonesSerie)
 			}
 
 			nonesSerie.Datapoints = nones
@@ -149,14 +149,14 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 						p.Val = math.NaN()
 						nones = append(nones, p)
 					}
-					cache[Req{}] = append(cache[Req{}], nonesSerie)
+					dataMap.Add(Req{}, nonesSerie)
 				}
 
 				nonesSerie.Datapoints = nones
 				outSeries = append(outSeries, nonesSerie)
 			} else {
 				// key found in both inByKey and totalSerieByKey
-				serie1, serie2 := normalizeTwo(cache, serie1, totalSerieByKey[key])
+				serie1, serie2 := NormalizeTwo(dataMap, serie1, totalSerieByKey[key])
 				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
@@ -165,7 +165,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
 				}
 				outSeries = append(outSeries, serie1)
-				cache[Req{}] = append(cache[Req{}], serie1)
+				dataMap.Add(Req{}, serie1)
 			}
 
 		}
@@ -179,11 +179,11 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, cache map[Req]
 // * a single series -> used as divisor for all input series
 // * multiple series -> must match len(series), sort and match up in pairs to input series
 // * nil             -> generate total by summing the inputs
-func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap DataMap) ([]models.Series, error) {
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalsSerie = sumSeries(normalize(cache, in), cache)
+		totalsSerie = sumSeries(Normalize(dataMap, in), dataMap)
 		if len(in) == 1 {
 			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.QueryPatt = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
@@ -212,7 +212,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[R
 			totalsSerie = totals[i]
 		}
 		if len(totalsSerie.Datapoints) > 0 {
-			serie, totalsSerie = normalizeTwo(cache, serie, totalsSerie)
+			serie, totalsSerie = NormalizeTwo(dataMap, serie, totalsSerie)
 			serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
 			for i := range serie.Datapoints {
 				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
@@ -228,7 +228,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, cache map[R
 		serie.Tags = map[string]string{"name": serie.Target}
 		serie.Meta = serie.Meta.Merge(totalsSerie.Meta)
 		outSeries = append(outSeries, serie)
-		cache[Req{}] = append(cache[Req{}], serie)
+		dataMap.Add(Req{}, serie)
 	}
 	return outSeries, nil
 }
@@ -264,11 +264,11 @@ func groupSeriesByKey(in []models.Series, nodes []expr, keys map[string]struct{}
 // otherwise we do an optimization: we know that the datapoints for that key won't actually be used,
 // in that case we only need to return a series that has the proper fields set like QueryPattern etc.
 // note: inByKey is only used for its keys, the values (series slices) are not used.
-func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, cache map[Req][]models.Series) map[string]models.Series {
+func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, dataMap DataMap) map[string]models.Series {
 	totalSerieByKey := make(map[string]models.Series, len(totalSeriesByKey))
 	for key := range totalSeriesByKey {
 		if _, ok := inByKey[key]; ok {
-			totalSerieByKey[key] = sumSeries(normalize(cache, totalSeriesByKey[key]), cache)
+			totalSerieByKey[key] = sumSeries(Normalize(dataMap, totalSeriesByKey[key]), dataMap)
 		} else {
 			totalSerieByKey[key] = totalSeriesByKey[key][0]
 		}
@@ -277,7 +277,7 @@ func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, cache 
 }
 
 // sumSeries returns a copy-on-write series that is the sum of the inputs
-func sumSeries(in []models.Series, cache map[Req][]models.Series) models.Series {
+func sumSeries(in []models.Series, dataMap DataMap) models.Series {
 	if len(in) == 1 {
 		return in[0]
 	}
@@ -313,6 +313,6 @@ Loop:
 		Tags:         map[string]string{"name": name},
 		Meta:         meta,
 	}
-	cache[Req{}] = append(cache[Req{}], sum)
+	dataMap.Add(Req{}, sum)
 	return sum
 }

@@ -16,6 +16,8 @@ a series is fixed, with respect to a query with from/to time, when
 * it is quantized.
 * contains all the timestamps such that `from <= timestamps < to`, but no more.
 
+To achieve this, points with null values may be added.
+
 ## canonical form
 
 canonical form comes into play when we need to normalize (through consolidation of points) a series, to be at a higher interval.

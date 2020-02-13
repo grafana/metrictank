@@ -28,8 +28,8 @@ func (s *FuncTransformNull) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncTransformNull) Exec(dataMap DataMap) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +56,6 @@ func (s *FuncTransformNull) Exec(cache map[Req][]models.Series) ([]models.Series
 			series[i].Datapoints = append(series[i].Datapoints, p)
 		}
 	}
-	cache[Req{}] = append(cache[Req{}], series...)
+	dataMap.Add(Req{}, series...)
 	return series, nil
 }

@@ -31,8 +31,8 @@ func (s *FuncAggregate) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, queryPatts, err := consumeFuncs(cache, s.in)
+func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
+	series, queryPatts, err := consumeFuncs(dataMap, s.in)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
-	series = normalize(cache, series)
+	series = Normalize(dataMap, series)
 	s.agg.function(series, &out)
 
 	// The tags for the aggregated series is only the tags that are
@@ -77,7 +77,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 	output.Consolidator = cons
 	output.Meta = meta
 
-	cache[Req{}] = append(cache[Req{}], output)
+	dataMap.Add(Req{}, output)
 
 	return []models.Series{output}, nil
 }
