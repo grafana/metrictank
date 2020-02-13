@@ -50,15 +50,16 @@ func NormalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Ser
 // * interval > in.Interval
 // * interval % in.Interval == 0
 func NormalizeTo(cache map[Req][]models.Series, in models.Series, interval uint32) models.Series {
+
+	if len(in.Datapoints) == 0 {
+		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is empty", in.Target, in.Interval, interval))
+	}
+
 	// we need to copy the datapoints first because the consolidater will reuse the input slice
 	// also, the input may not be pre-canonical. so add nulls in front and at the back to make it pre-canonical.
 	// this may make points in front and at the back less accurate when consolidated (e.g. summing when some of the points are null results in a lower value)
 	// but this is what graphite does....
 	datapoints := pointSlicePool.Get().([]schema.Point)
-
-	if len(in.Datapoints) == 0 {
-		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is empty", in.Target, in.Interval, interval))
-	}
 
 	// example of how this works:
 	// if in.Interval is 5, and interval is 15, then for example, to generate point 15, you want inputs 5, 10 and 15.
