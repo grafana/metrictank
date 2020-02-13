@@ -35,9 +35,9 @@ type GraphiteFunc interface {
 	// IMPORTANT: for performance and correctness, functions should
 	// * not modify slices of points that they get from their inputs
 	// * use the pool to get new slices in which to store any new/modified dat
-	// * add the newly created slices into the cache so they can be reclaimed after the output is consumed
+	// * add the newly created slices into the dataMap so they can be reclaimed after the output is consumed
 	// * not modify other properties on its input series, such as Tags map or Meta
-	Exec(map[Req][]models.Series) ([]models.Series, error)
+	Exec(dataMap map[Req][]models.Series) ([]models.Series, error)
 }
 
 type funcConstructor func() GraphiteFunc
@@ -131,11 +131,11 @@ func summarizeCons(series []models.Series) (consolidation.Consolidator, consolid
 	return series[0].Consolidator, series[0].QueryCons
 }
 
-func consumeFuncs(cache map[Req][]models.Series, fns []GraphiteFunc) ([]models.Series, []string, error) {
+func consumeFuncs(dataMap map[Req][]models.Series, fns []GraphiteFunc) ([]models.Series, []string, error) {
 	var series []models.Series
 	var queryPatts []string
 	for i := range fns {
-		in, err := fns[i].Exec(cache)
+		in, err := fns[i].Exec(dataMap)
 		if err != nil {
 			return nil, nil, err
 		}

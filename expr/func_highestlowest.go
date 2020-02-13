@@ -37,8 +37,8 @@ func (s *FuncHighestLowest) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncHighestLowest) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncHighestLowest) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}

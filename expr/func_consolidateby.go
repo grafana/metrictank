@@ -39,8 +39,8 @@ func (s *FuncConsolidateBy) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncConsolidateBy) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncConsolidateBy) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}

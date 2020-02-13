@@ -29,8 +29,8 @@ func (s *FuncOffset) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncOffset) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncOffset) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +43,6 @@ func (s *FuncOffset) Exec(cache map[Req][]models.Series) ([]models.Series, error
 		series[i].QueryPatt = fmt.Sprintf("offset(%s,%f)", serie.QueryPatt, s.factor)
 		series[i].Datapoints = out
 	}
-	cache[Req{}] = append(cache[Req{}], series...)
+	dataMap[Req{}] = append(dataMap[Req{}], series...)
 	return series, nil
 }

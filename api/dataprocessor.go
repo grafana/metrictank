@@ -626,7 +626,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 // each first uniquely-identified series's backing datapoints slice is reused
 // any subsequent non-uniquely-identified series is merged into the former and has its
 // datapoints slice returned to the pool. input series must be canonical
-func mergeSeries(in []models.Series, data map[expr.Req][]models.Series) []models.Series {
+func mergeSeries(in []models.Series, dataMap map[expr.Req][]models.Series) []models.Series {
 	type segment struct {
 		target  string
 		query   string
@@ -658,7 +658,7 @@ func mergeSeries(in []models.Series, data map[expr.Req][]models.Series) []models
 			// we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
-			series = expr.Normalize(data, series)
+			series = expr.Normalize(dataMap, series)
 			log.Debugf("DP mergeSeries: %s has multiple series.", series[0].Target)
 			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {

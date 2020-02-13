@@ -37,12 +37,12 @@ func (s *FuncDivideSeriesLists) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	dividends, err := s.dividends.Exec(cache)
+func (s *FuncDivideSeriesLists) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	dividends, err := s.dividends.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
-	divisors, err := s.divisors.Exec(cache)
+	divisors, err := s.divisors.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 
 	var series []models.Series
 	for i := range dividends {
-		dividend, divisor := NormalizeTwo(cache, dividends[i], divisors[i])
+		dividend, divisor := NormalizeTwo(dataMap, dividends[i], divisors[i])
 
 		out := pointSlicePool.Get().([]schema.Point)
 		for i := 0; i < len(dividend.Datapoints); i++ {
@@ -82,7 +82,7 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 			QueryPNGroup: dividend.QueryPNGroup,
 			Meta:         dividend.Meta.Copy().Merge(divisor.Meta),
 		}
-		cache[Req{}] = append(cache[Req{}], output)
+		dataMap[Req{}] = append(dataMap[Req{}], output)
 		series = append(series, output)
 	}
 	return series, nil

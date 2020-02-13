@@ -30,10 +30,10 @@ func (s *FuncAliasSub) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncAliasSub) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAliasSub) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
 	// support native graphite (python) groups like \3 by turning them into ${3}
 	replace := groupPython.ReplaceAllString(s.replace, "$${$1}")
-	series, err := s.in.Exec(cache)
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ func (s FuncMock) Context(context Context) Context {
 	return context
 }
 
-func (s FuncMock) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
+func (s FuncMock) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
 	for i := range s.data {
 		s.data[i].SetTags()
 	}

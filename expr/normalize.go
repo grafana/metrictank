@@ -11,8 +11,8 @@ import (
 )
 
 // Normalize normalizes series to the same common LCM interval - if they don't already have the same interval
-// any adjusted series gets created in a series drawn out of the pool and is added to the cache so it can be reclaimed
-func Normalize(cache map[Req][]models.Series, in []models.Series) []models.Series {
+// any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
+func Normalize(dataMap map[Req][]models.Series, in []models.Series) []models.Series {
 	var intervals []uint32
 	for _, s := range in {
 		if s.Interval == 0 {
@@ -23,13 +23,13 @@ func Normalize(cache map[Req][]models.Series, in []models.Series) []models.Serie
 	lcm := util.Lcm(intervals)
 	for i, s := range in {
 		if s.Interval != lcm {
-			in[i] = NormalizeTo(cache, s, lcm)
+			in[i] = NormalizeTo(dataMap, s, lcm)
 		}
 	}
 	return in
 }
 
-func NormalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Series, models.Series) {
+func NormalizeTwo(dataMap map[Req][]models.Series, a, b models.Series) (models.Series, models.Series) {
 	if a.Interval == b.Interval {
 		return a, b
 	}
@@ -37,10 +37,10 @@ func NormalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Ser
 	lcm := util.Lcm(intervals)
 
 	if a.Interval != lcm {
-		a = NormalizeTo(cache, a, lcm)
+		a = NormalizeTo(dataMap, a, lcm)
 	}
 	if b.Interval != lcm {
-		b = NormalizeTo(cache, b, lcm)
+		b = NormalizeTo(dataMap, b, lcm)
 	}
 	return a, b
 }
@@ -49,7 +49,7 @@ func NormalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Ser
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
-func NormalizeTo(cache map[Req][]models.Series, in models.Series, interval uint32) models.Series {
+func NormalizeTo(dataMap map[Req][]models.Series, in models.Series, interval uint32) models.Series {
 
 	if len(in.Datapoints) == 0 {
 		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is empty", in.Target, in.Interval, interval))
@@ -77,7 +77,7 @@ func NormalizeTo(cache map[Req][]models.Series, in models.Series, interval uint3
 
 	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
 	in.Interval = interval
-	cache[Req{}] = append(cache[Req{}], in)
+	dataMap[Req{}] = append(dataMap[Req{}], in)
 	return in
 }
 

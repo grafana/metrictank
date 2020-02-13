@@ -24,14 +24,14 @@ func (s *FuncFallbackSeries) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncFallbackSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncFallbackSeries) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(series) == 0 {
-		series, err = s.fallback.Exec(cache)
+		series, err = s.fallback.Exec(dataMap)
 		if err != nil {
 			return nil, err
 		}

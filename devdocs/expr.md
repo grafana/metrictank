@@ -18,15 +18,15 @@ See section 'Considerations around Series changes and reuse and why we chose cop
 * must not modify existing data that the fields of any pre-existing `models.Series` point to. At the time of writing it's only the Datapoints, Tags and Meta fields, but this may change.
   (exception: FuncGet)
 * should use the pool to get new slices in which to store their new/modified datapoints.
-* should add said new slices into the cache so that when the plan has run, and the caller calls plan.Clean(), we can return its datapoints slice to the pool.
-* the other purpose of the cache is to add processed data to the set of available data such that other functions could reuse it, but this mechanism is not implemented yet.
-  That's why we always add to the cache without bothering to set the right request key (`cache[Req{}]`).
+* should add said new slices into the dataMap so that when the plan has run, and the caller calls plan.Clean(), we can return its datapoints slice to the pool.
+* the other purpose of the dataMap is to add processed data to the set of available data such that other functions could reuse it, but this mechanism is not implemented yet.
+  That's why we always add to the dataMap without bothering to set the right request key (`dataMap[Req{}]`).
 
 example: an averageSeries() of 3 series:
 * will create an output series value.
 * it will use a new datapoints slice, retrieved from pool, because the points will be different. also it will allocate a new meta section and tags map because they are different from the input series also.
-* won't put the 3 inputs back in the pool or cache, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
-* It will however store the newly created series into the cache such that during plan cleanup time, the series' datapoints slice will be moved back to the pool.
+* won't put the 3 inputs back in the pool or dataMap, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
+* It will however store the newly created series into the dataMap such that during plan cleanup time, the series' datapoints slice will be moved back to the pool.
 
 # Considerations around Series changes and reuse and why we chose copy-on-write.
 

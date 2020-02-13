@@ -783,9 +783,9 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	// * fetched series, grouped by their expr.Req, such that expr.FuncGet can find the data it needs and feed it into subsequent expr.GraphiteFunc functions
 	// * additional series generated while handling the request (e.g. function processing, normalization), keyed by an empty expr.Req (such that can't be mistakenly picked up by FuncGet)
 	// all of these series will need to be returned to the pool once we're done with all processing and have generated our response body, which will happen in plan.Clean()
-	data := make(map[expr.Req][]models.Series)
+	dataMap := make(map[expr.Req][]models.Series)
 
-	out = mergeSeries(out, data)
+	out = mergeSeries(out, dataMap)
 
 	if len(metaTagEnrichmentData) > 0 {
 		for i := range out {
@@ -800,17 +800,17 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	for _, serie := range out {
 		q := expr.NewReqFromSerie(serie)
-		data[q] = append(data[q], serie)
+		dataMap[q] = append(dataMap[q], serie)
 	}
 
 	// Sort each merged series so that the output of a function is well-defined and repeatable.
-	for k := range data {
-		sort.Sort(models.SeriesByTarget(data[k]))
+	for k := range dataMap {
+		sort.Sort(models.SeriesByTarget(dataMap[k]))
 	}
 	meta.RenderStats.PrepareSeriesDuration = time.Since(b)
 
 	preRun := time.Now()
-	out, err = plan.Run(data)
+	out, err = plan.Run(dataMap)
 
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)

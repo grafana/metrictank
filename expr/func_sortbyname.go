@@ -31,8 +31,8 @@ func (s *FuncSortByName) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncSortByName) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncSortByName) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}

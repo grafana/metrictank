@@ -26,8 +26,8 @@ func (s *FuncCountSeries) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, queryPatts, err := consumeFuncs(cache, s.in)
+func (s *FuncCountSeries) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+	series, queryPatts, err := consumeFuncs(dataMap, s.in)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (s *FuncCountSeries) Exec(cache map[Req][]models.Series) ([]models.Series, 
 	output.Consolidator = cons
 	output.QueryCons = queryCons
 	output.Meta = meta
-	cache[Req{}] = append(cache[Req{}], output)
+	dataMap[Req{}] = append(dataMap[Req{}], output)
 
 	return []models.Series{output}, nil
 }

@@ -701,7 +701,7 @@ func TestConsolidateBy(t *testing.T) {
 		if diff := cmp.Diff(c.expReq, plan.Reqs); diff != "" {
 			t.Errorf("case %d: %q (-want +got):\n%s", i, c.in, diff)
 		}
-		input := map[Req][]models.Series{
+		dataMap := map[Req][]models.Series{
 			NewReq("a", from, to, 0, 0, 0): {{
 				QueryPatt:    "a",
 				Target:       "a",
@@ -727,7 +727,7 @@ func TestConsolidateBy(t *testing.T) {
 				Interval:     10,
 			}},
 		}
-		out, err := plan.Run(input)
+		out, err := plan.Run(dataMap)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -879,10 +879,10 @@ func TestNamingChains(t *testing.T) {
 				Interval:  10,
 			}
 		}
-		input := map[Req][]models.Series{
+		dataMap := map[Req][]models.Series{
 			plan.Reqs[0]: series,
 		}
-		out, err := plan.Run(input)
+		out, err := plan.Run(dataMap)
 		if err != nil {
 			t.Fatal(err)
 		}
