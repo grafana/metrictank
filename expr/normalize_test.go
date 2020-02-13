@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -55,9 +54,6 @@ func TestNormalizeOneSeriesAdjustWithPreCanonicalize(t *testing.T) {
 	}
 	dataMap := NewDataMap()
 	got := Normalize(dataMap, in)
-	fmt.Println("got:")
-	fmt.Println(got[0].Datapoints)
-	fmt.Println(got[1].Datapoints)
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
 	}
@@ -147,9 +143,6 @@ func TestNormalizeMultiLCMSeriesAdjustWithPreCanonicalize(t *testing.T) {
 	}
 	dataMap := NewDataMap()
 	got := Normalize(dataMap, in)
-	fmt.Println("got:")
-	fmt.Println(got[0].Datapoints)
-	fmt.Println(got[1].Datapoints)
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
 	}
