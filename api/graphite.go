@@ -779,7 +779,13 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	meta.RenderStats.GetTargetsDuration = b.Sub(a)
 	meta.StorageStats.Trace(span)
 
-	out = mergeSeries(out)
+	// this map will contain all series that we will feed into the processing chain or generated therein:
+	// * fetched series, grouped by their expr.Req, such that expr.FuncGet can find the data it needs and feed it into subsequent expr.GraphiteFunc functions
+	// * additional series generated while handling the request (e.g. function processing, normalization), keyed by an empty expr.Req (such that can't be mistakenly picked up by FuncGet)
+	// all of these series will need to be returned to the pool once we're done with all processing and have generated our response body, which will happen in plan.Clean()
+	data := make(map[expr.Req][]models.Series)
+
+	out = mergeSeries(out, data)
 
 	if len(metaTagEnrichmentData) > 0 {
 		for i := range out {
@@ -792,7 +798,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	// instead of waiting for all data to come in and then start processing everything, we could consider starting processing earlier, at the risk of doing needless work
 	// if we need to cancel the request due to a fetch error
 
-	data := make(map[expr.Req][]models.Series)
 	for _, serie := range out {
 		q := expr.NewReqFromSerie(serie)
 		data[q] = append(data[q], serie)

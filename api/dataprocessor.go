@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/expr"
+
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
@@ -624,7 +626,7 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 // each first uniquely-identified series's backing datapoints slice is reused
 // any subsequent non-uniquely-identified series is merged into the former and has its
 // datapoints slice returned to the pool. input series must be canonical
-func mergeSeries(in []models.Series) []models.Series {
+func mergeSeries(in []models.Series, data map[expr.Req][]models.Series) []models.Series {
 	type segment struct {
 		target  string
 		query   string
@@ -656,6 +658,7 @@ func mergeSeries(in []models.Series) []models.Series {
 			// we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
+			series = expr.Normalize(data, series)
 			log.Debugf("DP mergeSeries: %s has multiple series.", series[0].Target)
 			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {

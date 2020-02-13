@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/expr"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/cache/accnt"
@@ -628,7 +629,7 @@ func TestMergeSeries(t *testing.T) {
 		Interval: 10,
 	})
 
-	merged := mergeSeries(out)
+	merged := mergeSeries(out, expr.NewDataMap())
 	if len(merged) != 5 {
 		t.Errorf("Expected data to be merged down to 5 series. got %d instead", len(merged))
 	}
