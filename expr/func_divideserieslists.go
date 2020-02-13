@@ -52,7 +52,7 @@ func (s *FuncDivideSeriesLists) Exec(cache map[Req][]models.Series) ([]models.Se
 
 	var series []models.Series
 	for i := range dividends {
-		dividend, divisor := normalizeTwo(cache, dividends[i], divisors[i])
+		dividend, divisor := NormalizeTwo(cache, dividends[i], divisors[i])
 
 		out := pointSlicePool.Get().([]schema.Point)
 		for i := 0; i < len(dividend.Datapoints); i++ {

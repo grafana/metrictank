@@ -73,9 +73,9 @@ func (s *FuncDivideSeries) Exec(cache map[Req][]models.Series) ([]models.Series,
 			if ok {
 				divisor = newDiv
 				// we now have the right divisor but may still need to normalize the dividend
-				dividend, divisor = normalizeTwo(cache, dividend, divisor)
+				dividend, divisor = NormalizeTwo(cache, dividend, divisor)
 			} else {
-				dividend, divisor = normalizeTwo(cache, dividend, divisor)
+				dividend, divisor = NormalizeTwo(cache, dividend, divisor)
 				divisorsByRes[lcm] = divisor
 			}
 		}

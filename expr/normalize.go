@@ -10,9 +10,9 @@ import (
 	"github.com/grafana/metrictank/util"
 )
 
-// normalize normalizes series to the same common LCM interval - if they don't already have the same interval
+// Normalize normalizes series to the same common LCM interval - if they don't already have the same interval
 // any adjusted series gets created in a series drawn out of the pool and is added to the cache so it can be reclaimed
-func normalize(cache map[Req][]models.Series, in []models.Series) []models.Series {
+func Normalize(cache map[Req][]models.Series, in []models.Series) []models.Series {
 	var intervals []uint32
 	for _, s := range in {
 		if s.Interval == 0 {
@@ -23,13 +23,13 @@ func normalize(cache map[Req][]models.Series, in []models.Series) []models.Serie
 	lcm := util.Lcm(intervals)
 	for i, s := range in {
 		if s.Interval != lcm {
-			in[i] = normalizeTo(cache, s, lcm)
+			in[i] = NormalizeTo(cache, s, lcm)
 		}
 	}
 	return in
 }
 
-func normalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Series, models.Series) {
+func NormalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Series, models.Series) {
 	if a.Interval == b.Interval {
 		return a, b
 	}
@@ -37,19 +37,19 @@ func normalizeTwo(cache map[Req][]models.Series, a, b models.Series) (models.Ser
 	lcm := util.Lcm(intervals)
 
 	if a.Interval != lcm {
-		a = normalizeTo(cache, a, lcm)
+		a = NormalizeTo(cache, a, lcm)
 	}
 	if b.Interval != lcm {
-		b = normalizeTo(cache, b, lcm)
+		b = NormalizeTo(cache, b, lcm)
 	}
 	return a, b
 }
 
-// normalizeTo normalizes the given series to the desired interval
+// NormalizeTo normalizes the given series to the desired interval
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
-func normalizeTo(cache map[Req][]models.Series, in models.Series, interval uint32) models.Series {
+func NormalizeTo(cache map[Req][]models.Series, in models.Series, interval uint32) models.Series {
 	// we need to copy the datapoints first because the consolidater will reuse the input slice
 	// also, the input may not be pre-canonical. so add nulls in front and at the back to make it pre-canonical.
 	// this may make points in front and at the back less accurate when consolidated (e.g. summing when some of the points are null results in a lower value)

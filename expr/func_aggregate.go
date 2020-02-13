@@ -48,7 +48,7 @@ func (s *FuncAggregate) Exec(cache map[Req][]models.Series) ([]models.Series, er
 		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
-	series = normalize(cache, series)
+	series = Normalize(cache, series)
 	s.agg.function(series, &out)
 
 	// The tags for the aggregated series is only the tags that are

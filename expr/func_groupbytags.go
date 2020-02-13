@@ -132,7 +132,7 @@ func (s *FuncGroupByTags) Exec(cache map[Req][]models.Series) ([]models.Series, 
 		newSeries.SetTags()
 
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
-		group.s = normalize(cache, group.s)
+		group.s = Normalize(cache, group.s)
 		aggFunc(group.s, &newSeries.Datapoints)
 		cache[Req{}] = append(cache[Req{}], newSeries)
 

@@ -50,7 +50,7 @@ func TestNormalizeOneSeriesAdjustWithPreCanonicalize(t *testing.T) {
 		},
 	}
 	cache := make(map[Req][]models.Series)
-	got := normalize(cache, in)
+	got := Normalize(cache, in)
 	fmt.Println("got:")
 	fmt.Println(got[0].Datapoints)
 	fmt.Println(got[1].Datapoints)
@@ -125,7 +125,7 @@ func TestNormalizeMultiLCMSeriesAdjustWithPreCanonicalize(t *testing.T) {
 		},
 	}
 	cache := make(map[Req][]models.Series)
-	got := normalize(cache, in)
+	got := Normalize(cache, in)
 	fmt.Println("got:")
 	fmt.Println(got[0].Datapoints)
 	fmt.Println(got[1].Datapoints)
