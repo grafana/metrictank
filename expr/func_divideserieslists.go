@@ -37,7 +37,7 @@ func (s *FuncDivideSeriesLists) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncDivideSeriesLists) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncDivideSeriesLists) Exec(dataMap DataMap) ([]models.Series, error) {
 	dividends, err := s.dividends.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (s *FuncDivideSeriesLists) Exec(dataMap map[Req][]models.Series) ([]models.
 			QueryPNGroup: dividend.QueryPNGroup,
 			Meta:         dividend.Meta.Copy().Merge(divisor.Meta),
 		}
-		dataMap[Req{}] = append(dataMap[Req{}], output)
+		dataMap.Add(Req{}, output)
 		series = append(series, output)
 	}
 	return series, nil

@@ -49,7 +49,7 @@ func TestNormalizeOneSeriesAdjustWithPreCanonicalize(t *testing.T) {
 			},
 		},
 	}
-	dataMap := make(map[Req][]models.Series)
+	dataMap := NewDataMap()
 	got := Normalize(dataMap, in)
 	fmt.Println("got:")
 	fmt.Println(got[0].Datapoints)
@@ -124,7 +124,7 @@ func TestNormalizeMultiLCMSeriesAdjustWithPreCanonicalize(t *testing.T) {
 			},
 		},
 	}
-	dataMap := make(map[Req][]models.Series)
+	dataMap := NewDataMap()
 	got := Normalize(dataMap, in)
 	fmt.Println("got:")
 	fmt.Println(got[0].Datapoints)

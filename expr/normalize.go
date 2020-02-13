@@ -12,7 +12,7 @@ import (
 
 // Normalize normalizes series to the same common LCM interval - if they don't already have the same interval
 // any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
-func Normalize(dataMap map[Req][]models.Series, in []models.Series) []models.Series {
+func Normalize(dataMap DataMap, in []models.Series) []models.Series {
 	var intervals []uint32
 	for _, s := range in {
 		if s.Interval == 0 {
@@ -29,7 +29,7 @@ func Normalize(dataMap map[Req][]models.Series, in []models.Series) []models.Ser
 	return in
 }
 
-func NormalizeTwo(dataMap map[Req][]models.Series, a, b models.Series) (models.Series, models.Series) {
+func NormalizeTwo(dataMap DataMap, a, b models.Series) (models.Series, models.Series) {
 	if a.Interval == b.Interval {
 		return a, b
 	}
@@ -49,7 +49,7 @@ func NormalizeTwo(dataMap map[Req][]models.Series, a, b models.Series) (models.S
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
-func NormalizeTo(dataMap map[Req][]models.Series, in models.Series, interval uint32) models.Series {
+func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Series {
 
 	if len(in.Datapoints) == 0 {
 		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is empty", in.Target, in.Interval, interval))
@@ -77,7 +77,7 @@ func NormalizeTo(dataMap map[Req][]models.Series, in models.Series, interval uin
 
 	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
 	in.Interval = interval
-	dataMap[Req{}] = append(dataMap[Req{}], in)
+	dataMap.Add(Req{}, in)
 	return in
 }
 

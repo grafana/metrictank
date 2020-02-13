@@ -31,7 +31,7 @@ func (s *FuncSortByName) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncSortByName) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncSortByName) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err

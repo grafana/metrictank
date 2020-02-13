@@ -33,7 +33,7 @@ func (s *FuncRemoveAboveBelowValue) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncRemoveAboveBelowValue) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncRemoveAboveBelowValue) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *FuncRemoveAboveBelowValue) Exec(dataMap map[Req][]models.Series) ([]mod
 		output = append(output, serie)
 	}
 
-	dataMap[Req{}] = append(dataMap[Req{}], output...)
+	dataMap.Add(Req{}, output...)
 
 	return output, nil
 }

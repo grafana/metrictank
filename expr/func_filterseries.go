@@ -78,7 +78,7 @@ func getOperatorFunc(operator string) (func(float64, float64) bool, error) {
 	return func(v1, v2 float64) bool { return false }, errors.NewBadRequest("Unsupported operator: " + operator)
 }
 
-func (s *FuncFilterSeries) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncFilterSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err

@@ -21,7 +21,7 @@ func (s FuncGet) Context(context Context) Context {
 	return context
 }
 
-func (s FuncGet) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s FuncGet) Exec(dataMap DataMap) ([]models.Series, error) {
 	series := dataMap[s.req]
 
 	// this function is the only exception to the COW pattern

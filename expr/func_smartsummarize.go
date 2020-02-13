@@ -29,7 +29,7 @@ func (s *FuncSmartSummarize) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncSmartSummarize) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncSmartSummarize) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	return series, err
 }

@@ -32,7 +32,7 @@ func (s *FuncMovingAverage) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncMovingAverage) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncMovingAverage) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err

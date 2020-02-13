@@ -779,11 +779,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	meta.RenderStats.GetTargetsDuration = b.Sub(a)
 	meta.StorageStats.Trace(span)
 
-	// this map will contain all series that we will feed into the processing chain or generated therein:
-	// * fetched series, grouped by their expr.Req, such that expr.FuncGet can find the data it needs and feed it into subsequent expr.GraphiteFunc functions
-	// * additional series generated while handling the request (e.g. function processing, normalization), keyed by an empty expr.Req (such that can't be mistakenly picked up by FuncGet)
-	// all of these series will need to be returned to the pool once we're done with all processing and have generated our response body, which will happen in plan.Clean()
-	dataMap := make(map[expr.Req][]models.Series)
+	dataMap := expr.NewDataMap()
 
 	out = mergeSeries(out, dataMap)
 
@@ -800,7 +796,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 
 	for _, serie := range out {
 		q := expr.NewReqFromSerie(serie)
-		dataMap[q] = append(dataMap[q], serie)
+		dataMap.Add(q, serie)
 	}
 
 	// Sort each merged series so that the output of a function is well-defined and repeatable.

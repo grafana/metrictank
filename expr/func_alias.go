@@ -24,7 +24,7 @@ func (s *FuncAlias) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncAlias) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAlias) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err

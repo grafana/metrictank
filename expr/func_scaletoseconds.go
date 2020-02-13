@@ -29,7 +29,7 @@ func (s *FuncScaleToSeconds) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncScaleToSeconds) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncScaleToSeconds) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -51,6 +51,6 @@ func (s *FuncScaleToSeconds) Exec(dataMap map[Req][]models.Series) ([]models.Ser
 			series[i].Datapoints = append(series[i].Datapoints, p)
 		}
 	}
-	dataMap[Req{}] = append(dataMap[Req{}], series...)
+	dataMap.Add(Req{}, series...)
 	return series, nil
 }

@@ -29,7 +29,7 @@ func (s *FuncScale) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncScale) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncScale) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -43,6 +43,6 @@ func (s *FuncScale) Exec(dataMap map[Req][]models.Series) ([]models.Series, erro
 		series[i].QueryPatt = fmt.Sprintf("scale(%s,%f)", serie.QueryPatt, s.factor)
 		series[i].Datapoints = out
 	}
-	dataMap[Req{}] = append(dataMap[Req{}], series...)
+	dataMap.Add(Req{}, series...)
 	return series, nil
 }

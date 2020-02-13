@@ -31,7 +31,7 @@ func (s *FuncPerSecond) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncPerSecond) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncPerSecond) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, _, err := consumeFuncs(dataMap, s.in)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (s *FuncPerSecond) Exec(dataMap map[Req][]models.Series) ([]models.Series, 
 			QueryPNGroup: serie.QueryPNGroup,
 		}
 		outputs = append(outputs, s)
-		dataMap[Req{}] = append(dataMap[Req{}], s)
+		dataMap.Add(Req{}, s)
 	}
 	return outputs, nil
 }

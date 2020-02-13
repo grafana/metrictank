@@ -26,7 +26,7 @@ func (s *FuncIntegral) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncIntegral) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncIntegral) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -49,6 +49,6 @@ func (s *FuncIntegral) Exec(dataMap map[Req][]models.Series) ([]models.Series, e
 			series[i].Datapoints = append(series[i].Datapoints, p)
 		}
 	}
-	dataMap[Req{}] = append(dataMap[Req{}], series...)
+	dataMap.Add(Req{}, series...)
 	return series, nil
 }

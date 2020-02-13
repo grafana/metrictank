@@ -38,7 +38,7 @@ func (s *FuncSummarize) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncSummarize) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncSummarize) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (s *FuncSummarize) Exec(dataMap map[Req][]models.Series) ([]models.Series, 
 		output.Tags["summarizeFunction"] = s.fn
 
 		outputs = append(outputs, output)
-		dataMap[Req{}] = append(dataMap[Req{}], output)
+		dataMap.Add(Req{}, output)
 	}
 	return outputs, nil
 }

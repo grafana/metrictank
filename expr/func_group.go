@@ -21,7 +21,7 @@ func (s *FuncGroup) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncGroup) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncGroup) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, _, err := consumeFuncs(dataMap, s.in)
 	if err != nil {
 		return nil, err

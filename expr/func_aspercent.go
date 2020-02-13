@@ -62,7 +62,7 @@ func (s *FuncAsPercent) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncAsPercent) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) Exec(dataMap DataMap) ([]models.Series, error) {
 	in, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func (s *FuncAsPercent) Exec(dataMap map[Req][]models.Series) ([]models.Series, 
 // * nil -> in which case we divide by the sum of all input series in the group
 // * serieslist -> we will sum the series in the group (or not, if we know that the group won't exist in `in` anyway, we don't need to do this work)
 // * NOT a number in this case.
-func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMap) ([]models.Series, error) {
 	var outSeries []models.Series
 
 	keys := make(map[string]struct{}) // will track all aggKeys seen, amongst inputs and totals series
@@ -126,7 +126,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap map[Re
 					p.Val = math.NaN()
 					nones = append(nones, p)
 				}
-				dataMap[Req{}] = append(dataMap[Req{}], nonesSerie)
+				dataMap.Add(Req{}, nonesSerie)
 			}
 
 			nonesSerie.Datapoints = nones
@@ -149,7 +149,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap map[Re
 						p.Val = math.NaN()
 						nones = append(nones, p)
 					}
-					dataMap[Req{}] = append(dataMap[Req{}], nonesSerie)
+					dataMap.Add(Req{}, nonesSerie)
 				}
 
 				nonesSerie.Datapoints = nones
@@ -165,7 +165,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap map[Re
 					serie1.Datapoints[i].Val = computeAsPercent(serie1.Datapoints[i].Val, serie2.Datapoints[i].Val)
 				}
 				outSeries = append(outSeries, serie1)
-				dataMap[Req{}] = append(dataMap[Req{}], serie1)
+				dataMap.Add(Req{}, serie1)
 			}
 
 		}
@@ -179,7 +179,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap map[Re
 // * a single series -> used as divisor for all input series
 // * multiple series -> must match len(series), sort and match up in pairs to input series
 // * nil             -> generate total by summing the inputs
-func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap DataMap) ([]models.Series, error) {
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
@@ -228,7 +228,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap map
 		serie.Tags = map[string]string{"name": serie.Target}
 		serie.Meta = serie.Meta.Merge(totalsSerie.Meta)
 		outSeries = append(outSeries, serie)
-		dataMap[Req{}] = append(dataMap[Req{}], serie)
+		dataMap.Add(Req{}, serie)
 	}
 	return outSeries, nil
 }
@@ -264,7 +264,7 @@ func groupSeriesByKey(in []models.Series, nodes []expr, keys map[string]struct{}
 // otherwise we do an optimization: we know that the datapoints for that key won't actually be used,
 // in that case we only need to return a series that has the proper fields set like QueryPattern etc.
 // note: inByKey is only used for its keys, the values (series slices) are not used.
-func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, dataMap map[Req][]models.Series) map[string]models.Series {
+func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, dataMap DataMap) map[string]models.Series {
 	totalSerieByKey := make(map[string]models.Series, len(totalSeriesByKey))
 	for key := range totalSeriesByKey {
 		if _, ok := inByKey[key]; ok {
@@ -277,7 +277,7 @@ func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, dataMa
 }
 
 // sumSeries returns a copy-on-write series that is the sum of the inputs
-func sumSeries(in []models.Series, dataMap map[Req][]models.Series) models.Series {
+func sumSeries(in []models.Series, dataMap DataMap) models.Series {
 	if len(in) == 1 {
 		return in[0]
 	}
@@ -313,6 +313,6 @@ Loop:
 		Tags:         map[string]string{"name": name},
 		Meta:         meta,
 	}
-	dataMap[Req{}] = append(dataMap[Req{}], sum)
+	dataMap.Add(Req{}, sum)
 	return sum
 }

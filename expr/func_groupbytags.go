@@ -32,7 +32,7 @@ func (s *FuncGroupByTags) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncGroupByTags) Exec(dataMap map[Req][]models.Series) ([]models.Series, error) {
+func (s *FuncGroupByTags) Exec(dataMap DataMap) ([]models.Series, error) {
 	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (s *FuncGroupByTags) Exec(dataMap map[Req][]models.Series) ([]models.Series
 		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
 		group.s = Normalize(dataMap, group.s)
 		aggFunc(group.s, &newSeries.Datapoints)
-		dataMap[Req{}] = append(dataMap[Req{}], newSeries)
+		dataMap.Add(Req{}, newSeries)
 
 		output = append(output, newSeries)
 	}
