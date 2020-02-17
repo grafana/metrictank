@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"sync"
 )
 
 var (
@@ -15,6 +16,7 @@ var (
 )
 
 type MetaRecordStatusByOrg struct {
+	sync.RWMutex
 	byOrg map[uint32]metaRecordStatus
 }
 
@@ -93,6 +95,9 @@ func (u UUID) String() string {
 // it returns a boolean indicating whether a reload of the meta records is necessary and
 // if it is then the second returned value is the batch id that needs to be loaded
 func (m *MetaRecordStatusByOrg) Update(orgId uint32, newBatch UUID, newCreatedAt, newLastUpdate uint64) (bool, UUID) {
+	m.Lock()
+	defer m.Unlock()
+
 	status, ok := m.byOrg[orgId]
 	if !ok {
 		m.byOrg[orgId] = metaRecordStatus{
@@ -125,6 +130,9 @@ func (m *MetaRecordStatusByOrg) Update(orgId uint32, newBatch UUID, newCreatedAt
 }
 
 func (m *MetaRecordStatusByOrg) GetStatus(orgId uint32) (UUID, uint64, uint64) {
+	m.RLock()
+	defer m.RUnlock()
+
 	status, ok := m.byOrg[orgId]
 	if !ok {
 		return DefaultBatchId, 0, 0
