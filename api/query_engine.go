@@ -278,10 +278,28 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 	// the bigger the interval the better (load less points), adjusted for number of reqs that
 	// have that interval. but their combined LCM may not exceed maxInterval.
 
+	// first, extract the set of valid intervals from each retention
+	validIntervalss, ok := getValidIntervals(rbr, from, minTTL)
+	if !ok {
+		return false
+	}
+
+	// now find the lowest resolution (highest) LCM interval that is not bigger than maxInterval
+	interval := getLowestResMatching(rbr, from, minTTL, 0, maxInterval, validIntervalss)
+
+	// now we finally found our optimal interval that we want to use.
+	// plan all our requests so that they result in the common output interval.
+	planToMulti(now, from, to, interval, rbr)
+
+	return true
+}
+
+// getValidIntervals returns a list of valid intervals
+// specifically, for each used retention, we include all the intervals that are ready and have long enough retention
+// if any retention has no such interval, we return false
+func getValidIntervals(rbr ReqsByRet, from, ttl uint32) ([][]uint32, bool) {
 	var validIntervalss [][]uint32
 
-	// first, extract the set of valid intervals from each retention
-	// if a retention has no valid intervals, we can't satisfy the request
 	for schemaID, reqs := range rbr {
 		if len(reqs) == 0 {
 			continue
@@ -290,13 +308,13 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 		rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
 		var validIntervals []uint32
 		for _, ret := range rets {
-			if ret.Ready <= from && ret.MaxRetention() >= int(minTTL) {
+			if ret.Ready <= from && ret.MaxRetention() >= int(ttl) {
 				ok = true
 				validIntervals = append(validIntervals, uint32(ret.SecondsPerPoint))
 			}
 		}
 		if !ok {
-			return false
+			return nil, false
 		}
 		// add our sequence of valid intervals to the list, unless it's there already
 		var found bool
@@ -310,12 +328,15 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 			validIntervalss = append(validIntervalss, validIntervals)
 		}
 	}
+	return validIntervalss, true
+}
 
-	// now, we need to pick a combination of intervals from each interval set.
-	// for each possible combination of intervals, we compute the LCM interval.
-	// if the LCM interval honors maxInterval, we compute the score.
-	// the interval with the highest score wins.
+// getLowestResMatching computes the LCM for each possible combination of provided intervals,
+// returns the LCM interval such that minInterval <= LCM interval <= maxInterval that requires the least points to be fetched.
+// If the proper LCM interval is not found, returns the lowest interval
+func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, validIntervalss [][]uint32) uint32 {
 	combos := util.AllCombinationsUint32(validIntervalss)
+
 	var maxScore int
 
 	lowestInterval := uint32(math.MaxUint32) // lowest interval we find
@@ -326,7 +347,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 		if candidateInterval < lowestInterval {
 			lowestInterval = candidateInterval
 		}
-		if candidateInterval > maxInterval {
+		if candidateInterval < minInterval || candidateInterval > maxInterval {
 			continue
 		}
 		var score int
@@ -335,9 +356,9 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 				continue
 			}
 			rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
-			_, ret, ok := findLowestResForInterval(rets, from, minTTL, candidateInterval)
+			_, ret, ok := findLowestResForInterval(rets, from, ttl, candidateInterval)
 			if !ok {
-				panic("planLowestResForMDPMulti: could not find coarsest retention. should never happen because we made sure our candidate LCM is based on what we have")
+				panic("getLowestResMatching: could not find lowest resolution for interval. should never happen because we made sure our candidate LCM is based on what we have")
 			}
 			score += len(reqs) * ret.SecondsPerPoint
 		}
@@ -346,16 +367,11 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 			interval = candidateInterval
 		}
 	}
-	// if we didn't find a suitable MDP-optimized one, just pick the lowest one we've seen.
+	// if we didn't find the matching interval, just pick the lowest one we've seen.
 	if interval == 0 {
 		interval = lowestInterval
 	}
-
-	// now we finally found our optimal interval that we want to use.
-	// plan all our requests so that they result in the common output interval.
-	planToMulti(now, from, to, interval, rbr)
-
-	return true
+	return interval
 }
 
 // planToMulti plans all requests of all retentions to the same given interval.
