@@ -86,6 +86,8 @@ var (
 	periodDur  time.Duration
 	flush      int // in ms
 	period     int // in s
+	offset     time.Duration
+	speedup    int
 
 	// global vars
 	stats         met.Backend

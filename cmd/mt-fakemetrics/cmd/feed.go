@@ -28,7 +28,7 @@ var feedCmd = &cobra.Command{
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
 		outs := getOutputs()
-		dataFeed(outs, metricName, orgs, mpo, period, flush, 0, 1, false)
+		dataFeed(outs, orgs, mpo, period, flush, 0, 1, false, TaggedBuilder{metricName})
 
 	},
 }
