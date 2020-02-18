@@ -52,6 +52,17 @@ func (r ReqMap) Dump() string {
 // Requests indexed by their retention ID
 type ReqsByRet [][]models.Req
 
+// OutInterval returns the outinterval of the ReqsByRet
+// this assumes that all requests have been planned to a consistent out interval, of course.
+func (rbr ReqsByRet) OutInterval() uint32 {
+	for _, reqs := range rbr {
+		if len(reqs) != 0 {
+			return reqs[0].OutInterval
+		}
+	}
+	return 0
+}
+
 // GroupData embodies a PNGroup broken down by whether requests are MDP-optimizable, and by retention
 type GroupData struct {
 	mdpyes ReqsByRet // MDP-optimizable requests

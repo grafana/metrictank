@@ -115,31 +115,39 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		//    too cautious and categorized many series as non-MDP optimizable whereas in reality they should be,
 		//    so in that case this option is a welcome way to reduce the impact of big queries.
 		//
-		// we could do two approaches: gradually reduce the interval of all series/groups being read, or just aggressively
-		// adjust one group at a time. The latter seems simpler, so for now we do just that.
-		if rp.PointsFetch() > uint32(mpprSoft) {
-			for group, split := range rp.pngroups {
-				if len(split.mdpno) > 0 {
-					split.mdpno, ok = planLowestResForMDPMulti(now, from, to, planMDP, split.mdpno)
-					if !ok {
-						return nil, errUnSatisfiable
-					}
-					rp.pngroups[group] = split
-					if rp.PointsFetch() <= uint32(mpprSoft) {
-						goto HonoredSoft
+		// try to reduce the resolution of both PNGroups as well as singles. keep reducing as long as we can until we
+		// meet the limit.
+
+		// note that this mechanism is a bit simplistic.
+		// * It pays no attention to which series is "worse off" (already has a low resolution). We could prioritize our
+		//   reductions to keep resolutions more or less consistent across all requests.
+		//   Though, is that any more fair? for some series it's more desirable to have them at lower resolutions than others.
+		// * In particular, our logic to start with PNGroups, then singles in schemaID order, is made up.
+		//   Also, because map iteration order is random, the order in which we reduce PNGroups is random. FIXME.
+		// * Because PNGroups may be comprised of multiple schemas, we typically don't have to adjust all of the comprising requests
+		//   to achieve an overall point reduction for the entire group. This means that singles may reduce faster than PNGroups
+		progress := true
+		for rp.PointsFetch() > uint32(mpprSoft) && progress {
+			progress = false
+			for _, data := range rp.pngroups {
+				if len(data.mdpno) > 0 {
+					ok := reduceResMulti(now, from, to, data.mdpno)
+					if ok {
+						progress = true
+						if rp.PointsFetch() <= uint32(mpprSoft) {
+							goto HonoredSoft
+						}
 					}
 				}
 			}
-			for i, req := range rp.single.mdpno {
-				rp.single.mdpno[i], ok = planLowestResForMDPSingle(now, from, to, planMDP, req)
-				if !ok {
-					return nil, errUnSatisfiable
-				}
-				// for every 10 requests we adjusted, check if we honor soft now.
-				// note that there may be thousands of requests
-				if i%10 == 9 {
-					if rp.PointsFetch() <= uint32(mpprSoft) {
-						goto HonoredSoft
+			for schemaID, reqs := range rp.single.mdpno {
+				if len(reqs) > 0 {
+					ok := reduceResSingles(now, from, to, uint16(schemaID), reqs)
+					if ok {
+						progress = true
+						if rp.PointsFetch() <= uint32(mpprSoft) {
+							goto HonoredSoft
+						}
 					}
 				}
 			}
@@ -294,6 +302,74 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 	return true
 }
 
+// reduceResSingles reduces the resolution of all requests of the given retention
+// to the next more coarse, common, interval (which may be different for different retentions)
+// we already assume that each request is setup to request as little as data as possible to yield
+// the desired output interval. Thus the only way to fetch fewer points is to increase the output
+// interval
+func reduceResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) bool {
+	if len(reqs) == 0 {
+		return true
+	}
+
+	curOut := reqs[0].OutInterval
+	minTTL := now - from
+
+	var ok bool
+
+	var archive int
+	var ret conf.Retention
+
+	rets := mdata.Schemas.Get(schemaID).Retentions.Rets
+	for i, retMaybe := range rets {
+		if retMaybe.Ready <= from && retMaybe.MaxRetention() >= int(minTTL) && uint32(retMaybe.SecondsPerPoint) > curOut {
+			ok = true
+			archive = i
+			ret = retMaybe
+			break
+		}
+	}
+
+	if !ok {
+		return false
+	}
+
+	for i := range reqs {
+		req := &reqs[i]
+		req.Plan(archive, ret)
+	}
+
+	return true
+
+}
+
+// reduceResMulti reduces the resolution of all requests to the next more coarse, common, interval
+// we already assume that each request is setup to request as little as data as possible to yield
+// the desired output interval. Thus the only way to fetch fewer points is to increase the output
+// interval
+func reduceResMulti(now, from, to uint32, rbr ReqsByRet) bool {
+	curOut := rbr.OutInterval()
+	minTTL := now - from
+
+	validIntervalss, ok := getValidIntervals(rbr, from, minTTL)
+	if !ok {
+		return false
+	}
+
+	// now find the highest resolution (lowest) LCM interval that is bigger than our current interval
+	interval := getHighestResMatching(rbr, from, minTTL, curOut+1, math.MaxUint32, validIntervalss)
+	if interval == 0 {
+		return false
+	}
+
+	// now we finally found our optimal interval that we want to use.
+	// plan all our requests so that they result in the common output interval.
+	planToMulti(now, from, to, interval, rbr)
+
+	return true
+
+}
+
 // getValidIntervals returns a list of valid intervals
 // specifically, for each used retention, we include all the intervals that are ready and have long enough retention
 // if any retention has no such interval, we return false
@@ -370,6 +446,26 @@ func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uin
 	// if we didn't find the matching interval, just pick the lowest one we've seen.
 	if interval == 0 {
 		interval = lowestInterval
+	}
+	return interval
+}
+
+// getHighestLowestResMatching computes the LCM for each possible combination of provided intervals,
+// returns the lowest LCM interval such that minInterval <= LCM interval <= maxInterval.
+// if the proper LCM interval is not found, returns 0
+// it's the callers responsibility to assure the intervals correspond to valid intervals/retentions for the given reqs.
+func getHighestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, validIntervalss [][]uint32) uint32 {
+	combos := util.AllCombinationsUint32(validIntervalss)
+
+	interval := uint32(math.MaxUint32) // lowest matching interval we find
+	for _, combo := range combos {
+		candidateInterval := util.Lcm(combo)
+		if candidateInterval < minInterval || candidateInterval > maxInterval {
+			continue
+		}
+		if candidateInterval < interval {
+			interval = candidateInterval
+		}
 	}
 	return interval
 }
