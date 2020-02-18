@@ -289,24 +289,25 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 	var interval uint32                      // will be set to either of the two above
 	for _, combo := range combos {
 		candidateInterval = util.Lcm(combo)
-		if candidateInterval <= maxInterval {
-			var score int
-			for _, req := range reqs {
-				rets := getRetentions(req)
-				_, ret, ok := findLowestResForInterval(rets, from, minTTL, candidateInterval)
-				if !ok {
-					panic("planLowestResForMDPMulti: could not find coarsest retention. should never happen because we made sure our candidate LCM is based on what we have")
-				}
-				score += len(reqs) * ret.SecondsPerPoint
-			}
-
-			if score > maxScore {
-				maxScore = score
-				interval = candidateInterval
-			}
-		}
 		if candidateInterval < lowestInterval {
 			lowestInterval = candidateInterval
+		}
+		if candidateInterval > maxInterval {
+			continue
+		}
+		var score int
+		for _, req := range reqs {
+			rets := getRetentions(req)
+			_, ret, ok := findLowestResForInterval(rets, from, minTTL, candidateInterval)
+			if !ok {
+				panic("planLowestResForMDPMulti: could not find coarsest retention. should never happen because we made sure our candidate LCM is based on what we have")
+			}
+			score += len(reqs) * ret.SecondsPerPoint
+		}
+
+		if score > maxScore {
+			maxScore = score
+			interval = candidateInterval
 		}
 	}
 	// if we didn't find a suitable MDP-optimized one, just pick the lowest one we've seen.
