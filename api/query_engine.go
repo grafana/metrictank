@@ -101,15 +101,19 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 	}
 
 	if mpprSoft > 0 {
-		// at this point, all MDP-optimizable series have already been optimized
-		// we can try to reduce the resolution of non-MDP-optimizable series
-		// if metrictank is already handling all, or most of your queries, then we have been able to determine
-		// MDP-optimizability very well. If the request came from Graphite, we have to assume it may run GR-functions.
-		// thus in the former case, we pretty much know that this is going to have an adverse effect on your queries,
-		// and you should probably not use this option, or we should even get rid of it.
-		// in the latter case though, it's quite likely we were too cautious and categorized many series as non-MDP
-		// optimizable whereas in reality they should be, so in that case this option is a welcome way to reduce the
-		// impact of big queries
+		// at this point, MDP-optimizable series have already seen a decent resolution reduction
+		// so to meet this constraint, we will try to reduce the resolution of non-MDP-optimizable series
+		// in the future we can make this even more aggressive and also try to reduce MDP-optimized series even more
+		//
+		// Note:
+		// A) if metrictank is already handling all, or most of your queries, then we have been able to determine
+		//    MDP-optimizability very well. In this case we pretty much know that if we need to enforce this option
+		//    it is going to have an adverse effect on your queries, and you should probably not use this option,
+		//    or we should even get rid of it.
+		// B) If the request came from Graphite, we have to assume it may run GR-functions and quite likely we were
+		//    too cautious and categorized many series as non-MDP optimizable whereas in reality they should be,
+		//    so in that case this option is a welcome way to reduce the impact of big queries.
+		//
 		// we could do two approaches: gradually reduce the interval of all series/groups being read, or just aggressively
 		// adjust one group at a time. The latter seems simpler, so for now we do just that.
 		if rp.PointsFetch() > uint32(mpprSoft) {
