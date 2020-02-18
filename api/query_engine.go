@@ -27,10 +27,6 @@ var (
 	errMaxPointsPerReq = response.NewError(http.StatusRequestEntityTooLarge, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
 )
 
-func getRetentions(req models.Req) []conf.Retention {
-	return mdata.Schemas.Get(req.SchemaId).Retentions.Rets
-}
-
 // planRequests updates the requests with all details for fetching.
 // Notes:
 // [1] MDP-optimization may reduce amount of points down to MDP/2, but not lower. TODO: how about reduce to MDP exactly if possible, and a bit lower otherwise
@@ -89,27 +85,18 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		if len(reqs) == 0 {
 			continue
 		}
-		for i, req := range reqs {
-			// could be optimized: for each retention, get best archive once, then plan all requests
-			// TODO do this later after committing the cleanups
-			// maybe then we can remove the getRetentions function too
-			rp.single.mdpno[schemaID][i], ok = planHighestResSingle(now, from, to, req)
-			if !ok {
-				return nil, errUnSatisfiable
-			}
+		ok = planHighestResSingles(now, from, to, uint16(schemaID), reqs)
+		if !ok {
+			return nil, errUnSatisfiable
 		}
 	}
 	for schemaID, reqs := range rp.single.mdpyes {
 		if len(reqs) == 0 {
 			continue
 		}
-		for i, req := range reqs {
-			// could be optimized: for each retention, get best archive once, then plan all requests
-			// TODO do this later after committing the cleanups
-			rp.single.mdpyes[schemaID][i], ok = planLowestResForMDPSingle(now, from, to, planMDP, req)
-			if !ok {
-				return nil, errUnSatisfiable
-			}
+		ok = planLowestResForMDPSingles(now, from, to, planMDP, uint16(schemaID), reqs)
+		if !ok {
+			return nil, errUnSatisfiable
 		}
 	}
 
@@ -189,31 +176,48 @@ HonoredSoft:
 	return &rp, nil
 }
 
-func planHighestResSingle(now, from, to uint32, req models.Req) (models.Req, bool) {
-	rets := getRetentions(req)
+// planHighestResSingles plans all requests of the given retention to their most precise resolution (which may be different for different retentions)
+func planHighestResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) bool {
+	rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
 	minTTL := now - from
 	archive, ret, ok := findHighestResRet(rets, from, minTTL)
 	if ok {
-		req.Plan(archive, ret)
+		for i := range reqs {
+			req := &reqs[i]
+			req.Plan(archive, ret)
+		}
 	}
-	return req, ok
+	return ok
 }
 
-func planLowestResForMDPSingle(now, from, to, mdp uint32, req models.Req) (models.Req, bool) {
-	rets := getRetentions(req)
+// planLowestResForMDPSingles plans all requests of the given retention to an interval such that requests still return >=mdp/2 points (interval may be different for different retentions)
+func planLowestResForMDPSingles(now, from, to, mdp uint32, schemaID uint16, reqs []models.Req) bool {
+	if len(reqs) == 0 {
+		return true
+	}
+	rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
+	var archive int
+	var ret conf.Retention
 	var ok bool
 	for i := len(rets) - 1; i >= 0; i-- {
 		// skip non-ready option.
 		if rets[i].Ready > from {
 			continue
 		}
-		ok = true
-		req.Plan(i, rets[i])
-		if req.PointsFetch() >= mdp/2 {
+		archive, ret, ok = i, rets[i], true
+		(&reqs[0]).Plan(i, rets[i])
+		if reqs[0].PointsFetch() >= mdp/2 {
 			break
 		}
 	}
-	return req, ok
+	if !ok {
+		return false
+	}
+	for i := range reqs {
+		req := &reqs[i]
+		req.Plan(archive, ret)
+	}
+	return true
 }
 
 // planHighestResMulti plans all requests of all retentions to the most precise, common, resolution.
