@@ -322,9 +322,9 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 				maxScore = score
 				interval = candidateInterval
 			}
-			if candidateInterval < lowestInterval {
-				lowestInterval = candidateInterval
-			}
+		}
+		if candidateInterval < lowestInterval {
+			lowestInterval = candidateInterval
 		}
 	}
 	// if we didn't find a suitable MDP-optimized one, just pick the lowest one we've seen.
