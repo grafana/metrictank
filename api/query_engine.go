@@ -169,18 +169,9 @@ HonoredSoft:
 func planHighestResSingle(now, from, to uint32, req models.Req) (models.Req, bool) {
 	rets := getRetentions(req)
 	minTTL := now - from
-	var ok bool
-	for i, ret := range rets {
-		// skip non-ready option.
-		if ret.Ready > from {
-			continue
-		}
-		ok = true
-		req.Plan(i, ret)
-
-		if req.TTL >= minTTL {
-			break
-		}
+	archive, ret, ok := findHighestResRet(rets, from, minTTL)
+	if ok {
+		req.Plan(archive, ret)
 	}
 	return req, ok
 }
@@ -201,6 +192,8 @@ func planLowestResForMDPSingle(now, from, to, mdp uint32, req models.Req) (model
 	}
 	return req, ok
 }
+
+// planHighestResMulti plans all requests of all retentions to the most precise, common, resolution.
 func planHighestResMulti(now, from, to uint32, reqs []models.Req) ([]models.Req, bool) {
 	minTTL := now - from
 
@@ -209,23 +202,13 @@ func planHighestResMulti(now, from, to uint32, reqs []models.Req) ([]models.Req,
 
 	for i := range reqs {
 		req := &reqs[i]
-		var ok bool
 		rets := getRetentions(*req)
-		for i, ret := range rets {
-			// skip non-ready option.
-			if ret.Ready > from {
-				continue
-			}
-			ok = true
-			req.Plan(i, ret)
-
-			if req.TTL >= minTTL {
-				break
-			}
-		}
+		// TODO: might be more efficient to do this once per retention
+		archive, ret, ok := findHighestResRet(rets, from, minTTL)
 		if !ok {
 			return nil, false
 		}
+		req.Plan(archive, ret)
 		if _, exists := seenIntervals[req.ArchInterval]; !exists {
 			listIntervals = append(listIntervals, req.ArchInterval)
 			seenIntervals[req.ArchInterval] = struct{}{}
@@ -242,6 +225,7 @@ func planHighestResMulti(now, from, to uint32, reqs []models.Req) ([]models.Req,
 	return reqs, true
 }
 
+// planLowestResForMDPMulti plans all requests of all retentions to the same common interval such that they still return >=mdp/2 points
 // note: we can assume all reqs have the same MDP.
 func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]models.Req, bool) {
 	minTTL := now - from
@@ -292,8 +276,8 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 	}
 
 	// now, we need to pick a combination of intervals from each interval set.
-	// for each possibly combination of intervals, we compute the LCM interval.
-	// if if the LCM interval honors maxInterval, we compute the score
+	// for each possible combination of intervals, we compute the LCM interval.
+	// if the LCM interval honors maxInterval, we compute the score.
 	// the interval with the highest score wins.
 	// note : we can probably make this more performant by iterating over
 	// the retentions, instead of over individual requests
@@ -309,15 +293,13 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 			var score int
 			for _, req := range reqs {
 				rets := getRetentions(req)
-				// we know that every request must have a ready retention with an interval that fits into the candidate LCM
-				// only a matter of finding the best (largest) one
-				for i := len(rets) - 1; i >= 0; i-- {
-					ret := rets[i]
-					if uint32(ret.SecondsPerPoint) <= candidateInterval && candidateInterval%uint32(ret.SecondsPerPoint) == 0 && ret.Ready <= from && req.TTL >= minTTL {
-						score += ret.SecondsPerPoint
-					}
+				_, ret, ok := findLowestResForInterval(rets, from, minTTL, candidateInterval)
+				if !ok {
+					panic("planLowestResForMDPMulti: could not find coarsest retention. should never happen because we made sure our candidate LCM is based on what we have")
 				}
+				score += len(reqs) * ret.SecondsPerPoint
 			}
+
 			if score > maxScore {
 				maxScore = score
 				interval = candidateInterval
@@ -336,21 +318,58 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, reqs []models.Req) ([]m
 	for i := range reqs {
 		req := &reqs[i]
 		rets := getRetentions(*req)
-		for i := len(rets) - 1; i >= 0; i-- {
-			ret := rets[i]
-			if ret.Ready <= from && req.TTL >= minTTL {
-				if uint32(ret.SecondsPerPoint) == interval {
-					req.Plan(i, ret)
-					break
-				}
-				if interval%uint32(ret.SecondsPerPoint) == 0 {
-					req.Plan(i, ret)
-					req.PlanNormalization(interval)
-					break
-				}
-			}
+		archive, ret, ok := findLowestResForInterval(rets, from, minTTL, interval)
+		if !ok {
+			panic("planLowestResForMDPMulti: could not find coarsest retention. this should never happen because we already set up the intervals up front")
+		}
+		req.Plan(archive, ret)
+		if interval != uint32(ret.SecondsPerPoint) {
+			req.PlanNormalization(interval)
 		}
 
 	}
 	return reqs, true
+}
+
+// findHighestResRet finds the most precise (lowest interval) retention that:
+// * is ready for long enough to accommodate `from`
+// * has a long enough TTL, or otherwise the longest TTL
+func findHighestResRet(rets []conf.Retention, from, ttl uint32) (int, conf.Retention, bool) {
+
+	var archive int
+	var ret conf.Retention
+	var ok bool
+
+	for i, retMaybe := range rets {
+		// skip non-ready option.
+		if retMaybe.Ready > from {
+			continue
+		}
+		archive, ret, ok = i, retMaybe, true
+
+		if uint32(retMaybe.MaxRetention()) >= ttl {
+			break
+		}
+	}
+
+	return archive, ret, ok
+}
+
+//findLowestResForInterval finds the coarsest retention out of the list that matches these criteria:
+// * it's ready for long enough to accommodate `from`
+// * its retention is long enough to cover the desired `ttl`
+// * it has an interval that either:
+//   - matches the desired interval exactly.
+//   - fits into the desired interval. this will return more data at fetch time and require some normalization
+// note that because we iterate in descending order we always return an exact match when possible.
+func findLowestResForInterval(rets []conf.Retention, from, ttl, interval uint32) (int, conf.Retention, bool) {
+	for i := len(rets) - 1; i >= 0; i-- {
+		ret := rets[i]
+		if ret.Ready <= from &&
+			uint32(ret.MaxRetention()) >= ttl &&
+			interval%uint32(ret.SecondsPerPoint) == 0 {
+			return i, ret, true
+		}
+	}
+	return 0, conf.Retention{}, false
 }
