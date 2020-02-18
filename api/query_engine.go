@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"reflect"
@@ -349,8 +350,18 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 	if interval == 0 {
 		interval = lowestInterval
 	}
+
 	// now we finally found our optimal interval that we want to use.
 	// plan all our requests so that they result in the common output interval.
+	planToMulti(now, from, to, interval, rbr)
+
+	return true
+}
+
+// planToMulti plans all requests of all retentions to the same given interval.
+// caller must have assured that the requests support this interval, otherwise we will panic
+func planToMulti(now, from, to, interval uint32, rbr ReqsByRet) {
+	minTTL := now - from
 	for schemaID, reqs := range rbr {
 		if len(reqs) == 0 {
 			continue
@@ -358,7 +369,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 		rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
 		archive, ret, ok := findLowestResForInterval(rets, from, minTTL, interval)
 		if !ok {
-			panic("planLowestResForMDPMulti: could not find coarsest retention. this should never happen because we already set up the intervals up front")
+			panic(fmt.Sprintf("planToMulti: could not findLowestResForInterval for desired interval %d", interval))
 		}
 		for i := range reqs {
 			req := &reqs[i]
@@ -368,7 +379,6 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 			}
 		}
 	}
-	return true
 }
 
 // findHighestResRet finds the most precise (lowest interval) retention that:
