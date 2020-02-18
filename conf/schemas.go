@@ -51,6 +51,11 @@ func (s Schemas) List() ([]Schema, Schema) {
 	return s.raw, s.DefaultSchema
 }
 
+// Len returns the max number of possible schemas
+func (s Schemas) Len() int {
+	return len(s.index) + 1 // s.DefaultSchema
+}
+
 func (s *Schemas) BuildIndex() {
 	s.index = make([]Schema, 0)
 	for _, schema := range s.raw {
