@@ -46,8 +46,7 @@ var (
 //     Any request in a PNGroup has already been vetted to be worthy of pre-normalization, thus there is absolutely no loss of information.
 //
 // planRequests follows these steps:
-// 1) Initial parameters.
-//    select the highest resolution possible within TTL for all requests. there's 4 cases:
+// 1) Initial parameters. There's 4 cases:
 //    * requests in the same PNGroup,    and MDP-optimizable: reduce aggressively: to longest common interval such that points >=MDP/2
 //    * requests in the same PNGroup but not MDP-optimizable: reduce conservatively: to shortest common interval that still meets TTL
 //    * MDP optimizable singles     : longest interval such that points >= MDP/2
@@ -67,13 +66,8 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 
 	ok, rp := false, NewReqsPlan(*reqs)
 
+	// 1) Initial parameters
 	for group, split := range rp.pngroups {
-		if len(split.mdpno) > 0 {
-			ok = planHighestResMulti(now, from, to, split.mdpno)
-			if !ok {
-				return nil, errUnSatisfiable
-			}
-		}
 		if len(split.mdpyes) > 0 {
 			ok = planLowestResForMDPMulti(now, from, to, planMDP, split.mdpyes)
 			if !ok {
@@ -81,14 +75,11 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 			}
 			rp.pngroups[group] = split
 		}
-	}
-	for schemaID, reqs := range rp.single.mdpno {
-		if len(reqs) == 0 {
-			continue
-		}
-		ok = planHighestResSingles(now, from, to, uint16(schemaID), reqs)
-		if !ok {
-			return nil, errUnSatisfiable
+		if len(split.mdpno) > 0 {
+			ok = planHighestResMulti(now, from, to, split.mdpno)
+			if !ok {
+				return nil, errUnSatisfiable
+			}
 		}
 	}
 	for schemaID, reqs := range rp.single.mdpyes {
@@ -100,7 +91,17 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 			return nil, errUnSatisfiable
 		}
 	}
+	for schemaID, reqs := range rp.single.mdpno {
+		if len(reqs) == 0 {
+			continue
+		}
+		ok = planHighestResSingles(now, from, to, uint16(schemaID), reqs)
+		if !ok {
+			return nil, errUnSatisfiable
+		}
+	}
 
+	// 2) pick coarser data if needed to honor max-points-per-req-soft
 	if mpprSoft > 0 {
 		// at this point, MDP-optimizable series have already seen a decent resolution reduction
 		// so to meet this constraint, we will try to reduce the resolution of non-MDP-optimizable series
@@ -155,12 +156,13 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 	}
 HonoredSoft:
 
+	// 3) honor max-points-per-req-hard
 	if mpprHard > 0 && int(rp.PointsFetch()) > mpprHard {
 		return nil, errMaxPointsPerReq
 
 	}
 
-	// send out some metrics and we're done!
+	// 4) send out some metrics and we're done!
 	for _, reqs := range rp.single.mdpyes {
 		if len(reqs) != 0 {
 			reqRenderChosenArchive.ValueUint32(uint32(reqs[0].Archive) * uint32(len(reqs)))
@@ -293,7 +295,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 	}
 
 	// now find the lowest resolution (highest) LCM interval that is not bigger than maxInterval
-	interval := getLowestResMatching(rbr, from, minTTL, 0, maxInterval, validIntervalsSet)
+	interval := getLowestResFromSetMatching(rbr, from, minTTL, 0, maxInterval, validIntervalsSet)
 
 	// now we finally found our optimal interval that we want to use.
 	// plan all our requests so that they result in the common output interval.
@@ -307,6 +309,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 // we already assume that each request is setup to request as little as data as possible to yield
 // the desired output interval. Thus the only way to fetch fewer points is to increase the output
 // interval
+// returns whether we were able to reduce
 func reduceResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) bool {
 	if len(reqs) == 0 {
 		return true
@@ -347,6 +350,7 @@ func reduceResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) 
 // we already assume that each request is setup to request as little as data as possible to yield
 // the desired output interval. Thus the only way to fetch fewer points is to increase the output
 // interval
+// returns whether we were able to reduce
 func reduceResMulti(now, from, to uint32, rbr ReqsByRet) bool {
 	curOut := rbr.OutInterval()
 	minTTL := now - from
@@ -357,7 +361,7 @@ func reduceResMulti(now, from, to uint32, rbr ReqsByRet) bool {
 	}
 
 	// now find the highest resolution (lowest) LCM interval that is bigger than our current interval
-	interval := getHighestResMatching(rbr, from, minTTL, curOut+1, math.MaxUint32, validIntervalss)
+	interval := getHighestResFromSetMatching(from, minTTL, curOut+1, math.MaxUint32, validIntervalss)
 	if interval == 0 {
 		return false
 	}
@@ -415,16 +419,17 @@ func getValidIntervals(schemaID uint16, from, ttl uint32) ([]uint32, bool) {
 	return validIntervals, ok
 }
 
-// getLowestResMatching computes the LCM for each possible combination of the intervalsSet
+// getLowestResFromSetMatching computes the LCM for each possible combination of the intervalsSet
 // returns the LCM interval such that minInterval <= LCM interval <= maxInterval that requires the least points to be fetched.
 // If the proper LCM interval is not found, returns the lowest interval
-func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, intervalsSet [][]uint32) uint32 {
+// Caller must make sure all requests support these intervals, otherwise we panic
+func getLowestResFromSetMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, intervalsSet [][]uint32) uint32 {
 	combos := util.AllCombinationsUint32(intervalsSet)
 
 	var maxScore int
 
-	lowestInterval := uint32(math.MaxUint32) // lowest interval we find
-	var returnInterval uint32                // will be set to either of the two above
+	lowestInterval := uint32(math.MaxUint32)
+	var returnInterval uint32
 	for _, combo := range combos {
 		candidateInterval := util.Lcm(combo)
 		if candidateInterval < lowestInterval {
@@ -439,9 +444,9 @@ func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uin
 				continue
 			}
 			rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
-			_, ret, ok := findLowestResForInterval(rets, from, ttl, candidateInterval)
+			_, ret, ok := findLowestValidResForInterval(rets, from, ttl, candidateInterval)
 			if !ok {
-				panic("getLowestResMatching: could not find lowest resolution for interval. should never happen because we made sure our candidate LCM is based on what we have")
+				panic(fmt.Sprintf("getLowestResFromSetMatching: could not findLowestValidResForInterval for interval %d", candidateInterval))
 			}
 			score += len(reqs) * ret.SecondsPerPoint
 		}
@@ -452,25 +457,24 @@ func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uin
 	}
 	// if we didn't find the matching interval, just pick the lowest one we've seen.
 	if returnInterval == 0 {
-		returnInterval = lowestInterval
+		return lowestInterval
 	}
 	return returnInterval
 }
 
-// getHighestLowestResMatching computes the LCM for each possible combination of the intervalsSet
+// getHighestResFromSetMatching computes the LCM for each possible combination of the intervalsSet
 // returns the lowest LCM interval such that minInterval <= LCM interval <= maxInterval.
 // if the proper LCM interval is not found, returns 0
-// it's the callers responsibility to assure the intervals correspond to valid intervals/retentions for the given reqs.
-func getHighestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, intervalsSet [][]uint32) uint32 {
+func getHighestResFromSetMatching(from, ttl, minInterval, maxInterval uint32, intervalsSet [][]uint32) uint32 {
 	combos := util.AllCombinationsUint32(intervalsSet)
 
-	interval := uint32(math.MaxUint32) // lowest matching interval we find
+	var interval uint32 // lowest matching interval we find
 	for _, combo := range combos {
 		candidateInterval := util.Lcm(combo)
 		if candidateInterval < minInterval || candidateInterval > maxInterval {
 			continue
 		}
-		if candidateInterval < interval {
+		if interval == 0 || candidateInterval < interval {
 			interval = candidateInterval
 		}
 	}
@@ -486,14 +490,14 @@ func planToMulti(now, from, to, interval uint32, rbr ReqsByRet) {
 			continue
 		}
 		rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
-		archive, ret, ok := findLowestResForInterval(rets, from, minTTL, interval)
+		archive, ret, ok := findLowestValidResForInterval(rets, from, minTTL, interval)
 		if !ok {
 			panic(fmt.Sprintf("planToMulti: could not findLowestResForInterval for desired interval %d", interval))
 		}
 		for i := range reqs {
 			req := &reqs[i]
 			req.Plan(archive, ret)
-			if interval != uint32(ret.SecondsPerPoint) {
+			if interval != req.ArchInterval {
 				req.PlanNormalization(interval)
 			}
 		}
@@ -524,14 +528,11 @@ func findHighestResRet(rets []conf.Retention, from, ttl uint32) (int, conf.Reten
 	return archive, ret, ok
 }
 
-//findLowestResForInterval finds the coarsest retention out of the list that matches these criteria:
-// * it's ready for long enough to accommodate `from`
-// * its retention is long enough to cover the desired `ttl`
-// * it has an interval that either:
-//   - matches the desired interval exactly.
-//   - fits into the desired interval. this will return more data at fetch time and require some normalization
+// findLowestValidResForInterval finds the coarsest valid retention that has an interval that either:
+// - matches the desired interval exactly.
+// - is a fraction of the desired interval. this will return more data at fetch time and require some normalization
 // note that because we iterate in descending order we always return an exact match when possible.
-func findLowestResForInterval(rets []conf.Retention, from, ttl, interval uint32) (int, conf.Retention, bool) {
+func findLowestValidResForInterval(rets []conf.Retention, from, ttl, interval uint32) (int, conf.Retention, bool) {
 	for i := len(rets) - 1; i >= 0; i-- {
 		ret := rets[i]
 		if ret.Valid(from, ttl) && interval%uint32(ret.SecondsPerPoint) == 0 {
