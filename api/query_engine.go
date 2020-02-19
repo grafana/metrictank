@@ -68,14 +68,14 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 
 	// 1) Initial parameters
 	for group, split := range rp.pngroups {
-		if len(split.mdpyes) > 0 {
+		if split.mdpyes.HasData() {
 			ok = planLowestResForMDPMulti(now, from, to, planMDP, split.mdpyes)
 			if !ok {
 				return nil, errUnSatisfiable
 			}
 			rp.pngroups[group] = split
 		}
-		if len(split.mdpno) > 0 {
+		if split.mdpno.HasData() {
 			ok = planHighestResMulti(now, from, to, split.mdpno)
 			if !ok {
 				return nil, errUnSatisfiable

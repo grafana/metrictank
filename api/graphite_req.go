@@ -63,6 +63,15 @@ func (rbr ReqsByRet) OutInterval() uint32 {
 	return 0
 }
 
+func (rbr ReqsByRet) HasData() bool {
+	for _, reqs := range rbr {
+		if len(reqs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // GroupData embodies a PNGroup broken down by whether requests are MDP-optimizable, and by retention
 type GroupData struct {
 	mdpyes ReqsByRet // MDP-optimizable requests
