@@ -287,13 +287,13 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 	// have that interval. but their combined LCM may not exceed maxInterval.
 
 	// first, extract the set of valid intervals from each retention
-	validIntervalss, ok := getValidIntervals(rbr, from, minTTL)
+	validIntervalsSet, ok := getValidIntervalsSet(rbr, from, minTTL)
 	if !ok {
 		return false
 	}
 
 	// now find the lowest resolution (highest) LCM interval that is not bigger than maxInterval
-	interval := getLowestResMatching(rbr, from, minTTL, 0, maxInterval, validIntervalss)
+	interval := getLowestResMatching(rbr, from, minTTL, 0, maxInterval, validIntervalsSet)
 
 	// now we finally found our optimal interval that we want to use.
 	// plan all our requests so that they result in the common output interval.
@@ -351,7 +351,7 @@ func reduceResMulti(now, from, to uint32, rbr ReqsByRet) bool {
 	curOut := rbr.OutInterval()
 	minTTL := now - from
 
-	validIntervalss, ok := getValidIntervals(rbr, from, minTTL)
+	validIntervalss, ok := getValidIntervalsSet(rbr, from, minTTL)
 	if !ok {
 		return false
 	}
@@ -370,56 +370,64 @@ func reduceResMulti(now, from, to uint32, rbr ReqsByRet) bool {
 
 }
 
-// getValidIntervals returns a list of valid intervals
-// specifically, for each used retention, we include all the intervals that are ready and have long enough retention
-// if any retention has no such interval, we return false
-func getValidIntervals(rbr ReqsByRet, from, ttl uint32) ([][]uint32, bool) {
-	var validIntervalss [][]uint32
+// getValidIntervalsSet returns a list of valid interval lists; one for each used retention
+// (used retention means a retention that has >0 requests associated to it)
+// if any used retention has no valid intervals, we return false
+func getValidIntervalsSet(rbr ReqsByRet, from, ttl uint32) ([][]uint32, bool) {
+	var validIntervalsSet [][]uint32
 
 	for schemaID, reqs := range rbr {
 		if len(reqs) == 0 {
 			continue
 		}
-		var ok bool
-		rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
-		var validIntervals []uint32
-		for _, ret := range rets {
-			if ret.Ready <= from && ret.MaxRetention() >= int(ttl) {
-				ok = true
-				validIntervals = append(validIntervals, uint32(ret.SecondsPerPoint))
-			}
-		}
+		validIntervals, ok := getValidIntervals(uint16(schemaID), from, ttl)
 		if !ok {
 			return nil, false
 		}
 		// add our sequence of valid intervals to the list, unless it's there already
 		var found bool
-		for _, v := range validIntervalss {
+		for _, v := range validIntervalsSet {
 			if reflect.DeepEqual(v, validIntervals) {
 				found = true
 				break
 			}
 		}
 		if !found {
-			validIntervalss = append(validIntervalss, validIntervals)
+			validIntervalsSet = append(validIntervalsSet, validIntervals)
 		}
 	}
-	return validIntervalss, true
+	return validIntervalsSet, true
 }
 
-// getLowestResMatching computes the LCM for each possible combination of provided intervals,
+// getValidIntervals returns the list of "valid" intervals for the given retention
+// "valid" means ready for long enough and a retention that covers ttl
+func getValidIntervals(schemaID uint16, from, ttl uint32) ([]uint32, bool) {
+
+	var ok bool
+	var validIntervals []uint32
+
+	rets := mdata.Schemas.Get(schemaID).Retentions.Rets
+	for _, ret := range rets {
+		if ret.Ready <= from && ret.MaxRetention() >= int(ttl) {
+			ok = true
+			validIntervals = append(validIntervals, uint32(ret.SecondsPerPoint))
+		}
+	}
+	return validIntervals, ok
+}
+
+// getLowestResMatching computes the LCM for each possible combination of the intervalsSet
 // returns the LCM interval such that minInterval <= LCM interval <= maxInterval that requires the least points to be fetched.
 // If the proper LCM interval is not found, returns the lowest interval
-func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, validIntervalss [][]uint32) uint32 {
-	combos := util.AllCombinationsUint32(validIntervalss)
+func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, intervalsSet [][]uint32) uint32 {
+	combos := util.AllCombinationsUint32(intervalsSet)
 
 	var maxScore int
 
 	lowestInterval := uint32(math.MaxUint32) // lowest interval we find
-	var candidateInterval uint32             // the candidate MDP-optimized interval
-	var interval uint32                      // will be set to either of the two above
+	var returnInterval uint32                // will be set to either of the two above
 	for _, combo := range combos {
-		candidateInterval = util.Lcm(combo)
+		candidateInterval := util.Lcm(combo)
 		if candidateInterval < lowestInterval {
 			lowestInterval = candidateInterval
 		}
@@ -440,22 +448,22 @@ func getLowestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uin
 		}
 		if score > maxScore {
 			maxScore = score
-			interval = candidateInterval
+			returnInterval = candidateInterval
 		}
 	}
 	// if we didn't find the matching interval, just pick the lowest one we've seen.
-	if interval == 0 {
-		interval = lowestInterval
+	if returnInterval == 0 {
+		returnInterval = lowestInterval
 	}
-	return interval
+	return returnInterval
 }
 
-// getHighestLowestResMatching computes the LCM for each possible combination of provided intervals,
+// getHighestLowestResMatching computes the LCM for each possible combination of the intervalsSet
 // returns the lowest LCM interval such that minInterval <= LCM interval <= maxInterval.
 // if the proper LCM interval is not found, returns 0
 // it's the callers responsibility to assure the intervals correspond to valid intervals/retentions for the given reqs.
-func getHighestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, validIntervalss [][]uint32) uint32 {
-	combos := util.AllCombinationsUint32(validIntervalss)
+func getHighestResMatching(rbr ReqsByRet, from, ttl, minInterval, maxInterval uint32, intervalsSet [][]uint32) uint32 {
+	combos := util.AllCombinationsUint32(intervalsSet)
 
 	interval := uint32(math.MaxUint32) // lowest matching interval we find
 	for _, combo := range combos {
