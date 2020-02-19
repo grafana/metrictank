@@ -322,7 +322,7 @@ func reduceResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) 
 
 	rets := mdata.Schemas.Get(schemaID).Retentions.Rets
 	for i, retMaybe := range rets {
-		if retMaybe.Ready <= from && retMaybe.MaxRetention() >= int(minTTL) && uint32(retMaybe.SecondsPerPoint) > curOut {
+		if retMaybe.Valid(from, minTTL) && uint32(retMaybe.SecondsPerPoint) > curOut {
 			ok = true
 			archive = i
 			ret = retMaybe
@@ -399,8 +399,7 @@ func getValidIntervalsSet(rbr ReqsByRet, from, ttl uint32) ([][]uint32, bool) {
 	return validIntervalsSet, true
 }
 
-// getValidIntervals returns the list of "valid" intervals for the given retention
-// "valid" means ready for long enough and a retention that covers ttl
+// getValidIntervals returns the list of valid intervals for the given set of retentions
 func getValidIntervals(schemaID uint16, from, ttl uint32) ([]uint32, bool) {
 
 	var ok bool
@@ -408,7 +407,7 @@ func getValidIntervals(schemaID uint16, from, ttl uint32) ([]uint32, bool) {
 
 	rets := mdata.Schemas.Get(schemaID).Retentions.Rets
 	for _, ret := range rets {
-		if ret.Ready <= from && ret.MaxRetention() >= int(ttl) {
+		if ret.Valid(from, ttl) {
 			ok = true
 			validIntervals = append(validIntervals, uint32(ret.SecondsPerPoint))
 		}
@@ -535,9 +534,7 @@ func findHighestResRet(rets []conf.Retention, from, ttl uint32) (int, conf.Reten
 func findLowestResForInterval(rets []conf.Retention, from, ttl, interval uint32) (int, conf.Retention, bool) {
 	for i := len(rets) - 1; i >= 0; i-- {
 		ret := rets[i]
-		if ret.Ready <= from &&
-			uint32(ret.MaxRetention()) >= ttl &&
-			interval%uint32(ret.SecondsPerPoint) == 0 {
+		if ret.Valid(from, ttl) && interval%uint32(ret.SecondsPerPoint) == 0 {
 			return i, ret, true
 		}
 	}
