@@ -105,7 +105,7 @@ DESTINATIONS                                                                    
 
 When distributing traffic among multiple instances of carbon-relay-ng it is important to ensure that the same metrics always get sent to the same carbon-relay-ng instances to preserve the order of the data points. It's ok to have many carbon-relay-ng instances send data to GrafanaCloud concurrently.
 
-```
+```table
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
 | metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 | 
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| 
@@ -130,7 +130,7 @@ As mentioned in the previous chapter, it is important that metrics get distribut
 
 This setup gives you failure tolerance and scalability:
 
-```
+```table
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
 | metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 | 
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| 
