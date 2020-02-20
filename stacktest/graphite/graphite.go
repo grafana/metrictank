@@ -1,8 +1,11 @@
 package graphite
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -56,7 +59,14 @@ func ExecuteRenderQuery(req *http.Request) Response {
 	if len(traceHeader) > 0 {
 		r.TraceID = traceHeader[0]
 	}
-	r.DecodeErr = json.NewDecoder(resp.Body).Decode(&r.Decoded)
+	var bodyBuf bytes.Buffer
+	tee := io.TeeReader(resp.Body, &bodyBuf)
+
+	r.DecodeErr = json.NewDecoder(tee).Decode(&r.Decoded)
+	if r.DecodeErr != nil {
+		body, _ := ioutil.ReadAll(&bodyBuf)
+		r.BodyErr = string(body)
+	}
 	resp.Body.Close()
 	return r
 }

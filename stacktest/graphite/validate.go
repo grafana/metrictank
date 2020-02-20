@@ -15,6 +15,7 @@ type Response struct {
 	Code      int
 	TraceID   string
 	Decoded   Data
+	BodyErr   string // set if we could not decode json
 }
 
 func (r Response) StringWithoutData() string {
