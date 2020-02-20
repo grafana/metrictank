@@ -290,6 +290,264 @@ func TestPlanRequestsMultiIntervalsUseRaw(t *testing.T) {
 	})
 }
 
+// TestPlanRequestsMaxPointsPerReqSoft tests how maxPointsPerReqSoft gets applied.
+// we validate that:
+// * requests are coarsened, PNGroup by PNGroup (we can predict PNGroup map iteration order, so we only test with 1 PNGroup),
+//   and singles in groups by retention (in schemaID order)
+// * PNGroups obviously will need a common interval, which gets interesting when using multiple schemas
+// * coarsening continues until all data is fetched at its coarsest. At that point we may breach soft, but never hard
+func TestPlanRequestsMaxPointsPerReqSoft(t *testing.T) {
+	in, out := generate(0, 1000, []reqProp{
+		// 4 singles from 2 different retentions
+		NewReqProp(10, 0, 0),
+		NewReqProp(10, 0, 0),
+		NewReqProp(15, 3, 0),
+		NewReqProp(15, 3, 0),
+		// multi comprised of 2 reqs from different retentions (rather than the same retention, just to make it more interesting)
+		NewReqProp(10, 0, 0),
+		NewReqProp(15, 3, 0),
+	})
+
+	in[4].PNGroup = 123
+	in[5].PNGroup = 123
+	out[4].PNGroup = 123
+	out[5].PNGroup = 123
+
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:1h,60s:2h,300s:7d"),
+		conf.MustParseRetentions("15s:1h,30s:2h,120s:7d"),
+	}
+
+	// if we don't hit limits, everything will use archive 0, except
+	// since the PNGroup has LCM(10,15) = 30, for one of them it'll read archive=1, for the archive it'll use archive 0 and consolidate by 3x
+	adjust(&out[0], 0, 10, 10, 3600)
+	adjust(&out[1], 0, 10, 10, 3600)
+	adjust(&out[2], 0, 15, 15, 3600)
+	adjust(&out[3], 0, 15, 15, 3600)
+
+	adjust(&out[4], 0, 10, 30, 3600)
+	adjust(&out[5], 1, 30, 30, 3600*2)
+
+	plan := testPlan(in, rets, out, nil, 800, 0, 0, t)
+	expPointsFetch := 1000/10 + 1000/10 + 1000/15 + 1000/15 + 1000/10 + 1000/30 // 465
+	if int(plan.PointsFetch()) != expPointsFetch {
+		t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+	}
+
+	t.Run("WithMaxPointsPerReqSoftVeryTight466", func(t *testing.T) {
+		// this should still work as before, but just make the limit
+		plan := testPlan(in, rets, out, nil, 800, 466, 0, t)
+		if int(plan.PointsFetch()) != expPointsFetch {
+			t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+		}
+	})
+
+	// now we test a few cases where Soft is just aggressive enough that we need to do our first round of reductions
+	t.Run("WithMaxPointsPerReqSoftBroken1", func(t *testing.T) {
+
+		// the PNGroup will move to the 60s resolution
+		adjust(&out[4], 1, 60, 60, 3600*2)
+		adjust(&out[5], 1, 30, 60, 3600*2)
+		expPointsFetch := 1000/10 + 1000/10 + 1000/15 + 1000/15 + 1000/60 + 1000/30 // 381
+
+		t.Run("Soft464", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 464, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft382", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 382, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft381", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 381, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+	})
+
+	// getting tighter. we need 2 rounds of reductions
+	t.Run("WithMaxPointsPerReqSoftBroken2", func(t *testing.T) {
+
+		// the PNGroup will move to the 60s resolution, like before...
+		adjust(&out[4], 1, 60, 60, 3600*2)
+		adjust(&out[5], 1, 30, 60, 3600*2)
+		// ... but now also the singles that have schemaID 0 will move to the next rollup
+		adjust(&out[0], 1, 60, 60, 3600*2)
+		adjust(&out[1], 1, 60, 60, 3600*2)
+		expPointsFetch := 1000/60 + 1000/60 + 1000/15 + 1000/15 + 1000/60 + 1000/30 // 213
+
+		t.Run("Soft380", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 380, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft213", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 213, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+	})
+
+	// getting tighter. we need 3 rounds of reductions
+	t.Run("WithMaxPointsPerReqSoftBroken3", func(t *testing.T) {
+
+		// the PNGroup will move to the 60s resolution, like before...
+		adjust(&out[4], 1, 60, 60, 3600*2)
+		adjust(&out[5], 1, 30, 60, 3600*2)
+		// ... but now also the singles that have schemaID 0 will move to the next rollup like before ...
+		adjust(&out[0], 1, 60, 60, 3600*2)
+		adjust(&out[1], 1, 60, 60, 3600*2)
+		// ... but now schemaID 1 based requests also move to the next rollup
+		adjust(&out[2], 1, 30, 30, 3600*2)
+		adjust(&out[3], 1, 30, 30, 3600*2)
+		expPointsFetch := 1000/60 + 1000/60 + 1000/30 + 1000/30 + 1000/60 + 1000/30 // 147
+
+		t.Run("Soft212", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 212, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft147", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 147, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+	})
+
+	// every request has been coarsened. but we need to accommodate an even tighter Soft limit
+	// at this point we start over again and reduce the PNGroup even further
+	t.Run("WithMaxPointsPerReqSoftBroken4", func(t *testing.T) {
+
+		// singles are the same as before
+		adjust(&out[0], 1, 60, 60, 3600*2)
+		adjust(&out[1], 1, 60, 60, 3600*2)
+		adjust(&out[2], 1, 30, 30, 3600*2)
+		adjust(&out[3], 1, 30, 30, 3600*2)
+
+		// but the PNGroup will be further reduced. from outInterval 60 to the next available one, which is 120
+		// this moves the 2nd req to the next archive, but the first one can stay where it is!
+		adjust(&out[4], 1, 60, 120, 3600*2)
+		adjust(&out[5], 2, 120, 120, 3600*24*7)
+
+		expPointsFetch := 1000/60 + 1000/60 + 1000/30 + 1000/30 + 1000/60 + 1000/120 // 122
+
+		t.Run("Soft146", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 146, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft122", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 122, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+	})
+
+	// pushing even more, we now also reduce singles with schemaID 0 further
+	t.Run("WithMaxPointsPerReqSoftBroken5", func(t *testing.T) {
+
+		adjust(&out[0], 2, 300, 300, 3600*24*7)
+		adjust(&out[1], 2, 300, 300, 3600*24*7)
+		adjust(&out[2], 1, 30, 30, 3600*2)
+		adjust(&out[3], 1, 30, 30, 3600*2)
+		adjust(&out[4], 1, 60, 120, 3600*2)
+		adjust(&out[5], 2, 120, 120, 3600*24*7)
+
+		expPointsFetch := 1000/300 + 1000/300 + 1000/30 + 1000/30 + 1000/60 + 1000/120 // 96
+
+		t.Run("Soft121", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 121, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft96", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 96, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+	})
+	// pushing even more, we now also reduce singles with schemaID 1 further
+	t.Run("WithMaxPointsPerReqSoftBroken6", func(t *testing.T) {
+
+		adjust(&out[0], 2, 300, 300, 3600*24*7)
+		adjust(&out[1], 2, 300, 300, 3600*24*7)
+		adjust(&out[2], 2, 120, 120, 3600*24*7)
+		adjust(&out[3], 2, 120, 120, 3600*24*7)
+		adjust(&out[4], 1, 60, 120, 3600*2)
+		adjust(&out[5], 2, 120, 120, 3600*24*7)
+
+		expPointsFetch := 1000/300 + 1000/300 + 1000/120 + 1000/120 + 1000/60 + 1000/120 // 46
+
+		t.Run("Soft95", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 95, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft46", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 46, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+	})
+
+	// pushing even more, we circle back around and reduce the PNGroup further
+	// from interval 120 whichever is the next higher one: 600
+	t.Run("WithMaxPointsPerReqSoftBroken6", func(t *testing.T) {
+
+		adjust(&out[0], 2, 300, 300, 3600*24*7)
+		adjust(&out[1], 2, 300, 300, 3600*24*7)
+		adjust(&out[2], 2, 120, 120, 3600*24*7)
+		adjust(&out[3], 2, 120, 120, 3600*24*7)
+		adjust(&out[4], 2, 300, 600, 3600*24*7)
+		adjust(&out[5], 2, 120, 600, 3600*24*7)
+
+		expPointsFetch := 1000/300 + 1000/300 + 1000/120 + 1000/120 + 1000/300 + 1000/120 // 33
+
+		t.Run("Soft45", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 45, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+		t.Run("Soft33", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 33, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+		})
+
+		// now, the moment we've all been waiting for... since everything is reduced to the max, what happens if we try to go further?
+		// we simply start breaching the soft limit.
+		t.Run("Soft32", func(t *testing.T) {
+			plan := testPlan(in, rets, out, nil, 800, 32, 0, t)
+			if int(plan.PointsFetch()) != expPointsFetch {
+				t.Errorf("points fetched expected %d, got %d", expPointsFetch, plan.PointsFetch())
+			}
+
+			// but we can get an error if we update the Hard limit instead:
+			testPlan(in, rets, out, nil, 800, 32, 33, t)
+			testPlan(in, rets, out, errMaxPointsPerReq, 800, 32, 32, t)
+			testPlan(in, rets, out, errMaxPointsPerReq, 800, 32, 30, t)
+			testPlan(in, rets, out, errMaxPointsPerReq, 800, 32, 1, t)
+		})
+	})
+}
+
 // 3 series with different raw intervals from the same schemas. TTL causes both to go to first rollup, which for one of them is raw
 func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
 	in, out := generate(0, 1000, []reqProp{
