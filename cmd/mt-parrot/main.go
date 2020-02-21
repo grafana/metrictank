@@ -83,7 +83,7 @@ func parsePartitionMethod() {
 func initGateway() {
 	var err error
 	backend, _ := statsd.New(false, "", "")
-	gateway, err = gnet.New(gatewayAddress + "/metrics", gatewayKey, backend)
+	gateway, err = gnet.New(gatewayAddress+"/metrics", gatewayKey, backend)
 	if err != nil {
 		log.Fatal(err)
 	}
