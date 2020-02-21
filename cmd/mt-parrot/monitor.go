@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/grafana/metrictank/stacktest/graphite"
+	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
@@ -33,33 +34,30 @@ func monitor() {
 		for _, s := range query.Decoded {
 			log.Infof("%d - %d", s.Datapoints[0].Ts, s.Datapoints[len(s.Datapoints)-1].Ts)
 
-			stats := seriesStats{}
-			stats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
+			serStats := seriesStats{}
+			serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
 
 			for _, dp := range s.Datapoints {
 
 				if math.IsNaN(dp.Val) {
-					stats.nans += 1
+					serStats.nans += 1
 					continue
 				}
 				if diff := dp.Val - float64(dp.Ts); diff != 0 {
-					stats.lastSeen = dp.Ts
-					stats.deltaSum += diff
-					stats.numNonMatching += 1
+					serStats.lastSeen = dp.Ts
+					serStats.deltaSum += diff
+					serStats.numNonMatching += 1
 				}
 			}
 
-			//TODO create/emit metrics for each partition
-
 			//number of missing values for each series
-			fmt.Printf("parrot.monitoring.nanCount;partition=%d; %d\n", stats.partition, stats.nans)
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", serStats.partition)).Set(int(serStats.nans))
 			//time since the last value was recorded
-			fmt.Printf("parrot.monitoring.lag;partition=%d; %d\n", stats.partition, stats.lastTs-stats.lastSeen)
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", serStats.partition)).Set(int(serStats.lastTs - serStats.lastSeen))
 			//total amount of drift between expected value and actual values
-			fmt.Printf("parrot.monitoring.deltaSum;partition=%d; %f\n", stats.partition, stats.deltaSum)
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", serStats.partition)).Set(int(serStats.deltaSum))
 			//total number of entries where drift occurred
-			fmt.Printf("parrot.monitoring.nonMatching;partition=%d; %d\n", stats.partition, stats.numNonMatching)
-			fmt.Println()
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", serStats.partition)).Set(int(serStats.numNonMatching))
 		}
 	}
 }
