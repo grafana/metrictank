@@ -151,28 +151,30 @@ func (rp ReqsPlan) PointsFetch() uint32 {
 // Dump provides a human readable string representation of the ReqsPlan
 func (rp ReqsPlan) Dump() string {
 	out := fmt.Sprintf("ReqsPlan (%d entries):\n", rp.cnt)
-	out += "  Groups:\n"
+	out += "  # Groups:\n"
 	for i, data := range rp.pngroups {
-		out += fmt.Sprintf("    * group %d\nMDP-yes:\n", i)
+		out += fmt.Sprintf("    ## group %d\n", i)
+		out += "      ### MDP-yes:\n"
 		for schemaID, reqs := range data.mdpyes {
 			for _, req := range reqs {
-				out += fmt.Sprintf("      [%d] %s\n", schemaID, req.DebugString())
+				out += fmt.Sprintf("        [%d] %s\n", schemaID, req.DebugString())
 			}
 		}
-		out += "  MDP-no:\n"
+		out += "      ### MDP-no:\n"
 		for schemaID, reqs := range data.mdpno {
 			for _, req := range reqs {
-				out += fmt.Sprintf("      [%d] %s\n", schemaID, req.DebugString())
+				out += fmt.Sprintf("        [%d] %s\n", schemaID, req.DebugString())
 			}
 		}
 	}
-	out += "  Single MDP-yes:\n"
+	out += "  # Single\n"
+	out += "   ## MDP-yes:\n"
 	for schemaID, reqs := range rp.single.mdpyes {
 		for _, req := range reqs {
 			out += fmt.Sprintf("    [%d] %s\n", schemaID, req.DebugString())
 		}
 	}
-	out += "  Single MDP-no:\n"
+	out += "    ## MDP-no:\n"
 	for schemaID, reqs := range rp.single.mdpno {
 		for _, req := range reqs {
 			out += fmt.Sprintf("    [%d] %s\n", schemaID, req.DebugString())
