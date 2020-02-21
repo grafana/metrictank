@@ -32,6 +32,12 @@ func monitor() {
 	for tick := range time.NewTicker(queryInterval).C {
 
 		query := graphite.ExecuteRenderQuery(buildRequest(tick))
+		if query.HTTPErr != nil {
+			stats.NewCounter32("parrot.monitoring.error;error=http").Inc()
+		}
+		if query.DecodeErr != nil {
+			stats.NewCounter32("parrot.monitoring.error;error=decode").Inc()
+		}
 
 		for _, s := range query.Decoded {
 			log.Infof("%d - %d", s.Datapoints[0].Ts, s.Datapoints[len(s.Datapoints)-1].Ts)
@@ -39,7 +45,7 @@ func monitor() {
 			partition, err := extractPartition(s.Target)
 			if err != nil {
 				log.Debug("unable to extract partition", err)
-				stats.NewCounter32("parrot.monitoring.error.parsePartition").Inc()
+				stats.NewCounter32("parrot.monitoring.error;error=parsePartition").Inc()
 				continue
 			}
 			serStats := seriesStats{}
