@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -34,6 +36,12 @@ func monitor() {
 		for _, s := range query.Decoded {
 			log.Infof("%d - %d", s.Datapoints[0].Ts, s.Datapoints[len(s.Datapoints)-1].Ts)
 
+			partition, err := extractPartition(s.Target)
+			if err != nil {
+				log.Debug("unable to extract partition", err)
+				stats.NewCounter32("parrot.monitoring.error.parsePartition").Inc()
+				continue
+			}
 			serStats := seriesStats{}
 			serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
 
@@ -60,6 +68,21 @@ func monitor() {
 			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", serStats.partition)).Set(int(serStats.numNonMatching))
 		}
 	}
+}
+
+var pattern = regexp.MustCompile(`parrot.testdata.(\d+).generated.\w+`)
+
+func extractPartition(target string) (int32, error) {
+	submatch := pattern.FindStringSubmatch(target)
+	if len(submatch) < 2 {
+		return -1, errors.New(fmt.Sprintf("target [%s] did not match pattern", target))
+	}
+	partition, err := strconv.Atoi(submatch[1])
+	if err != nil {
+		return -1, err
+	}
+	return int32(partition), nil
+
 }
 
 func buildRequest(now time.Time) *http.Request {
