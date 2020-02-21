@@ -26,7 +26,7 @@ var (
 )
 
 func init() {
-	parrotCmd.Flags().StringVar(&gatewayAddress, "gateway-address", "http://localhost:6059/metrics", "the url of the metrics gateway to publish to")
+	parrotCmd.Flags().StringVar(&gatewayAddress, "gateway-address", "http://localhost:6059", "the url of the metrics gateway")
 	parrotCmd.Flags().StringVar(&gatewayKey, "gateway-key", "", "the bearer token to include with gateway requests")
 	parrotCmd.Flags().IntVar(&orgId, "org-id", 1, "org id to publish parrot metrics to")
 	parrotCmd.Flags().Int32Var(&partitionCount, "partition-count", 8, "number of partitions to publish parrot metrics to")
@@ -83,7 +83,7 @@ func parsePartitionMethod() {
 func initGateway() {
 	var err error
 	backend, _ := statsd.New(false, "", "")
-	gateway, err = gnet.New(gatewayAddress, gatewayKey, backend)
+	gateway, err = gnet.New(gatewayAddress + "/metrics", gatewayKey, backend)
 	if err != nil {
 		log.Fatal(err)
 	}
