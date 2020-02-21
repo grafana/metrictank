@@ -22,7 +22,7 @@ func getReqMap(reqs []models.Req) *ReqMap {
 
 // testPlan verifies the aligment of the given requests, given the retentions (one or more patterns, one or more retentions each)
 // passing mpprSoft/mpprHard 0 means we will set them automatically such that they will never be hit
-func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, mpprSoft, mpprHard int, t *testing.T) {
+func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.Req, outErr error, now uint32, mpprSoft, mpprHard int, t *testing.T) *ReqsPlan {
 	var schemas []conf.Schema
 
 	maxPointsPerReqSoft := mpprSoft
@@ -66,6 +66,7 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 			}
 		}
 	}
+	return out
 }
 
 // There are a lot of factors to consider. I haven't found a practical way to test all combinations of every factor
