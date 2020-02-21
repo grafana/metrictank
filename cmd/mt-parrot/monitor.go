@@ -26,9 +26,9 @@ type seriesStats struct {
 }
 
 func monitor() {
-	for range time.NewTicker(queryInterval).C {
+	for tick := range time.NewTicker(queryInterval).C {
 
-		query := graphite.ExecuteRenderQuery(buildRequest())
+		query := graphite.ExecuteRenderQuery(buildRequest(tick))
 
 		for _, s := range query.Decoded {
 			log.Infof("%d - %d", s.Datapoints[0].Ts, s.Datapoints[len(s.Datapoints)-1].Ts)
@@ -64,13 +64,12 @@ func monitor() {
 	}
 }
 
-func buildRequest() *http.Request {
+func buildRequest(now time.Time) *http.Request {
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/render", gatewayAddress), nil)
 	q := req.URL.Query()
 	q.Set("target", "parrot.testdata.*.generated.*")
-	//TODO parameterize this
-	q.Set("from", "-5min")
-	q.Set("until", "now")
+	q.Set("from", strconv.FormatInt(now.Add(-5*time.Minute).Unix(), 10))
+	q.Set("until", strconv.FormatInt(now.Unix(), 10))
 	q.Set("format", "json")
 	q.Set("X-Org-Id", strconv.Itoa(orgId))
 	req.URL.RawQuery = q.Encode()
