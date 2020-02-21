@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"sort"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
@@ -123,14 +124,21 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		// * It pays no attention to which series is "worse off" (already has a low resolution). We could prioritize our
 		//   reductions to keep resolutions more or less consistent across all requests.
 		//   Though, is that any more fair? for some series it's more desirable to have them at lower resolutions than others.
-		// * In particular, our logic to start with PNGroups, then singles in schemaID order, is made up.
-		//   Also, because map iteration order is random, the order in which we reduce PNGroups is random. FIXME.
+		// * In particular, our logic to do PNGroups in ascending size order, then singles in schemaID order, is made up.
 		// * Because PNGroups may be comprised of multiple schemas, we typically don't have to adjust all of the comprising requests
 		//   to achieve an overall point reduction for the entire group. This means that singles may reduce faster than PNGroups
 		progress := true
+
+		pngroupsByLen := make([]models.PNGroup, 0, len(rp.pngroups))
+		for group := range rp.pngroups {
+			pngroupsByLen = append(pngroupsByLen, group)
+		}
+		sort.Slice(pngroupsByLen, func(i, j int) bool { return rp.pngroups[pngroupsByLen[i]].Len() < rp.pngroups[pngroupsByLen[j]].Len() })
+
 		for rp.PointsFetch() > uint32(mpprSoft) && progress {
 			progress = false
-			for _, data := range rp.pngroups {
+			for _, groupID := range pngroupsByLen {
+				data := rp.pngroups[groupID]
 				if len(data.mdpno) > 0 {
 					ok := reduceResMulti(now, from, to, data.mdpno)
 					if ok {

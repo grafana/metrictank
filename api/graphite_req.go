@@ -72,6 +72,14 @@ func (rbr ReqsByRet) HasData() bool {
 	return false
 }
 
+func (rbr ReqsByRet) Len() int {
+	var cnt int
+	for _, reqs := range rbr {
+		cnt += len(reqs)
+	}
+	return cnt
+}
+
 // GroupData embodies a PNGroup broken down by whether requests are MDP-optimizable, and by retention
 type GroupData struct {
 	mdpyes ReqsByRet // MDP-optimizable requests
@@ -83,6 +91,10 @@ func NewGroupData() GroupData {
 		mdpyes: make([][]models.Req, mdata.Schemas.Len()),
 		mdpno:  make([][]models.Req, mdata.Schemas.Len()),
 	}
+}
+
+func (gd GroupData) Len() int {
+	return gd.mdpno.Len() + gd.mdpyes.Len()
 }
 
 // ReqsPlan holds requests that have been planned, broken down by PNGroup and MDP-optimizability
