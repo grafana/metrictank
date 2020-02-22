@@ -34,7 +34,7 @@ func (e ErrBadArgument) Error() string {
 	return fmt.Sprintf("argument bad type. expected %s - got %s", e.exp, e.got)
 }
 
-func (e ErrBadArgument) Code() int {
+func (e ErrBadArgument) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 
@@ -47,7 +47,7 @@ func (e ErrBadArgumentStr) Error() string {
 	return fmt.Sprintf("argument bad type. expected %s - got %s", e.exp, e.got)
 }
 
-func (e ErrBadArgumentStr) Code() int {
+func (e ErrBadArgumentStr) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 
@@ -57,7 +57,7 @@ func (e ErrUnknownFunction) Error() string {
 	return fmt.Sprintf("unknown function %q", string(e))
 }
 
-func (e ErrUnknownFunction) Code() int {
+func (e ErrUnknownFunction) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 
@@ -69,7 +69,7 @@ func (e ErrUnknownKwarg) Error() string {
 	return fmt.Sprintf("unknown keyword argument %q", e.key)
 }
 
-func (e ErrUnknownKwarg) Code() int {
+func (e ErrUnknownKwarg) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 
@@ -83,7 +83,7 @@ func (e ErrBadKwarg) Error() string {
 	return fmt.Sprintf("keyword argument %q bad type. expected %T - got %s", e.key, e.exp, e.got)
 }
 
-func (e ErrBadKwarg) Code() int {
+func (e ErrBadKwarg) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 
@@ -95,7 +95,7 @@ func (e ErrKwargSpecifiedTwice) Error() string {
 	return fmt.Sprintf("keyword argument %q specified twice", e.key)
 }
 
-func (e ErrKwargSpecifiedTwice) Code() int {
+func (e ErrKwargSpecifiedTwice) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 

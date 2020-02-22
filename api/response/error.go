@@ -10,7 +10,9 @@ import (
 )
 
 type Error interface {
-	Code() int
+	//This could have just been `Code`, but that would make it accidentally share an interface with gocql and lead to nonsense HTTP codes
+	//See https://github.com/grafana/metrictank/issues/1678
+	HTTPStatusCode() int
 	Error() string
 }
 
@@ -29,7 +31,7 @@ func WrapError(e error) *ErrorResp {
 		code: http.StatusInternalServerError,
 	}
 	if _, ok := e.(Error); ok {
-		resp.code = e.(Error).Code()
+		resp.code = e.(Error).HTTPStatusCode()
 	}
 
 	resp.ValidateAndFixCode()
@@ -56,7 +58,7 @@ func WrapErrorForTagDB(e error) *ErrorResp {
 	}
 
 	if _, ok := e.(Error); ok {
-		resp.code = e.(Error).Code()
+		resp.code = e.(Error).HTTPStatusCode()
 	}
 
 	resp.ValidateAndFixCode()
@@ -79,6 +81,10 @@ func Errorf(code int, format string, a ...interface{}) *ErrorResp {
 
 func (r *ErrorResp) Error() string {
 	return r.err
+}
+
+func (r *ErrorResp) HTTPStatusCode() int {
+	return r.code
 }
 
 func (r *ErrorResp) Code() int {
