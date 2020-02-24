@@ -6,11 +6,20 @@ import (
 )
 
 type Gauge64 struct {
-	val uint64
+	val    uint64
+	suffix []byte
 }
 
 func NewGauge64(name string) *Gauge64 {
-	return registry.getOrAdd(name, &Gauge64{}).(*Gauge64)
+	return registry.getOrAdd(name, &Gauge64{
+		suffix: []byte(".gauge64"),
+	}).(*Gauge64)
+}
+
+func NewGauge64WithTags(name string) *Gauge64 {
+	return registry.getOrAdd(name, &Gauge64{
+		suffix: []byte(";type=gauge64"),
+	}).(*Gauge64)
 }
 
 func (g *Gauge64) Inc() {
@@ -51,7 +60,7 @@ func (g *Gauge64) SetUint64(val uint64) {
 
 func (g *Gauge64) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint64(&g.val)
-	buf = WriteUint64(buf, prefix, []byte(".gauge64"), val, now)
+	buf = WriteUint64(buf, prefix, g.suffix, val, now)
 	return buf
 }
 

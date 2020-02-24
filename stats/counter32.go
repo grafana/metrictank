@@ -6,11 +6,20 @@ import (
 )
 
 type Counter32 struct {
-	val uint32
+	val    uint32
+	suffix []byte
 }
 
 func NewCounter32(name string) *Counter32 {
-	return registry.getOrAdd(name, &Counter32{}).(*Counter32)
+	return registry.getOrAdd(name, &Counter32{
+		suffix: []byte(".counter32"),
+	}).(*Counter32)
+}
+
+func NewCounter32WithTags(name string) *Counter32 {
+	return registry.getOrAdd(name, &Counter32{
+		suffix: []byte(";type=counter32"),
+	}).(*Counter32)
 }
 
 func (c *Counter32) SetUint32(val uint32) {
@@ -35,6 +44,6 @@ func (c *Counter32) Peek() uint32 {
 
 func (c *Counter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&c.val)
-	buf = WriteUint32(buf, prefix, []byte(".counter32"), val, now)
+	buf = WriteUint32(buf, prefix, c.suffix, val, now)
 	return buf
 }

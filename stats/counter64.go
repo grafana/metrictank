@@ -6,11 +6,20 @@ import (
 )
 
 type Counter64 struct {
-	val uint64
+	val    uint64
+	suffix []byte
 }
 
 func NewCounter64(name string) *Counter64 {
-	return registry.getOrAdd(name, &Counter64{}).(*Counter64)
+	return registry.getOrAdd(name, &Counter64{
+		suffix: []byte(".counter64"),
+	}).(*Counter64)
+}
+
+func NewCounter64WithTags(name string) *Counter64 {
+	return registry.getOrAdd(name, &Counter64{
+		suffix: []byte(";type=counter64"),
+	}).(*Counter64)
 }
 
 func (c *Counter64) SetUint64(val uint64) {
@@ -27,6 +36,6 @@ func (c *Counter64) AddUint64(val uint64) {
 
 func (c *Counter64) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint64(&c.val)
-	buf = WriteUint64(buf, prefix, []byte(".counter64"), val, now)
+	buf = WriteUint64(buf, prefix, c.suffix, val, now)
 	return buf
 }
