@@ -34,15 +34,15 @@ func (l *LatencyHistogram15s32) ReportGraphite(prefix, buf []byte, now time.Time
 	r, ok := l.hist.Report(snap)
 	if ok {
 		sum := atomic.SwapUint64(&l.sum, 0)
-		buf = WriteUint32(buf, prefix, []byte("latency.min.gauge32"), r.Min/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.mean.gauge32"), uint32((sum / uint64(r.Count) / 1000)), now)
-		buf = WriteUint32(buf, prefix, []byte("latency.median.gauge32"), r.Median/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.p75.gauge32"), r.P75/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.p90.gauge32"), r.P90/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.max.gauge32"), r.Max/1000, now)
+		buf = WriteUint32(buf, prefix, []byte(".latency.min.gauge32"), r.Min/1000, now)
+		buf = WriteUint32(buf, prefix, []byte(".latency.mean.gauge32"), uint32((sum / uint64(r.Count) / 1000)), now)
+		buf = WriteUint32(buf, prefix, []byte(".latency.median.gauge32"), r.Median/1000, now)
+		buf = WriteUint32(buf, prefix, []byte(".latency.p75.gauge32"), r.P75/1000, now)
+		buf = WriteUint32(buf, prefix, []byte(".latency.p90.gauge32"), r.P90/1000, now)
+		buf = WriteUint32(buf, prefix, []byte(".latency.max.gauge32"), r.Max/1000, now)
 	}
-	buf = WriteUint32(buf, prefix, []byte("values.count32"), r.Count, now)
-	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(r.Count)/now.Sub(l.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, []byte(".values.count32"), r.Count, now)
+	buf = WriteFloat64(buf, prefix, []byte(".values.rate32"), float64(r.Count)/now.Sub(l.since).Seconds(), now)
 
 	l.since = now
 	return buf

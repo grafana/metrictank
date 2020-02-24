@@ -72,7 +72,6 @@ func (g *Graphite) reporter(interval int) {
 			fullPrefix.Reset()
 			fullPrefix.Write(g.prefix)
 			fullPrefix.WriteString(name)
-			fullPrefix.WriteRune('.')
 			buf = metric.ReportGraphite(fullPrefix.Bytes(), buf, now)
 		}
 

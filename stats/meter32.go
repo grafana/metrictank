@@ -128,11 +128,11 @@ func (m *Meter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 		}
 	}
 
-	buf = WriteUint32(buf, prefix, []byte("min.gauge32"), m.min, now)
-	buf = WriteUint32(buf, prefix, []byte("mean.gauge32"), uint32(runningsum/uint64(m.count)), now)
-	buf = WriteUint32(buf, prefix, []byte("max.gauge32"), m.max, now)
-	buf = WriteUint32(buf, prefix, []byte("values.count32"), m.count, now)
-	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(m.count)/now.Sub(m.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, []byte(".min.gauge32"), m.min, now)
+	buf = WriteUint32(buf, prefix, []byte(".mean.gauge32"), uint32(runningsum/uint64(m.count)), now)
+	buf = WriteUint32(buf, prefix, []byte(".max.gauge32"), m.max, now)
+	buf = WriteUint32(buf, prefix, []byte(".values.count32"), m.count, now)
+	buf = WriteFloat64(buf, prefix, []byte(".values.rate32"), float64(m.count)/now.Sub(m.since).Seconds(), now)
 	m.since = now
 
 	m.clear()

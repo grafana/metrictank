@@ -38,6 +38,6 @@ func (b *Bool) Peek() bool {
 
 func (b *Bool) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&b.val)
-	buf = WriteUint32(buf, prefix, []byte("gauge1"), val, now)
+	buf = WriteUint32(buf, prefix, []byte(".gauge1"), val, now)
 	return buf
 }

@@ -35,6 +35,6 @@ func (c *Counter32) Peek() uint32 {
 
 func (c *Counter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&c.val)
-	buf = WriteUint32(buf, prefix, []byte("counter32"), val, now)
+	buf = WriteUint32(buf, prefix, []byte(".counter32"), val, now)
 	return buf
 }

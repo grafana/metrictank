@@ -29,6 +29,6 @@ func (g *TimeDiffReporter32) ReportGraphite(prefix, buf []byte, now time.Time) [
 	if now32 < target {
 		report = target - now32
 	}
-	buf = WriteUint32(buf, prefix, []byte("gauge32"), report, now)
+	buf = WriteUint32(buf, prefix, []byte(".gauge32"), report, now)
 	return buf
 }
