@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/metrictank/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	log "github.com/sirupsen/logrus"
 	jaeger "github.com/uber/jaeger-client-go"
 	"gopkg.in/macaron.v1"
 )
@@ -35,12 +36,23 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		// graphite cluster requests use local=1
 		// this way we can differentiate "full" render requests from client to MT (encompassing data processing, proxying to graphite, etc)
 		// from "subrequests" where metrictank is called by graphite and graphite does the processing and returns to the client
+
+		err := macCtx.Req.ParseForm()
+		if err != nil {
+			log.Errorf("Could not parse http request: %v", err)
+		}
+
 		if macCtx.Req.Request.Form.Get("local") == "1" {
 			path += "-local"
 		}
 
 		spanCtx, _ := tracer.Extract(opentracing.HTTPHeaders, opentracing.HTTPHeadersCarrier(macCtx.Req.Header))
+
 		span := tracer.StartSpan("HTTP "+macCtx.Req.Method+" "+path, ext.RPCServerOption(spanCtx))
+
+		if macCtx.Req.Form.Get("force-trace") == "true" {
+			ext.SamplingPriority.Set(span, 1)
+		}
 
 		ext.HTTPMethod.Set(span, macCtx.Req.Method)
 		ext.HTTPUrl.Set(span, macCtx.Req.URL.String())
