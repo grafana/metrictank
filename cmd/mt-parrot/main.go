@@ -49,7 +49,7 @@ func main() {
 }
 
 var parrotCmd = &cobra.Command{
-	Use:   "parrot",
+	Use:   "mt-parrot",
 	Short: "generate deterministic metrics for each metrictank partition",
 	Run: func(cmd *cobra.Command, args []string) {
 		lvl, err := log.ParseLevel(logLevel)

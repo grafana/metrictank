@@ -540,13 +540,13 @@ It prints the MKey
 generate deterministic metrics for each metrictank partition
 
 Usage:
-  parrot [flags]
+  mt-parrot [flags]
 
 Flags:
       --artificial-metrics-interval duration   interval to send metrics (default 5s)
       --gateway-address string                 the url of the metrics gateway (default "http://localhost:6059")
       --gateway-key string                     the bearer token to include with gateway requests
-  -h, --help                                   help for parrot
+  -h, --help                                   help for mt-parrot
       --log-level string                       log level. panic|fatal|error|warning|info|debug (default "info")
       --org-id int                             org id to publish parrot metrics to (default 1)
       --partition-count int32                  number of kafka partitions in use (default 8)
