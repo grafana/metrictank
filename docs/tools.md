@@ -549,8 +549,8 @@ Flags:
   -h, --help                                   help for parrot
       --log-level string                       log level. panic|fatal|error|warning|info|debug (default "info")
       --org-id int                             org id to publish parrot metrics to (default 1)
-      --partition-count int32                  number of partitions to publish parrot metrics to (default 8)
-      --partition-method string                the partition method to use, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
+      --partition-count int32                  number of kafka partitions in use (default 8)
+      --partition-method string                the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
       --query-interval duration                interval to query to validate metrics (default 10s)
 ```
 

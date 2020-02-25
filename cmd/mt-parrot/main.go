@@ -29,8 +29,8 @@ func init() {
 	parrotCmd.Flags().StringVar(&gatewayAddress, "gateway-address", "http://localhost:6059", "the url of the metrics gateway")
 	parrotCmd.Flags().StringVar(&gatewayKey, "gateway-key", "", "the bearer token to include with gateway requests")
 	parrotCmd.Flags().IntVar(&orgId, "org-id", 1, "org id to publish parrot metrics to")
-	parrotCmd.Flags().Int32Var(&partitionCount, "partition-count", 8, "number of partitions to publish parrot metrics to")
-	parrotCmd.Flags().StringVar(&partitionMethodString, "partition-method", "bySeries", "the partition method to use, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv")
+	parrotCmd.Flags().Int32Var(&partitionCount, "partition-count", 8, "number of kafka partitions in use")
+	parrotCmd.Flags().StringVar(&partitionMethodString, "partition-method", "bySeries", "the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv")
 	parrotCmd.Flags().DurationVar(&artificialMetricsInterval, "artificial-metrics-interval", 5*time.Second, "interval to send metrics")
 	parrotCmd.Flags().DurationVar(&queryInterval, "query-interval", 10*time.Second, "interval to query to validate metrics")
 
