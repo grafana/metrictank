@@ -13,8 +13,7 @@ import (
 
 var (
 	httpError           = stats.NewCounter32("parrot.monitoring.error;error=http")
-	decodeError         = stats.NewCounter32("parrot.monitoring.error;error=decode")
-	parsePartitionError = stats.NewCounter32("parrot.monitoring.error;error=parsePartition")
+	invalidError         = stats.NewCounter32("parrot.monitoring.error;error=invalid")
 )
 
 type seriesStats struct {
@@ -38,7 +37,7 @@ func monitor() {
 			httpError.Inc()
 		}
 		if query.DecodeErr != nil {
-			decodeError.Inc()
+			invalidError.Inc()
 		}
 
 		for _, s := range query.Decoded {
@@ -46,7 +45,7 @@ func monitor() {
 			partition, err := strconv.Atoi(s.Target)
 			if err != nil {
 				log.Debug("unable to parse partition", err)
-				parsePartitionError.Inc()
+				invalidError.Inc()
 				continue
 			}
 			serStats := seriesStats{}
