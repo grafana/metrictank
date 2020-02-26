@@ -89,6 +89,7 @@ func prepareIngest(in []*schema.MetricData, toPublish []*schema.MetricData) ([]*
 			promDiscards.Add(m.OrgId, err.Error())
 			continue
 		}
+		m.SetId()
 		metricTimestamp = getMetricsTimestampStat(m.OrgId)
 		metricTimestamp.ValueUint32(uint32(m.Time))
 		toPublish = append(toPublish, m)

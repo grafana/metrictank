@@ -284,7 +284,6 @@ func (m *mtPublisher) Publish(metrics []*schema.MetricData) error {
 				return errors.New("need to deduce interval but cannot")
 			}
 		}
-		metric.SetId()
 
 		isMD := false
 		isMP := false
