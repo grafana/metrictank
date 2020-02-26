@@ -247,7 +247,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	rCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	resultChan, errorChan := queryPeers(rCtx, requiredPeers, func(ctx context.Context, node cluster.Node) (interface{}, error) {
+	resultChan, errorChan := queryPeers(rCtx, requiredPeers, "getTargetsRemote", func(ctx context.Context, node cluster.Node) (interface{}, error) {
 		var resp models.GetDataRespV1
 		reqs, ok := shardReqs[node.GetPartitions()[0]]
 		if !ok {
@@ -255,7 +255,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 			// Return empty response, no error
 			return resp, nil
 		}
-		body, err := node.PostRaw(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
+		body, err := node.PostRaw(ctx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
 		if body == nil || err != nil {
 			return nil, err
 		}
