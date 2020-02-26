@@ -52,9 +52,9 @@ func Logger() macaron.Handler {
 		var content strings.Builder
 		fmt.Fprintf(&content, "ts=%s", time.Now().Format(time.RFC3339Nano))
 
-		traceID, _ := extractTraceID(ctx.Req.Context())
+		traceID, sampled := extractTraceID(ctx.Req.Context())
 		if traceID != "" {
-			fmt.Fprintf(&content, " traceID=%s", traceID)
+			fmt.Fprintf(&content, " traceID=%s, sampled=%t", traceID, sampled)
 		}
 
 		err := ctx.Req.ParseForm()
@@ -66,6 +66,7 @@ func Logger() macaron.Handler {
 			paramsAsString += "?"
 			paramsAsString += ctx.Req.Form.Encode()
 		}
+
 		fmt.Fprintf(&content, " msg=\"%s %s%s (%v) %v\" orgID=%d", ctx.Req.Method, ctx.Req.URL.Path, paramsAsString, rw.Status(), time.Since(start), ctx.OrgId)
 
 		referer := ctx.Req.Referer()
@@ -119,5 +120,5 @@ func extractTraceID(ctx context.Context) (string, bool) {
 		return "", false
 	}
 
-	return sctx.TraceID().String(), true
+	return sctx.TraceID().String(), sctx.IsSampled()
 }
