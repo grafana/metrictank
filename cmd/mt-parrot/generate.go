@@ -14,7 +14,7 @@ func produceTestMetrics(schemas []*schema.MetricData) {
 			metric.Time = tick.Unix()
 			metric.Value = float64(tick.Unix())
 		}
-		gateway.Flush(schemas)
+		publisher.Flush(schemas)
 		log.Infof("flushed schemas for ts %d", tick.Unix())
 	}
 }

@@ -22,7 +22,7 @@ var (
 	logLevel              string
 
 	partitionMethod schema.PartitionByMethod
-	gateway         out.Out
+	publisher       out.Out
 )
 
 func init() {
@@ -83,7 +83,7 @@ func parsePartitionMethod() {
 func initGateway() {
 	var err error
 	backend, _ := statsd.New(false, "", "")
-	gateway, err = gnet.New(gatewayAddress+"/metrics", gatewayKey, backend)
+	publisher, err = gnet.New(gatewayAddress+"/metrics", gatewayKey, backend)
 	if err != nil {
 		log.Fatal(err)
 	}
