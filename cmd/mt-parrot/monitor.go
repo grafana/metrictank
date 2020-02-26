@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+var (
+	httpError   = stats.NewCounter32("parrot.monitoring.error;error=http")
+	decodeError = stats.NewCounter32("parrot.monitoring.error;error=decode")
+)
+
 type seriesStats struct {
 	lastTs uint32
 	//the partition currently being checked
@@ -33,10 +38,10 @@ func monitor() {
 
 		query := graphite.ExecuteRenderQuery(buildRequest(tick))
 		if query.HTTPErr != nil {
-			stats.NewCounter32("parrot.monitoring.error;error=http").Inc()
+			httpError.Inc()
 		}
 		if query.DecodeErr != nil {
-			stats.NewCounter32("parrot.monitoring.error;error=decode").Inc()
+			decodeError.Inc()
 		}
 
 		for _, s := range query.Decoded {
