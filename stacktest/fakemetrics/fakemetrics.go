@@ -87,9 +87,9 @@ func (f *FakeMetrics) Close() error {
 
 func (f *FakeMetrics) run() {
 	// advantage over regular ticker:
-	// 1) no ticks dropped
+	// 1) no ticks dropped: a hiccup in flushing should be handled by still producing all stats and flushing them when we can
 	// 2) ticks come asap after the start of a new second, so we can measure better how long it took to get the data
-	ticker := clock.AlignedTick(time.Second)
+	ticker := clock.AlignedTickLossless(time.Second)
 
 	for {
 		select {
