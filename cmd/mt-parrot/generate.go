@@ -55,8 +55,8 @@ var alphabet = []rune("abcdefghijklmnopqrstuvwxyz")
 
 //generatePartitionSuffix deterministically generates a suffix for partition by brute force
 func generatePartitionSuffix(i int) string {
-	if i == 0 {
-		return ""
+	if i > 25 {
+		return generatePartitionSuffix((i/26)-1) + string(alphabet[i%26])
 	}
-	return generatePartitionSuffix(i/26) + string(alphabet[i%26])
+	return string(alphabet[i%26])
 }
