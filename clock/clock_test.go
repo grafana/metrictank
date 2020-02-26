@@ -6,8 +6,8 @@ import (
 )
 
 func TestAlignedTickLossless(t *testing.T) {
-	period := 100 * time.Millisecond
-	lateToleration := 10 * time.Millisecond
+	period := time.Second
+	lateToleration := 100 * time.Millisecond
 
 	// whatever time it is now, we expect the tick pointing to the next aligned tick,
 	// and we expect to see it slightly after that timestamp
@@ -24,7 +24,7 @@ func TestAlignedTickLossless(t *testing.T) {
 		if elapsed < expWithin || elapsed > expWithin+lateToleration {
 			t.Fatalf("expected to see tick v0 after %v to %v, but it took %v", expWithin, expWithin+lateToleration, elapsed)
 		}
-	case <-time.After(period + 10*time.Millisecond):
+	case <-time.After(period + lateToleration):
 		t.Fatalf("did not get tick v0 on time")
 	}
 
@@ -37,7 +37,7 @@ func TestAlignedTickLossless(t *testing.T) {
 		if v1 != expTick {
 			t.Fatalf("expected v1 %v, got %v", expTick, v1)
 		}
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(lateToleration):
 		t.Fatalf("did not get tick v1 on time")
 	}
 
@@ -47,7 +47,7 @@ func TestAlignedTickLossless(t *testing.T) {
 		if v2 != expTick {
 			t.Fatalf("expected v2 %v, got %v", expTick, v2)
 		}
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(lateToleration):
 		t.Fatalf("did not get tick v2 on time")
 	}
 
@@ -57,7 +57,7 @@ func TestAlignedTickLossless(t *testing.T) {
 		if v3 != expTick {
 			t.Fatalf("expected v3 %v, got %v", expTick, v3)
 		}
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(lateToleration):
 		t.Fatalf("did not get tick v3 on time")
 	}
 
@@ -76,7 +76,7 @@ func TestAlignedTickLossless(t *testing.T) {
 		if elapsed < expWithin-lateToleration || elapsed > expWithin+lateToleration {
 			t.Fatalf("expected to see tick v4 after %v to %v, but it took %v", expWithin-lateToleration, expWithin+lateToleration, elapsed)
 		}
-	case <-time.After(period + 10*time.Millisecond):
+	case <-time.After(period + lateToleration):
 		t.Fatalf("did not get tick v4 on time")
 	}
 
