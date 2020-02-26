@@ -63,14 +63,8 @@ func (n *Carbon) Flush(metrics []*schema.MetricData) error {
 	buf := bytes.NewBufferString("")
 	for _, m := range metrics {
 		tagsString := ""
-		for i, tag := range m.Tags {
-			if i == 0 {
-				tagsString += ";"
-			} else {
-				tagsString += ","
-
-			}
-			tagsString += tag
+		for _, tag := range m.Tags {
+			tagsString += fmt.Sprintf(";%s", tag)
 		}
 		buf.WriteString(fmt.Sprintf("%s%s %f %d\n", m.Name, tagsString, m.Value, m.Time))
 	}
