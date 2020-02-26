@@ -12,14 +12,14 @@ import (
 )
 
 var (
-	gatewayAddress            string
-	gatewayKey                string
-	orgId                     int
-	partitionCount            int32
-	partitionMethodString     string
-	artificialMetricsInterval time.Duration
-	queryInterval             time.Duration
-	logLevel                  string
+	gatewayAddress        string
+	gatewayKey            string
+	orgId                 int
+	partitionCount        int32
+	partitionMethodString string
+	testMetricsInterval   time.Duration
+	queryInterval         time.Duration
+	logLevel              string
 
 	partitionMethod schema.PartitionByMethod
 	gateway         out.Out
@@ -31,7 +31,7 @@ func init() {
 	parrotCmd.Flags().IntVar(&orgId, "org-id", 1, "org id to publish parrot metrics to")
 	parrotCmd.Flags().Int32Var(&partitionCount, "partition-count", 8, "number of kafka partitions in use")
 	parrotCmd.Flags().StringVar(&partitionMethodString, "partition-method", "bySeries", "the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv")
-	parrotCmd.Flags().DurationVar(&artificialMetricsInterval, "artificial-metrics-interval", 5*time.Second, "interval to send metrics")
+	parrotCmd.Flags().DurationVar(&testMetricsInterval, "test-metrics-interval", 5*time.Second, "interval to send test metrics")
 	parrotCmd.Flags().DurationVar(&queryInterval, "query-interval", 10*time.Second, "interval to query to validate metrics")
 
 	parrotCmd.Flags().StringVar(&logLevel, "log-level", "info", "log level. panic|fatal|error|warning|info|debug")
@@ -61,7 +61,7 @@ var parrotCmd = &cobra.Command{
 		initGateway()
 
 		schemas := generateSchemas(partitionCount)
-		go produceArtificialMetrics(schemas)
+		go produceTestMetrics(schemas)
 
 		monitor()
 	},

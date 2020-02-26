@@ -8,8 +8,8 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
-func produceArtificialMetrics(schemas []*schema.MetricData) {
-	for tick := range time.NewTicker(artificialMetricsInterval).C {
+func produceTestMetrics(schemas []*schema.MetricData) {
+	for tick := range time.NewTicker(testMetricsInterval).C {
 		for _, metric := range schemas {
 			metric.Time = tick.Unix()
 			metric.Value = float64(tick.Unix())
@@ -34,7 +34,7 @@ func generateSchema(desiredPartition int32) *schema.MetricData {
 		OrgId:    orgId,
 		Unit:     "partyparrots",
 		Mtype:    "gauge",
-		Interval: int(artificialMetricsInterval.Seconds()),
+		Interval: int(testMetricsInterval.Seconds()),
 	}
 
 	for i := 1; true; i++ {
