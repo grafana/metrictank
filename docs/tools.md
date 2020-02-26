@@ -543,15 +543,15 @@ Usage:
   mt-parrot [flags]
 
 Flags:
-      --artificial-metrics-interval duration   interval to send metrics (default 5s)
-      --gateway-address string                 the url of the metrics gateway (default "http://localhost:6059")
-      --gateway-key string                     the bearer token to include with gateway requests
-  -h, --help                                   help for mt-parrot
-      --log-level string                       log level. panic|fatal|error|warning|info|debug (default "info")
-      --org-id int                             org id to publish parrot metrics to (default 1)
-      --partition-count int32                  number of kafka partitions in use (default 8)
-      --partition-method string                the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
-      --query-interval duration                interval to query to validate metrics (default 10s)
+      --gateway-address string           the url of the metrics gateway (default "http://localhost:6059")
+      --gateway-key string               the bearer token to include with gateway requests
+  -h, --help                             help for mt-parrot
+      --log-level string                 log level. panic|fatal|error|warning|info|debug (default "info")
+      --org-id int                       org id to publish parrot metrics to (default 1)
+      --partition-count int32            number of kafka partitions in use (default 8)
+      --partition-method string          the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
+      --query-interval duration          interval to query to validate metrics (default 10s)
+      --test-metrics-interval duration   interval to send test metrics (default 10s)
 ```
 
 
