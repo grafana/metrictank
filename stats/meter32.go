@@ -108,9 +108,9 @@ func (m *Meter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 		p   float64
 		str string
 	}{
-		{0.50, "median.gauge32"},
-		{0.75, "p75.gauge32"},
-		{0.90, "p90.gauge32"},
+		{0.50, ".median.gauge32"},
+		{0.75, ".p75.gauge32"},
+		{0.90, ".p90.gauge32"},
 	}
 
 	pidx := 0
