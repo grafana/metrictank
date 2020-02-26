@@ -58,9 +58,9 @@ func monitor() {
 					serStats.nans += 1
 					continue
 				}
+				serStats.lastSeen = dp.Ts
 				if diff := dp.Val - float64(dp.Ts); diff != 0 {
 					log.Debugf("partition=%d dp.Val=%f dp.Ts=%d diff=%f", partition, dp.Val, dp.Ts, diff)
-					serStats.lastSeen = dp.Ts
 					serStats.deltaSum += diff
 					serStats.numNonMatching += 1
 				}
