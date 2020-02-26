@@ -1,28 +1,25 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 )
 
 var (
-	httpError   = stats.NewCounter32("parrot.monitoring.error;error=http")
-	decodeError = stats.NewCounter32("parrot.monitoring.error;error=decode")
+	httpError           = stats.NewCounter32("parrot.monitoring.error;error=http")
+	decodeError         = stats.NewCounter32("parrot.monitoring.error;error=decode")
+	parsePartitionError = stats.NewCounter32("parrot.monitoring.error;error=parsePartition")
 )
 
 type seriesStats struct {
 	lastTs uint32
 	//the partition currently being checked
-	partition int32
-	//the number of nans present in the time series
 	nans int32
 	//the sum of abs(value - ts) across the time series
 	deltaSum float64
@@ -46,11 +43,10 @@ func monitor() {
 
 		for _, s := range query.Decoded {
 			log.Infof("%d - %d", s.Datapoints[0].Ts, s.Datapoints[len(s.Datapoints)-1].Ts)
-
-			partition, err := extractPartition(s.Target)
+			partition, err := strconv.Atoi(s.Target)
 			if err != nil {
-				log.Debug("unable to extract partition", err)
-				stats.NewCounter32("parrot.monitoring.error;error=parsePartition").Inc()
+				log.Debug("unable to parse partition", err)
+				parsePartitionError.Inc()
 				continue
 			}
 			serStats := seriesStats{}
@@ -71,36 +67,21 @@ func monitor() {
 			}
 
 			//number of missing values for each series
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", serStats.partition)).Set(int(serStats.nans))
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", partition)).Set(int(serStats.nans))
 			//time since the last value was recorded
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", serStats.partition)).Set(int(serStats.lastTs - serStats.lastSeen))
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", partition)).Set(int(serStats.lastTs - serStats.lastSeen))
 			//total amount of drift between expected value and actual values
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", serStats.partition)).Set(int(serStats.deltaSum))
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", partition)).Set(int(serStats.deltaSum))
 			//total number of entries where drift occurred
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", serStats.partition)).Set(int(serStats.numNonMatching))
+			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", partition)).Set(int(serStats.numNonMatching))
 		}
 	}
-}
-
-var pattern = regexp.MustCompile(`parrot.testdata.(\d+).generated.\w+`)
-
-func extractPartition(target string) (int32, error) {
-	submatch := pattern.FindStringSubmatch(target)
-	if len(submatch) < 2 {
-		return -1, errors.New(fmt.Sprintf("target [%s] did not match pattern", target))
-	}
-	partition, err := strconv.Atoi(submatch[1])
-	if err != nil {
-		return -1, err
-	}
-	return int32(partition), nil
-
 }
 
 func buildRequest(now time.Time) *http.Request {
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/render", gatewayAddress), nil)
 	q := req.URL.Query()
-	q.Set("target", "parrot.testdata.*.generated.*")
+	q.Set("target", "aliasByNode(parrot.testdata.*.generated.*, 2)")
 	q.Set("from", strconv.Itoa(int(now.Add(-5*time.Minute).Unix())))
 	q.Set("until", strconv.Itoa(int(now.Unix())))
 	q.Set("format", "json")
