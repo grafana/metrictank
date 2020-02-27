@@ -276,13 +276,12 @@ func (m *mtPublisher) Publish(metrics []*schema.MetricData) error {
 
 	for _, metric := range metrics {
 		if metric.Interval == 0 {
-			if m.autoInterval {
-				_, s := m.schemas.Match(metric.Name, 0)
-				metric.Interval = s.Retentions.Rets[0].SecondsPerPoint
-			} else {
-				log.Error("interval is 0 but can't deduce interval automatically. this should never happen")
-				return errors.New("need to deduce interval but cannot")
-			}
+			log.Error("interval must be set before publishing")
+			return errors.New("interval must be set before publishing")
+		}
+		if metric.Id == "" {
+			log.Error("metric ID must be set before publishing")
+			return errors.New("metric ID must be set before publishing")
 		}
 
 		isMD := false
