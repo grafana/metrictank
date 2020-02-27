@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,10 +26,35 @@ type LoggingResponseWriter struct {
 	errBody []byte // the body in case it is an error
 }
 
+func decompressGzip(b []byte) ([]byte, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(reader)
+}
+
 func (rw *LoggingResponseWriter) Write(b []byte) (int, error) {
 	if rw.ResponseWriter.Status() >= 400 {
-		rw.errBody = make([]byte, len(b))
-		copy(rw.errBody, b)
+		if rw.Header().Get("Content-Encoding") == "gzip" {
+			d, err := decompressGzip(b)
+			if err != nil {
+				log.Errorf("Decompressing gzip body failed: %s", err.Error())
+				// In some cases, decompression fails because the body is in fact
+				// not compressed, save the body as is.
+				// This happens when the gziper middleware is enabled because it
+				// sets the 'Content-Encoding' header to 'gzip' before it actually
+				// compresses the body.
+				rw.errBody = make([]byte, len(b))
+				copy(rw.errBody, b)
+			} else {
+				rw.errBody = d
+			}
+		} else {
+			rw.errBody = make([]byte, len(b))
+			copy(rw.errBody, b)
+		}
 	}
 	return rw.ResponseWriter.Write(b)
 }
