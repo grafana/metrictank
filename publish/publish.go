@@ -18,7 +18,10 @@ var (
 )
 
 type Publisher interface {
+	//Publish the given metrics.
+	//Requires that the metric interval and ID have been set
 	Publish(metrics []*schema.MetricData) error
+	//Type returns the type of system the Publisher publishes to
 	Type() string
 }
 
