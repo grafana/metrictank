@@ -2,16 +2,14 @@ package middleware
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
-	jaeger "github.com/uber/jaeger-client-go"
 	macaron "gopkg.in/macaron.v1"
 )
 
@@ -52,7 +50,7 @@ func Logger() macaron.Handler {
 		var content strings.Builder
 		fmt.Fprintf(&content, "ts=%s", time.Now().Format(time.RFC3339Nano))
 
-		traceID, _ := extractTraceID(ctx.Req.Context())
+		traceID := util.ExtractTraceID(ctx.Req.Context())
 		if traceID != "" {
 			fmt.Fprintf(&content, " traceID=%s", traceID)
 		}
@@ -107,17 +105,4 @@ func extractHeaders(req *http.Request) (string, error) {
 		return "", err
 	}
 	return url.PathEscape(string(b.Bytes())), nil
-}
-
-func extractTraceID(ctx context.Context) (string, bool) {
-	sp := opentracing.SpanFromContext(ctx)
-	if sp == nil {
-		return "", false
-	}
-	sctx, ok := sp.Context().(jaeger.SpanContext)
-	if !ok {
-		return "", false
-	}
-
-	return sctx.TraceID().String(), true
 }

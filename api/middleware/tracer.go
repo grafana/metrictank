@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"context"
 	"errors"
+	"math/rand"
 	"net/http"
 
 	"github.com/grafana/metrictank/tracing"
@@ -28,6 +30,9 @@ func DisableTracing(c *Context) {
 	c.Data["noTrace"] = true
 }
 
+// key used for adding traceID to a context.Context
+type TraceID struct{}
+
 // Tracer returns a middleware that traces requests
 func Tracer(tracer opentracing.Tracer) macaron.Handler {
 	return func(macCtx *macaron.Context) {
@@ -46,7 +51,6 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		ext.HTTPUrl.Set(span, macCtx.Req.URL.String())
 		ext.Component.Set(span, "metrictank/api")
 
-		macCtx.Req = macaron.Request{macCtx.Req.WithContext(opentracing.ContextWithSpan(macCtx.Req.Context(), span))}
 		macCtx.Resp = &TracingResponseWriter{
 			ResponseWriter: macCtx.Resp,
 		}
@@ -54,12 +58,21 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 
 		rw := macCtx.Resp.(*TracingResponseWriter)
 
+		var traceID string
 		// if tracing is enabled (context is not a opentracing.noopSpanContext)
-		// store traceID in output headers
+		// use the existing traceID and store the traceID in output headers
 		if spanCtx, ok := span.Context().(jaeger.SpanContext); ok {
-			traceID := spanCtx.TraceID().String()
-			headers := macCtx.Resp.Header()
-			headers["Trace-Id"] = []string{traceID}
+			traceID = spanCtx.TraceID().String()
+			macCtx.Resp.Header().Set("Trace-Id", traceID)
+		} else {
+			// no traceId, so lets generate a new one.
+			traceID = jaeger.TraceID{Low: uint64(rand.Int63())}.String()
+		}
+
+		// update the context.Context in our http.Request to include our openTracing span
+		// and also just store the traceID in the context for easy retrival.
+		macCtx.Req = macaron.Request{
+			Request: macCtx.Req.WithContext(context.WithValue(opentracing.ContextWithSpan(macCtx.Req.Context(), span), TraceID{}, traceID)),
 		}
 
 		// call next handler. This will return after all handlers

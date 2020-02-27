@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/macaron.v1"
@@ -159,4 +161,9 @@ func (ln tcpKeepAliveListener) Accept() (c net.Conn, err error) {
 	tc.SetKeepAlive(true)
 	tc.SetKeepAlivePeriod(3 * time.Minute)
 	return tc, nil
+}
+
+// write a log message with the requests traceID as a field in the log message.
+func LogWithTraceID(ctx context.Context) *log.Entry {
+	return log.WithField("traceID", util.ExtractTraceID(ctx))
 }
