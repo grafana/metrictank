@@ -27,22 +27,22 @@ func (l *LatencyHistogram15s32) Value(t time.Duration) {
 	l.hist.AddDuration(t)
 }
 
-func (l *LatencyHistogram15s32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (l *LatencyHistogram15s32) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	snap := l.hist.Snapshot()
 	// TODO: once we can actually do cool stuff (e.g. visualize) histogram bucket data, report it
 	// for now, only report the summaries :(
 	r, ok := l.hist.Report(snap)
 	if ok {
 		sum := atomic.SwapUint64(&l.sum, 0)
-		buf = WriteUint32(buf, prefix, []byte("latency.min.gauge32"), r.Min/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.mean.gauge32"), uint32((sum / uint64(r.Count) / 1000)), now)
-		buf = WriteUint32(buf, prefix, []byte("latency.median.gauge32"), r.Median/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.p75.gauge32"), r.P75/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.p90.gauge32"), r.P90/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.max.gauge32"), r.Max/1000, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".latency.min.gauge32"), tags, r.Min/1000, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".latency.mean.gauge32"), tags, uint32((sum / uint64(r.Count) / 1000)), now)
+		buf = WriteUint32(buf, prefix, name, []byte(".latency.median.gauge32"), tags, r.Median/1000, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".latency.p75.gauge32"), tags, r.P75/1000, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".latency.p90.gauge32"), tags, r.P90/1000, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".latency.max.gauge32"), tags, r.Max/1000, now)
 	}
-	buf = WriteUint32(buf, prefix, []byte("values.count32"), r.Count, now)
-	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(r.Count)/now.Sub(l.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, name, []byte(".values.count32"), tags, r.Count, now)
+	buf = WriteFloat64(buf, prefix, name, []byte(".values.rate32"), tags, float64(r.Count)/now.Sub(l.since).Seconds(), now)
 
 	l.since = now
 	return buf

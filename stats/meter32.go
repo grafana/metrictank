@@ -92,7 +92,7 @@ func (m *Meter32) ValuesUint32(val, num uint32) {
 	m.Unlock()
 }
 
-func (m *Meter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (m *Meter32) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	m.Lock()
 	if m.count == 0 {
 		m.Unlock()
@@ -123,16 +123,16 @@ func (m *Meter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 		runningsum += uint64(m.hist[key]) * uint64(key)
 		p := float64(runningcount) / float64(m.count)
 		for pidx < len(quantiles) && quantiles[pidx].p <= p {
-			buf = WriteUint32(buf, prefix, []byte(quantiles[pidx].str), key, now)
+			buf = WriteUint32(buf, prefix, name, []byte(quantiles[pidx].str), tags, key, now)
 			pidx++
 		}
 	}
 
-	buf = WriteUint32(buf, prefix, []byte("min.gauge32"), m.min, now)
-	buf = WriteUint32(buf, prefix, []byte("mean.gauge32"), uint32(runningsum/uint64(m.count)), now)
-	buf = WriteUint32(buf, prefix, []byte("max.gauge32"), m.max, now)
-	buf = WriteUint32(buf, prefix, []byte("values.count32"), m.count, now)
-	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(m.count)/now.Sub(m.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, name, []byte(".min.gauge32"), tags, m.min, now)
+	buf = WriteUint32(buf, prefix, name, []byte(".mean.gauge32"), tags, uint32(runningsum/uint64(m.count)), now)
+	buf = WriteUint32(buf, prefix, name, []byte(".max.gauge32"), tags, m.max, now)
+	buf = WriteUint32(buf, prefix, name, []byte(".values.count32"), tags, m.count, now)
+	buf = WriteFloat64(buf, prefix, name, []byte(".values.rate32"), tags, float64(m.count)/now.Sub(m.since).Seconds(), now)
 	m.since = now
 
 	m.clear()

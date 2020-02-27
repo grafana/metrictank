@@ -41,12 +41,12 @@ func (r *Range32) ValueUint32(val uint32) {
 	r.Unlock()
 }
 
-func (r *Range32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (r *Range32) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	r.Lock()
 	// if no values were seen, don't report anything to graphite
 	if r.valid {
-		buf = WriteUint32(buf, prefix, []byte("min.gauge32"), r.min, now)
-		buf = WriteUint32(buf, prefix, []byte("max.gauge32"), r.max, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".min.gauge32"), tags, r.min, now)
+		buf = WriteUint32(buf, prefix, name, []byte(".max.gauge32"), tags, r.max, now)
 		r.min = math.MaxUint32
 		r.max = 0
 		r.valid = false

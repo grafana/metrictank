@@ -36,8 +36,8 @@ func (b *Bool) Peek() bool {
 	return true
 }
 
-func (b *Bool) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (b *Bool) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&b.val)
-	buf = WriteUint32(buf, prefix, []byte("gauge1"), val, now)
+	buf = WriteUint32(buf, prefix, name, []byte(".gauge1"), tags, val, now)
 	return buf
 }

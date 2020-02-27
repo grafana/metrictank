@@ -23,7 +23,7 @@ func NewProcessReporter() (*ProcessReporter, error) {
 	return registry.getOrAdd("process", &p).(*ProcessReporter), nil
 }
 
-func (m *ProcessReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (m *ProcessReporter) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	stat, err := m.proc.NewStat()
 
 	if err == nil {
@@ -31,18 +31,18 @@ func (m *ProcessReporter) ReportGraphite(prefix, buf []byte, now time.Time) []by
 		rss := uint64(stat.ResidentMemory())
 
 		// metric process.virtual_memory_bytes.gauge64 is a gauge of the process VSZ from /proc/pid/stat
-		buf = WriteUint64(buf, prefix, []byte("virtual_memory_bytes.gauge64"), vsz, now)
+		buf = WriteUint64(buf, prefix, name, []byte(".virtual_memory_bytes.gauge64"), tags, vsz, now)
 
 		// metric process.resident_memory_bytes.gauge64 is a gauge of the process RSS from /proc/pid/stat
-		buf = WriteUint64(buf, prefix, []byte("resident_memory_bytes.gauge64"), rss, now)
+		buf = WriteUint64(buf, prefix, name, []byte(".resident_memory_bytes.gauge64"), tags, rss, now)
 		// metric process.minor_page_faults.counter64 is the number of minor faults the process has made which have not required loading a memory page from disk
-		buf = WriteUint64(buf, prefix, []byte("minor_page_faults.counter64"), uint64(stat.MinFlt), now)
+		buf = WriteUint64(buf, prefix, name, []byte(".minor_page_faults.counter64"), tags, uint64(stat.MinFlt), now)
 
 		// metric process.major_page_faults.counter64 is the number of major faults the process has made which have required loading a memory page from disk
-		buf = WriteUint64(buf, prefix, []byte("major_page_faults.counter64"), uint64(stat.MajFlt), now)
+		buf = WriteUint64(buf, prefix, name, []byte(".major_page_faults.counter64"), tags, uint64(stat.MajFlt), now)
 
 		// metric is Total user and system CPU time spent in seconds
-		buf = WriteFloat64(buf, prefix, []byte("cpu_seconds_total.counter64"), stat.CPUTime(), now)
+		buf = WriteFloat64(buf, prefix, name, []byte(".cpu_seconds_total.counter64"), tags, stat.CPUTime(), now)
 	}
 
 	return buf

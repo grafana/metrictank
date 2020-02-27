@@ -39,10 +39,10 @@ func (c *CounterRate32) Peek() uint32 {
 	return atomic.LoadUint32(&c.val)
 }
 
-func (c *CounterRate32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (c *CounterRate32) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&c.val)
-	buf = WriteUint32(buf, prefix, []byte("counter32"), val, now)
-	buf = WriteFloat64(buf, prefix, []byte("rate32"), float64(val-c.prev)/now.Sub(c.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, name, []byte(".counter32"), tags, val, now)
+	buf = WriteFloat64(buf, prefix, name, []byte(".rate32"), tags, float64(val-c.prev)/now.Sub(c.since).Seconds(), now)
 
 	c.prev = val
 	c.since = now

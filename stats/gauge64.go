@@ -48,9 +48,9 @@ func (g *Gauge64) SetUint64(val uint64) {
 	atomic.StoreUint64((*uint64)(g), val)
 }
 
-func (g *Gauge64) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (g *Gauge64) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	val := atomic.LoadUint64((*uint64)(g))
-	buf = WriteUint64(buf, prefix, []byte("gauge64"), val, now)
+	buf = WriteUint64(buf, prefix, name, []byte(".gauge64"), tags, val, now)
 	return buf
 }
 

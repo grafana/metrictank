@@ -45,37 +45,37 @@ func getGcPercent() int {
 	return val
 }
 
-func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (m MemoryReporter) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	m.mem = m.timeBoundGetMemStats().(runtime.MemStats)
 	gcPercent := getGcPercent()
 
 	// metric memory.total_bytes_allocated is a counter of total number of bytes allocated during process lifetime
-	buf = WriteUint64(buf, prefix, []byte("total_bytes_allocated.counter64"), m.mem.TotalAlloc, now)
+	buf = WriteUint64(buf, prefix, name, []byte(".total_bytes_allocated.counter64"), tags, m.mem.TotalAlloc, now)
 
 	// metric memory.bytes_allocated_on_heap is a gauge of currently allocated (within the runtime) memory.
-	buf = WriteUint64(buf, prefix, []byte("bytes.allocated_in_heap.gauge64"), m.mem.Alloc, now)
+	buf = WriteUint64(buf, prefix, name, []byte(".bytes.allocated_in_heap.gauge64"), tags, m.mem.Alloc, now)
 
 	// metric memory.bytes.obtained_from_sys is the number of bytes currently obtained from the system by the process.  This is what the profiletrigger looks at.
-	buf = WriteUint64(buf, prefix, []byte("bytes.obtained_from_sys.gauge64"), m.mem.Sys, now)
+	buf = WriteUint64(buf, prefix, name, []byte(".bytes.obtained_from_sys.gauge64"), tags, m.mem.Sys, now)
 
 	// metric memory.total_gc_cycles is a counter of the number of GC cycles since process start
-	buf = WriteUint32(buf, prefix, []byte("total_gc_cycles.counter64"), m.mem.NumGC, now)
+	buf = WriteUint32(buf, prefix, name, []byte(".total_gc_cycles.counter64"), tags, m.mem.NumGC, now)
 
 	// metric memory.gc.cpu_fraction is how much cpu is consumed by the GC across process lifetime, in pro-mille
-	buf = WriteUint32(buf, prefix, []byte("gc.cpu_fraction.gauge32"), uint32(1000*m.mem.GCCPUFraction), now)
+	buf = WriteUint32(buf, prefix, name, []byte(".gc.cpu_fraction.gauge32"), tags, uint32(1000*m.mem.GCCPUFraction), now)
 
 	// metric memory.gc.heap_objects is how many objects are allocated on the heap, it's a key indicator for GC workload
-	buf = WriteUint64(buf, prefix, []byte("gc.heap_objects.gauge64"), m.mem.HeapObjects, now)
+	buf = WriteUint64(buf, prefix, name, []byte(".gc.heap_objects.gauge64"), tags, m.mem.HeapObjects, now)
 
 	// there was no new GC run, we should only report points to represent actual runs
 	if m.gcCyclesTotal != m.mem.NumGC {
 		// metric memory.gc.last_duration is the duration of the last GC STW pause in nanoseconds
-		buf = WriteUint64(buf, prefix, []byte("gc.last_duration.gauge64"), m.mem.PauseNs[(m.mem.NumGC+255)%256], now)
+		buf = WriteUint64(buf, prefix, name, []byte(".gc.last_duration.gauge64"), tags, m.mem.PauseNs[(m.mem.NumGC+255)%256], now)
 		m.gcCyclesTotal = m.mem.NumGC
 	}
 
 	// metric memory.gc.gogc is the current GOGC value (derived from the GOGC environment variable)
-	buf = WriteInt32(buf, prefix, []byte("gc.gogc.sgauge32"), int32(gcPercent), now)
+	buf = WriteInt32(buf, prefix, name, []byte(".gc.gogc.sgauge32"), tags, int32(gcPercent), now)
 
 	return buf
 }

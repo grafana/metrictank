@@ -33,8 +33,8 @@ func (c *Counter32) Peek() uint32 {
 	return atomic.LoadUint32(&c.val)
 }
 
-func (c *Counter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (c *Counter32) WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&c.val)
-	buf = WriteUint32(buf, prefix, []byte("counter32"), val, now)
+	buf = WriteUint32(buf, prefix, name, []byte(".counter32"), tags, val, now)
 	return buf
 }
