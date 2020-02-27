@@ -207,6 +207,12 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
+		err := response.WrapError(err)
+		if err.Code() == http.StatusBadRequest && !request.NoProxy {
+			log.Infof("Proxying to Graphite because of error: %s", err.Error())
+			s.proxyToGraphite(ctx)
+			return
+		}
 		ctx.Error(http.StatusBadRequest, err.Error())
 		return
 	}
@@ -233,13 +239,14 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	}
 	plan, err := expr.NewPlan(exprs, fromUnix, toUnix, mdp, stable, opts)
 	if err != nil {
-		if fun, ok := err.(expr.ErrUnknownFunction); ok {
-			if request.NoProxy {
-				ctx.Error(http.StatusBadRequest, "localOnly requested, but the request cant be handled locally")
-				return
-			}
+		fun, isUnknownFunction := err.(expr.ErrUnknownFunction)
+		err := response.WrapError(err)
+		if err.Code() == http.StatusBadRequest && !request.NoProxy {
+			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
-			proxyStats.Miss(string(fun))
+			if isUnknownFunction {
+				proxyStats.Miss(string(fun))
+			}
 			return
 		}
 		ctx.Error(http.StatusBadRequest, err.Error())
@@ -251,6 +258,11 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, plan)
 	if err != nil {
 		err := response.WrapError(err)
+		if err.Code() == http.StatusBadRequest && !request.NoProxy {
+			log.Infof("Proxying to Graphite because of error: %s", err.Error())
+			s.proxyToGraphite(ctx)
+			return
+		}
 		if err.Code() != http.StatusBadRequest {
 			tracing.Failure(execSpan)
 		}
