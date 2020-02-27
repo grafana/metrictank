@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"time"
-
+	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func produceTestMetrics(schemas []*schema.MetricData) {
-	for tick := range time.NewTicker(testMetricsInterval).C {
+	for tick := range clock.AlignedTickLossless(testMetricsInterval) {
 		for _, metric := range schemas {
 			metric.Time = tick.Unix()
 			metric.Value = float64(tick.Unix())

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stats"
 	log "github.com/sirupsen/logrus"
@@ -41,7 +42,7 @@ type partitionMetrics struct {
 
 func monitor() {
 	metricsBySeries := initMetricsBySeries()
-	for tick := range time.NewTicker(queryInterval).C {
+	for tick := range clock.AlignedTickLossless(queryInterval) {
 
 		query := graphite.ExecuteRenderQuery(buildRequest(tick))
 		if query.HTTPErr != nil {
