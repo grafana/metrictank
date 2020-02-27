@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	httpError           = stats.NewCounter32("parrot.monitoring.error;error=http")
-	invalidError         = stats.NewCounter32("parrot.monitoring.error;error=invalid")
+	httpError    = stats.NewCounter32("parrot.monitoring.error;error=http")
+	invalidError = stats.NewCounter32("parrot.monitoring.error;error=invalid")
 )
 
 type seriesStats struct {
@@ -24,12 +24,23 @@ type seriesStats struct {
 	deltaSum float64
 	//the number of timestamps where value != ts
 	numNonMatching int32
-
 	//tracks the last seen non-NaN time stamp (useful for lag
 	lastSeen uint32
 }
 
+type partitionMetrics struct {
+	//number of missing values for each series
+	nanCount *stats.Gauge32
+	//time since the last value was recorded
+	lag *stats.Gauge32
+	//total amount of drift between expected value and actual values
+	deltaSum *stats.Gauge32
+	//total number of entries where drift occurred
+	nonMatching *stats.Gauge32
+}
+
 func monitor() {
+	metricsBySeries := initMetricsBySeries()
 	for tick := range time.NewTicker(queryInterval).C {
 
 		query := graphite.ExecuteRenderQuery(buildRequest(tick))
@@ -65,16 +76,27 @@ func monitor() {
 				}
 			}
 
-			//number of missing values for each series
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", partition)).Set(int(serStats.nans))
-			//time since the last value was recorded
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", partition)).Set(int(serStats.lastTs - serStats.lastSeen))
-			//total amount of drift between expected value and actual values
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", partition)).Set(int(serStats.deltaSum))
-			//total number of entries where drift occurred
-			stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", partition)).Set(int(serStats.numNonMatching))
+			metrics := metricsBySeries[partition]
+			metrics.nanCount.Set(int(serStats.nans))
+			metrics.lag.Set(int(serStats.lastTs - serStats.lastSeen))
+			metrics.deltaSum.Set(int(serStats.deltaSum))
+			metrics.nonMatching.Set(int(serStats.numNonMatching))
 		}
 	}
+}
+
+func initMetricsBySeries() []partitionMetrics {
+	var metricsBySeries []partitionMetrics
+	for p := 0; p < int(partitionCount); p++ {
+		metrics := partitionMetrics{
+			nanCount:    stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", p)),
+			lag:         stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", p)),
+			deltaSum:    stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", p)),
+			nonMatching: stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", p)),
+		}
+		metricsBySeries = append(metricsBySeries, metrics)
+	}
+	return metricsBySeries
 }
 
 func buildRequest(now time.Time) *http.Request {
