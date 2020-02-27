@@ -1,9 +1,9 @@
 package stats
 
 import (
-	"bytes"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,8 +19,13 @@ var (
 )
 
 type GraphiteMetric interface {
-	// Report the measurements in graphite format and reset measurements for the next interval if needed
-	ReportGraphite(prefix []byte, buf []byte, now time.Time) []byte
+	// WriteGraphiteLine appends the Graphite formatted metric measurement to `buf` and resets measurements for the next interval if needed
+	// `buf` is the incoming buffer to be appended to
+	// `prefix` is an optional prefix to the metric name which must have a trailing '.' if present
+	// `name` is the required name of the metric. It should not have a leading or trailing '.' or a trailing ';'
+	// `tags` is an optional list of tags which must have a leading ';' if present.
+	// `now` is the time that the metrics should be reported at
+	WriteGraphiteLine(buf, prefix, name, tags []byte, now time.Time) []byte
 }
 
 type Graphite struct {
@@ -67,13 +72,9 @@ func (g *Graphite) reporter(interval int) {
 
 		buf := make([]byte, 0)
 
-		var fullPrefix bytes.Buffer
 		for name, metric := range registry.list() {
-			fullPrefix.Reset()
-			fullPrefix.Write(g.prefix)
-			fullPrefix.WriteString(name)
-			fullPrefix.WriteRune('.')
-			buf = metric.ReportGraphite(fullPrefix.Bytes(), buf, now)
+			nameBytes, tagBytes := splitNameAndTags(name)
+			buf = metric.WriteGraphiteLine(buf, g.prefix, nameBytes, tagBytes, now)
 		}
 
 		genDataDuration.Set(int(time.Since(pre).Nanoseconds()))
@@ -81,6 +82,14 @@ func (g *Graphite) reporter(interval int) {
 		g.toGraphite <- buf
 		queueItems.Value(len(g.toGraphite))
 	}
+}
+
+func splitNameAndTags(name string) ([]byte, []byte) {
+	idx := strings.IndexRune(name, ';')
+	if idx == -1 {
+		return []byte(name), nil
+	}
+	return []byte(name[:idx]), []byte(name[idx:])
 }
 
 // writer connects to graphite and submits all pending data to it
