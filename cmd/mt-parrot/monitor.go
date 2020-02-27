@@ -14,6 +14,7 @@ import (
 
 var (
 	httpError    = stats.NewCounter32("parrot.monitoring.error;error=http")
+	decodeError = stats.NewCounter32("parrot.monitoring.error;error=decode")
 	invalidError = stats.NewCounter32("parrot.monitoring.error;error=invalid")
 )
 
@@ -49,7 +50,7 @@ func monitor() {
 			httpError.Inc()
 		}
 		if query.DecodeErr != nil {
-			invalidError.Inc()
+			decodeError.Inc()
 		}
 
 		for _, s := range query.Decoded {
