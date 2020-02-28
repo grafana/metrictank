@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/mdata"
 )
 
 // ReqMap is a map of requests of data,
@@ -48,41 +49,84 @@ func (r ReqMap) Dump() string {
 	return out
 }
 
-// PNGroupSplit embodies a PNGroup broken down by whether requests are MDP-optimizable
-type PNGroupSplit struct {
-	mdpyes []models.Req // MDP-optimizable requests
-	mdpno  []models.Req // not MDP-optimizable reqs
+// Requests indexed by their retention ID
+type ReqsByRet [][]models.Req
+
+// OutInterval returns the outinterval of the ReqsByRet
+// this assumes that all requests have been planned to a consistent out interval, of course.
+func (rbr ReqsByRet) OutInterval() uint32 {
+	for _, reqs := range rbr {
+		if len(reqs) != 0 {
+			return reqs[0].OutInterval
+		}
+	}
+	return 0
+}
+
+func (rbr ReqsByRet) HasData() bool {
+	for _, reqs := range rbr {
+		if len(reqs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (rbr ReqsByRet) Len() int {
+	var cnt int
+	for _, reqs := range rbr {
+		cnt += len(reqs)
+	}
+	return cnt
+}
+
+// GroupData embodies a PNGroup broken down by whether requests are MDP-optimizable, and by retention
+type GroupData struct {
+	mdpyes ReqsByRet // MDP-optimizable requests
+	mdpno  ReqsByRet // not MDP-optimizable reqs
+}
+
+func NewGroupData() GroupData {
+	return GroupData{
+		mdpyes: make([][]models.Req, mdata.Schemas.Len()),
+		mdpno:  make([][]models.Req, mdata.Schemas.Len()),
+	}
+}
+
+func (gd GroupData) Len() int {
+	return gd.mdpno.Len() + gd.mdpyes.Len()
 }
 
 // ReqsPlan holds requests that have been planned, broken down by PNGroup and MDP-optimizability
 type ReqsPlan struct {
-	pngroups map[models.PNGroup]PNGroupSplit
-	single   PNGroupSplit
+	pngroups map[models.PNGroup]GroupData
+	single   GroupData
 	cnt      uint32
 }
 
 // NewReqsPlan generates a ReqsPlan based on the provided ReqMap.
 func NewReqsPlan(reqs ReqMap) ReqsPlan {
 	rp := ReqsPlan{
-		pngroups: make(map[models.PNGroup]PNGroupSplit),
+		pngroups: make(map[models.PNGroup]GroupData),
+		single:   NewGroupData(),
 		cnt:      reqs.cnt,
 	}
 	for group, groupReqs := range reqs.pngroups {
-		var split PNGroupSplit
+		data := NewGroupData()
 		for _, req := range groupReqs {
 			if req.MaxPoints > 0 {
-				split.mdpyes = append(split.mdpyes, req)
+				data.mdpyes[req.SchemaId] = append(data.mdpyes[req.SchemaId], req)
 			} else {
-				split.mdpno = append(split.mdpno, req)
+				data.mdpno[req.SchemaId] = append(data.mdpno[req.SchemaId], req)
 			}
 		}
-		rp.pngroups[group] = split
+		rp.pngroups[group] = data
 	}
 	for _, req := range reqs.single {
 		if req.MaxPoints > 0 {
-			rp.single.mdpyes = append(rp.single.mdpyes, req)
+			rp.single.mdpyes[req.SchemaId] = append(rp.single.mdpyes[req.SchemaId], req)
 		} else {
-			rp.single.mdpno = append(rp.single.mdpno, req)
+			rp.single.mdpno[req.SchemaId] = append(rp.single.mdpno[req.SchemaId], req)
 		}
 	}
 	return rp
@@ -91,18 +135,26 @@ func NewReqsPlan(reqs ReqMap) ReqsPlan {
 // PointsFetch returns how many points this plan will fetch when executed
 func (rp ReqsPlan) PointsFetch() uint32 {
 	var cnt uint32
-	for _, r := range rp.single.mdpyes {
-		cnt += r.PointsFetch()
-	}
-	for _, r := range rp.single.mdpno {
-		cnt += r.PointsFetch()
-	}
-	for _, split := range rp.pngroups {
-		for _, r := range split.mdpyes {
-			cnt += r.PointsFetch()
+	for _, rbr := range rp.single.mdpyes {
+		for _, req := range rbr {
+			cnt += req.PointsFetch()
 		}
-		for _, r := range split.mdpno {
-			cnt += r.PointsFetch()
+	}
+	for _, rbr := range rp.single.mdpno {
+		for _, req := range rbr {
+			cnt += req.PointsFetch()
+		}
+	}
+	for _, data := range rp.pngroups {
+		for _, rbr := range data.mdpyes {
+			for _, req := range rbr {
+				cnt += req.PointsFetch()
+			}
+		}
+		for _, rbr := range data.mdpno {
+			for _, req := range rbr {
+				cnt += req.PointsFetch()
+			}
 		}
 	}
 	return cnt
@@ -111,24 +163,34 @@ func (rp ReqsPlan) PointsFetch() uint32 {
 // Dump provides a human readable string representation of the ReqsPlan
 func (rp ReqsPlan) Dump() string {
 	out := fmt.Sprintf("ReqsPlan (%d entries):\n", rp.cnt)
-	out += "  Groups:\n"
-	for i, split := range rp.pngroups {
-		out += fmt.Sprintf("    * group %d\nMDP-yes:\n", i)
-		for _, r := range split.mdpyes {
-			out += "      " + r.DebugString() + "\n"
+	out += "  # Groups:\n"
+	for i, data := range rp.pngroups {
+		out += fmt.Sprintf("    ## group %d\n", i)
+		out += "      ### MDP-yes:\n"
+		for schemaID, reqs := range data.mdpyes {
+			for _, req := range reqs {
+				out += fmt.Sprintf("        [%d] %s\n", schemaID, req.DebugString())
+			}
 		}
-		out += "  MDP-no:\n"
-		for _, r := range split.mdpno {
-			out += "      " + r.DebugString() + "\n"
+		out += "      ### MDP-no:\n"
+		for schemaID, reqs := range data.mdpno {
+			for _, req := range reqs {
+				out += fmt.Sprintf("        [%d] %s\n", schemaID, req.DebugString())
+			}
 		}
 	}
-	out += "  Single MDP-yes:\n"
-	for _, r := range rp.single.mdpyes {
-		out += "    " + r.DebugString() + "\n"
+	out += "  # Single\n"
+	out += "   ## MDP-yes:\n"
+	for schemaID, reqs := range rp.single.mdpyes {
+		for _, req := range reqs {
+			out += fmt.Sprintf("    [%d] %s\n", schemaID, req.DebugString())
+		}
 	}
-	out += "  Single MDP-no:\n"
-	for _, r := range rp.single.mdpno {
-		out += "    " + r.DebugString() + "\n"
+	out += "    ## MDP-no:\n"
+	for schemaID, reqs := range rp.single.mdpno {
+		for _, req := range reqs {
+			out += fmt.Sprintf("    [%d] %s\n", schemaID, req.DebugString())
+		}
 	}
 	return out
 }
@@ -137,18 +199,26 @@ func (rp ReqsPlan) Dump() string {
 // best effort: not aware of summarize(), aggregation functions, runtime normalization. but does account for runtime consolidation
 func (rp ReqsPlan) PointsReturn(planMDP uint32) uint32 {
 	var cnt uint32
-	for _, r := range rp.single.mdpyes {
-		cnt += r.PointsReturn(planMDP)
-	}
-	for _, r := range rp.single.mdpno {
-		cnt += r.PointsReturn(planMDP)
-	}
-	for _, split := range rp.pngroups {
-		for _, r := range split.mdpyes {
-			cnt += r.PointsReturn(planMDP)
+	for _, rbr := range rp.single.mdpyes {
+		for _, req := range rbr {
+			cnt += req.PointsReturn(planMDP)
 		}
-		for _, r := range split.mdpno {
-			cnt += r.PointsReturn(planMDP)
+	}
+	for _, rbr := range rp.single.mdpno {
+		for _, req := range rbr {
+			cnt += req.PointsReturn(planMDP)
+		}
+	}
+	for _, data := range rp.pngroups {
+		for _, rbr := range data.mdpyes {
+			for _, req := range rbr {
+				cnt += req.PointsReturn(planMDP)
+			}
+		}
+		for _, rbr := range data.mdpno {
+			for _, req := range rbr {
+				cnt += req.PointsReturn(planMDP)
+			}
 		}
 	}
 	return cnt
@@ -157,11 +227,19 @@ func (rp ReqsPlan) PointsReturn(planMDP uint32) uint32 {
 // List returns the requests contained within the plan as a slice
 func (rp ReqsPlan) List() []models.Req {
 	l := make([]models.Req, 0, rp.cnt)
-	l = append(l, rp.single.mdpno...)
-	l = append(l, rp.single.mdpyes...)
-	for _, g := range rp.pngroups {
-		l = append(l, g.mdpno...)
-		l = append(l, g.mdpyes...)
+	for _, reqs := range rp.single.mdpno {
+		l = append(l, reqs...)
+	}
+	for _, reqs := range rp.single.mdpyes {
+		l = append(l, reqs...)
+	}
+	for _, data := range rp.pngroups {
+		for _, reqs := range data.mdpno {
+			l = append(l, reqs...)
+		}
+		for _, reqs := range data.mdpyes {
+			l = append(l, reqs...)
+		}
 	}
 	return l
 }
