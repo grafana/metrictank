@@ -49,7 +49,7 @@ func (g *Gauge32) SetUint32(val uint32) {
 	atomic.StoreUint32(&g.val, val)
 }
 
-func (g *Gauge32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (g *Gauge32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&g.val)
 	buf = WriteUint32(buf, prefix, []byte("gauge32"), val, now)
 	return buf

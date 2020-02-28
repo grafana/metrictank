@@ -92,7 +92,7 @@ func (m *Meter32) ValuesUint32(val, num uint32) {
 	m.Unlock()
 }
 
-func (m *Meter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (m *Meter32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	m.Lock()
 	if m.count == 0 {
 		m.Unlock()
