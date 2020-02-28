@@ -22,7 +22,7 @@ func (e errAsPercentNumSeriesMismatch) Error() string {
 	return fmt.Sprintf("asPercent got %d input series but %d total series (should  be same amount or 1)", e.numIn, e.numTotal)
 }
 
-func (e errAsPercentNumSeriesMismatch) Code() int {
+func (e errAsPercentNumSeriesMismatch) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 

@@ -18,7 +18,7 @@ func (i InvalidExpressionError) Error() string {
 	return fmt.Sprintf("Invalid expression: %s", string(i))
 }
 
-func (i InvalidExpressionError) Code() int {
+func (i InvalidExpressionError) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 

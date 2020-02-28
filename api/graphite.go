@@ -251,7 +251,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, plan)
 	if err != nil {
 		err := response.WrapError(err)
-		if err.Code() != http.StatusBadRequest {
+		if err.HTTPStatusCode() != http.StatusBadRequest {
 			tracing.Failure(execSpan)
 		}
 		tracing.Error(execSpan, err)
