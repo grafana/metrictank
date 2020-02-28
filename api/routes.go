@@ -11,14 +11,14 @@ import (
 
 func (s *Server) RegisterRoutes() {
 	r := s.Macaron
+	r.Use(middleware.RequestStats())
+	r.Use(middleware.Tracer(s.Tracer))
+	r.Use(middleware.OrgMiddleware(multiTenant))
+	r.Use(middleware.Logger())
 	if useGzip {
 		r.Use(gziper.Gziper())
 	}
-	r.Use(middleware.RequestStats())
-	r.Use(middleware.Tracer(s.Tracer))
 	r.Use(macaron.Renderer())
-	r.Use(middleware.OrgMiddleware(multiTenant))
-	r.Use(middleware.Logger())
 	r.Use(middleware.CorsHandler())
 	bind := binding.Bind
 	withOrg := middleware.RequireOrg()

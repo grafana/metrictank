@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/metrictank/util"
+
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 	jaeger "github.com/uber/jaeger-client-go"
@@ -21,13 +23,12 @@ var (
 
 type LoggingResponseWriter struct {
 	macaron.ResponseWriter
-	errBody []byte // the body in case it is an error
+	errBody *bytes.Buffer // the body in case it is an error
 }
 
 func (rw *LoggingResponseWriter) Write(b []byte) (int, error) {
 	if rw.ResponseWriter.Status() >= 400 {
-		rw.errBody = make([]byte, len(b))
-		copy(rw.errBody, b)
+		rw.errBody.Write(b)
 	}
 	return rw.ResponseWriter.Write(b)
 }
@@ -37,6 +38,7 @@ func Logger() macaron.Handler {
 		start := time.Now()
 		rw := &LoggingResponseWriter{
 			ResponseWriter: ctx.Resp,
+			errBody:        &bytes.Buffer{},
 		}
 		ctx.Resp = rw
 		ctx.MapTo(ctx.Resp, (*http.ResponseWriter)(nil))
@@ -79,7 +81,16 @@ func Logger() macaron.Handler {
 		}
 
 		if rw.Status() < 200 || rw.Status() >= 300 {
-			errorMsg := url.PathEscape(string(rw.errBody))
+			var errBody string
+			if rw.Header().Get("Content-Encoding") == "gzip" {
+				errBody, err = util.DecompressGzip(rw.errBody)
+				if err != nil {
+					log.Errorf("Decompressing gzip body failed: %s", err.Error())
+				}
+			} else {
+				errBody = rw.errBody.String()
+			}
+			errorMsg := url.PathEscape(errBody)
 			fmt.Fprintf(&content, " error=\"%s\"", errorMsg)
 		}
 
