@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-        "github.com/Shopify/sarama/tools/tls"
+	"github.com/Shopify/sarama/tools/tls"
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/kafka"
 	"github.com/grafana/metrictank/stats"
