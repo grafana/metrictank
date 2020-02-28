@@ -68,6 +68,7 @@
   packages = [
     ".",
     "mocks",
+    "tools/tls",
   ]
   pruneopts = "NUT"
   revision = "dde3ddda8b4b3a594690086725799ab1573bb895"
@@ -1184,6 +1185,7 @@
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/Shopify/sarama",
     "github.com/Shopify/sarama/mocks",
+    "github.com/Shopify/sarama/tools/tls",
     "github.com/alyu/configparser",
     "github.com/cespare/xxhash",
     "github.com/davecgh/go-spew/spew",
