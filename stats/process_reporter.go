@@ -23,7 +23,7 @@ func NewProcessReporter() (*ProcessReporter, error) {
 	return registry.getOrAdd("process", &p).(*ProcessReporter), nil
 }
 
-func (m *ProcessReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (m *ProcessReporter) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	stat, err := m.proc.NewStat()
 
 	if err == nil {

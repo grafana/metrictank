@@ -45,7 +45,7 @@ func getGcPercent() int {
 	return val
 }
 
-func (m *MemoryReporter) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (m *MemoryReporter) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	m.mem = m.timeBoundGetMemStats().(runtime.MemStats)
 	gcPercent := getGcPercent()
 

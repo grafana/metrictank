@@ -27,7 +27,7 @@ func (l *LatencyHistogram15s32) Value(t time.Duration) {
 	l.hist.AddDuration(t)
 }
 
-func (l *LatencyHistogram15s32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (l *LatencyHistogram15s32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	snap := l.hist.Snapshot()
 	// TODO: once we can actually do cool stuff (e.g. visualize) histogram bucket data, report it
 	// for now, only report the summaries :(
