@@ -130,15 +130,15 @@ func ConfigProcess(instance string) {
 	config.Net.MaxOpenRequests = netMaxOpenRequests
 	config.Version = kafkaVersion
 
-	if *tlsEnabled {
-		tlsConfig, err := tls.NewConfig(*tlsClientCert, *tlsClientKey)
+	if tlsEnabled {
+		tlsConfig, err := tls.NewConfig(tlsClientCert, tlsClientKey)
 		if err != nil {
-			printErrorAndExit(69, "Failed to create TLS config: %s", err)
+			log.Fatalf("Failed to create TLS config: %s", err)
 		}
 
 		config.Net.TLS.Enable = true
 		config.Net.TLS.Config = tlsConfig
-		config.Net.TLS.Config.InsecureSkipVerify = *tlsSkipVerify
+		config.Net.TLS.Config.InsecureSkipVerify = tlsSkipVerify
 	}
 
 	err = config.Validate()
