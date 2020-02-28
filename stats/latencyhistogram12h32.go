@@ -10,12 +10,25 @@ import (
 type LatencyHistogram12h32 struct {
 	hist  hist12h.Hist12h
 	since time.Time
+	name  []byte
+	tags  []byte
 }
 
 func NewLatencyHistogram12h32(name string) *LatencyHistogram12h32 {
 	return registry.getOrAdd(name, &LatencyHistogram12h32{
 		hist:  hist12h.New(),
 		since: time.Now(),
+		name:  []byte(name),
+	},
+	).(*LatencyHistogram12h32)
+}
+
+func NewLatencyHistogram12h32WithTags(name, tags string) *LatencyHistogram12h32 {
+	return registry.getOrAdd(name, &LatencyHistogram12h32{
+		hist:  hist12h.New(),
+		since: time.Now(),
+		name:  []byte(name),
+		tags:  []byte(tags),
 	},
 	).(*LatencyHistogram12h32)
 }
@@ -30,15 +43,15 @@ func (l *LatencyHistogram12h32) ReportGraphite(prefix, buf []byte, now time.Time
 	// for now, only report the summaries :(
 	r, ok := l.hist.Report(snap)
 	if ok {
-		buf = WriteUint32(buf, prefix, []byte("latency.min.gauge32"), r.Min/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.mean.gauge32"), r.Mean/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.median.gauge32"), r.Median/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.p75.gauge32"), r.P75/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.p90.gauge32"), r.P90/1000, now)
-		buf = WriteUint32(buf, prefix, []byte("latency.max.gauge32"), r.Max/1000, now)
+		buf = WriteUint32(buf, prefix, l.name, []byte(".latency.min.gauge32"), l.tags, r.Min/1000, now)
+		buf = WriteUint32(buf, prefix, l.name, []byte(".latency.mean.gauge32"), l.tags, r.Mean/1000, now)
+		buf = WriteUint32(buf, prefix, l.name, []byte(".latency.median.gauge32"), l.tags, r.Median/1000, now)
+		buf = WriteUint32(buf, prefix, l.name, []byte(".latency.p75.gauge32"), l.tags, r.P75/1000, now)
+		buf = WriteUint32(buf, prefix, l.name, []byte(".latency.p90.gauge32"), l.tags, r.P90/1000, now)
+		buf = WriteUint32(buf, prefix, l.name, []byte(".latency.max.gauge32"), l.tags, r.Max/1000, now)
 	}
-	buf = WriteUint32(buf, prefix, []byte("values.count32"), r.Count, now)
-	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(r.Count)/now.Sub(l.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, l.name, []byte(".values.count32"), l.tags, r.Count, now)
+	buf = WriteFloat64(buf, prefix, l.name, []byte(".values.rate32"), l.tags, float64(r.Count)/now.Sub(l.since).Seconds(), now)
 	l.since = now
 	return buf
 }

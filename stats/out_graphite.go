@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"bytes"
 	"io"
 	"net"
 	"sync"
@@ -67,13 +66,8 @@ func (g *Graphite) reporter(interval int) {
 
 		buf := make([]byte, 0)
 
-		var fullPrefix bytes.Buffer
-		for name, metric := range registry.list() {
-			fullPrefix.Reset()
-			fullPrefix.Write(g.prefix)
-			fullPrefix.WriteString(name)
-			fullPrefix.WriteRune('.')
-			buf = metric.ReportGraphite(fullPrefix.Bytes(), buf, now)
+		for _, metric := range registry.list() {
+			buf = metric.ReportGraphite(g.prefix, buf, now)
 		}
 
 		genDataDuration.Set(int(time.Since(pre).Nanoseconds()))

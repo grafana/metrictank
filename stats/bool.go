@@ -6,11 +6,22 @@ import (
 )
 
 type Bool struct {
-	val uint32
+	val  uint32
+	name []byte
+	tags []byte
 }
 
 func NewBool(name string) *Bool {
-	return registry.getOrAdd(name, &Bool{}).(*Bool)
+	return registry.getOrAdd(name, &Bool{
+		name: []byte(name),
+	}).(*Bool)
+}
+
+func NewBoolWithTags(name, tags string) *Bool {
+	return registry.getOrAdd(name, &Bool{
+		name: []byte(name),
+		tags: []byte(tags),
+	}).(*Bool)
 }
 
 func (b *Bool) SetTrue() {
@@ -38,6 +49,6 @@ func (b *Bool) Peek() bool {
 
 func (b *Bool) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&b.val)
-	buf = WriteUint32(buf, prefix, []byte("gauge1"), val, now)
+	buf = WriteUint32(buf, prefix, b.name, []byte(".gauge1"), b.tags, val, now)
 	return buf
 }
