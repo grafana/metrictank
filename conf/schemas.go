@@ -51,6 +51,11 @@ func (s Schemas) List() ([]Schema, Schema) {
 	return s.raw, s.DefaultSchema
 }
 
+// Len returns the max number of possible schemas
+func (s Schemas) Len() int {
+	return len(s.index) + 1 // s.DefaultSchema
+}
+
 func (s *Schemas) BuildIndex() {
 	s.index = make([]Schema, 0)
 	for _, schema := range s.raw {
@@ -176,7 +181,7 @@ func ReadSchemas(file string) (Schemas, error) {
 //   less then the interval of the next rollup.
 // - If the pattern doesnt match, then we skip ahead to the next pattern.
 //
-// eg. from the above diagram we would compare the pattern for schame0
+// eg. from the above diagram we would compare the pattern for schema0
 //     (pattern1), if it doesnt match we will then compare the pattern of
 //     schema2 (pattern2) and if that doesnt match we would try schema5
 //     (pattern3).

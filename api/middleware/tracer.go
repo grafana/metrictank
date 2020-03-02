@@ -1,25 +1,27 @@
 package middleware
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 
 	"github.com/grafana/metrictank/tracing"
+	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
+	log "github.com/sirupsen/logrus"
 	jaeger "github.com/uber/jaeger-client-go"
 	"gopkg.in/macaron.v1"
 )
 
 type TracingResponseWriter struct {
 	macaron.ResponseWriter
-	errBody []byte // the body in case it is an error
+	errBody *bytes.Buffer // the body in case it is an error
 }
 
 func (rw *TracingResponseWriter) Write(b []byte) (int, error) {
 	if rw.ResponseWriter.Status() >= 400 {
-		rw.errBody = make([]byte, len(b))
-		copy(rw.errBody, b)
+		rw.errBody.Write(b)
 	}
 	return rw.ResponseWriter.Write(b)
 }
@@ -49,6 +51,7 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 		macCtx.Req = macaron.Request{macCtx.Req.WithContext(opentracing.ContextWithSpan(macCtx.Req.Context(), span))}
 		macCtx.Resp = &TracingResponseWriter{
 			ResponseWriter: macCtx.Resp,
+			errBody:        &bytes.Buffer{},
 		}
 		macCtx.MapTo(macCtx.Resp, (*http.ResponseWriter)(nil))
 
@@ -78,7 +81,17 @@ func Tracer(tracer opentracing.Tracer) macaron.Handler {
 			span.SetTag("http.size", rw.Size())
 		}
 		if status >= 400 {
-			tracing.Error(span, errors.New(string(rw.errBody)))
+			var errBody string
+			if rw.Header().Get("Content-Encoding") == "gzip" {
+				var err error
+				errBody, err = util.DecompressGzip(rw.errBody)
+				if err != nil {
+					log.Errorf("Decompressing gzip body failed: %s", err.Error())
+				}
+			} else {
+				errBody = rw.errBody.String()
+			}
+			tracing.Error(span, errors.New(errBody))
 			if status >= http.StatusInternalServerError {
 				tracing.Failure(span)
 			}

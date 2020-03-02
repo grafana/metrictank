@@ -97,6 +97,11 @@ func (r Retention) MaxRetention() int {
 	return r.SecondsPerPoint * r.NumberOfPoints
 }
 
+// Valid returns whether the given retention has been ready long enough (wrt from), and has a sufficient retention (wrt ttl)
+func (r Retention) Valid(from, ttl uint32) bool {
+	return r.Ready <= from && uint32(r.MaxRetention()) >= ttl
+}
+
 func (r Retention) String() string {
 	s := dur.FormatDuration(uint32(r.SecondsPerPoint))
 	s += ":" + dur.FormatDuration(uint32(r.NumberOfPoints*r.SecondsPerPoint))

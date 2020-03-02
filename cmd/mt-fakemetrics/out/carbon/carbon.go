@@ -62,7 +62,11 @@ func (n *Carbon) Flush(metrics []*schema.MetricData) error {
 	preFlush := time.Now()
 	buf := bytes.NewBufferString("")
 	for _, m := range metrics {
-		buf.WriteString(fmt.Sprintf("%s %f %d\n", m.Name, m.Value, m.Time))
+		tagsString := ""
+		for _, tag := range m.Tags {
+			tagsString += fmt.Sprintf(";%s", tag)
+		}
+		buf.WriteString(fmt.Sprintf("%s%s %f %d\n", m.Name, tagsString, m.Value, m.Time))
 	}
 	prePub := time.Now()
 	_, err := n.conn.Write(buf.Bytes())

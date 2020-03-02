@@ -15,7 +15,7 @@ func NewInternalf(format string, a ...interface{}) Internal {
 	return Internal(fmt.Sprintf(format, a...))
 }
 
-func (i Internal) Code() int {
+func (i Internal) HTTPStatusCode() int {
 	return http.StatusInternalServerError
 }
 
@@ -33,7 +33,7 @@ func NewBadRequestf(format string, a ...interface{}) BadRequest {
 	return BadRequest(fmt.Sprintf(format, a...))
 }
 
-func (b BadRequest) Code() int {
+func (b BadRequest) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 

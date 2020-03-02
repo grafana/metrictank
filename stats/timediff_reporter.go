@@ -22,7 +22,7 @@ func (g *TimeDiffReporter32) Set(target uint32) {
 	atomic.StoreUint32(&g.target, target)
 }
 
-func (g *TimeDiffReporter32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (g *TimeDiffReporter32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	target := atomic.LoadUint32(&g.target)
 	now32 := uint32(now.Unix())
 	report := uint32(0)

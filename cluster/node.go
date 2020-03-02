@@ -143,7 +143,7 @@ func (r *Error) Error() string {
 }
 
 // implement response.Response
-func (r *Error) Code() int {
+func (r *Error) HTTPStatusCode() int {
 	return r.code
 }
 

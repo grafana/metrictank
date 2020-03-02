@@ -41,7 +41,7 @@ func (r *Range32) ValueUint32(val uint32) {
 	r.Unlock()
 }
 
-func (r *Range32) ReportGraphite(prefix, buf []byte, now time.Time) []byte {
+func (r *Range32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 	r.Lock()
 	// if no values were seen, don't report anything to graphite
 	if r.valid {
