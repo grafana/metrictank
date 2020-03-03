@@ -50,9 +50,11 @@ func monitor() {
 		query := graphite.ExecuteRenderQuery(buildRequest(tick))
 		if query.HTTPErr != nil {
 			httpError.Inc()
+			continue
 		}
 		if query.DecodeErr != nil {
 			decodeError.Inc()
+			continue
 		}
 
 		for _, s := range query.Decoded {
