@@ -1370,14 +1370,14 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 }
 
 func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
-	if s.MetricIndex == nil {
-		response.Write(ctx, response.NewJson(200, []tagquery.MetaTagRecord{}, ""))
-		return
-	}
-
 	if s.MetaRecords == nil || !memory.MetaTagSupport {
 		// meta tag support is disabled
 		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
+		return
+	}
+
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewJson(200, []tagquery.MetaTagRecord{}, ""))
 		return
 	}
 
@@ -1386,6 +1386,12 @@ func (s *Server) getMetaTagRecords(ctx *middleware.Context) {
 }
 
 func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest models.MetaTagRecordUpsert) {
+	if s.MetaRecords == nil || !memory.MetaTagSupport {
+		// meta tag support is disabled
+		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
+		return
+	}
+
 	if s.MetricIndex == nil {
 		response.Write(ctx, response.WrapError(fmt.Errorf("No metric index present")))
 		return
@@ -1394,12 +1400,6 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 	record, err := tagquery.ParseMetaTagRecord(upsertRequest.MetaTags, upsertRequest.Expressions)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
-		return
-	}
-
-	if s.MetaRecords == nil || !memory.MetaTagSupport {
-		// meta tag support is disabled
-		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
 		return
 	}
 
@@ -1413,6 +1413,12 @@ func (s *Server) metaTagRecordUpsert(ctx *middleware.Context, upsertRequest mode
 }
 
 func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.MetaTagRecordSwap) {
+	if s.MetaRecords == nil || !memory.MetaTagSupport {
+		// meta tag support is disabled
+		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
+		return
+	}
+
 	if s.MetricIndex == nil {
 		response.Write(ctx, response.WrapError(fmt.Errorf("No metric index present")))
 		return
@@ -1426,12 +1432,6 @@ func (s *Server) metaTagRecordSwap(ctx *middleware.Context, swapRequest models.M
 			response.Write(ctx, response.Errorf(http.StatusBadRequest, "Error when parsing record %d: %s", i, err))
 			return
 		}
-	}
-
-	if s.MetaRecords == nil || !memory.MetaTagSupport {
-		// meta tag support is disabled
-		response.Write(ctx, response.NewError(http.StatusNotImplemented, "Meta tag support is not enabled"))
-		return
 	}
 
 	err = s.MetaRecords.MetaTagRecordSwap(ctx.OrgId, metaTagRecords)
