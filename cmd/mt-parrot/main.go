@@ -21,6 +21,7 @@ var (
 	queryInterval         time.Duration
 	lookbackPeriod        time.Duration
 	logLevel              string
+	lastPublish           int64
 
 	partitionMethod schema.PartitionByMethod
 	publisher       out.Out

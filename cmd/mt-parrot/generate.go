@@ -5,6 +5,7 @@ import (
 	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
+	"sync/atomic"
 )
 
 func produceTestMetrics(schemas []*schema.MetricData) {
@@ -14,6 +15,7 @@ func produceTestMetrics(schemas []*schema.MetricData) {
 			metric.Value = float64(tick.Unix())
 		}
 		publisher.Flush(schemas)
+		atomic.StoreInt64(&lastPublish, tick.Unix())
 		log.Infof("flushed schemas for ts %d", tick.Unix())
 	}
 }

@@ -103,7 +103,8 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 
 	metrics := metricsBySeries[partition]
 	metrics.nanCount.Set(int(serStats.nans))
-	metrics.lag.Set(int(serStats.lastTs - serStats.lastSeen))
+	lag := lastPublish - int64(serStats.lastSeen)
+	metrics.lag.Set(int(lag))
 	metrics.deltaSum.Set(int(serStats.deltaSum))
 	metrics.nonMatching.Set(int(serStats.numNonMatching))
 }
