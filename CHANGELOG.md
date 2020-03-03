@@ -2,6 +2,8 @@
 
 ## breaking changes
 
+* as of v0.13.1-379-gce12d79c the meta record index configuration parameters have been moved out
+  of the section `cassandra-idx`, they now have their own section `cassandra-meta-record-idx`.
 * as of v0.13.1-186-gc75005d the `/tags/delSeries` no longer accepts a `propagate` parameter.
   It is no longer possible to send the request to only a single node, it now always propagates to all nodes, bringing this method in line with `/metrics/delete`.
 * as of v0.13.1-38-gb88c3b84 by default we reject data points with a timestamp far in the future.
