@@ -6,11 +6,15 @@ import (
 )
 
 type Gauge32 struct {
-	val uint32
+	val  uint32
+	name []byte
+	tags []byte
 }
 
 func NewGauge32(name string) *Gauge32 {
-	return registry.getOrAdd(name, &Gauge32{}).(*Gauge32)
+	return registry.getOrAdd(name, &Gauge32{
+		name: []byte(name),
+	}).(*Gauge32)
 }
 
 func (g *Gauge32) Inc() {
@@ -49,8 +53,8 @@ func (g *Gauge32) SetUint32(val uint32) {
 	atomic.StoreUint32(&g.val, val)
 }
 
-func (g *Gauge32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
+func (g *Gauge32) WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte {
 	val := atomic.LoadUint32(&g.val)
-	buf = WriteUint32(buf, prefix, []byte("gauge32"), val, now)
+	buf = WriteUint32(buf, prefix, g.name, []byte(".gauge32"), g.tags, val, now)
 	return buf
 }

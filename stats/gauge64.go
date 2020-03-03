@@ -5,27 +5,32 @@ import (
 	"time"
 )
 
-type Gauge64 uint64
+type Gauge64 struct {
+	val  uint64
+	name []byte
+	tags []byte
+}
 
 func NewGauge64(name string) *Gauge64 {
-	u := Gauge64(0)
-	return registry.getOrAdd(name, &u).(*Gauge64)
+	return registry.getOrAdd(name, &Gauge64{
+		name: []byte(name),
+	}).(*Gauge64)
 }
 
 func (g *Gauge64) Inc() {
-	atomic.AddUint64((*uint64)(g), 1)
+	atomic.AddUint64(&g.val, 1)
 }
 
 func (g *Gauge64) Dec() {
-	atomic.AddUint64((*uint64)(g), ^uint64(0))
+	atomic.AddUint64(&g.val, ^uint64(0))
 }
 
 func (g *Gauge64) AddUint64(val uint64) {
-	atomic.AddUint64((*uint64)(g), val)
+	atomic.AddUint64(&g.val, val)
 }
 
 func (g *Gauge64) DecUint64(val uint64) {
-	atomic.AddUint64((*uint64)(g), ^uint64(val-1))
+	atomic.AddUint64(&g.val, ^uint64(val-1))
 }
 
 func (g *Gauge64) Add(val int) {
@@ -41,19 +46,19 @@ func (g *Gauge64) Add(val int) {
 }
 
 func (g *Gauge64) Set(val int) {
-	atomic.StoreUint64((*uint64)(g), uint64(val))
+	atomic.StoreUint64(&g.val, uint64(val))
 }
 
 func (g *Gauge64) SetUint64(val uint64) {
-	atomic.StoreUint64((*uint64)(g), val)
+	atomic.StoreUint64(&g.val, val)
 }
 
-func (g *Gauge64) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
-	val := atomic.LoadUint64((*uint64)(g))
-	buf = WriteUint64(buf, prefix, []byte("gauge64"), val, now)
+func (g *Gauge64) WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte {
+	val := atomic.LoadUint64(&g.val)
+	buf = WriteUint64(buf, prefix, g.name, []byte(".gauge64"), g.tags, val, now)
 	return buf
 }
 
 func (g *Gauge64) Peek() uint64 {
-	return atomic.LoadUint64((*uint64)(g))
+	return atomic.LoadUint64(&g.val)
 }
