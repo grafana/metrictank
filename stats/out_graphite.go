@@ -1,7 +1,6 @@
 package stats
 
 import (
-	"bytes"
 	"io"
 	"net"
 	"sync"
@@ -19,8 +18,11 @@ var (
 )
 
 type GraphiteMetric interface {
-	// Report the measurements in graphite format and reset measurements for the next interval if needed
-	ReportGraphite(buf, prefix []byte, now time.Time) []byte
+	// WriteGraphiteLine appends the Graphite formatted metric measurement to `buf` and resets measurements for the next interval if needed
+	// `buf` is the incoming buffer to be appended to
+	// `prefix` is an optional prefix to the metric name which must have a trailing '.' if present
+	// `now` is the time that the metrics should be reported at
+	WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte
 }
 
 type Graphite struct {
@@ -67,13 +69,8 @@ func (g *Graphite) reporter(interval int) {
 
 		buf := make([]byte, 0)
 
-		var fullPrefix bytes.Buffer
-		for name, metric := range registry.list() {
-			fullPrefix.Reset()
-			fullPrefix.Write(g.prefix)
-			fullPrefix.WriteString(name)
-			fullPrefix.WriteRune('.')
-			buf = metric.ReportGraphite(buf, fullPrefix.Bytes(), now)
+		for _, metric := range registry.list() {
+			buf = metric.WriteGraphiteLine(buf, g.prefix, now)
 		}
 
 		genDataDuration.Set(int(time.Since(pre).Nanoseconds()))
