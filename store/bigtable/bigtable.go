@@ -29,31 +29,31 @@ var (
 	errCtxCanceled    = errors.New("context canceled")
 
 	// metric store.bigtable.get.exec is the duration of getting from bigtable store
-	btblGetExecDuration = stats.NewLatencyHistogram15s32("store.bigtable.get.exec")
+	btblGetExecDuration = stats.NewLatencyHistogram15s32("store.bigtable.get.exec", "")
 	// metric store.bigtable.get.wait is the duration of the get spent in the queue
-	btblGetWaitDuration = stats.NewLatencyHistogram12h32("store.bigtable.get.wait")
+	btblGetWaitDuration = stats.NewLatencyHistogram12h32("store.bigtable.get.wait", "")
 	// metric store.bigtable.put.exec is the duration of putting in bigtable store
-	btblPutExecDuration = stats.NewLatencyHistogram15s32("store.bigtable.put.exec")
+	btblPutExecDuration = stats.NewLatencyHistogram15s32("store.bigtable.put.exec", "")
 	// metric store.bigtable.put.wait is the duration of a put in the wait queue
-	btblPutWaitDuration = stats.NewLatencyHistogram12h32("store.bigtable.put.wait")
+	btblPutWaitDuration = stats.NewLatencyHistogram12h32("store.bigtable.put.wait", "")
 	// metric store.bigtable.put.bytes is the number of chunk bytes saved in each bulkApply
-	btblPutBytes = stats.NewMeter32("store.bigtable.put.bytes", true)
+	btblPutBytes = stats.NewMeter32("store.bigtable.put.bytes", "", true)
 	// metric store.bigtable.get.error is the count of reads that failed
-	btblReadError = stats.NewCounter32("store.bigtable.get.error")
+	btblReadError = stats.NewCounter32("store.bigtable.get.error", "")
 
 	// metric store.bigtable.chunks_per_row is how many chunks are retrieved per row in get queries
-	btblChunksPerRow = stats.NewMeter32("store.bigtable.chunks_per_row", false)
+	btblChunksPerRow = stats.NewMeter32("store.bigtable.chunks_per_row", "", false)
 	// metric store.bigtable.rows_per_response is how many rows come per get response
-	btblRowsPerResponse = stats.NewMeter32("store.bigtable.rows_per_response", false)
+	btblRowsPerResponse = stats.NewMeter32("store.bigtable.rows_per_response", "", false)
 
 	// metric store.bigtable.chunk_operations.save_ok is counter of successful saves
-	chunkSaveOk = stats.NewCounter32("store.bigtable.chunk_operations.save_ok")
+	chunkSaveOk = stats.NewCounter32("store.bigtable.chunk_operations.save_ok", "")
 	// metric store.bigtable.chunk_operations.save_fail is counter of failed saves
-	chunkSaveFail = stats.NewCounter32("store.bigtable.chunk_operations.save_fail")
+	chunkSaveFail = stats.NewCounter32("store.bigtable.chunk_operations.save_fail", "")
 	// metric store.bigtable.chunk_size.at_save is the sizes of chunks seen when saving them
-	chunkSizeAtSave = stats.NewMeter32("store.bigtable.chunk_size.at_save", true)
+	chunkSizeAtSave = stats.NewMeter32("store.bigtable.chunk_size.at_save", "", true)
 	// metric store.bigtable.chunk_size.at_load is the sizes of chunks seen when loading them
-	chunkSizeAtLoad = stats.NewMeter32("store.bigtable.chunk_size.at_load", true)
+	chunkSizeAtLoad = stats.NewMeter32("store.bigtable.chunk_size.at_load", "", true)
 )
 
 func formatRowKey(key schema.AMKey, month uint32) string {
@@ -130,7 +130,7 @@ func NewStore(cfg *StoreConfig, ttls []uint32, schemaMaxChunkSpan uint32) (*Stor
 		// In total, each processWriteQueue thread should not have more then "write-queue-size" chunks
 		// that are queued.  To ensure this, set the channel size to "write-queue-size" - "write-max-flush-size"
 		s.writeQueues[i] = make(chan *mdata.ChunkWriteRequest, cfg.WriteQueueSize-cfg.WriteMaxFlushSize)
-		s.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.bigtable.write_queue.%d.items", i+1))
+		s.writeQueueMeters[i] = stats.NewRange32(fmt.Sprintf("store.bigtable.write_queue.%d.items", i+1), "")
 		go s.processWriteQueue(s.writeQueues[i], s.writeQueueMeters[i])
 	}
 

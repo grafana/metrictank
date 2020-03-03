@@ -11,9 +11,10 @@ type Gauge64 struct {
 	tags []byte
 }
 
-func NewGauge64(name string) *Gauge64 {
-	return registry.getOrAdd(name, &Gauge64{
+func NewGauge64(name, tags string) *Gauge64 {
+	return registry.getOrAdd(name+tags, &Gauge64{
 		name: []byte(name),
+		tags: []byte(name),
 	}).(*Gauge64)
 }
 

@@ -20,10 +20,11 @@ type Range32 struct {
 	tags  []byte
 }
 
-func NewRange32(name string) *Range32 {
+func NewRange32(name, tags string) *Range32 {
 	return registry.getOrAdd(name, &Range32{
 		min:  math.MaxUint32,
 		name: []byte(name),
+		tags: []byte(tags),
 	},
 	).(*Range32)
 }

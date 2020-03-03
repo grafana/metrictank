@@ -13,10 +13,11 @@ type TimeDiffReporter32 struct {
 	tags   []byte
 }
 
-func NewTimeDiffReporter32(name string, target uint32) *TimeDiffReporter32 {
+func NewTimeDiffReporter32(name, tags string, target uint32) *TimeDiffReporter32 {
 	return registry.getOrAdd(name, &TimeDiffReporter32{
 		target: target,
 		name:   []byte(name),
+		tags:   []byte(tags),
 	},
 	).(*TimeDiffReporter32)
 }

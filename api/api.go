@@ -20,16 +20,16 @@ import (
 
 var (
 	// metric api.get_target is how long it takes to get a target
-	getTargetDuration = stats.NewLatencyHistogram15s32("api.get_target")
+	getTargetDuration = stats.NewLatencyHistogram15s32("api.get_target", "")
 
 	// metric api.iters_to_points is how long it takes to decode points from a chunk iterator
-	itersToPointsDuration = stats.NewLatencyHistogram15s32("api.iters_to_points")
+	itersToPointsDuration = stats.NewLatencyHistogram15s32("api.iters_to_points", "")
 
 	// metric api.requests_span.mem_and_cassandra is the timerange of requests hitting both in-memory and cassandra
-	reqSpanBoth = stats.NewMeter32("api.requests_span.mem_and_cassandra", false)
+	reqSpanBoth = stats.NewMeter32("api.requests_span.mem_and_cassandra", "", false)
 
 	// metric api.requests_span.mem is the timerange of requests hitting only the ringbuffer
-	reqSpanMem = stats.NewMeter32("api.requests_span.mem", false)
+	reqSpanMem = stats.NewMeter32("api.requests_span.mem", "", false)
 )
 
 type Server struct {

@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	metricsValid    = stats.NewCounterRate32("metrics.http.valid")    // valid metrics received (not necessarily published)
-	metricsRejected = stats.NewCounterRate32("metrics.http.rejected") // invalid metrics received
+	metricsValid    = stats.NewCounterRate32("metrics.http.valid", "")    // valid metrics received (not necessarily published)
+	metricsRejected = stats.NewCounterRate32("metrics.http.rejected", "") // invalid metrics received
 
 	metricsTSLock    = &sync.Mutex{}
 	metricsTimestamp = make(map[int]*stats.Range32)
@@ -40,7 +40,7 @@ func getMetricsTimestampStat(org int) *stats.Range32 {
 	metricsTSLock.Lock()
 	metricTimestamp, ok := metricsTimestamp[org]
 	if !ok {
-		metricTimestamp = stats.NewRange32(fmt.Sprintf("metrics.timestamp.http.%d", org)) // min/max timestamps seen in each interval
+		metricTimestamp = stats.NewRange32(fmt.Sprintf("metrics.timestamp.http.%d", org), "") // min/max timestamps seen in each interval
 		metricsTimestamp[org] = metricTimestamp
 	}
 	metricsTSLock.Unlock()

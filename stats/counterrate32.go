@@ -14,12 +14,12 @@ type CounterRate32 struct {
 	tags  []byte
 }
 
-func NewCounterRate32(name string) *CounterRate32 {
-	c := CounterRate32{
+func NewCounterRate32(name, tags string) *CounterRate32 {
+	return registry.getOrAdd(name+tags, &CounterRate32{
 		since: time.Now(),
 		name:  []byte(name),
-	}
-	return registry.getOrAdd(name, &c).(*CounterRate32)
+		tags:  []byte(tags),
+	}).(*CounterRate32)
 }
 
 func (c *CounterRate32) SetUint32(val uint32) {

@@ -18,7 +18,7 @@ import (
 
 var (
 	maxSize         uint64
-	searchFwdBug    = stats.NewCounter32("recovered_errors.cache.metric.searchForwardBug")
+	searchFwdBug    = stats.NewCounter32("recovered_errors.cache.metric.searchForwardBug", "")
 	ErrInvalidRange = errors.New("CCache: invalid range: from must be less than to")
 )
 

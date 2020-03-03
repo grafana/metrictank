@@ -22,33 +22,33 @@ const COLUMN_FAMILY = "idx"
 
 var (
 	// metric idx.bigtable.query-insert.ok is how many insert queries for a metric completed successfully (triggered by an add or an update)
-	statQueryInsertOk = stats.NewCounter32("idx.bigtable.query-insert.ok")
+	statQueryInsertOk = stats.NewCounter32("idx.bigtable.query-insert.ok", "")
 	// metric idx.bigtable.query-insert.fail is how many insert queries for a metric failed (triggered by an add or an update)
-	statQueryInsertFail = stats.NewCounter32("idx.bigtable.query-insert.fail")
+	statQueryInsertFail = stats.NewCounter32("idx.bigtable.query-insert.fail", "")
 	// metric idx.bigtable.query-delete.ok is how many delete queries for a metric completed successfully (triggered by an update or a delete)
-	statQueryDeleteOk = stats.NewCounter32("idx.bigtable.query-delete.ok")
+	statQueryDeleteOk = stats.NewCounter32("idx.bigtable.query-delete.ok", "")
 	// metric idx.bigtable.query-delete.fail is how many delete queries for a metric failed (triggered by an update or a delete)
-	statQueryDeleteFail = stats.NewCounter32("idx.bigtable.query-delete.fail")
+	statQueryDeleteFail = stats.NewCounter32("idx.bigtable.query-delete.fail", "")
 
 	// metric idx.bigtable.query-insert.wait is time inserts spent in queue before being executed
-	statQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.bigtable.query-insert.wait")
+	statQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.bigtable.query-insert.wait", "")
 	// metric idx.bigtable.query-insert.exec is time spent executing inserts (possibly repeatedly until success)
-	statQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.bigtable.query-insert.exec")
+	statQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.bigtable.query-insert.exec", "")
 	// metric idx.bigtable.query-delete.exec is time spent executing deletes (possibly repeatedly until success)
-	statQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.bigtable.query-delete.exec")
+	statQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.bigtable.query-delete.exec", "")
 
 	// metric idx.bigtable.add is the duration of an add of one metric to the bigtable idx, including the add to the in-memory index, excluding the insert query
-	statAddDuration = stats.NewLatencyHistogram15s32("idx.bigtable.add")
+	statAddDuration = stats.NewLatencyHistogram15s32("idx.bigtable.add", "")
 	// metric idx.bigtable.update is the duration of an update of one metric to the bigtable idx, including the update to the in-memory index, excluding any insert/delete queries
-	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.bigtable.update")
+	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.bigtable.update", "")
 	// metric idx.bigtable.prune is the duration of a prune of the bigtable idx, including the prune of the in-memory index and all needed delete queries
-	statPruneDuration = stats.NewLatencyHistogram15s32("idx.bigtable.prune")
+	statPruneDuration = stats.NewLatencyHistogram15s32("idx.bigtable.prune", "")
 	// metric idx.bigtable.delete is the duration of a delete of one or more metrics from the bigtable idx, including the delete from the in-memory index and the delete query
-	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.bigtable.delete")
+	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.bigtable.delete", "")
 	// metric idx.bigtable.save.skipped is how many saves have been skipped due to the writeQueue being full
-	statSaveSkipped = stats.NewCounter32("idx.bigtable.save.skipped")
+	statSaveSkipped = stats.NewCounter32("idx.bigtable.save.skipped", "")
 	// metric idx.bigtable.save.bytes-per-request is the number of bytes written to bigtable in each request.
-	statSaveBytesPerRequest = stats.NewMeter32("idx.bigtable.save.bytes-per-request", true)
+	statSaveBytesPerRequest = stats.NewMeter32("idx.bigtable.save.bytes-per-request", "", true)
 )
 
 type writeReq struct {

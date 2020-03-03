@@ -27,13 +27,13 @@ var NotFoundErr = errors.New("not found")
 var (
 
 	// metric api.cluster.speculative.attempts is how many peer queries resulted in speculation
-	speculativeAttempts = stats.NewCounter32("api.cluster.speculative.attempts")
+	speculativeAttempts = stats.NewCounter32("api.cluster.speculative.attempts", "")
 
 	// metric api.cluster.speculative.wins is how many peer queries were improved due to speculation
-	speculativeWins = stats.NewCounter32("api.cluster.speculative.wins")
+	speculativeWins = stats.NewCounter32("api.cluster.speculative.wins", "")
 
 	// metric api.cluster.speculative.requests is how many speculative http requests made to peers
-	speculativeRequests = stats.NewCounter32("api.cluster.speculative.requests")
+	speculativeRequests = stats.NewCounter32("api.cluster.speculative.requests", "")
 )
 
 func (s *Server) explainPriority(ctx *middleware.Context) {

@@ -25,31 +25,31 @@ import (
 
 var (
 	// metric idx.cassadra.query-insert.ok is how many insert queries for a metric completed successfully (triggered by an add or an update)
-	statQueryInsertOk = stats.NewCounter32("idx.cassandra.query-insert.ok")
+	statQueryInsertOk = stats.NewCounter32("idx.cassandra.query-insert.ok", "")
 	// metric idx.cassandra.query-insert.fail is how many insert queries for a metric failed (triggered by an add or an update)
-	statQueryInsertFail = stats.NewCounter32("idx.cassandra.query-insert.fail")
+	statQueryInsertFail = stats.NewCounter32("idx.cassandra.query-insert.fail", "")
 	// metric idx.cassadra.query-delete.ok is how many delete queries for a metric completed successfully (triggered by an update or a delete)
-	statQueryDeleteOk = stats.NewCounter32("idx.cassandra.query-delete.ok")
+	statQueryDeleteOk = stats.NewCounter32("idx.cassandra.query-delete.ok", "")
 	// metric idx.cassandra.query-delete.fail is how many delete queries for a metric failed (triggered by an update or a delete)
-	statQueryDeleteFail = stats.NewCounter32("idx.cassandra.query-delete.fail")
+	statQueryDeleteFail = stats.NewCounter32("idx.cassandra.query-delete.fail", "")
 
 	// metric idx.cassandra.query-insert.wait is time inserts spent in queue before being executed
-	statQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.cassandra.query-insert.wait")
+	statQueryInsertWaitDuration = stats.NewLatencyHistogram12h32("idx.cassandra.query-insert.wait", "")
 	// metric idx.cassandra.query-insert.exec is time spent executing inserts (possibly repeatedly until success)
-	statQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-insert.exec")
+	statQueryInsertExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-insert.exec", "")
 	// metric idx.cassandra.query-delete.exec is time spent executing deletes (possibly repeatedly until success)
-	statQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-delete.exec")
+	statQueryDeleteExecDuration = stats.NewLatencyHistogram15s32("idx.cassandra.query-delete.exec", "")
 
 	// metric idx.cassandra.add is the duration of an add of one metric to the cassandra idx, including the add to the in-memory index, excluding the insert query
-	statAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add")
+	statAddDuration = stats.NewLatencyHistogram15s32("idx.cassandra.add", "")
 	// metric idx.cassandra.update is the duration of an update of one metric to the cassandra idx, including the update to the in-memory index, excluding any insert/delete queries
-	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.cassandra.update")
+	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.cassandra.update", "")
 	// metric idx.cassandra.prune is the duration of a prune of the cassandra idx, including the prune of the in-memory index and all needed delete queries
-	statPruneDuration = stats.NewLatencyHistogram15s32("idx.cassandra.prune")
+	statPruneDuration = stats.NewLatencyHistogram15s32("idx.cassandra.prune", "")
 	// metric idx.cassandra.delete is the duration of a delete of one or more metrics from the cassandra idx, including the delete from the in-memory index and the delete query
-	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
+	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete", "")
 	// metric idx.cassandra.save.skipped is how many saves have been skipped due to the writeQueue being full
-	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
+	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped", "")
 	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
 )
 

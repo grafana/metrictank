@@ -11,9 +11,10 @@ type Bool struct {
 	tags []byte
 }
 
-func NewBool(name string) *Bool {
-	return registry.getOrAdd(name, &Bool{
+func NewBool(name, tags string) *Bool {
+	return registry.getOrAdd(name+tags, &Bool{
 		name: []byte(name),
+		tags: []byte(tags),
 	}).(*Bool)
 }
 

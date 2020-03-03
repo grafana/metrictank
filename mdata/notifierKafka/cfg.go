@@ -33,10 +33,10 @@ var partitionLag map[int32]*stats.Gauge64
 var FlagSet *flag.FlagSet
 
 // metric cluster.notifier.kafka.messages-published is a counter of messages published to the kafka cluster notifier
-var messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published")
+var messagesPublished = stats.NewCounter32("cluster.notifier.kafka.messages-published", "")
 
 // metric cluster.notifier.kafka.message_size is the sizes seen of messages through the kafka cluster notifier
-var messagesSize = stats.NewMeter32("cluster.notifier.kafka.message_size", false)
+var messagesSize = stats.NewMeter32("cluster.notifier.kafka.message_size", "", false)
 
 func init() {
 	FlagSet = flag.NewFlagSet("kafka-cluster", flag.ExitOnError)
@@ -126,12 +126,12 @@ func ConfigProcess(instance string) {
 
 	for _, part := range partitions {
 		// metric cluster.notifier.kafka.partition.%d.offset is the current offset for the partition (%d) that we have consumed
-		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part))
+		partitionOffset[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.offset", part), "")
 		// metric cluster.notifier.kafka.partition.%d.log_size is the size of the kafka partition (%d), aka the newest available offset.
-		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.log_size", part))
+		partitionLogSize[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.log_size", part), "")
 		// metric cluster.notifier.kafka.partition.%d.lag is how many messages (mechunkWriteRequestsrics) there are in the kafka
 		// partition (%d) that we have not yet consumed.
-		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.lag", part))
+		partitionLag[part] = stats.NewGauge64(fmt.Sprintf("cluster.notifier.kafka.partition.%d.lag", part), "")
 	}
 	log.Infof("kafka-cluster: consuming from partitions %v", partitions)
 }

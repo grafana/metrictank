@@ -15,40 +15,40 @@ import (
 
 var (
 	// metric cluster.events.join is how many node join events were received
-	eventsJoin = stats.NewCounter32("cluster.events.join")
+	eventsJoin = stats.NewCounter32("cluster.events.join", "")
 	// metric cluster.events.update is how many node update events were received
-	eventsUpdate = stats.NewCounter32("cluster.events.update")
+	eventsUpdate = stats.NewCounter32("cluster.events.update", "")
 	// metric cluster.events.leave is how many node leave events were received
-	eventsLeave = stats.NewCounter32("cluster.events.leave")
+	eventsLeave = stats.NewCounter32("cluster.events.leave", "")
 
 	// metric cluster.self.state.ready is whether this instance is ready
-	nodeReady = stats.NewBool("cluster.self.state.ready")
+	nodeReady = stats.NewBool("cluster.self.state.ready", "")
 	// metric cluster.self.state.primary is whether this instance is a primary
-	nodePrimary = stats.NewBool("cluster.self.state.primary")
+	nodePrimary = stats.NewBool("cluster.self.state.primary", "")
 	// metric cluster.self.partitions is the number of partitions this instance consumes
-	nodePartitions = stats.NewGauge32("cluster.self.partitions")
+	nodePartitions = stats.NewGauge32("cluster.self.partitions", "")
 	// metric cluster.self.priority is the priority of the node. A lower number gives higher priority
-	nodePriority = stats.NewGauge32("cluster.self.priority")
+	nodePriority = stats.NewGauge32("cluster.self.priority", "")
 
 	// metric cluster.total.state.primary-ready is the number of nodes we know to be primary and ready
-	totalPrimaryReady = stats.NewGauge32("cluster.total.state.primary-ready")
+	totalPrimaryReady = stats.NewGauge32("cluster.total.state.primary-ready", "")
 	// metric cluster.total.state.primary-not-ready is the number of nodes we know to be primary but not ready (total should only be in this state very temporarily)
-	totalPrimaryNotReady = stats.NewGauge32("cluster.total.state.primary-not-ready")
+	totalPrimaryNotReady = stats.NewGauge32("cluster.total.state.primary-not-ready", "")
 	// metric cluster.total.state.secondary-ready is the number of nodes we know to be secondary and ready
-	totalSecondaryReady = stats.NewGauge32("cluster.total.state.secondary-ready")
+	totalSecondaryReady = stats.NewGauge32("cluster.total.state.secondary-ready", "")
 	// metric cluster.total.state.secondary-not-ready is the number of nodes we know to be secondary and not ready
-	totalSecondaryNotReady = stats.NewGauge32("cluster.total.state.secondary-not-ready")
+	totalSecondaryNotReady = stats.NewGauge32("cluster.total.state.secondary-not-ready", "")
 	// metric cluster.total.state.query-ready is the number of nodes we know to be query nodes and ready
-	totalQueryReady = stats.NewGauge32("cluster.total.state.query-ready")
+	totalQueryReady = stats.NewGauge32("cluster.total.state.query-ready", "")
 	// metric cluster.total.state.query-not-ready is the number of nodes we know to be query nodes and not ready
-	totalQueryNotReady = stats.NewGauge32("cluster.total.state.query-not-ready")
+	totalQueryNotReady = stats.NewGauge32("cluster.total.state.query-not-ready", "")
 	// metric cluster.total.partitions is the number of partitions in the cluster that we know of
-	totalPartitions = stats.NewGauge32("cluster.total.partitions")
+	totalPartitions = stats.NewGauge32("cluster.total.partitions", "")
 
 	// metric cluster.decode_err.join is a counter of json unmarshal errors
-	unmarshalErrJoin = stats.NewCounter32("cluster.decode_err.join")
+	unmarshalErrJoin = stats.NewCounter32("cluster.decode_err.join", "")
 	// metric cluster.decode_err.update is a counter of json unmarshal errors
-	unmarshalErrUpdate = stats.NewCounter32("cluster.decode_err.update")
+	unmarshalErrUpdate = stats.NewCounter32("cluster.decode_err.update", "")
 )
 
 type ClusterManager interface {

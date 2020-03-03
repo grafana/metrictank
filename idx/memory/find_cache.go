@@ -13,19 +13,19 @@ import (
 
 var (
 	// metric idx.memory.find-cache.ops.hit is a counter of findCache hits
-	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.ops.hit")
+	findCacheHit = stats.NewCounterRate32("idx.memory.find-cache.ops.hit", "")
 	// metric idx.memory.find-cache.ops.miss is a counter of findCache misses
-	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.ops.miss")
+	findCacheMiss = stats.NewCounterRate32("idx.memory.find-cache.ops.miss", "")
 	// metric idx.memory.find-cache.backoff is the number of find caches in backoff mode
-	findCacheBackoff = stats.NewGauge32("idx.memory.find-cache.backoff")
+	findCacheBackoff = stats.NewGauge32("idx.memory.find-cache.backoff", "")
 	// metric idx.memory.find-cache.entries is the number of entries in the cache
-	findCacheEntries = stats.NewGauge32("idx.memory.find-cache.entries")
+	findCacheEntries = stats.NewGauge32("idx.memory.find-cache.entries", "")
 	// metric idx.memory.find-cache.invalidation.recv is the number of received invalidation requests
-	findCacheInvalidationsReceived = stats.NewCounterRate32("idx.memory.find-cache.invalidation.recv")
+	findCacheInvalidationsReceived = stats.NewCounterRate32("idx.memory.find-cache.invalidation.recv", "")
 	// metric idx.memory.find-cache.invalidation.exec is the number of executed invalidation requests
-	findCacheInvalidationsExecuted = stats.NewCounterRate32("idx.memory.find-cache.invalidation.exec")
+	findCacheInvalidationsExecuted = stats.NewCounterRate32("idx.memory.find-cache.invalidation.exec", "")
 	// metric idx.memory.find-cache.invalidation.drop is the number of dropped invalidation requests
-	findCacheInvalidationsDropped = stats.NewCounterRate32("idx.memory.find-cache.invalidation.drop")
+	findCacheInvalidationsDropped = stats.NewCounterRate32("idx.memory.find-cache.invalidation.drop", "")
 )
 
 type invalidateRequest struct {

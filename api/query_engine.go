@@ -18,12 +18,12 @@ import (
 var (
 	// metric api.request.render.chosen_archive is the archive chosen for the request.
 	// 0 means original data, 1 means first agg level, 2 means 2nd
-	reqRenderChosenArchive = stats.NewMeter32("api.request.render.chosen_archive", false)
+	reqRenderChosenArchive = stats.NewMeter32("api.request.render.chosen_archive", "", false)
 	// metric api.request.render.points_fetched is the number of points that need to be fetched for a /render request.
-	reqRenderPointsFetched = stats.NewMeter32("api.request.render.points_fetched", false)
+	reqRenderPointsFetched = stats.NewMeter32("api.request.render.points_fetched", "", false)
 	// metric api.request.render.points_returned is the number of points the request will return
 	// best effort: not aware of summarize(), aggregation functions, runtime normalization. but does account for runtime consolidation
-	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
+	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", "", false)
 
 	errUnSatisfiable   = response.NewError(http.StatusNotFound, "request cannot be satisfied due to lack of available retentions")
 	errMaxPointsPerReq = response.NewError(http.StatusRequestEntityTooLarge, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")

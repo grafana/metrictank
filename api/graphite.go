@@ -39,18 +39,18 @@ var MissingOrgHeaderErr = errors.New("orgId not set in headers")
 var MissingQueryErr = errors.New("missing query param")
 var InvalidFormatErr = errors.New("invalid format specified")
 var InvalidTimeRangeErr = errors.New("invalid time range requested")
-var renderReqProxied = stats.NewCounter32("api.request.render.proxied")
+var renderReqProxied = stats.NewCounter32("api.request.render.proxied", "")
 
 var (
 	// metric api.request.render.series is the number of series a /render request is handling.  This is the number
 	// of metrics after all of the targets in the request have expanded by searching the index.
-	reqRenderSeriesCount = stats.NewMeter32("api.request.render.series", false)
+	reqRenderSeriesCount = stats.NewMeter32("api.request.render.series", "", false)
 
 	// metric api.request.render.targets is the number of targets a /render request is handling.
-	reqRenderTargetCount = stats.NewMeter32("api.request.render.targets", false)
+	reqRenderTargetCount = stats.NewMeter32("api.request.render.targets", "", false)
 
 	// metric plan.run is the time spent running the plan for a request (function processing of all targets and runtime consolidation)
-	planRunDuration = stats.NewLatencyHistogram15s32("plan.run")
+	planRunDuration = stats.NewLatencyHistogram15s32("plan.run", "")
 )
 
 // map of consolidation methods and the ordered list of rollup aggregations that should

@@ -37,13 +37,13 @@ func NewGraphite(prefix, addr string, interval, bufferSize int, timeout time.Dur
 	if len(prefix) != 0 && prefix[len(prefix)-1] != '.' {
 		prefix = prefix + "."
 	}
-	NewGauge32("stats.graphite.write_queue.size").Set(bufferSize)
-	queueItems = NewRange32("stats.graphite.write_queue.items")
+	NewGauge32("stats.graphite.write_queue.size", "").Set(bufferSize)
+	queueItems = NewRange32("stats.graphite.write_queue.items", "")
 	// metric stats.generate_message is how long it takes to generate the stats
-	genDataDuration = NewGauge32("stats.generate_message.duration")
-	flushDuration = NewLatencyHistogram15s32("stats.graphite.flush")
-	messageSize = NewGauge32("stats.message_size")
-	connected = NewBool("stats.graphite.connected")
+	genDataDuration = NewGauge32("stats.generate_message.duration", "")
+	flushDuration = NewLatencyHistogram15s32("stats.graphite.flush", "")
+	messageSize = NewGauge32("stats.message_size", "")
+	connected = NewBool("stats.graphite.connected", "")
 
 	g := &Graphite{
 		prefix:     []byte(prefix),

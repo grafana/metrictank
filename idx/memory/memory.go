@@ -25,29 +25,29 @@ import (
 
 var (
 	// metric idx.memory.ops.update is the number of updates to the memory idx
-	statUpdate = stats.NewCounter32("idx.memory.ops.update")
+	statUpdate = stats.NewCounter32("idx.memory.ops.update", "")
 	// metric idx.memory.ops.add is the number of additions to the memory idx
-	statAdd = stats.NewCounter32("idx.memory.ops.add")
+	statAdd = stats.NewCounter32("idx.memory.ops.add", "")
 	// metric idx.memory.add is the duration of a (successful) add of a metric to the memory idx
-	statAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add")
+	statAddDuration = stats.NewLatencyHistogram15s32("idx.memory.add", "")
 	// metric idx.memory.update is the duration of (successful) update of a metric to the memory idx
-	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.memory.update")
+	statUpdateDuration = stats.NewLatencyHistogram15s32("idx.memory.update", "")
 	// metric idx.memory.get is the duration of a get of one metric in the memory idx
-	statGetDuration = stats.NewLatencyHistogram15s32("idx.memory.get")
+	statGetDuration = stats.NewLatencyHistogram15s32("idx.memory.get", "")
 	// metric idx.memory.list is the duration of memory idx listings
-	statListDuration = stats.NewLatencyHistogram15s32("idx.memory.list")
+	statListDuration = stats.NewLatencyHistogram15s32("idx.memory.list", "")
 	// metric idx.memory.find is the duration of memory idx find
-	statFindDuration = stats.NewLatencyHistogram15s32("idx.memory.find")
+	statFindDuration = stats.NewLatencyHistogram15s32("idx.memory.find", "")
 	// metric idx.memory.delete is the duration of a delete of one or more metrics from the memory idx
-	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete")
+	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.memory.delete", "")
 	// metric idx.memory.prune is the duration of successful memory idx prunes
-	statPruneDuration = stats.NewLatencyHistogram15s32("idx.memory.prune")
+	statPruneDuration = stats.NewLatencyHistogram15s32("idx.memory.prune", "")
 
 	// metric idx.memory.filtered is number of series that have been excluded from responses due to their lastUpdate property
-	statFiltered = stats.NewCounter32("idx.memory.filtered")
+	statFiltered = stats.NewCounter32("idx.memory.filtered", "")
 
 	// metric idx.metrics_active is the number of currently known metrics in the index
-	statMetricsActive = stats.NewGauge32("idx.metrics_active")
+	statMetricsActive = stats.NewGauge32("idx.metrics_active", "")
 
 	Enabled                      bool
 	maxPruneLockTime             = time.Millisecond * 100

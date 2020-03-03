@@ -48,7 +48,7 @@ func (r *requestStats) PathStatusCount(path string, status int) {
 	}
 	c, ok := p[status]
 	if !ok {
-		c = stats.NewCounterRate32(metricKey)
+		c = stats.NewCounterRate32(metricKey, "")
 		p[status] = c
 	}
 	r.Unlock()
@@ -59,7 +59,7 @@ func (r *requestStats) PathLatency(path string, dur time.Duration) {
 	r.Lock()
 	p, ok := r.latencyHistograms[path]
 	if !ok {
-		p = stats.NewLatencyHistogram15s32(fmt.Sprintf("api.request.%s", path))
+		p = stats.NewLatencyHistogram15s32(fmt.Sprintf("api.request.%s", path), "")
 		r.latencyHistograms[path] = p
 	}
 	r.Unlock()
@@ -70,7 +70,7 @@ func (r *requestStats) PathSize(path string, size int) {
 	r.Lock()
 	p, ok := r.sizeMeters[path]
 	if !ok {
-		p = stats.NewMeter32(fmt.Sprintf("api.request.%s.size", path), false)
+		p = stats.NewMeter32(fmt.Sprintf("api.request.%s.size", path), "", false)
 		r.sizeMeters[path] = p
 	}
 	r.Unlock()

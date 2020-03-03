@@ -28,7 +28,7 @@ func (s *graphiteProxyStats) Miss(fun string) {
 	s.Lock()
 	counter, ok := s.funcMiss[fun]
 	if !ok {
-		counter = stats.NewCounter32(fmt.Sprintf("api.request.render.proxy-due-to.%s", fun))
+		counter = stats.NewCounter32(fmt.Sprintf("api.request.render.proxy-due-to.%s", fun), "")
 		s.funcMiss[fun] = counter
 	}
 	s.Unlock()

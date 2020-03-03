@@ -15,7 +15,7 @@ var (
 	notifiers []Notifier
 
 	// metric cluster.notifier.all.messages-received is a counter of messages received from cluster notifiers
-	messagesReceived = stats.NewCounter32("cluster.notifier.all.messages-received")
+	messagesReceived = stats.NewCounter32("cluster.notifier.all.messages-received", "")
 )
 
 type Notifier interface {

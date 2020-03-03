@@ -243,7 +243,7 @@ func main() {
 	***********************************/
 	log.Infof("Metrictank starting. version: %s - runtime: %s", version, runtime.Version())
 	// metric version.%s is the version of metrictank running.  The metric value is always 1
-	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(version, ".", "_", -1)))
+	mtVersion := stats.NewBool(fmt.Sprintf("version.%s", strings.Replace(version, ".", "_", -1)), "")
 	mtVersion.Set(true)
 
 	/***********************************
@@ -472,7 +472,7 @@ func main() {
 	// and it was able to save its complete chunks, this node will be able to take over without dataloss.
 	// You can upgrade a candidate to primary while the timer is not 0 yet, it just means it may have missing data in the chunks that it will save.
 	maxChunkSpan := mdata.MaxChunkSpan()
-	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", (uint32(time.Now().Unix())/maxChunkSpan+1)*maxChunkSpan)
+	stats.NewTimeDiffReporter32("cluster.self.promotion_wait", "", (uint32(time.Now().Unix())/maxChunkSpan+1)*maxChunkSpan)
 
 	/***********************************
 		Set our ready state so we can accept requests from users
