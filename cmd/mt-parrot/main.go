@@ -59,7 +59,7 @@ var parrotCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("failed to parse log-level, %s", err.Error())
 		}
-		if int(lookbackPeriod.Seconds())%int(testMetricsInterval) != 0 {
+		if int(lookbackPeriod.Seconds())%int(testMetricsInterval.Seconds()) != 0 {
 			log.Fatal("lookback period must be evenly divisible by test metrics interval")
 		}
 		log.SetLevel(lvl)
