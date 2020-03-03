@@ -19,6 +19,7 @@ var (
 	partitionMethodString string
 	testMetricsInterval   time.Duration
 	queryInterval         time.Duration
+	lookbackPeriod        time.Duration
 	logLevel              string
 
 	partitionMethod schema.PartitionByMethod
@@ -33,6 +34,7 @@ func init() {
 	parrotCmd.Flags().StringVar(&partitionMethodString, "partition-method", "bySeries", "the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv")
 	parrotCmd.Flags().DurationVar(&testMetricsInterval, "test-metrics-interval", 10*time.Second, "interval to send test metrics")
 	parrotCmd.Flags().DurationVar(&queryInterval, "query-interval", 10*time.Second, "interval to query to validate metrics")
+	parrotCmd.Flags().DurationVar(&lookbackPeriod, "lookback-period", 5*time.Minute, "how far to look back when validating metrics")
 
 	parrotCmd.Flags().StringVar(&logLevel, "log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
@@ -55,6 +57,9 @@ var parrotCmd = &cobra.Command{
 		lvl, err := log.ParseLevel(logLevel)
 		if err != nil {
 			log.Fatalf("failed to parse log-level, %s", err.Error())
+		}
+		if int(lookbackPeriod.Seconds())%int(testMetricsInterval) != 0 {
+			log.Fatal("lookback period must be evenly divisible by test metrics interval")
 		}
 		log.SetLevel(lvl)
 		parsePartitionMethod()

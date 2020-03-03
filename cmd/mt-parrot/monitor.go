@@ -110,7 +110,7 @@ func buildRequest(now time.Time) *http.Request {
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/render", gatewayAddress), nil)
 	q := req.URL.Query()
 	q.Set("target", "aliasByNode(parrot.testdata.*.generated.*, 2)")
-	q.Set("from", strconv.Itoa(int(now.Add(-5*time.Minute).Unix())))
+	q.Set("from", strconv.Itoa(int(now.Add(-1*lookbackPeriod).Unix()-1)))
 	q.Set("until", strconv.Itoa(int(now.Unix())))
 	q.Set("format", "json")
 	q.Set("X-Org-Id", strconv.Itoa(orgId))
