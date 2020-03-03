@@ -30,6 +30,12 @@ type seriesStats struct {
 	numNonMatching int32
 	//tracks the last seen non-NaN time stamp (useful for lag
 	lastSeen uint32
+	//the expected number of points were received
+	correctNumPoints bool
+	//the last ts matches `now`
+	correctAlignment bool
+	//all points are sorted and 1 period apart
+	correctSpacing bool
 }
 
 type partitionMetrics struct {
@@ -58,25 +64,31 @@ func monitor() {
 		}
 
 		for _, s := range query.Decoded {
-			processPartitionSeries(s)
+			processPartitionSeries(s, tick)
 		}
 	}
 }
 
-
-func processPartitionSeries(s graphite.Series) {
-	log.Infof("%d - %d", s.Datapoints[0].Ts, s.Datapoints[len(s.Datapoints)-1].Ts)
+func processPartitionSeries(s graphite.Series, now time.Time) {
 	partition, err := strconv.Atoi(s.Target)
 	if err != nil {
 		log.Debug("unable to parse partition", err)
 		invalidError.Inc()
 		return
 	}
+	if len(s.Datapoints) < 2 {
+		log.Debugf("partition has invalid number of datapoints: %d", len(s.Datapoints))
+		invalidError.Inc()
+		return
+	}
+
 	serStats := seriesStats{}
 	serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
+	serStats.correctAlignment = int64(serStats.lastTs) == now.Unix()
+	serStats.correctNumPoints = len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval)+1
+	serStats.correctSpacing = checkSpacing(s.Datapoints)
 
 	for _, dp := range s.Datapoints {
-
 		if math.IsNaN(dp.Val) {
 			serStats.nans += 1
 			continue
@@ -94,6 +106,18 @@ func processPartitionSeries(s graphite.Series) {
 	metrics.lag.Set(int(serStats.lastTs - serStats.lastSeen))
 	metrics.deltaSum.Set(int(serStats.deltaSum))
 	metrics.nonMatching.Set(int(serStats.numNonMatching))
+}
+
+func checkSpacing(points []graphite.Point) bool {
+	previous := points[0].Ts
+	for i := 1; i < len(points); i++ {
+		current := points[i].Ts
+		if current-previous != uint32(testMetricsInterval.Seconds()) {
+			return false
+		}
+		previous = current
+	}
+	return true
 }
 
 func initMetricsBySeries() {
