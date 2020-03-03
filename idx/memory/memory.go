@@ -119,6 +119,10 @@ func ConfigProcess() {
 		log.Fatal("find-cache-invalidate-max-size should be smaller than find-cache-invalidate-queue-size")
 	}
 
+	if MetaTagSupport && !TagSupport {
+		log.Fatal("To enable meta tag support it is required to also enable tag support")
+	}
+
 	tagquery.MetaTagSupport = MetaTagSupport
 	tagquery.MatchCacheSize = matchCacheSize
 }
@@ -127,6 +131,7 @@ func ConfigProcess() {
 // this is needed to support unit tests.
 type MemoryIndex interface {
 	idx.MetricIndex
+	idx.MetaRecordIdx
 	LoadPartition(int32, []schema.MetricDefinition) int
 	UpdateArchiveLastSave(schema.MKey, int32, uint32)
 	add(*idx.Archive)

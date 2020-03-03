@@ -14,6 +14,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/metrictank/cassandra"
+	cassUtils "github.com/grafana/metrictank/cassandra"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
@@ -148,42 +149,15 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		if err != nil {
 			return nil, err
 		}
-		for _, table := range ttlTables {
-			log.Infof("cassandra-store: ensuring that table %s exists.", table.Name)
-			err := tmpSession.Query(fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)).Exec()
-			if err != nil {
-				return nil, err
-			}
-		}
+	}
 
+	for _, table := range ttlTables {
+		log.Infof("cassandra-store: ensuring that table %s exists.", table.Name)
+
+		schema := fmt.Sprintf(schemaTable, config.Keyspace, table.Name, table.WindowSize, table.WindowSize*60*60)
+		err := cassUtils.EnsureTableExists(tmpSession, config.CreateKeyspace, config.Keyspace, schema, table.Name)
 		if err != nil {
 			return nil, err
-		}
-	} else {
-		var keyspaceMetadata *gocql.KeyspaceMetadata
-		// five attempts to verify the keyspace exists before returning an error
-	AttemptLoop:
-		for attempt := 1; attempt > 0; attempt++ {
-			keyspaceMetadata, err = tmpSession.KeyspaceMetadata(config.Keyspace)
-			if err != nil {
-				log.Warnf("cassandra keyspace not found; attempt: %v", attempt)
-				if attempt >= 5 {
-					return nil, err
-				}
-				time.Sleep(5 * time.Second)
-			} else {
-				for _, table := range ttlTables {
-					if _, ok := keyspaceMetadata.Tables[table.Name]; !ok {
-						log.Warnf("cassandra table %s not found; attempt: %v", table.Name, attempt)
-						if attempt >= 5 {
-							return nil, fmt.Errorf("cassandra table %s not found after %d attempts", table.Name, attempt)
-						}
-						time.Sleep(5 * time.Second)
-						continue AttemptLoop
-					}
-				}
-				break
-			}
 		}
 	}
 

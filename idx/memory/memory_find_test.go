@@ -14,12 +14,14 @@ import (
 
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 )
 
 var (
 	ix                   MemoryIndex
+	metaRecordIdx        idx.MetaRecordIdx
 	currentIndex         int  // 1 small; 2 large
 	currentlyPartitioned bool // was the last call to New() for a partitioned or un-partitioned index.
 )
@@ -179,6 +181,7 @@ func InitSmallIndex() {
 		currentlyPartitioned = Partitioned
 		ix = New()
 		ix.Init()
+		metaRecordIdx = ix
 
 		currentIndex = 1
 	} else {
@@ -401,7 +404,7 @@ func testTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
 
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
@@ -434,7 +437,7 @@ func testTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
 
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "dc", Value: "dc5"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
@@ -514,7 +517,7 @@ func testTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
 	}
 
 	orgId := uint32(1)
-	ix.MetaTagRecordUpsert(orgId, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(orgId, tagquery.MetaTagRecord{
 		MetaTags: tagquery.Tags{
 			{Key: "directionMeta", Value: "read"},
 			{Key: "directionMeta2", Value: "read"},
@@ -547,7 +550,7 @@ func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
 
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
@@ -679,7 +682,7 @@ func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "host2", Value: "all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
 	})
@@ -688,7 +691,7 @@ func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression2},
 	})
@@ -810,7 +813,7 @@ func testAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
 
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "another", Value: "tag"}, tagquery.Tag{Key: "meta", Value: "tag"}},
 		Expressions: tagquery.Expressions{metaRecordExpression},
 	})
@@ -923,7 +926,7 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "metric", Value: "all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
 	})
@@ -932,7 +935,7 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "metric", Value: "disk_all"}},
 		Expressions: tagquery.Expressions{metaRecordExpression2},
 	})
@@ -941,7 +944,7 @@ func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "meta1", Value: "all_metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression3},
 	})
@@ -1074,7 +1077,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	}
 	// since "direction" is a tag in the metric tag index, we don't
 	// include values of the meta tag index in the autocomplete results
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "direction", Value: "none"}},
 		Expressions: tagquery.Expressions{metaRecordExpression1},
 	})
@@ -1083,7 +1086,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expressions: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{{Key: "has_direction", Value: "true"}, {Key: "has_direction", Value: "yes"}},
 		Expressions: metaRecordExpressions2,
 	})
@@ -1092,7 +1095,7 @@ func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expression: %s", err)
 	}
-	ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+	metaRecordIdx.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
 		MetaTags:    tagquery.Tags{tagquery.Tag{Key: "all", Value: "metrics"}},
 		Expressions: tagquery.Expressions{metaRecordExpression3},
 	})

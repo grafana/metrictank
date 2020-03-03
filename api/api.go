@@ -41,6 +41,7 @@ type Server struct {
 	MetricIndex     idx.MetricIndex
 	MemoryStore     mdata.Metrics
 	BackendStore    mdata.Store
+	MetaRecords     idx.MetaRecordIdx
 	Cache           cache.Cache
 	shutdown        chan struct{}
 	Tracer          opentracing.Tracer
@@ -55,6 +56,9 @@ func (s *Server) BindMemoryStore(store mdata.Metrics) {
 }
 func (s *Server) BindBackendStore(store mdata.Store) {
 	s.BackendStore = store
+}
+func (s *Server) BindMetaRecords(mr idx.MetaRecordIdx) {
+	s.MetaRecords = mr
 }
 
 func (s *Server) BindCache(cache cache.Cache) {
