@@ -47,6 +47,12 @@ type partitionMetrics struct {
 	deltaSum *stats.Gauge32
 	//total number of entries where drift occurred
 	nonMatching *stats.Gauge32
+	//the expected number of points were received
+	correctNumPoints *stats.Bool
+	//the last ts matches `now`
+	correctAlignment *stats.Bool
+	//all points are sorted and 1 period apart
+	correctSpacing *stats.Bool
 }
 
 func monitor() {
@@ -107,6 +113,9 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 	metrics.lag.Set(int(lag))
 	metrics.deltaSum.Set(int(serStats.deltaSum))
 	metrics.nonMatching.Set(int(serStats.numNonMatching))
+	metrics.correctNumPoints.Set(serStats.correctNumPoints)
+	metrics.correctAlignment.Set(serStats.correctAlignment)
+	metrics.correctSpacing.Set(serStats.correctSpacing)
 }
 
 func checkSpacing(points []graphite.Point) bool {
@@ -124,10 +133,13 @@ func checkSpacing(points []graphite.Point) bool {
 func initMetricsBySeries() {
 	for p := 0; p < int(partitionCount); p++ {
 		metrics := partitionMetrics{
-			nanCount:    stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", p)),
-			lag:         stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", p)),
-			deltaSum:    stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", p)),
-			nonMatching: stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", p)),
+			nanCount:         stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", p)),
+			lag:              stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", p)),
+			deltaSum:         stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", p)),
+			nonMatching:      stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", p)),
+			correctNumPoints: stats.NewBool(fmt.Sprintf("parrot.monitoring.correctNumPoints;partition=%d", p)),
+			correctAlignment: stats.NewBool(fmt.Sprintf("parrot.monitoring.correctAlignment;partition=%d", p)),
+			correctSpacing:   stats.NewBool(fmt.Sprintf("parrot.monitoring.correctSpacing;partition=%d", p)),
 		}
 		metricsBySeries = append(metricsBySeries, metrics)
 	}
