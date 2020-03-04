@@ -547,6 +547,7 @@ Flags:
       --gateway-key string               the bearer token to include with gateway requests
   -h, --help                             help for mt-parrot
       --log-level string                 log level. panic|fatal|error|warning|info|debug (default "info")
+      --lookback-period duration         how far to look back when validating metrics (default 5m0s)
       --org-id int                       org id to publish parrot metrics to (default 1)
       --partition-count int32            number of kafka partitions in use (default 8)
       --partition-method string          the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
