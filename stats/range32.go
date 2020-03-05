@@ -16,11 +16,14 @@ type Range32 struct {
 	min   uint32
 	max   uint32
 	valid bool // whether any values have been seen
+	name  []byte
+	tags  []byte
 }
 
 func NewRange32(name string) *Range32 {
 	return registry.getOrAdd(name, &Range32{
-		min: math.MaxUint32,
+		min:  math.MaxUint32,
+		name: []byte(name),
 	},
 	).(*Range32)
 }
@@ -41,12 +44,12 @@ func (r *Range32) ValueUint32(val uint32) {
 	r.Unlock()
 }
 
-func (r *Range32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
+func (r *Range32) WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte {
 	r.Lock()
 	// if no values were seen, don't report anything to graphite
 	if r.valid {
-		buf = WriteUint32(buf, prefix, []byte("min.gauge32"), r.min, now)
-		buf = WriteUint32(buf, prefix, []byte("max.gauge32"), r.max, now)
+		buf = WriteUint32(buf, prefix, r.name, []byte(".min.gauge32"), r.tags, r.min, now)
+		buf = WriteUint32(buf, prefix, r.name, []byte(".max.gauge32"), r.tags, r.max, now)
 		r.min = math.MaxUint32
 		r.max = 0
 		r.valid = false

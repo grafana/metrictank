@@ -10,7 +10,7 @@ func NewDevnull() {
 		buf := make([]byte, 0)
 		for now := range ticker {
 			for _, metric := range registry.list() {
-				metric.ReportGraphite(buf[:], nil, now)
+				metric.WriteGraphiteLine(buf[:], nil, now)
 			}
 		}
 	}()

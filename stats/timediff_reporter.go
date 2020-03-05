@@ -9,11 +9,14 @@ import (
 // once reached, reports 0
 type TimeDiffReporter32 struct {
 	target uint32
+	name   []byte
+	tags   []byte
 }
 
 func NewTimeDiffReporter32(name string, target uint32) *TimeDiffReporter32 {
 	return registry.getOrAdd(name, &TimeDiffReporter32{
 		target: target,
+		name:   []byte(name),
 	},
 	).(*TimeDiffReporter32)
 }
@@ -22,13 +25,13 @@ func (g *TimeDiffReporter32) Set(target uint32) {
 	atomic.StoreUint32(&g.target, target)
 }
 
-func (g *TimeDiffReporter32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
+func (g *TimeDiffReporter32) WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte {
 	target := atomic.LoadUint32(&g.target)
 	now32 := uint32(now.Unix())
 	report := uint32(0)
 	if now32 < target {
 		report = target - now32
 	}
-	buf = WriteUint32(buf, prefix, []byte("gauge32"), report, now)
+	buf = WriteUint32(buf, prefix, g.name, []byte(".gauge32"), g.tags, report, now)
 	return buf
 }

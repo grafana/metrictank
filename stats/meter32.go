@@ -23,6 +23,8 @@ type Meter32 struct {
 	max   uint32
 	count uint32
 	since time.Time
+	name  []byte
+	tags  []byte
 }
 
 func NewMeter32(name string, approx bool) *Meter32 {
@@ -31,6 +33,7 @@ func NewMeter32(name string, approx bool) *Meter32 {
 		hist:   make(map[uint32]uint32),
 		min:    math.MaxUint32,
 		since:  time.Now(),
+		name:   []byte(name),
 	},
 	).(*Meter32)
 }
@@ -92,7 +95,7 @@ func (m *Meter32) ValuesUint32(val, num uint32) {
 	m.Unlock()
 }
 
-func (m *Meter32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
+func (m *Meter32) WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte {
 	m.Lock()
 	if m.count == 0 {
 		m.Unlock()
@@ -108,9 +111,9 @@ func (m *Meter32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 		p   float64
 		str string
 	}{
-		{0.50, "median.gauge32"},
-		{0.75, "p75.gauge32"},
-		{0.90, "p90.gauge32"},
+		{0.50, ".median.gauge32"},
+		{0.75, ".p75.gauge32"},
+		{0.90, ".p90.gauge32"},
 	}
 
 	pidx := 0
@@ -123,16 +126,16 @@ func (m *Meter32) ReportGraphite(buf, prefix []byte, now time.Time) []byte {
 		runningsum += uint64(m.hist[key]) * uint64(key)
 		p := float64(runningcount) / float64(m.count)
 		for pidx < len(quantiles) && quantiles[pidx].p <= p {
-			buf = WriteUint32(buf, prefix, []byte(quantiles[pidx].str), key, now)
+			buf = WriteUint32(buf, prefix, m.name, []byte(quantiles[pidx].str), m.tags, key, now)
 			pidx++
 		}
 	}
 
-	buf = WriteUint32(buf, prefix, []byte("min.gauge32"), m.min, now)
-	buf = WriteUint32(buf, prefix, []byte("mean.gauge32"), uint32(runningsum/uint64(m.count)), now)
-	buf = WriteUint32(buf, prefix, []byte("max.gauge32"), m.max, now)
-	buf = WriteUint32(buf, prefix, []byte("values.count32"), m.count, now)
-	buf = WriteFloat64(buf, prefix, []byte("values.rate32"), float64(m.count)/now.Sub(m.since).Seconds(), now)
+	buf = WriteUint32(buf, prefix, m.name, []byte(".min.gauge32"), m.tags, m.min, now)
+	buf = WriteUint32(buf, prefix, m.name, []byte(".mean.gauge32"), m.tags, uint32(runningsum/uint64(m.count)), now)
+	buf = WriteUint32(buf, prefix, m.name, []byte(".max.gauge32"), m.tags, m.max, now)
+	buf = WriteUint32(buf, prefix, m.name, []byte(".values.count32"), m.tags, m.count, now)
+	buf = WriteFloat64(buf, prefix, m.name, []byte(".values.rate32"), m.tags, float64(m.count)/now.Sub(m.since).Seconds(), now)
 	m.since = now
 
 	m.clear()
