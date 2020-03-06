@@ -47,7 +47,8 @@ func NewSchemas(schemas []Schema) Schemas {
 	return s
 }
 
-func (s Schemas) List() ([]Schema, Schema) {
+// ListRaw returns the raw unexpanded schemas
+func (s Schemas) ListRaw() ([]Schema, Schema) {
 	return s.raw, s.DefaultSchema
 }
 

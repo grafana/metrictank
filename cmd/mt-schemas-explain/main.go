@@ -66,7 +66,7 @@ func main() {
 		fmt.Println()
 	}
 
-	s, def := schemas.List()
+	s, def := schemas.ListRaw()
 
 	for _, schema := range s {
 		display(schema)

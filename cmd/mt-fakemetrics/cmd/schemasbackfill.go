@@ -49,7 +49,7 @@ var schemasbackfillCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("can't read schemas file %q: %s", schemasFile, err.Error())
 		}
-		schemasList, _ := schemas.List()
+		schemasList, _ := schemas.ListRaw()
 		wg := &sync.WaitGroup{}
 		initStats(true, "schemasbackfill")
 		period = int(periodDur.Seconds())
