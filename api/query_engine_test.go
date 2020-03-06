@@ -564,6 +564,43 @@ func TestPlanRequestsMultipleIntervalsPerSchema(t *testing.T) {
 	testPlan(in, rets, out, nil, 1200, 0, 0, t)
 }
 
+// TestPlanRequests_NonRetInterval test what happens when series have a RawInterval that is != rets[0].Interval
+func TestPlanRequests_NonRetInterval(t *testing.T) {
+	in, out := generate(30, 60, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(15, 0, 0),
+		NewReqProp(25, 0, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("1s:800s:2h:2:true,60s:1140s:1h:2:true"),
+	}
+
+	// they should simply return archive 0, raw resolution
+	adjust(&out[0], 0, 10, 10, 800)
+	adjust(&out[1], 0, 15, 15, 800)
+	adjust(&out[2], 0, 25, 25, 800)
+	testPlan(in, rets, out, nil, 800, 0, 0, t)
+
+	t.Run("DifferentPNGroups", func(t *testing.T) {
+		// nothing should change
+		in[0].PNGroup, out[0].PNGroup = 123, 123
+		in[1].PNGroup, out[1].PNGroup = 124, 124
+		in[2].PNGroup, out[2].PNGroup = 125, 125
+		testPlan(in, rets, out, nil, 800, 0, 0, t)
+	})
+	t.Run("SamePNGroups", func(t *testing.T) {
+		// they should all consolidate to a common interval, the LCM
+		// note that in this case it would be more useful to simply read the 2nd rollup for all of them
+		in[0].PNGroup, out[0].PNGroup = 123, 123
+		in[1].PNGroup, out[1].PNGroup = 123, 123
+		in[2].PNGroup, out[2].PNGroup = 123, 123
+		adjust(&out[0], 0, 10, 150, 800)
+		adjust(&out[1], 0, 15, 150, 800)
+		adjust(&out[2], 0, 25, 150, 800)
+		testPlan(in, rets, out, nil, 800, 0, 0, t)
+	})
+}
+
 var result *ReqsPlan
 
 func BenchmarkPlanRequestsSamePNGroupNoLimits(b *testing.B) {
