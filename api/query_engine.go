@@ -63,6 +63,9 @@ var (
 //
 // note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
+
+// TODO: MDP-yes and max-points-per-req-soft code paths may not take into account that archive 0 may have a different raw interval.
+// see https://github.com/grafana/metrictank/issues/1679 (for MDP-no it does do the right thing)
 func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard int) (*ReqsPlan, error) {
 
 	ok, rp := false, NewReqsPlan(*reqs)
@@ -262,10 +265,13 @@ func planHighestResMulti(now, from, to uint32, rbr ReqsByRet) bool {
 		for i := range reqs {
 			req := &reqs[i]
 			req.Plan(archive, ret)
-		}
-		if _, exists := seenIntervals[reqs[0].ArchInterval]; !exists {
-			listIntervals = append(listIntervals, reqs[0].ArchInterval)
-			seenIntervals[reqs[0].ArchInterval] = struct{}{}
+
+			// note: requests with the same schemaID may still have a different ArchInterval if archive=0 (raw data)
+			// because we allow series to have different native intervals than what the schema specifies.
+			if _, exists := seenIntervals[req.ArchInterval]; !exists {
+				listIntervals = append(listIntervals, req.ArchInterval)
+				seenIntervals[req.ArchInterval] = struct{}{}
+			}
 		}
 	}
 	interval := util.Lcm(listIntervals)
