@@ -128,7 +128,8 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		//   Though, is that any more fair? for some series it's more desirable to have them at lower resolutions than others.
 		// * In particular, our logic to do PNGroups in ascending size order, then singles in archivesID order, is made up.
 		// * Because PNGroups may be comprised of multiple schemas, we typically don't have to adjust all of the comprising requests
-		//   to achieve an overall point reduction for the entire group. This means that singles may reduce faster than PNGroups
+		//   to achieve an overall point reduction for the entire group. This means that singles may reduce faster
+		//   (grow their intervals faster per iteration) than PNGroups
 		progress := true
 
 		pngroupsByLen := make([]models.PNGroup, 0, len(rp.pngroups))
