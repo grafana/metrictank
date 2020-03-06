@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/archives"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 
@@ -84,15 +84,10 @@ func (r *Req) Init(archive idx.Archive, cons consolidation.Consolidator, node cl
 }
 
 // Plan updates the planning parameters to match the i'th archive in its retention rules
-func (r *Req) Plan(i int, ret conf.Retention) {
+func (r *Req) Plan(i int, a archives.Archive) {
 	r.Archive = uint8(i)
-	if i == 0 {
-		// The first retention is raw data, so use its native interval
-		r.ArchInterval = r.RawInterval
-	} else {
-		r.ArchInterval = uint32(ret.SecondsPerPoint)
-	}
-	r.TTL = uint32(ret.MaxRetention())
+	r.ArchInterval = a.Interval
+	r.TTL = a.TTL
 	r.OutInterval = r.ArchInterval
 	r.AggNum = 1
 }
@@ -108,7 +103,7 @@ func (r *Req) PlanNormalization(interval uint32) {
 // * the Req MUST have been Plan()'d already!
 // * interval MUST be a multiple of the ArchInterval (so we can normalize if needed)
 // * the TTL of lower resolution archives is always assumed to be at least as long as the current archive
-func (r *Req) AdjustTo(interval, from uint32, rets []conf.Retention) {
+func (r *Req) AdjustTo(interval, from uint32, as archives.Archives) {
 
 	// if we satisfy the interval with our current settings, nothing left to do
 	if r.ArchInterval == interval {
@@ -116,10 +111,10 @@ func (r *Req) AdjustTo(interval, from uint32, rets []conf.Retention) {
 	}
 
 	// let's see if we can deliver it via a lower-res rollup archive.
-	for i, ret := range rets[r.Archive+1:] {
-		if interval == uint32(ret.SecondsPerPoint) && ret.Ready <= from {
+	for i, a := range as[r.Archive+1:] {
+		if interval == a.Interval && a.Ready <= from {
 			// we're in luck. this will be more efficient than runtime consolidation
-			r.Plan(int(r.Archive)+1+i, ret)
+			r.Plan(int(r.Archive)+1+i, a)
 			return
 		}
 	}
