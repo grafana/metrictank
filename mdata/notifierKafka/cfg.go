@@ -53,9 +53,9 @@ func init() {
 	FlagSet.StringVar(&offsetStr, "offset", "newest", "Set the offset to start consuming from. Can be oldest, newest or a time duration")
 	FlagSet.StringVar(&backlogProcessTimeoutStr, "backlog-process-timeout", "60s", "Maximum time backlog processing can block during metrictank startup. Setting to a low value may result in data loss")
 	FlagSet.BoolVar(&tlsEnabled, "tls-enabled", false, "Whether to enable TLS")
-	FlagSet.BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "Whether skip TLS server cert verification")
+	FlagSet.BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "Whether to skip TLS server cert verification")
 	FlagSet.StringVar(&tlsClientCert, "tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
-	FlagSet.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with tls-enabled and -tls-client-cert)")
+	FlagSet.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with -tls-enabled and -tls-client-cert)")
 	globalconf.Register("kafka-cluster", FlagSet, flag.ExitOnError)
 }
 

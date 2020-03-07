@@ -83,9 +83,9 @@ func ConfigSetup() {
 	inKafkaMdm.DurationVar(&consumerMaxProcessingTime, "consumer-max-processing-time", time.Second, "The maximum amount of time the consumer expects a message takes to process")
 	inKafkaMdm.IntVar(&netMaxOpenRequests, "net-max-open-requests", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
 	inKafkaMdm.BoolVar(&tlsEnabled, "tls-enabled", false, "Whether to enable TLS")
-	inKafkaMdm.BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "Whether skip TLS server cert verification")
+	inKafkaMdm.BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "Whether to skip TLS server cert verification")
 	inKafkaMdm.StringVar(&tlsClientCert, "tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
-	inKafkaMdm.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with tls-enabled and -tls-client-cert)")
+	inKafkaMdm.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with -tls-enabled and -tls-client-cert)")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm, flag.ExitOnError)
 }
 
