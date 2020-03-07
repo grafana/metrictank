@@ -353,11 +353,11 @@ consumer-max-processing-time = 1s
 net-max-open-requests = 100
 # Whether to enable TLS
 tls-enabled = false
-# Whether skip TLS server cert verification
+# Whether to skip TLS server cert verification
 tls-skip-verify = false
 # Client cert for client authentication (use with -tls-enabled and -tls-client-key)
 tls-client-cert =
-# Client key for client authentication (use with tls-enabled and -tls-client-cert)
+# Client key for client authentication (use with -tls-enabled and -tls-client-cert)
 tls-client-key =
 ```
 
@@ -462,11 +462,11 @@ offset = newest
 backlog-process-timeout = 60s
 # Whether to enable TLS
 tls-enabled = false
-# Whether skip TLS server cert verification
+# Whether to skip TLS server cert verification
 tls-skip-verify = false
 # Client cert for client authentication (use with -tls-enabled and -tls-client-key)
 tls-client-cert =
-# Client key for client authentication (use with tls-enabled and -tls-client-cert)
+# Client key for client authentication (use with -tls-enabled and -tls-client-cert)
 tls-client-key =
 ```
 

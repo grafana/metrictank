@@ -536,11 +536,11 @@ Flags:
   -tls-client-cert string
     	Client cert for client authentication (use with -tls-enabled and -tls-client-key)
   -tls-client-key string
-    	Client key for client authentication (use with tls-enabled and -tls-client-cert)
+    	Client key for client authentication (use with -tls-enabled and -tls-client-cert)
   -tls-enabled
     	Whether to enable TLS
   -tls-skip-verify
-    	Whether skip TLS server cert verification
+    	Whether to skip TLS server cert verification
   -topic string
     	kafka topic (default "metricpersist")
 ```
