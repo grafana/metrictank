@@ -12,8 +12,13 @@ type Counter64 struct {
 }
 
 func NewCounter64(name string) *Counter64 {
-	return registry.getOrAdd(name, &Counter64{
+	return NewTaggedCounter64(name, "")
+}
+
+func NewTaggedCounter64(name, tags string) *Counter64 {
+	return registry.getOrAdd(name+tags, &Counter64{
 		name: []byte(name),
+		tags: []byte(tags),
 	}).(*Counter64)
 }
 
