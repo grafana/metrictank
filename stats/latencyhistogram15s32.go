@@ -17,10 +17,10 @@ type LatencyHistogram15s32 struct {
 }
 
 func NewLatencyHistogram15s32(name string) *LatencyHistogram15s32 {
-	return NewTaggedLatencyHistogram15s32(name, "")
+	return NewLatencyHistogram15s32WithTags(name, "")
 }
 
-func NewTaggedLatencyHistogram15s32(name, tags string) *LatencyHistogram15s32 {
+func NewLatencyHistogram15s32WithTags(name, tags string) *LatencyHistogram15s32 {
 	return registry.getOrAdd(name+tags, &LatencyHistogram15s32{
 		hist:  hist15s.New(),
 		since: time.Now(),

@@ -15,10 +15,10 @@ type CounterRate32 struct {
 }
 
 func NewCounterRate32(name string) *CounterRate32 {
-	return NewTaggedCounterRate32(name, "")
+	return NewCounterRate32WithTags(name, "")
 }
 
-func NewTaggedCounterRate32(name, tags string) *CounterRate32 {
+func NewCounterRate32WithTags(name, tags string) *CounterRate32 {
 	return registry.getOrAdd(name+tags, &CounterRate32{
 		since: time.Now(),
 		name:  []byte(name),

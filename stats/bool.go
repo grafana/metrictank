@@ -12,10 +12,10 @@ type Bool struct {
 }
 
 func NewBool(name string) *Bool {
-	return NewTaggedBool(name, "")
+	return NewBoolWithTags(name, "")
 }
 
-func NewTaggedBool(name, tags string) *Bool {
+func NewBoolWithTags(name, tags string) *Bool {
 	return registry.getOrAdd(name+tags, &Bool{
 		name: []byte(name),
 		tags: []byte(tags),

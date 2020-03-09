@@ -28,10 +28,10 @@ type Meter32 struct {
 }
 
 func NewMeter32(name string, approx bool) *Meter32 {
-	return NewTaggedMeter32(name, "", approx)
+	return NewMeter32WithTags(name, "", approx)
 }
 
-func NewTaggedMeter32(name, tags string, approx bool) *Meter32 {
+func NewMeter32WithTags(name, tags string, approx bool) *Meter32 {
 	return registry.getOrAdd(name+tags, &Meter32{
 		approx: approx,
 		hist:   make(map[uint32]uint32),
