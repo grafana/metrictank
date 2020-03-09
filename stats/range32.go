@@ -21,9 +21,14 @@ type Range32 struct {
 }
 
 func NewRange32(name string) *Range32 {
-	return registry.getOrAdd(name, &Range32{
+	return NewRange32WithTags(name, "")
+}
+
+func NewRange32WithTags(name, tags string) *Range32 {
+	return registry.getOrAdd(name+tags, &Range32{
 		min:  math.MaxUint32,
 		name: []byte(name),
+		tags: []byte(tags),
 	},
 	).(*Range32)
 }

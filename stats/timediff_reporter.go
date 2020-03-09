@@ -14,9 +14,14 @@ type TimeDiffReporter32 struct {
 }
 
 func NewTimeDiffReporter32(name string, target uint32) *TimeDiffReporter32 {
-	return registry.getOrAdd(name, &TimeDiffReporter32{
+	return NewTimeDiffReporter32WithTags(name, "", target)
+}
+
+func NewTimeDiffReporter32WithTags(name, tags string, target uint32) *TimeDiffReporter32 {
+	return registry.getOrAdd(name+tags, &TimeDiffReporter32{
 		target: target,
 		name:   []byte(name),
+		tags:   []byte(tags),
 	},
 	).(*TimeDiffReporter32)
 }

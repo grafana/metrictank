@@ -12,8 +12,13 @@ type Counter32 struct {
 }
 
 func NewCounter32(name string) *Counter32 {
-	return registry.getOrAdd(name, &Counter32{
+	return NewCounter32WithTags(name, "")
+}
+
+func NewCounter32WithTags(name, tags string) *Counter32 {
+	return registry.getOrAdd(name+tags, &Counter32{
 		name: []byte(name),
+		tags: []byte(tags),
 	}).(*Counter32)
 }
 
