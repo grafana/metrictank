@@ -107,13 +107,12 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 }
 
 func checkSpacing(points []graphite.Point) bool {
-	previous := points[0].Ts
 	for i := 1; i < len(points); i++ {
-		current := points[i].Ts
-		if current-previous != uint32(testMetricsInterval.Seconds()) {
+		prev := points[i-1].Ts
+		cur := points[i].Ts
+		if cur-prev != uint32(testMetricsInterval.Seconds()) {
 			return false
 		}
-		previous = current
 	}
 	return true
 }
