@@ -280,7 +280,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 	}
 }
 
-var nameChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%&*+-/:;<>?@[]^_|~."
+var nameChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%&*+-/:;<>?@[]^_|~. "
 
 func isNameChar(r byte) bool {
 	return strings.IndexByte(nameChar, r) >= 0
