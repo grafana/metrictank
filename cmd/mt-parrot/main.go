@@ -5,9 +5,12 @@ import (
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/gnet"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/stats"
 	"github.com/raintank/met/statsd"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -23,6 +26,12 @@ var (
 	logLevel              string
 	lastPublish           int64
 
+	statsGraphite   *stats.Graphite
+	statsPrefix     string
+	statsAddr       string
+	statsBufferSize int
+	statsTimeout    time.Duration
+
 	partitionMethod schema.PartitionByMethod
 	publisher       out.Out
 )
@@ -36,6 +45,10 @@ func init() {
 	parrotCmd.Flags().DurationVar(&testMetricsInterval, "test-metrics-interval", 10*time.Second, "interval to send test metrics")
 	parrotCmd.Flags().DurationVar(&queryInterval, "query-interval", 10*time.Second, "interval to query to validate metrics")
 	parrotCmd.Flags().DurationVar(&lookbackPeriod, "lookback-period", 5*time.Minute, "how far to look back when validating metrics")
+	parrotCmd.Flags().StringVar(&statsPrefix, "stats-prefix", "", "stats prefix (will add trailing dot automatically if needed)")
+	parrotCmd.Flags().StringVar(&statsAddr, "stats-address", "localhost:2003", "address to send monitoring statistics to")
+	parrotCmd.Flags().IntVar(&statsBufferSize, "stats-buffer-size", 20000, "how many messages (holding all measurements from one interval) to buffer up in case graphite endpoint is unavailable.")
+	parrotCmd.Flags().DurationVar(&statsTimeout, "stats-timeout", time.Second*10, "timeout after which a write is considered not successful")
 
 	parrotCmd.Flags().StringVar(&logLevel, "log-level", "info", "log level. panic|fatal|error|warning|info|debug")
 
@@ -62,9 +75,11 @@ var parrotCmd = &cobra.Command{
 		if int(lookbackPeriod.Seconds())%int(testMetricsInterval.Seconds()) != 0 {
 			log.Fatal("lookback period must be evenly divisible by test metrics interval")
 		}
+
 		log.SetLevel(lvl)
 		parsePartitionMethod()
 		initGateway()
+		initStats()
 
 		schemas := generateSchemas(partitionCount)
 		go produceTestMetrics(schemas)
@@ -94,4 +109,11 @@ func initGateway() {
 		log.Fatal(err)
 	}
 	log.Info("gateway initialized")
+}
+
+func initStats() {
+	hostname, _ := os.Hostname()
+	prefix := strings.Replace(statsPrefix, "$hostname", strings.Replace(hostname, ".", "_", -1), -1)
+	//need to use a negative interval so we can manually set the report timestamps
+	statsGraphite = stats.NewGraphite(prefix, statsAddr, -1, statsBufferSize, statsTimeout)
 }

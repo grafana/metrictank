@@ -58,6 +58,7 @@ func monitor() {
 		for _, s := range query.Decoded {
 			processPartitionSeries(s, tick)
 		}
+		statsGraphite.Report(tick)
 	}
 }
 

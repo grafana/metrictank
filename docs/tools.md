@@ -552,6 +552,10 @@ Flags:
       --partition-count int32            number of kafka partitions in use (default 8)
       --partition-method string          the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
       --query-interval duration          interval to query to validate metrics (default 10s)
+      --stats-address string             address to send monitoring statistics to (default "localhost:2003")
+      --stats-buffer-size int            how many messages (holding all measurements from one interval) to buffer up in case graphite endpoint is unavailable. (default 20000)
+      --stats-prefix string              stats prefix (will add trailing dot automatically if needed)
+      --stats-timeout duration           timeout after which a write is considered not successful (default 10s)
       --test-metrics-interval duration   interval to send test metrics (default 10s)
 ```
 
