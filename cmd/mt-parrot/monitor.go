@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	httpError    = stats.NewCounter32("parrot.monitoring.error;error=http")
-	decodeError  = stats.NewCounter32("parrot.monitoring.error;error=decode")
-	invalidError = stats.NewCounter32("parrot.monitoring.error;error=invalid")
+	httpError    = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=http")
+	decodeError  = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=decode")
+	invalidError = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=invalid")
 )
 
 var metricsBySeries []partitionMetrics
@@ -122,19 +122,19 @@ func initMetricsBySeries() {
 	for p := 0; p < int(partitionCount); p++ {
 		metrics := partitionMetrics{
 			// metric parrot.monitoring.nancount is the number of missing values for each series
-			nanCount: stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nancount;partition=%d", p)),
+			nanCount: stats.NewGauge32WithTags("parrot.monitoring.nancount", fmt.Sprintf(";partition=%d", p)),
 			// metric parrot.monitoring.lag is the time since the last value was recorded
-			lag: stats.NewGauge32(fmt.Sprintf("parrot.monitoring.lag;partition=%d", p)),
+			lag: stats.NewGauge32WithTags("parrot.monitoring.lag", fmt.Sprintf(";partition=%d", p)),
 			// metric parrot.monitoring.deltaSum is the total amount of drift between expected value and actual values
-			deltaSum: stats.NewGauge32(fmt.Sprintf("parrot.monitoring.deltaSum;partition=%d", p)),
+			deltaSum: stats.NewGauge32WithTags("parrot.monitoring.deltaSum", fmt.Sprintf(";partition=%d", p)),
 			// metric parrot.monitoring.nonMatching is the total number of entries where drift occurred
-			nonMatching: stats.NewGauge32(fmt.Sprintf("parrot.monitoring.nonMatching;partition=%d", p)),
+			nonMatching: stats.NewGauge32WithTags("parrot.monitoring.nonMatching", fmt.Sprintf(";partition=%d", p)),
 			// metric parrot.monitoring.correctNumPoints is whether the expected number of points were received
-			correctNumPoints: stats.NewBool(fmt.Sprintf("parrot.monitoring.correctNumPoints;partition=%d", p)),
+			correctNumPoints: stats.NewBoolWithTags("parrot.monitoring.correctNumPoints", fmt.Sprintf(";partition=%d", p)),
 			// metric parrot.monitoring.correctAlignment is whether the last ts matches `now`
-			correctAlignment: stats.NewBool(fmt.Sprintf("parrot.monitoring.correctAlignment;partition=%d", p)),
+			correctAlignment: stats.NewBoolWithTags("parrot.monitoring.correctAlignment", fmt.Sprintf(";partition=%d", p)),
 			// metric parrot.monitoring.correctSpacing is whether all points are sorted and 1 period apart
-			correctSpacing: stats.NewBool(fmt.Sprintf("parrot.monitoring.correctSpacing;partition=%d", p)),
+			correctSpacing: stats.NewBoolWithTags("parrot.monitoring.correctSpacing", fmt.Sprintf(";partition=%d", p)),
 		}
 		metricsBySeries = append(metricsBySeries, metrics)
 	}
