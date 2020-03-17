@@ -72,6 +72,8 @@ var parrotCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalf("failed to parse log-level, %s", err.Error())
 		}
+
+		validateDurationsInSeconds()
 		if int(lookbackPeriod.Seconds())%int(testMetricsInterval.Seconds()) != 0 {
 			log.Fatal("lookback period must be evenly divisible by test metrics interval")
 		}
@@ -116,4 +118,16 @@ func initStats() {
 	prefix := strings.Replace(statsPrefix, "$hostname", strings.Replace(hostname, ".", "_", -1), -1)
 	//need to use a negative interval so we can manually set the report timestamps
 	statsGraphite = stats.NewGraphite(prefix, statsAddr, -1, statsBufferSize, statsTimeout)
+}
+
+func validateDurationsInSeconds() {
+	if testMetricsInterval%time.Second != 0 {
+		log.Fatal("test-metrics-interval must be in seconds")
+	}
+	if queryInterval%time.Second != 0 {
+		log.Fatal("query-interval must be in seconds")
+	}
+	if lookbackPeriod%time.Second != 0 {
+		log.Fatal("lookback-period must be in seconds")
+	}
 }
