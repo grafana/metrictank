@@ -1,7 +1,8 @@
-___
+---
 title: Governance
 layout: page
-___
+
+---
 
 # Metrictank Governance
 
