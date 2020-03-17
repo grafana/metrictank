@@ -59,13 +59,13 @@ The current team members are:
 
 ### Technical decisions
 
-Technical decisions should be discussed and voted upon on the Metrictank [development mailing list][devlist]. Informal conversations may also be held in #metrictank-dev in slack or in the appropriate Github issue.
+Technical decisions should be discussed and voted upon on the Metrictank [development mailing list][devlist]. Informal conversations may also be held in *#metrictank-dev* in [slack][slack] or in the appropriate Github issue.
 
 Decisions are usually made by [lazy consensus](#consensus). If no consensus can be reached, the matter may be resolved by [majority](#majority-vote) vote.
 
 ### Governance changes
 
-Material changes to this document are discussed publicly in the #metrictank-dev channel in slack or on the Metrictank [development mailing list][devlist]. Any change requires a [supermajority](#supermajority-vote) in favor.
+Material changes to this document are discussed publicly in the *#metrictank-dev* channel in [slack][slack] or on the Metrictank [development mailing list][devlist]. Any change requires a [supermajority](#supermajority-vote) in favor.
 
 ### Editorial changes
 
@@ -85,7 +85,7 @@ For all votes, including [lazy consensus](#consensus), voting must be open for a
 
 In all cases, all and only team members are eligible to vote, with the sole exception of the forced removal of a team member, in which said member is not eligible to vote.
 
-Discussions and votes on personnel matters (including but not limited to team membership) are held on the private [team mailing list][team]. All other discussions are held in the #metrictank-dev channel in slack, in their respective Github issues, or on the Metrictank [development mailing list][devlist]. All other votes are held on the Metrictank [development mailing list][devlist].
+Discussions and votes on personnel matters (including but not limited to team membership) are held on the private [team mailing list][team]. All other discussions are held in the *#metrictank-dev* channel in [slack][slack], in their respective Github issues, or on the Metrictank [development mailing list][devlist]. All other votes are held on the Metrictank [development mailing list][devlist].
 
 For public discussions, anyone interested is encouraged to participate. Formal power to object or vote is limited to team members.
 
@@ -93,7 +93,7 @@ For public discussions, anyone interested is encouraged to participate. Formal p
 
 The default decision making mechanism for the Metrictank project is lazy consensus, which is itself a form of voting. This means that any decision on technical issues is considered supported by the team as long as nobody objects.
 
-Silence on any consensus decision is implicit agreement and equivalent to explicit agreement. Explicit agreement may be stated at will. Decisions may, but do not need to be, called out and put up for decision in the #metrictank-dev channel in slack or on the Metrictank [development mailing list][devlist] at any time and by anyone.
+Silence on any consensus decision is implicit agreement and equivalent to explicit agreement. Explicit agreement may be stated at will. Decisions may, but do not need to be, called out and put up for decision in the *#metrictank-dev* channel in [slack][slack] or on the Metrictank [development mailing list][devlist] at any time and by anyone.
 
 Consensus decisions can never override or go against the spirit of an earlier explicit vote.
 
@@ -130,7 +130,7 @@ The On / Offboarding section is informational and can be changed by [lazy consen
 Once a new member is approved they must enable 2 factor authentication for their Github account prior to starting the onboarding process. Then, the new member is:
 
 * Added to the list of team members, ideally by sending a PR of their own, or at least approving said PR
-* Announced in the #metrictank-dev channel in slack and the Metrictank [development mailing list][devlist] by an existing team member
+* Announced in the *#metrictank-dev* channel in [slack][slack] and the Metrictank [development mailing list][devlist] by an existing team member
 * Added to the [Github project][gh] as a collaborator. Optionally, they are added to the community, and related organizations and repositories
 * Added to the private [team mailing list][team]
 
@@ -157,7 +157,7 @@ Open an issue in Github with your motion. If there are objections and no consens
 
 To become an official team member, you should make ongoing contributions to one or more project(s) for at least three months. At that point, a team member may propose you for membership. The discussion about this will be held in private, and you will be informed privately when a decision has been made.
 
-Should the decision be in favor, your new membership will also be announced in the #metrictank-dev channel in slack and on the Metrictank [development mailing list][devlist].
+Should the decision be in favor, your new membership will also be announced in the *#metrictank-dev* channel in [slack][slack] and on the Metrictank [development mailing list][devlist].
 
 ### How do I remove a team member?
 
