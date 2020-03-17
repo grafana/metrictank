@@ -16,7 +16,7 @@ func produceTestMetrics(schemas []*schema.MetricData) {
 		}
 		publisher.Flush(schemas)
 		atomic.StoreInt64(&lastPublish, tick.Unix())
-		log.Infof("flushed schemas for ts %d", tick.Unix())
+		log.Infof("flushed metrics for ts %d", tick.Unix())
 	}
 }
 
