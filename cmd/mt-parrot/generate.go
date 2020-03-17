@@ -39,7 +39,7 @@ func generateSchema(desiredPartition int32) *schema.MetricData {
 	}
 
 	for i := 1; true; i++ {
-		metric.Name = fmt.Sprintf("parrot.testdata.%d.generated.%s", desiredPartition, generatePartitionSuffix(i))
+		metric.Name = fmt.Sprintf("parrot.testdata.%d.identity.%s", desiredPartition, generatePartitionSuffix(i))
 		id, err := metric.PartitionID(partitionMethod, partitionCount)
 		if err != nil {
 			log.Fatal(err)
