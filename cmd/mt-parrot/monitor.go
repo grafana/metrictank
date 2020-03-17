@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -96,7 +97,7 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 
 	metrics := metricsBySeries[partition]
 	metrics.nanCount.Set(int(serStats.nans))
-	lag := lastPublish - int64(serStats.lastSeen)
+	lag := atomic.LoadInt64(&lastPublish) - int64(serStats.lastSeen)
 	metrics.lag.Set(int(lag))
 	metrics.deltaSum.Set(int(serStats.deltaSum))
 	metrics.nonMatching.Set(int(serStats.numNonMatching))
