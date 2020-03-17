@@ -28,14 +28,6 @@
   version = "1.1.0"
 
 [[projects]]
-  digest = "1:360c7be30f85be4294e3e38958b5f48ff76c9d2e50cc0d987f84a56963592ad3"
-  name = "github.com/DataDog/zstd"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "809b919c325d7887bff7bd876162af73db53e878"
-  version = "v1.4.0"
-
-[[projects]]
   branch = "master"
   digest = "1:622bc18c663f130b5b16abe3c723a5ce0f91413b0e59e1f2e319d8dae337ecb3"
   name = "github.com/Dieterbe/artisanalhistogram"
@@ -63,15 +55,16 @@
   version = "v0.4.5"
 
 [[projects]]
-  digest = "1:d50c46fe6bfa3459c9a169575f94d8b97493e8a11b658fceb5d765ca3135de7a"
+  digest = "1:126d55734c3842b1ad75d0590bf8d033b967ca5ede6fe0d2b9ad313facfd5390"
   name = "github.com/Shopify/sarama"
   packages = [
     ".",
     "mocks",
+    "tools/tls",
   ]
   pruneopts = "NUT"
-  revision = "dde3ddda8b4b3a594690086725799ab1573bb895"
-  version = "v1.23.0"
+  revision = "b3a812117be917e2dd4f8cbcf4ff861e3ae7ef38"
+  version = "v1.26.1"
 
 [[projects]]
   branch = "master"
@@ -457,29 +450,20 @@
   revision = "82e8091afdea241119c34a452fe24fcc2a0b962e"
 
 [[projects]]
-  digest = "1:1da1796a71eb70f1e3e085984d044f67840bb0326816ec8276231aa87b1b9fc3"
+  digest = "1:126c6b25526d94f040466baf577c19f0fc0cfb42abd800d5d27eec848767e0a2"
   name = "github.com/klauspost/compress"
   packages = [
     "flate",
+    "fse",
     "gzip",
+    "huff0",
+    "snappy",
+    "zstd",
+    "zstd/internal/xxhash",
   ]
   pruneopts = "NUT"
-  revision = "14c9a76e3c95e47f8ccce949bba2c1101a8b85e6"
-
-[[projects]]
-  digest = "1:6a2949d9a141c72cfaa5b55c65794d9b1179878fccdcae735ab62be27bf9cf34"
-  name = "github.com/klauspost/cpuid"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "09cded8978dc9e80714c4d85b0322337b0a1e5e0"
-  version = "v1.0"
-
-[[projects]]
-  digest = "1:0e75567539a8cbbc0bf5e0ef6a7823edb83df96139f50e84f15b53f7a1693f56"
-  name = "github.com/klauspost/crc32"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "6834731faf32e62a2dd809d99fb24d1e4ae5a92d"
+  revision = "d4b3bb13d45b000ac3a915d4f32069a9284540bb"
+  version = "v1.10.2"
 
 [[projects]]
   digest = "1:4059c14e87a2de3a434430340521b5feece186c1469eff0834c29a63870de3ed"
@@ -1184,6 +1168,7 @@
     "github.com/Dieterbe/profiletrigger/heap",
     "github.com/Shopify/sarama",
     "github.com/Shopify/sarama/mocks",
+    "github.com/Shopify/sarama/tools/tls",
     "github.com/alyu/configparser",
     "github.com/cespare/xxhash",
     "github.com/davecgh/go-spew/spew",

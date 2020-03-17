@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
+	"github.com/Shopify/sarama/tools/tls"
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/input"
@@ -61,6 +62,10 @@ var consumerMaxProcessingTime time.Duration
 var netMaxOpenRequests int
 var offsetDuration time.Duration
 var kafkaStats stats.Kafka
+var tlsEnabled bool
+var tlsSkipVerify bool
+var tlsClientCert string
+var tlsClientKey string
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -77,6 +82,10 @@ func ConfigSetup() {
 	inKafkaMdm.DurationVar(&consumerMaxWaitTime, "consumer-max-wait-time", time.Second, "The maximum amount of time the broker will wait for Consumer.Fetch.Min bytes to become available before it returns fewer than that anyway")
 	inKafkaMdm.DurationVar(&consumerMaxProcessingTime, "consumer-max-processing-time", time.Second, "The maximum amount of time the consumer expects a message takes to process")
 	inKafkaMdm.IntVar(&netMaxOpenRequests, "net-max-open-requests", 100, "How many outstanding requests a connection is allowed to have before sending on it blocks")
+	inKafkaMdm.BoolVar(&tlsEnabled, "tls-enabled", false, "Whether to enable TLS")
+	inKafkaMdm.BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "Whether to skip TLS server cert verification")
+	inKafkaMdm.StringVar(&tlsClientCert, "tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
+	inKafkaMdm.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with -tls-enabled and -tls-client-cert)")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm, flag.ExitOnError)
 }
 
@@ -120,6 +129,18 @@ func ConfigProcess(instance string) {
 	config.Consumer.MaxProcessingTime = consumerMaxProcessingTime
 	config.Net.MaxOpenRequests = netMaxOpenRequests
 	config.Version = kafkaVersion
+
+	if tlsEnabled {
+		tlsConfig, err := tls.NewConfig(tlsClientCert, tlsClientKey)
+		if err != nil {
+			log.Fatalf("Failed to create TLS config: %s", err)
+		}
+
+		config.Net.TLS.Enable = true
+		config.Net.TLS.Config = tlsConfig
+		config.Net.TLS.Config.InsecureSkipVerify = tlsSkipVerify
+	}
+
 	err = config.Validate()
 	if err != nil {
 		log.Fatalf("kafkamdm: invalid config: %s", err)

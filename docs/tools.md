@@ -513,6 +513,14 @@ Flags:
     	Set the offset to start consuming from. Can be oldest, newest or a time duration (default "newest")
   -partitions string
     	kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in (default "*")
+  -tls-client-cert string
+    	Client cert for client authentication (use with -tls-enabled and -tls-client-key)
+  -tls-client-key string
+    	Client key for client authentication (use with -tls-enabled and -tls-client-cert)
+  -tls-enabled
+    	Whether to enable TLS
+  -tls-skip-verify
+    	Whether to skip TLS server cert verification
   -topic string
     	kafka topic (default "metricpersist")
 ```
