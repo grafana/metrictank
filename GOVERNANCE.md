@@ -164,7 +164,8 @@ Should the decision be in favor, your new membership will also be announced in t
 Team members may resign by notifying the private [team mailing list][team]. If you think a team member should be removed against their will, propose this to metrictank.team@gmail.com. Discussions will be held in the private [team mailing list][team].
 
 © Grafana Labs 2020 | Documentation Distributed under CC-BY-4.0
-Adapted from the original Prometheus governance documentation found at https://prometheus.io/governance/
+
+Adapted from the original Prometheus governance documentation found at <https://prometheus.io/governance/>
 
 [teamlist]: https://groups.google.com/forum/#!forum/metrictank-team
 [devlist]: https://groups.google.com/forum/#!forum/metrictank-dev
