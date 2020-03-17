@@ -81,8 +81,8 @@ var parrotCmd = &cobra.Command{
 		initGateway()
 		initStats()
 
-		schemas := generateSchemas(partitionCount)
-		go produceTestMetrics(schemas)
+		metrics := generateMetrics(partitionCount)
+		go produceTestMetrics(metrics)
 
 		monitor()
 	},

@@ -8,29 +8,29 @@ import (
 	"sync/atomic"
 )
 
-func produceTestMetrics(schemas []*schema.MetricData) {
+func produceTestMetrics(metrics []*schema.MetricData) {
 	for tick := range clock.AlignedTickLossless(testMetricsInterval) {
-		for _, metric := range schemas {
+		for _, metric := range metrics {
 			metric.Time = tick.Unix()
 			metric.Value = float64(tick.Unix())
 		}
-		publisher.Flush(schemas)
+		publisher.Flush(metrics)
 		atomic.StoreInt64(&lastPublish, tick.Unix())
 		log.Infof("flushed metrics for ts %d", tick.Unix())
 	}
 }
 
-//generateSchemas generates a MetricData that hashes to each of numPartitions partitions
-func generateSchemas(numPartitions int32) []*schema.MetricData {
+//generateMetrics generates a MetricData that hashes to each of numPartitions partitions
+func generateMetrics(numPartitions int32) []*schema.MetricData {
 	var metrics []*schema.MetricData
 	for i := int32(0); i < numPartitions; i++ {
-		metrics = append(metrics, generateSchema(i))
+		metrics = append(metrics, generateMetric(i))
 	}
 	return metrics
 }
 
-//generateSchema generates a single MetricData that hashes to the given partition
-func generateSchema(desiredPartition int32) *schema.MetricData {
+//generateMetric generates a single MetricData that hashes to the given partition
+func generateMetric(desiredPartition int32) *schema.MetricData {
 	metric := schema.MetricData{
 		OrgId:    orgId,
 		Unit:     "partyparrots",
