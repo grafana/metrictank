@@ -21,7 +21,7 @@ The Metrictank developers and community are expected to follow the values define
 * Only Team Members may vote
 * Most voting takes place on the Metrictank [development mailing list][devlist], with the exception of personnel or other private matters
 * Voting is accomplished by [lazy consensus](#consensus) in most cases
-* All issues requiring a vote, including [lazy consensus](#consensus), will be open for at least 21 days or until enough votes have been cast that any more votes cannot further change the outcome
+* All issues requiring a vote, including [lazy consensus](#consensus), will be open for at least 14 days or until enough votes have been cast that any more votes cannot further change the outcome
 * Adding or removing Team Members is accomplished by [supermajority](#supermajority-vote) vote
 * Major changes to the project or governance require a formal vote by either [majority](#majority-vote) or [supermajority](#supermajority-vote)
  
