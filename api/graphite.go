@@ -207,8 +207,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
-		err := response.WrapError(err)
-		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy {
+		// note: any parsing error is always due to bad request
+		if !request.NoProxy {
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
 			return
