@@ -59,7 +59,7 @@ Decisions are usually made by [lazy consensus](#consensus). If no consensus can 
 
 ### Pull requests
 
-A pull request which proposes changes aligned with an approved technical decision does not require consensus. If a team member explicitly objects to the changes a vote may be called.
+A pull request which proposes changes aligned with an approved technical decision does not require consensus, but does require the approval of at least one team member who is not the author of the PR. If a team member explicitly objects to the change, whether before or after the PR is merged, a vote may be called to block or revert the PR, respectively.
 
 ### Governance changes
 
