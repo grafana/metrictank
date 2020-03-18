@@ -249,7 +249,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			}
 			return
 		}
-		ctx.Error(http.StatusBadRequest, err.Error())
+		ctx.Error(err.HTTPStatusCode(), err.Error())
 		return
 	}
 
