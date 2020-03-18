@@ -57,13 +57,17 @@ Technical decisions should be discussed and voted upon on the Metrictank [develo
 
 Decisions are usually made by [lazy consensus](#consensus). If no consensus can be reached, the matter may be resolved by [majority](#majority-vote) vote.
 
+### Pull requests
+
+A pull request which proposes changes aligned with an approved technical decision does not require consensus. If a team member explicity objects to the changes a vote may be called.
+
 ### Governance changes
 
 Material changes to this document are discussed publicly in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) or on the Metrictank [development mailing list][devlist]. Any change requires a [supermajority](#supermajority-vote) in favor.
 
 ### Editorial changes
 
-Editorial changes are changes which fix spelling or grammar, update work affiliation, or similar; they update style or reflect an outside and obvious reality. They do not change the intention or meaning of anything in this document. They must be made via PR and accepted via [lazy consensus](#consensus).
+Editorial changes are changes which fix spelling or grammar, update work affiliation, or similar; they update style or reflect an outside and obvious reality. They do not change the intention or meaning of anything in this document. They must be made via PR and accepted via [lazy consensus](#consensus). Editorial changes do not require the typical 14 day open voting period. A PR for an editorial change only needs to remain open for 5 days to achieve lazy consensus.
 
 ### Other matters
 
@@ -75,7 +79,7 @@ The Metrictank project usually runs by [lazy consensus](#consensus), however som
 
 Depending on the subject matter, as laid out above, different methods of voting are used.
 
-For all votes, including [lazy consensus](#consensus), voting must be open for at least 21 days. The end date should be clearly stated in the call to vote. A vote may be called and closed early if enough votes have come in one way so that further votes cannot change the final decision.
+For all votes, including [lazy consensus](#consensus), voting must be open for at least 14 days unless otherwise specified in this document. The end date should be clearly stated in the call to vote. A vote may be called and closed early if enough votes have come in one way so that further votes cannot change the final decision.
 
 In all cases, all and only team members are eligible to vote, with the sole exception of the forced removal of a team member, in which said member is not eligible to vote.
 
@@ -146,7 +150,7 @@ The FAQ section is informational and can be changed by [lazy consensus](#consens
 ### How do I reach you on slack?
 
 * [Join][slackjoin] us on slack
-* [Login][slack] to slack
+* [Login][slack] to our slack
 * Join #metrictank-dev for developer discussions
 * Join #metrictank for user support
 
