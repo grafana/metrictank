@@ -15,6 +15,10 @@ Welcome to the Metrictank community. Please be sure to read over our [Code Of Co
 * [User Support Mailing List][userlist] - for user support
 * [Announcements Mailing List][announcelist] - for important announcements
 
+## Contributing
+
+Please refer to our [guidelines for contributing][contributing]
+
 ## Governance
 
 If you are interested in how we make decisions about team members, feature requests, or pull requests, please read our [governance policy][governance]
@@ -26,3 +30,4 @@ If you are interested in how we make decisions about team members, feature reque
 [slack]: https://grafana.slack.com/
 [slackjoin]: https://slack.grafana.com/
 [governance]: https://github.com/grafana/metrictank/blob/master/GOVERNANCE.md
+[contributing]: https://github.com/grafana/metrictank/blob/master/docs/CONTRIBUTING.md
