@@ -55,11 +55,18 @@ func equalSeries(exp, got models.Series) error {
 		return fmt.Errorf("output expected %d, got %d", len(exp.Datapoints), len(got.Datapoints))
 	}
 	for j, p := range got.Datapoints {
-		bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-		if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
+		if (doubleFuzzyEqual(p.Val, exp.Datapoints[j].Val)) && p.Ts == exp.Datapoints[j].Ts {
 			continue
 		}
 		return fmt.Errorf("point %d - expected %v got %v", j, exp.Datapoints[j], p)
 	}
 	return nil
+}
+
+func doubleFuzzyEqual(a, b float64) bool {
+	if math.IsNaN(a) && math.IsNaN(b) {
+		return true
+	}
+	var epsilon = 1e-10
+	return a == b || math.Abs(a-b) < epsilon
 }
