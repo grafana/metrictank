@@ -17,7 +17,7 @@ Welcome to the Metrictank community. Please be sure to read over our [Code Of Co
 
 ## Governance
 
-If you are interested in how we make decisions about team members, feature requests, or prioritization of work, please read our [governance policy][governance]
+If you are interested in how we make decisions about team members, feature requests, or pull requests, please read our [governance policy][governance]
 
 [userlist]: https://groups.google.com/forum/#!forum/metrictank-users/
 [devlist]: https://groups.google.com/forum/#!forum/metrictank-dev/
