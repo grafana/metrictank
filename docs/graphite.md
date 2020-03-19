@@ -142,7 +142,7 @@ See also:
 | removeBelowValue(seriesList, n) seriesList                     |              | Stable     |
 | removeBetweenPercentile                                        |              | No         |
 | removeEmptySeries                                              |              | No         |
-| roundFunction                                                  |              | No         |
+| round                                                          |              | Stable     |
 | scale(seriesList, num) series                                  |              | Stable     |
 | scaleToSeconds(seriesList, seconds) seriesList                 |              | Stable     |
 | secondYAxis                                                    |              | No         |
