@@ -120,7 +120,7 @@ func TestRoundLowPrecInput(t *testing.T) {
 		}, {
 			precision:      20,
 			expectedName:   "round(lowPrec,20)",
-			expectedOutput: lowPrecR2,
+			expectedOutput: lowPrecR20,
 		},
 	}
 
