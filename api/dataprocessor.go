@@ -239,7 +239,6 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	for _, nodeReqs := range remoteReqs {
 		shardID := nodeReqs[0].Node.GetPartitions()[0]
 		requiredPeers[shardID] = allPeers[shardID]
-		// TODO - Sometimes two peers from the same shard have different responses here...very strange
 		shardReqs[shardID] = append(shardReqs[shardID], nodeReqs...)
 	}
 
