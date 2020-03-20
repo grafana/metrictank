@@ -512,7 +512,7 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(conte
 	return queryPeers(ctx, peerGroups, fetchFunc)
 }
 
-// queryAllShardsGeneric takes a function and peers grouped by shard. The function
+// queryPeers takes a function and peers grouped by shard. The function
 // is called it for one peer of each shard. If any peer fails, we try another replica.
 // If enough peers have been heard from (based on speculation-threshold configuration),
 // and we are missing the others, try to speculatively query other members of the shard group.
