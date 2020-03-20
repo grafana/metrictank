@@ -255,6 +255,21 @@ func (n *HTTPNode) SetPartitions(part []int32) {
 	n.Updated = time.Now()
 }
 
+type RawResp struct {
+	io.ReadCloser
+	span opentracing.Span
+}
+
+func (rr RawResp) Close() error {
+	rr.span.Finish()
+	if rr.ReadCloser != nil {
+		return rr.ReadCloser.Close()
+	}
+	return nil
+}
+
+// PostRaw executes a post request on the HTTPNode
+// Important: Close() must always be called on the returned ReadCloser, regardless of error state!
 func (n HTTPNode) PostRaw(ctx context.Context, name, path string, body Traceable) (io.ReadCloser, error) {
 	ctx, span := tracing.NewSpan(ctx, Tracer, name)
 	tags.SpanKindRPCClient.Set(span)
@@ -270,18 +285,21 @@ func (n HTTPNode) PostRaw(ctx context.Context, name, path string, body Traceable
 		if err != nil || time.Since(pre) > 10*time.Second {
 			body.TraceDebug(span)
 		}
-		span.Finish()
 	}(time.Now())
+
+	resp := RawResp{
+		span: span,
+	}
 
 	b, err := json.Marshal(body)
 	if err != nil {
-		return nil, NewError(http.StatusInternalServerError, err)
+		return resp, NewError(http.StatusInternalServerError, err)
 	}
 	reader := bytes.NewReader(b)
 	addr := n.RemoteURL() + path
 	req, err := http.NewRequest("POST", addr, reader)
 	if err != nil {
-		return nil, NewError(http.StatusInternalServerError, err)
+		return resp, NewError(http.StatusInternalServerError, err)
 	}
 	req = req.WithContext(ctx)
 	carrier := opentracing.HTTPHeadersCarrier(req.Header)
@@ -298,30 +316,31 @@ func (n HTTPNode) PostRaw(ctx context.Context, name, path string, body Traceable
 	case <-ctx.Done():
 		log.Debugf("CLU HTTPNode: context canceled on request to peer %s", n.Name)
 		err = nil
-		return nil, nil
+		return resp, nil
 	default:
 	}
 
 	if err != nil {
 		tags.Error.Set(span, true)
 		log.Errorf("CLU HTTPNode: error trying to talk to peer %s: %s", n.Name, err.Error())
-		return nil, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
+		return resp, NewError(http.StatusServiceUnavailable, errors.New("error trying to talk to peer"))
 	}
 	if rsp.StatusCode != 200 {
 		// Read in body so that the connection can be reused
 		io.Copy(ioutil.Discard, rsp.Body)
 		rsp.Body.Close()
-		return nil, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
+		return resp, NewError(rsp.StatusCode, fmt.Errorf(rsp.Status))
 	}
-	return rsp.Body, nil
+	resp.ReadCloser = rsp.Body
+	return resp, nil
 }
 
 func (n HTTPNode) Post(ctx context.Context, name, path string, body Traceable) (ret []byte, err error) {
 	bodyReader, err := n.PostRaw(ctx, name, path, body)
-	if err != nil || bodyReader == nil {
+	defer bodyReader.Close()
+	if err != nil {
 		return nil, err
 	}
-	defer bodyReader.Close()
 	return ioutil.ReadAll(bodyReader)
 }
 
