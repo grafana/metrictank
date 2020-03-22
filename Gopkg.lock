@@ -541,11 +541,12 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:ab414e66ca8d4ae93fc50eb34f0cff05fc8db3f9abb4223e571958b372f2ad77"
+  digest = "1:44c66ad69563dbe3f8e76d7d6cad21a03626e53f1875b5ab163ded419e01ca7a"
   name = "github.com/philhofer/fwd"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "92647f2bd94a89b170c19e96e6456dd64ac37e1a"
+  revision = "bb6d471dc95d4fe11e432687f8b70ff496cf3136"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:e39e722511703c69078a9455ce2c132db079547fd37861b42045d26a9dcd9c27"

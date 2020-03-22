@@ -13,6 +13,7 @@ import (
 
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
+	"github.com/tinylib/msgp/msgp"
 	macaron "gopkg.in/macaron.v1"
 
 	"github.com/grafana/metrictank/api/middleware"
@@ -106,7 +107,7 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 		From:     seenAfter,
 	}
 
-	resps, err := s.peerQuerySpeculative(ctx, data, "findSeriesRemote", "/index/find")
+	resps, err := s.queryAllShards(ctx, data, "findSeriesRemote", "/index/find")
 	if err != nil {
 		return nil, err
 	}
@@ -926,7 +927,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filte
 	result := make(map[string]uint64)
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter}
-	resps, err := s.peerQuerySpeculative(ctx, data, "clusterTagDetails", "/index/tag_details")
+	resps, err := s.queryAllShards(ctx, data, "clusterTagDetails", "/index/tag_details")
 	if err != nil {
 		return nil, err
 	}
@@ -1026,16 +1027,22 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions.Strings(), From: from}
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	responseChan, errorChan := s.peerQuerySpeculativeChan(newCtx, data, "clusterFindByTag", "/index/find_by_tag")
+	responseChan, errorChan := s.queryAllShardsGeneric(newCtx,
+		func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
+			resp := models.IndexFindByTagResp{}
+			body, err := peer.PostRaw(reqCtx, "clusterFindByTag", "/index/find_by_tag", data)
+			defer body.Close()
+			if err != nil {
+				return nil, err
+			}
+			err = msgp.Decode(body, &resp)
+			return resp, err
+		})
 
 	var allSeries []Series
 
 	for r := range responseChan {
-		resp := models.IndexFindByTagResp{}
-		_, err := resp.UnmarshalMsg(r.buf)
-		if err != nil {
-			return nil, err
-		}
+		resp := r.resp.(models.IndexFindByTagResp)
 
 		// Only check if maxSeriesPerReq > 0 (meaning enabled) or soft-limited
 		checkSeriesLimit := maxSeriesPerReq > 0 || softLimit
@@ -1096,7 +1103,7 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 
 func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string) ([]string, error) {
 	data := models.IndexTags{OrgId: orgId, Filter: filter}
-	resps, err := s.peerQuerySpeculative(ctx, data, "clusterTags", "/index/tags")
+	resps, err := s.queryAllShards(ctx, data, "clusterTags", "/index/tags")
 	if err != nil {
 		return nil, err
 	}
@@ -1148,7 +1155,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId uint32, pref
 	tagSet := make(map[string]struct{})
 
 	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, Limit: limit}
-	responses, err := s.peerQuerySpeculative(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
+	responses, err := s.queryAllShards(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
 	if err != nil {
 		return nil, err
 	}
@@ -1195,7 +1202,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32,
 	valSet := make(map[string]struct{})
 
 	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, Limit: limit}
-	responses, err := s.peerQuerySpeculative(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
+	responses, err := s.queryAllShards(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
 	if err != nil {
 		return nil, err
 	}
@@ -1226,7 +1233,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32,
 
 func (s *Server) graphiteTagTerms(ctx *middleware.Context, request models.GraphiteTagTerms) {
 	data := models.IndexTagTerms{OrgId: ctx.OrgId, Tags: request.Tags, Expr: request.Expr}
-	responses, err := s.peerQuerySpeculative(ctx.Req.Context(), data, "graphiteTagTerms", "/index/tags/terms")
+	responses, err := s.queryAllShards(ctx.Req.Context(), data, "graphiteTagTerms", "/index/tags/terms")
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
@@ -1303,7 +1310,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 	}
 
 	data := models.IndexTagDelSeries{OrgId: ctx.OrgId, Paths: request.Paths}
-	responses, errors := s.peerQuery(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
+	responses, errors := s.queryAllPeers(ctx.Req.Context(), data, "clusterTagDelSeries,", "/index/tags/delSeries")
 
 	// if there are any errors, write one of them and return
 	for _, err := range errors {

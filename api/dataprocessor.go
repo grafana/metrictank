@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/metrictank/expr"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
@@ -23,6 +24,7 @@ import (
 	tags "github.com/opentracing/opentracing-go/ext"
 	traceLog "github.com/opentracing/opentracing-go/log"
 	log "github.com/sirupsen/logrus"
+	"github.com/tinylib/msgp/msgp"
 )
 
 // doRecover is the handler that turns panics into returns from the top level of getTarget.
@@ -228,52 +230,51 @@ func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs [
 // getTargetsRemote issues the requests on other nodes
 // it's nothing more than a thin network wrapper around getTargetsLocal of a peer.
 func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[string][]models.Req) ([]models.Series, error) {
-	responses := make(chan getTargetsResp, len(remoteReqs))
-	rCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg := sync.WaitGroup{}
-	wg.Add(len(remoteReqs))
-	for _, nodeReqs := range remoteReqs {
-		log.Debugf("DP getTargetsRemote: handling %d reqs from %s", len(nodeReqs), nodeReqs[0].Node.GetName())
-		go func(reqs []models.Req) {
-			defer wg.Done()
-			node := reqs[0].Node
-			buf, err := node.Post(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
-			if err != nil {
-				cancel()
-				responses <- getTargetsResp{nil, err}
-				return
-			}
-			var resp models.GetDataRespV1
-			_, err = resp.UnmarshalMsg(buf)
-			if err != nil {
-				cancel()
-				log.Errorf("DP getTargetsRemote: error unmarshaling body from %s/getdata: %q", node.GetName(), err.Error())
-				responses <- getTargetsResp{nil, err}
-				return
-			}
-			log.Debugf("DP getTargetsRemote: %s returned %d series", node.GetName(), len(resp.Series))
-			ss.Add(&resp.Stats)
-			responses <- getTargetsResp{resp.Series, nil}
-		}(nodeReqs)
+
+	allPeers, err := cluster.MembersForSpeculativeQuery()
+	if err != nil {
+		return nil, err
 	}
 
-	// wait for all getTargetsRemote goroutines to end, then close our responses channel
-	go func() {
-		wg.Wait()
-		close(responses)
-	}()
+	requiredPeers := make(map[int32][]cluster.Node)
+	shardReqs := make(map[int32][]models.Req)
+	for _, nodeReqs := range remoteReqs {
+		shardID := nodeReqs[0].Node.GetPartitions()[0]
+		requiredPeers[shardID] = allPeers[shardID]
+		shardReqs[shardID] = append(shardReqs[shardID], nodeReqs...)
+	}
+
+	rCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	resultChan, errorChan := queryPeers(rCtx, requiredPeers, func(ctx context.Context, node cluster.Node) (interface{}, error) {
+		var resp models.GetDataRespV1
+		reqs, ok := shardReqs[node.GetPartitions()[0]]
+		if !ok {
+			log.Warnf("Unexpected shard group, node = %q", node)
+			// Return empty response, no error
+			return resp, nil
+		}
+		body, err := node.PostRaw(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
+		defer body.Close()
+		if err != nil {
+			return nil, err
+		}
+		err = msgp.Decode(body, &resp)
+		return resp, err
+	})
 
 	out := make([]models.Series, 0)
-	for resp := range responses {
-		if resp.err != nil {
-			return nil, resp.err
-		}
-		out = append(out, resp.series...)
+	for r := range resultChan {
+		resp := r.resp.(models.GetDataRespV1)
+		log.Debugf("DP getTargetsRemote: %s returned %d series", r.peer.GetName(), len(resp.Series))
+		ss.Add(&resp.Stats)
+		out = append(out, resp.Series...)
 	}
 
 	log.Debugf("DP getTargetsRemote: total of %d series found on peers", len(out))
-	return out, nil
+	err = <-errorChan
+	return out, err
 }
 
 // error is the error of the first failing target request

@@ -127,6 +127,10 @@ unused-packages = true
   source = "https://github.com/jaegertracing/jaeger-client-go.git"
 
 [[override]]
+  name = "github.com/philhofer/fwd"
+  version = "v1.0.0"
+
+[[override]]
   name = "github.com/uber/jaeger-lib"
   source = "https://github.com/jaegertracing/jaeger-lib.git"
 
