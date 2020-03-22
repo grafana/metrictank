@@ -239,7 +239,6 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	for _, nodeReqs := range remoteReqs {
 		shardID := nodeReqs[0].Node.GetPartitions()[0]
 		requiredPeers[shardID] = allPeers[shardID]
-		// TODO - Sometimes two peers from the same shard have different responses here...very strange
 		shardReqs[shardID] = append(shardReqs[shardID], nodeReqs...)
 	}
 
@@ -255,11 +254,11 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 			return resp, nil
 		}
 		body, err := node.PostRaw(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
-		if body == nil || err != nil {
+		defer body.Close()
+		if err != nil {
 			return nil, err
 		}
 		err = msgp.Decode(body, &resp)
-		body.Close()
 		return resp, err
 	})
 
