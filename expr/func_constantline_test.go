@@ -11,14 +11,11 @@ import (
 )
 
 func TestConstantLineSimple(t *testing.T) {
-	testConstantLine(
-		"simple",
-		1,
-		0,
-		100,
-		makeConstantLineSeries(1, 0, 100),
-		t,
-	)
+	testConstantLineWrapper("simple", 1, 0, 100, t)
+}
+
+func testConstantLineWrapper(name string, value float64, from uint32, to uint32, t *testing.T) {
+	testConstantLine(name, value, from, to, makeConstantLineSeries(value, from, to), t)
 }
 
 func makeConstantLineSeries(value float64, from uint32, to uint32) ([]models.Series) {
