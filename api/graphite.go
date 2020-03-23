@@ -1031,11 +1031,11 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 		func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
 			resp := models.IndexFindByTagResp{}
 			body, err := peer.PostRaw(reqCtx, "clusterFindByTag", "/index/find_by_tag", data)
-			defer body.Close()
-			if err != nil {
+			if body == nil || err != nil {
 				return nil, err
 			}
 			err = msgp.Decode(body, &resp)
+			body.Close()
 			return resp, err
 		})
 
