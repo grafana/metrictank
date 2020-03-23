@@ -256,11 +256,11 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 			return resp, nil
 		}
 		body, err := node.PostRaw(rCtx, "getTargetsRemote", "/getdata", models.GetData{Requests: reqs})
-		defer body.Close()
-		if err != nil {
+		if body == nil || err != nil {
 			return nil, err
 		}
 		err = msgp.Decode(body, &resp)
+		body.Close()
 		return resp, err
 	})
 
