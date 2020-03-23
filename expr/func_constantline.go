@@ -1,7 +1,7 @@
 package expr
 
 import (
-	"strconv"
+	"fmt"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
@@ -26,8 +26,8 @@ func (s *FuncConstantLine) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncConstantLine) Context(context Context) Context {
-	s.from = context.from
-	s.to = context.to
+	s.from = context.from - 1
+	s.to = context.to - 1
 	return context
 }
 
@@ -39,7 +39,7 @@ func (s *FuncConstantLine) Exec(dataMap DataMap) ([]models.Series, error) {
 			schema.Point{Val: s.value, Ts: s.to},
 		)
 
-	strValue := strconv.FormatFloat(s.value, 'f', -1, 64)
+	strValue := fmt.Sprintf("%g", s.value)
 
 	outputs := make([]models.Series, 1)
 	outputs[0] = models.Series{
@@ -47,6 +47,7 @@ func (s *FuncConstantLine) Exec(dataMap DataMap) ([]models.Series, error) {
 		QueryPatt: strValue,
 		Datapoints: out,
 	}
+	outputs[0].SetTags()
 
 	dataMap.Add(Req{}, outputs...)
 	return outputs, nil
