@@ -1,7 +1,7 @@
 package expr
 
 import (
-	"math"
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -16,20 +16,25 @@ func TestConstantLineSimple(t *testing.T) {
 		1,
 		0,
 		100,
-		makeConstantLineSeries(1, 0, 100)
+		makeConstantLineSeries(1, 0, 100),
+		t,
 	)
 }
 
 func makeConstantLineSeries(value float64, from uint32, to uint32) ([]models.Series) {
-	return []models.Series{
-		Target:		 fmt.Sprintf("%g", value),
-		QueryPatt:   fmt.Sprintf("%g", value),
-		Datapoints: []schema.Point{
-			{Val: value, Ts: from},
-			{Val: value, Ts: from + uint32((to-from)/2.0)},
-			{Val: value, Ts: to},
+	series := []models.Series{
+		{
+			Target:		 fmt.Sprintf("%g", value),
+			QueryPatt:   fmt.Sprintf("%g", value),
+			Datapoints: []schema.Point{
+				{Val: value, Ts: from},
+				{Val: value, Ts: from + uint32((to-from)/2.0)},
+				{Val: value, Ts: to},
+			},
 		},
 	}
+
+	return series
 }
 
 func testConstantLine(name string, value float64, from uint32, to uint32, out []models.Series, t *testing.T) {
@@ -37,7 +42,7 @@ func testConstantLine(name string, value float64, from uint32, to uint32, out []
 	f.(*FuncConstantLine).value  = value
 	f.(*FuncConstantLine).from = from
 	f.(*FuncConstantLine).to = to
-	gots, err = f.Exec(make(map[Req][]models.Series))
+	gots, err := f.Exec(make(map[Req][]models.Series))
 
 	if err != nil {
 		t.Fatalf("case %q: err should be nil. got %q", name, err)
@@ -117,8 +122,8 @@ func benchmarkConstantLine(b *testing.B, numSeries int, fn0, fn1 func() []schema
 	for i := 0; i < b.N; i++ {
 		f := NewConstantLine()
 		f.(*FuncConstantLine).value = 1.0
-		f.(*FuncConstantLine).from = 1584849600000
-		f.(*FuncConstantLine).to = 1584849660000
+		f.(*FuncConstantLine).from = 1584849600
+		f.(*FuncConstantLine).to = 1584849660
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)
