@@ -106,7 +106,7 @@ func TestConstantLineLargeInt(t *testing.T) {
 	}
 }
 
-func TestConstantLineSmallFloatLowPrec(t *testing.T) {
+func TestConstantLineLargeFloatLowPrec(t *testing.T) {
 	cases := []ConstantLineTestCase {
 		{
 			name: "constantLine(1000000000.234)",
@@ -123,7 +123,7 @@ func TestConstantLineSmallFloatLowPrec(t *testing.T) {
 	}
 }
 
-func TestConstantLineSmallFloatHighPrec(t *testing.T) {
+func TestConstantLineLargeFloatHighPrec(t *testing.T) {
 	cases := []ConstantLineTestCase {
 		{
 			name: "constantLine(1000000000.2345678912345)",
