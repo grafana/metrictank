@@ -1,7 +1,7 @@
 package expr
 
 import (
-    "fmt"
+	"fmt"
 	"github.com/grafana/metrictank/api/models"
 )
 
@@ -27,14 +27,14 @@ func (s *FuncUnique) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-    seenNames := make(map[string]bool)
+	seenNames := make(map[string]bool)
 	var uniqueSeries []models.Series
-    for _, serie := range series {
-        if _, ok := seenNames[serie.Target]; !ok {
-            seenNames[serie.Target] = true
-            uniqueSeries = append(uniqueSeries, serie)
-        }
-    }
-    fmt.Println("New UNIQUE func called !!!")
-    return uniqueSeries, nil
+	for _, serie := range series {
+		if _, ok := seenNames[serie.Target]; !ok {
+			seenNames[serie.Target] = true
+			uniqueSeries = append(uniqueSeries, serie)
+		}
+	}
+	fmt.Println("New UNIQUE func called !!!")
+	return uniqueSeries, nil
 }

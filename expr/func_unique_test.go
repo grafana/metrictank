@@ -72,34 +72,34 @@ func TestUnique(t *testing.T) {
 	)
 
 	out := []models.Series{
-        {
-            Interval:   10,
-            QueryPatt:  "foo.a",
-            Target:     "foo.a",
-            Datapoints: getCopy(a),
-        },
-        {
-            Interval:   100,
-            QueryPatt:  "foo.b",
-            Target:     "foo.b",
-            Datapoints: getCopy(b),
-        },
-        {
-            Interval:   10,
-            QueryPatt:  "bar.b",
-            Target:     "bar.b",
-            Datapoints: getCopy(b),
-        },
-        {
-            Interval:   100,
-            QueryPatt:  "bar.*",
-            Target:     "bar.d",
-            Datapoints: getCopy(d),
-        },
-    }
+		{
+			Interval:   10,
+			QueryPatt:  "foo.a",
+			Target:     "foo.a",
+			Datapoints: getCopy(a),
+		},
+		{
+			Interval:   100,
+			QueryPatt:  "foo.b",
+			Target:     "foo.b",
+			Datapoints: getCopy(b),
+		},
+		{
+			Interval:   10,
+			QueryPatt:  "bar.b",
+			Target:     "bar.b",
+			Datapoints: getCopy(b),
+		},
+		{
+			Interval:   100,
+			QueryPatt:  "bar.*",
+			Target:     "bar.d",
+			Datapoints: getCopy(d),
+		},
+	}
 
 	got, err := f.Exec(make(map[Req][]models.Series))
-    if err := equalOutput(out, got, nil, err); err != nil {
+	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
 }
