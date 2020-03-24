@@ -1,7 +1,9 @@
 package cassandra
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/grafana/globalconf"
@@ -33,6 +35,20 @@ type StoreConfig struct {
 	SchemaFile               string
 	ConnectionCheckInterval  time.Duration
 	ConnectionCheckTimeout   time.Duration
+	MaxChunkSpan             time.Duration
+}
+
+// Validate makes sure the StoreConfig settings are valid
+func (cfg *StoreConfig) Validate(schemaMaxChunkSpan uint32) error {
+	if CliConfig.MaxChunkSpan%time.Second != 0 {
+		return errors.New("max-chunkspan must be a whole number of seconds")
+	}
+	if CliConfig.Enabled {
+		if uint32(CliConfig.MaxChunkSpan.Seconds()) < schemaMaxChunkSpan {
+			return fmt.Errorf("max-chunkspan must be at least as high as the max chunkspan used in your storage-schemas (which is %d)", schemaMaxChunkSpan)
+		}
+	}
+	return nil
 }
 
 // return StoreConfig with default values set.
@@ -63,6 +79,7 @@ func NewStoreConfig() *StoreConfig {
 		SchemaFile:               "/etc/metrictank/schema-store-cassandra.toml",
 		ConnectionCheckInterval:  time.Second * 5,
 		ConnectionCheckTimeout:   time.Second * 30,
+		MaxChunkSpan:             time.Hour * 24,
 	}
 }
 
@@ -95,6 +112,7 @@ func ConfigSetup() *flag.FlagSet {
 	cas.StringVar(&CliConfig.SchemaFile, "schema-file", CliConfig.SchemaFile, "File containing the needed schemas in case database needs initializing")
 	cas.DurationVar(&CliConfig.ConnectionCheckInterval, "connection-check-interval", CliConfig.ConnectionCheckInterval, "interval at which to perform a connection check to cassandra, set to 0 to disable.")
 	cas.DurationVar(&CliConfig.ConnectionCheckTimeout, "connection-check-timeout", CliConfig.ConnectionCheckTimeout, "maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval.")
+	cas.DurationVar(&CliConfig.MaxChunkSpan, "max-chunkspan", CliConfig.MaxChunkSpan, "Maximum chunkspan size used.")
 	globalconf.Register("cassandra", cas, flag.ExitOnError)
 	return cas
 }
