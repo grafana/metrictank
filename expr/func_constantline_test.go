@@ -10,12 +10,153 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-func TestConstantLineSimple(t *testing.T) {
-	testConstantLineWrapper("simple", 1, 0, 100, t)
+type ConstantLineTestCase struct {
+	name 	string
+	value 	float64
 }
 
-func testConstantLineWrapper(name string, value float64, from uint32, to uint32, t *testing.T) {
-	testConstantLine(name, value, from, to, makeConstantLineSeries(value, from, to), t)
+// array of time ranges
+// 1s, 1m, 1hr, 1day, 30days, 400days
+var timeRanges = []uint32{
+	1,
+	60,
+	3600,
+	86400,
+	2592000,
+	34560000,
+}
+func TestConstantLineSmallInt(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1)",
+			value: 1,
+		},
+		{
+			name: "constantLine(100)",
+			value: 100,
+		},
+		{
+			name: "constantLine(10000)",
+			value: 10000,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+func TestConstantLineSmallFloatLowPrec(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1.234)",
+			value: 1.234,
+		},
+		{
+			name: "constantLine(100.234)",
+			value: 100.234,
+		},
+		{
+			name: "constantLine(10000.234)",
+			value: 10000.234,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+func TestConstantLineSmallFloatHighPrec(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1.2345678912345)",
+			value: 1.2345678912345,
+		},
+		{
+			name: "constantLine(100.2345678912345)",
+			value: 100.2345678912345,
+		},
+		{
+			name: "constantLine(10000.2345678912345)",
+			value: 10000.2345678912345,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+
+func TestConstantLineLargeInt(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1000000000)",
+			value: 1000000000,
+		},
+		{
+			name: "constantLine(1000000000000)",
+			value: 1000000000000,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+func TestConstantLineSmallFloatLowPrec(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1000000000.234)",
+			value: 1000000000.234,
+		},
+		{
+			name: "constantLine(1000000000000.234)",
+			value: 1000000000000.234,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+func TestConstantLineSmallFloatHighPrec(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1000000000.2345678912345)",
+			value: 1000000000.2345678912345,
+		},
+		{
+			name: "constantLine(1000000000000.2345678912345)",
+			value: 1000000000000.2345678912345,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+func TestConstantLineFloatTooManyDecimals(t *testing.T) {
+	cases := []ConstantLineTestCase {
+		{
+			name: "constantLine(1.23456789123456789123456789)",
+			value: 1.23456789123456789123456789,
+		},
+	}
+
+	for _, to := range timeRanges {
+		testConstantLineWrapper(cases, 0, to, t)
+	}
+}
+
+func testConstantLineWrapper(cases []ConstantLineTestCase, from uint32, to uint32, t *testing.T) {
+	for _, c := range cases {
+		testConstantLine(c.name, c.value, from, to, makeConstantLineSeries(c.value, from, to), t)
+	}
 }
 
 func makeConstantLineSeries(value float64, from uint32, to uint32) ([]models.Series) {
@@ -39,29 +180,10 @@ func testConstantLine(name string, value float64, from uint32, to uint32, out []
 	f.(*FuncConstantLine).value  = value
 	f.(*FuncConstantLine).from = from
 	f.(*FuncConstantLine).to = to
-	gots, err := f.Exec(make(map[Req][]models.Series))
+	got, err := f.Exec(make(map[Req][]models.Series))
 
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
-	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: isNonNull len output expected %d, got %d", name, len(out), len(gots))
-	}
-
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
-		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			if (p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
-		}
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Failed test %q: , got %q", name, err)
 	}
 }
 
