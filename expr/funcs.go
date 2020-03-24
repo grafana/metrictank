@@ -117,6 +117,7 @@ func init() {
 		"sumSeries":             {NewAggregateConstructor("sum", crossSeriesSum), true},
 		"summarize":             {NewSummarize, true},
 		"transformNull":         {NewTransformNull, true},
+		"unique":                {NewUnique, true},
 	}
 }
 
