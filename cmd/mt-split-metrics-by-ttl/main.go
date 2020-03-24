@@ -64,7 +64,7 @@ func main() {
 		panic(fmt.Sprintf("Error creating directory: %s", err))
 	}
 
-	store, err := cassandra.NewCassandraStore(storeConfig, ttls)
+	store, err := cassandra.NewCassandraStore(storeConfig, ttls, 86400)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}

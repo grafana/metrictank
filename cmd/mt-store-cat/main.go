@@ -185,7 +185,7 @@ func main() {
 		}
 	}
 
-	store, err := cassandra.NewCassandraStore(storeConfig, nil)
+	store, err := cassandra.NewCassandraStore(storeConfig, nil, 86400)
 	if err != nil {
 		log.Fatalf("failed to initialize cassandra. %s", err.Error())
 	}

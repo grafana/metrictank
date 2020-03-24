@@ -116,7 +116,7 @@ func main() {
 
 	var store mdata.Store
 	if cassandraStore.CliConfig.Enabled {
-		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
+		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs(), 86400)
 		if err != nil {
 			log.Fatalf("failed to initialize cassandra backend store. %s", err)
 		}

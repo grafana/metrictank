@@ -92,7 +92,7 @@ func main() {
 	// note: cassandraStore will not be aware via its TTLTables attribute of the other, pre-existing tables,
 	// only of the table we're copying to. but that's ok because we don't exercise any functionality that
 	// needs that
-	store, err := cassandra.NewCassandraStore(cassandra.CliConfig, []uint32{ttlIn, ttlOut})
+	store, err := cassandra.NewCassandraStore(cassandra.CliConfig, []uint32{ttlIn, ttlOut}, 86400)
 
 	if err != nil {
 		log.Fatalf("Failed to instantiate cassandra: %s", err)
