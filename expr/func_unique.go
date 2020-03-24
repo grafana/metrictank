@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"fmt"
 	"github.com/grafana/metrictank/api/models"
 )
 
@@ -35,6 +34,5 @@ func (s *FuncUnique) Exec(dataMap DataMap) ([]models.Series, error) {
 			uniqueSeries = append(uniqueSeries, serie)
 		}
 	}
-	fmt.Println("New UNIQUE func called !!!")
 	return uniqueSeries, nil
 }
