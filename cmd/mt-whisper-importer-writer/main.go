@@ -21,6 +21,7 @@ import (
 	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/logger"
 	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/importer"
 	bigTableStore "github.com/grafana/metrictank/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/store/cassandra"
@@ -116,7 +117,7 @@ func main() {
 
 	var store mdata.Store
 	if cassandraStore.CliConfig.Enabled {
-		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs(), 86400)
+		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs(), chunk.MaxConfigurableSpan())
 		if err != nil {
 			log.Fatalf("failed to initialize cassandra backend store. %s", err)
 		}

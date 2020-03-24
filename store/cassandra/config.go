@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/grafana/metrictank/mdata/chunk"
+
 	"github.com/grafana/globalconf"
 )
 
@@ -79,7 +81,7 @@ func NewStoreConfig() *StoreConfig {
 		SchemaFile:               "/etc/metrictank/schema-store-cassandra.toml",
 		ConnectionCheckInterval:  time.Second * 5,
 		ConnectionCheckTimeout:   time.Second * 30,
-		MaxChunkSpan:             time.Hour * 24,
+		MaxChunkSpan:             time.Second * time.Duration(chunk.MaxConfigurableSpan()),
 	}
 }
 

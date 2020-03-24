@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
@@ -92,7 +93,7 @@ func main() {
 	// note: cassandraStore will not be aware via its TTLTables attribute of the other, pre-existing tables,
 	// only of the table we're copying to. but that's ok because we don't exercise any functionality that
 	// needs that
-	store, err := cassandra.NewCassandraStore(cassandra.CliConfig, []uint32{ttlIn, ttlOut}, 86400)
+	store, err := cassandra.NewCassandraStore(cassandra.CliConfig, []uint32{ttlIn, ttlOut}, chunk.MaxConfigurableSpan())
 
 	if err != nil {
 		log.Fatalf("Failed to instantiate cassandra: %s", err)
