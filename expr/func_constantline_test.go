@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
@@ -15,16 +16,6 @@ type ConstantLineTestCase struct {
 	value 	float64
 }
 
-// array of time ranges
-// 1s, 1m, 1hr, 1day, 30days, 400days
-var timeRanges = []uint32{
-	1,
-	60,
-	3600,
-	86400,
-	2592000,
-	34560000,
-}
 func TestConstantLineSmallInt(t *testing.T) {
 	cases := []ConstantLineTestCase {
 		{
@@ -41,9 +32,7 @@ func TestConstantLineSmallInt(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
 func TestConstantLineSmallFloatLowPrec(t *testing.T) {
@@ -62,9 +51,7 @@ func TestConstantLineSmallFloatLowPrec(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
 func TestConstantLineSmallFloatHighPrec(t *testing.T) {
@@ -83,9 +70,7 @@ func TestConstantLineSmallFloatHighPrec(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
 
@@ -101,9 +86,7 @@ func TestConstantLineLargeInt(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
 func TestConstantLineLargeFloatLowPrec(t *testing.T) {
@@ -118,9 +101,7 @@ func TestConstantLineLargeFloatLowPrec(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
 func TestConstantLineLargeFloatHighPrec(t *testing.T) {
@@ -135,9 +116,7 @@ func TestConstantLineLargeFloatHighPrec(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
 func TestConstantLineFloatTooManyDecimals(t *testing.T) {
@@ -148,14 +127,27 @@ func TestConstantLineFloatTooManyDecimals(t *testing.T) {
 		},
 	}
 
-	for _, to := range timeRanges {
-		testConstantLineWrapper(cases, 0, to, t)
-	}
+	testConstantLineWrapper(cases, t)
 }
 
-func testConstantLineWrapper(cases []ConstantLineTestCase, from uint32, to uint32, t *testing.T) {
+func testConstantLineWrapper(cases []ConstantLineTestCase, t *testing.T) {
+	// array of time ranges
+	// 1s, 1m, 1hr, 1day, 30days, 400days
+	day := time.Hour * 24
+	timeRanges := []time.Duration{
+		time.Second,
+		time.Minute,
+		time.Hour,
+		day,
+		day * 30,
+		day * 400,
+	}
+
 	for _, c := range cases {
-		testConstantLine(c.name, c.value, from, to, makeConstantLineSeries(c.value, from, to), t)
+		for _, to := range timeRanges {
+			toInt := uint32(to)
+			testConstantLine(c.name, c.value, 0, toInt, makeConstantLineSeries(c.value, 0, toInt), t)
+		}
 	}
 }
 
