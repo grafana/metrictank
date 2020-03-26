@@ -62,6 +62,15 @@ var d = []schema.Point{
 	{Val: 250, Ts: 60},
 }
 
+var allZeros = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 0, Ts: 30},
+	{Val: 0, Ts: 40},
+	{Val: 0, Ts: 50},
+	{Val: 0, Ts: 60},
+}
+
 var allNulls = []schema.Point{
 	{Val: math.NaN(), Ts: 10},
 	{Val: math.NaN(), Ts: 20},
