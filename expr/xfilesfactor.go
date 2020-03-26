@@ -6,6 +6,9 @@ import (
 	"github.com/grafana/metrictank/api/models"
 )
 
+// crossSeriesXff returns a boolean indicating if the []models.series
+// is valid. It is valiid if the ratio of non-null points to total points
+// in a window (specified by index) >= minimum ratio (xFilesFactor)
 func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
 	nonNull := 0
 	for i := 0; i < len(in); i++ {
@@ -16,6 +19,8 @@ func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
 	return xff(nonNull, len(in), xFilesFactor)
 }
 
+// xff returns a boolean indicating if the ratio of non-null values
+// to total values is >= minimum ratio (xFilesFactor)
 func xff(nonNull int, total int, xFilesFactor float64) bool {
 	if nonNull <= 0 || total <= 0 {
 		return false

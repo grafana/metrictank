@@ -46,6 +46,8 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 	return nil
 }
 
+// crossSeriesAvg computes the average across all the series
+// using the number of non-null datapoints
 func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		num := 0
@@ -70,6 +72,11 @@ func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 	}
 }
 
+// crossSeriesAvgZero computes the average across all the series
+// using the total number of datapoints (the number of series)
+// So, if the original datapoints were [1, 1, 1, 1, null],
+// crossSeriesAvg would compute the new datapoint as 4/4=1 while
+// crossSeriesAvgZero would compute it as 4/5=0.8
 func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		sum := float64(0)
