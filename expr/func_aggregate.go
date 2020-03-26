@@ -53,15 +53,15 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
-
-	output := aggregate(series, agg, s.xFilesFactor)
+	series = Normalize(dataMap, series)
+	output := aggregate(series, queryPatts, agg, s.xFilesFactor)
 
 	dataMap.Add(Req{}, output)
 
 	return []models.Series{output}, nil
 }
 
-func aggregate(series []models.Series, agg seriesAggregator, xFilesFactor float64) models.Series {
+func aggregate(series []models.Series, queryPatts []string, agg seriesAggregator, xFilesFactor float64) models.Series {
 	if len(series) == 0 {
 		return models.Series{}
 	}
@@ -73,7 +73,6 @@ func aggregate(series []models.Series, agg seriesAggregator, xFilesFactor float6
 		return series[0]
 	}
 	out := pointSlicePool.Get().([]schema.Point)
-	series = Normalize(dataMap, series)
 
 	agg.function(series, &out)
 
@@ -100,7 +99,7 @@ func aggregate(series []models.Series, agg seriesAggregator, xFilesFactor float6
 	}
 
 	cons, queryCons := summarizeCons(series)
-	name := agg.name + "Series(" + formatQueryPatts(series) + ")"
+	name := agg.name + "Series(" + strings.Join(queryPatts, ",") + ")"
 
 	commonTags["aggregatedBy"] = agg.name
 	if _, ok := commonTags["name"]; !ok {

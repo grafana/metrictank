@@ -167,18 +167,9 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 func TestAggregateXFilesFactor(t *testing.T) {
 	input := [][]models.Series{
 		{
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(a),
-			},
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(b),
-			},
-			{
-				QueryPatt:  "foo.*",
-				Datapoints: getCopy(c),
-			},
+			getQuerySeries("foo.*", a),
+			getQuerySeries("foo.*", b),
+			getQuerySeries("foo.*", c),
 		},
 	}
 
@@ -204,10 +195,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgabc),
-		},
+		getTargetSeries("averageSeries(foo.*)", avgabc),
 		t,
 		0,
 	)
@@ -215,10 +203,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.25",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: getCopy(avgabc),
-		},
+		getTargetSeries("averageSeries(foo.*)", avgabc),
 		t,
 		0.25,
 	)
@@ -227,10 +212,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.5",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: avgabcxff05,
-		},
+		getTargetSeries("averageSeries(foo.*)", avgabcxff05),
 		t,
 		0.5,
 	)
@@ -239,10 +221,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.75",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: avgabcxff075,
-		},
+		getTargetSeries("averageSeries(foo.*)", avgabcxff075),
 		t,
 		0.75,
 	)
@@ -251,10 +230,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-1",
 		"average",
 		input,
-		models.Series{
-			Target:     "averageSeries(foo.*)",
-			Datapoints: avgabcxff075,
-		},
+		getTargetSeries("averageSeries(foo.*)", avgabcxff075),
 		t,
 		1,
 	)
