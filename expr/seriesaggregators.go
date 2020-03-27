@@ -95,8 +95,8 @@ func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
 		}
 		// Cases
 		// original is NaN
-			// num = 0 -> stay same
-			// num !=0 -> sum /
+		// num = 0 -> stay same
+		// num !=0 -> sum /
 		// original is Num
 		if math.IsNaN((*out)[i].Val) {
 			(*out)[i].Val = sum
