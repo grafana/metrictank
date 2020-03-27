@@ -50,25 +50,28 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 // using the number of non-null datapoints
 func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
+		*out = append(*out, in[0].Datapoints[i])
+	}
+
+	for i := 0; i < len(in[0].Datapoints); i++ {
 		num := 0
 		sum := float64(0)
-		for j := 0; j < len(in); j++ {
+		for j := 1; j < len(in); j++ {
 			p := in[j].Datapoints[i].Val
 			if !math.IsNaN(p) {
 				num++
 				sum += p
 			}
 		}
-		point := schema.Point{
-			Ts: in[0].Datapoints[i].Ts,
-		}
-		if num == 0 {
-			point.Val = math.NaN()
-		} else {
-			point.Val = sum / float64(num)
+		if num != 0 {
+			if math.IsNaN((*out)[i].Val) {
+				(*out)[i].Val = sum / float64(num)
+			} else {
+				(*out)[i].Val += sum
+				(*out)[i].Val /= float64(num + 1)
+			}
 		}
 
-		*out = append(*out, point)
 	}
 }
 
@@ -79,23 +82,28 @@ func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 // crossSeriesAvgZero would compute it as 4/5=0.8
 func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[0].Datapoints); i++ {
+		*out = append(*out, in[0].Datapoints[i])
+	}
+
+	for i := 0; i < len(in[0].Datapoints); i++ {
 		sum := float64(0)
-		for j := 0; j < len(in); j++ {
+		for j := 1; j < len(in); j++ {
 			p := in[j].Datapoints[i].Val
 			if !math.IsNaN(p) {
 				sum += p
 			}
 		}
-		point := schema.Point{
-			Ts: in[0].Datapoints[i].Ts,
-		}
-		if len(in) == 0 {
-			point.Val = math.NaN()
+		// Cases
+		// original is NaN
+			// num = 0 -> stay same
+			// num !=0 -> sum /
+		// original is Num
+		if math.IsNaN((*out)[i].Val) {
+			(*out)[i].Val = sum
 		} else {
-			point.Val = sum / float64(len(in))
+			(*out)[i].Val += sum
 		}
-
-		*out = append(*out, point)
+		(*out)[i].Val /= float64(len(in))
 	}
 }
 
@@ -253,11 +261,9 @@ func crossSeriesRange(in []models.Series, out *[]schema.Point) {
 
 func crossSeriesLast(in []models.Series, out *[]schema.Point) {
 	for i := 0; i < len(in[len(in)-1].Datapoints); i++ {
-		dp := in[0].Datapoints[i]
-		for _, s := range in {
-			if !math.IsNaN(s.Datapoints[i].Val) {
-				dp = s.Datapoints[i]
-			}
+		dp := in[len(in)-1].Datapoints[i]
+		for j := len(in) - 2; j >= 0 && math.IsNaN(dp.Val); j-- {
+			dp = in[j].Datapoints[i]
 		}
 		*out = append(*out, dp)
 	}

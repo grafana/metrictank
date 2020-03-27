@@ -77,9 +77,11 @@ func aggregate(series []models.Series, queryPatts []string, agg seriesAggregator
 	agg.function(series, &out)
 
 	//remove values in accordance to xFilesFactor
-	for i := 0; i < len(series[0].Datapoints); i++ {
-		if !crossSeriesXff(series, i, xFilesFactor) {
-			out[i].Val = math.NaN()
+	if !skipCrossSeriesXff(xFilesFactor) {
+		for i := 0; i < len(series[0].Datapoints); i++ {
+			if !crossSeriesXff(series, i, xFilesFactor) {
+				out[i].Val = math.NaN()
+			}
 		}
 	}
 
