@@ -121,19 +121,20 @@ func checkSpacing(points []graphite.Point) bool {
 func initMetricsBySeries() {
 	for p := 0; p < int(partitionCount); p++ {
 		metrics := partitionMetrics{
-			// metric parrot.monitoring.nancount is the number of missing values for each series
+			//TODO enable metrics2docs by adding 'metric' prefix to each metric
+			// parrot.monitoring.nancount is the number of missing values for each series
 			nanCount: stats.NewGauge32WithTags("parrot.monitoring.nancount", fmt.Sprintf(";partition=%d", p)),
-			// metric parrot.monitoring.lag is the time since the last value was recorded
+			// parrot.monitoring.lag is the time since the last value was recorded
 			lag: stats.NewGauge32WithTags("parrot.monitoring.lag", fmt.Sprintf(";partition=%d", p)),
-			// metric parrot.monitoring.deltaSum is the total amount of drift between expected value and actual values
+			// parrot.monitoring.deltaSum is the total amount of drift between expected value and actual values
 			deltaSum: stats.NewGauge32WithTags("parrot.monitoring.deltaSum", fmt.Sprintf(";partition=%d", p)),
-			// metric parrot.monitoring.nonMatching is the total number of entries where drift occurred
+			// parrot.monitoring.nonMatching is the total number of entries where drift occurred
 			nonMatching: stats.NewGauge32WithTags("parrot.monitoring.nonMatching", fmt.Sprintf(";partition=%d", p)),
-			// metric parrot.monitoring.correctNumPoints is whether the expected number of points were received
+			// parrot.monitoring.correctNumPoints is whether the expected number of points were received
 			correctNumPoints: stats.NewBoolWithTags("parrot.monitoring.correctNumPoints", fmt.Sprintf(";partition=%d", p)),
-			// metric parrot.monitoring.correctAlignment is whether the last ts matches `now`
+			// parrot.monitoring.correctAlignment is whether the last ts matches `now`
 			correctAlignment: stats.NewBoolWithTags("parrot.monitoring.correctAlignment", fmt.Sprintf(";partition=%d", p)),
-			// metric parrot.monitoring.correctSpacing is whether all points are sorted and 1 period apart
+			// parrot.monitoring.correctSpacing is whether all points are sorted and 1 period apart
 			correctSpacing: stats.NewBoolWithTags("parrot.monitoring.correctSpacing", fmt.Sprintf(";partition=%d", p)),
 		}
 		metricsBySeries = append(metricsBySeries, metrics)
