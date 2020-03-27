@@ -34,17 +34,17 @@ func (s *FuncConstantLine) Context(context Context) Context {
 func (s *FuncConstantLine) Exec(dataMap DataMap) ([]models.Series, error) {
 	out := pointSlicePool.Get().([]schema.Point)
 	out = append(out,
-			schema.Point{Val: s.value, Ts: s.from},
-			schema.Point{Val: s.value, Ts: s.from + uint32((s.to-s.from)/2.0)},
-			schema.Point{Val: s.value, Ts: s.to},
-		)
+		schema.Point{Val: s.value, Ts: s.from},
+		schema.Point{Val: s.value, Ts: s.from + uint32((s.to-s.from)/2.0)},
+		schema.Point{Val: s.value, Ts: s.to},
+	)
 
 	strValue := fmt.Sprintf("%g", s.value)
 
 	outputs := make([]models.Series, 1)
 	outputs[0] = models.Series{
-		Target: strValue,
-		QueryPatt: strValue,
+		Target:     strValue,
+		QueryPatt:  strValue,
 		Datapoints: out,
 	}
 	outputs[0].SetTags()

@@ -12,22 +12,22 @@ import (
 )
 
 type ConstantLineTestCase struct {
-	name 	string
-	value 	float64
+	name  string
+	value float64
 }
 
 func TestConstantLineSmallInt(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1)",
+			name:  "constantLine(1)",
 			value: 1,
 		},
 		{
-			name: "constantLine(100)",
+			name:  "constantLine(100)",
 			value: 100,
 		},
 		{
-			name: "constantLine(10000)",
+			name:  "constantLine(10000)",
 			value: 10000,
 		},
 	}
@@ -36,17 +36,17 @@ func TestConstantLineSmallInt(t *testing.T) {
 }
 
 func TestConstantLineSmallFloatLowPrec(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1.234)",
+			name:  "constantLine(1.234)",
 			value: 1.234,
 		},
 		{
-			name: "constantLine(100.234)",
+			name:  "constantLine(100.234)",
 			value: 100.234,
 		},
 		{
-			name: "constantLine(10000.234)",
+			name:  "constantLine(10000.234)",
 			value: 10000.234,
 		},
 	}
@@ -55,17 +55,17 @@ func TestConstantLineSmallFloatLowPrec(t *testing.T) {
 }
 
 func TestConstantLineSmallFloatHighPrec(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1.2345678912345)",
+			name:  "constantLine(1.2345678912345)",
 			value: 1.2345678912345,
 		},
 		{
-			name: "constantLine(100.2345678912345)",
+			name:  "constantLine(100.2345678912345)",
 			value: 100.2345678912345,
 		},
 		{
-			name: "constantLine(10000.2345678912345)",
+			name:  "constantLine(10000.2345678912345)",
 			value: 10000.2345678912345,
 		},
 	}
@@ -73,15 +73,14 @@ func TestConstantLineSmallFloatHighPrec(t *testing.T) {
 	testConstantLineWrapper(cases, t)
 }
 
-
 func TestConstantLineLargeInt(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1000000000)",
+			name:  "constantLine(1000000000)",
 			value: 1000000000,
 		},
 		{
-			name: "constantLine(1000000000000)",
+			name:  "constantLine(1000000000000)",
 			value: 1000000000000,
 		},
 	}
@@ -90,13 +89,13 @@ func TestConstantLineLargeInt(t *testing.T) {
 }
 
 func TestConstantLineLargeFloatLowPrec(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1000000000.234)",
+			name:  "constantLine(1000000000.234)",
 			value: 1000000000.234,
 		},
 		{
-			name: "constantLine(1000000000000.234)",
+			name:  "constantLine(1000000000000.234)",
 			value: 1000000000000.234,
 		},
 	}
@@ -105,13 +104,13 @@ func TestConstantLineLargeFloatLowPrec(t *testing.T) {
 }
 
 func TestConstantLineLargeFloatHighPrec(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1000000000.2345678912345)",
+			name:  "constantLine(1000000000.2345678912345)",
 			value: 1000000000.2345678912345,
 		},
 		{
-			name: "constantLine(1000000000000.2345678912345)",
+			name:  "constantLine(1000000000000.2345678912345)",
 			value: 1000000000000.2345678912345,
 		},
 	}
@@ -120,9 +119,9 @@ func TestConstantLineLargeFloatHighPrec(t *testing.T) {
 }
 
 func TestConstantLineFloatTooManyDecimals(t *testing.T) {
-	cases := []ConstantLineTestCase {
+	cases := []ConstantLineTestCase{
 		{
-			name: "constantLine(1.23456789123456789123456789)",
+			name:  "constantLine(1.23456789123456789123456789)",
 			value: 1.23456789123456789123456789,
 		},
 	}
@@ -151,11 +150,11 @@ func testConstantLineWrapper(cases []ConstantLineTestCase, t *testing.T) {
 	}
 }
 
-func makeConstantLineSeries(value float64, from uint32, to uint32) ([]models.Series) {
+func makeConstantLineSeries(value float64, from uint32, to uint32) []models.Series {
 	series := []models.Series{
 		{
-			Target:		 fmt.Sprintf("%g", value),
-			QueryPatt:   fmt.Sprintf("%g", value),
+			Target:    fmt.Sprintf("%g", value),
+			QueryPatt: fmt.Sprintf("%g", value),
 			Datapoints: []schema.Point{
 				{Val: value, Ts: from},
 				{Val: value, Ts: from + uint32((to-from)/2.0)},
@@ -169,7 +168,7 @@ func makeConstantLineSeries(value float64, from uint32, to uint32) ([]models.Ser
 
 func testConstantLine(name string, value float64, from uint32, to uint32, out []models.Series, t *testing.T) {
 	f := NewConstantLine()
-	f.(*FuncConstantLine).value  = value
+	f.(*FuncConstantLine).value = value
 	f.(*FuncConstantLine).from = from
 	f.(*FuncConstantLine).to = to
 	got, err := f.Exec(make(map[Req][]models.Series))
