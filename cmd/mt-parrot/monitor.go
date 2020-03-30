@@ -86,19 +86,25 @@ func monitor() {
 			continue
 		}
 
+		var invalid bool
 		for _, s := range resp.Decoded {
-			processPartitionSeries(s, tick)
+			ok := processPartitionSeries(s, tick)
+			if !ok {
+				invalid = true
+			}
+		}
+		if invalid {
+			invalidError.Inc()
 		}
 		statsGraphite.Report(tick)
 	}
 }
 
-func processPartitionSeries(s graphite.Series, now time.Time) {
+func processPartitionSeries(s graphite.Series, now time.Time) bool {
 	partition, err := strconv.Atoi(s.Target)
 	if err != nil {
 		log.Debug("unable to parse partition", err)
-		invalidError.Inc()
-		return
+		return false
 	}
 
 	serStats := seriesInfo{}
@@ -130,6 +136,8 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 	metrics.correctNumPoints.Set(serStats.correctNumPoints)
 	metrics.correctAlignment.Set(serStats.correctAlignment)
 	metrics.correctSpacing.Set(serStats.correctSpacing)
+
+	return true
 }
 
 func checkSpacing(points []graphite.Point) bool {
