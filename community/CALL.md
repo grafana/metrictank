@@ -10,7 +10,7 @@ Zoom Call Link: [https://grafana.zoom.us/j/594084707][zoom]
 
 ## Why?
 
-We want to provide a monthly summary of all things Metrictank, major bug fixes, breaking changes, upcoming events, and a place to discuss the future of the project.
+We want to provide a monthly summary of all things Metrictank: major bug fixes, breaking changes, upcoming events, and a place to discuss the future of the project.
 
 ## Code of Conduct
 
