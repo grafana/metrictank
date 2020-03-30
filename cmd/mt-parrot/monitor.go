@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync/atomic"
-	"time"
 
 	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/stacktest/graphite"
@@ -66,7 +65,9 @@ func monitor() {
 	initMetricsBySeries()
 	for tick := range clock.AlignedTickLossy(queryInterval) {
 
-		resp := graphite.ExecuteRenderQuery(buildRequest(tick))
+		from := uint32(tick.Add(-1 * lookbackPeriod).Unix())
+		to := uint32(tick.Unix())
+		resp := graphite.ExecuteRenderQuery(buildRequest(from, to))
 		if resp.HTTPErr != nil {
 			httpError.Inc()
 			continue
@@ -93,7 +94,7 @@ func monitor() {
 					// should not see same partition twice!
 					invalid = true
 				} else {
-					ok := processPartitionSeries(s.Datapoints, partition, tick)
+					ok := processPartitionSeries(s.Datapoints, partition, from, to)
 					if !ok {
 						invalid = true
 					}
@@ -119,8 +120,7 @@ func monitor() {
 // a,b,c,null,null <-- valid response. just a bit laggy
 // a,null,c,d,null <- invalid response.
 
-func processPartitionSeries(points []graphite.Point, partition int, now time.Time) bool {
-	lastTs := align.Forward(uint32(now.Unix()), uint32(testMetricsInterval.Seconds()))
+func processPartitionSeries(points []graphite.Point, partition int, from, to uint32) bool {
 
 	var nans, nonMatching, lastSeen uint32
 	var deltaSum float64
@@ -162,8 +162,13 @@ func processPartitionSeries(points []graphite.Point, partition int, now time.Tim
 	metrics.numPostNans.SetUint32(postNanPoints)
 	metrics.numNonMatching.SetUint32(nonMatching)
 
-	correctNumPoints := len(points) == int(lookbackPeriod/testMetricsInterval)
-	correctAlignment := points[len(points)-1].Ts == lastTs
+	// render api has from exclusive, to inclusive.
+	expFirstTs := align.ForwardIfNotAligned(from+1, uint32(testMetricsInterval.Seconds()))
+	expLastTs := align.BackwardIfNotAligned(to, uint32(testMetricsInterval.Seconds()))
+	expNumPoints := int((expLastTs-expFirstTs)/uint32(testMetricsInterval.Seconds()) + 1)
+
+	correctNumPoints := len(points) == expNumPoints
+	correctAlignment := points[len(points)-1].Ts == expLastTs
 
 	metrics.correctNumPoints.Set(correctNumPoints)
 	metrics.correctAlignment.Set(correctAlignment)
@@ -175,12 +180,12 @@ func processPartitionSeries(points []graphite.Point, partition int, now time.Tim
 
 }
 
-func buildRequest(now time.Time) *http.Request {
+func buildRequest(from, to uint32) *http.Request {
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/render", gatewayAddress), nil)
 	q := req.URL.Query()
 	q.Set("target", "aliasByNode(parrot.testdata.*.identity.*, 2)")
-	q.Set("from", strconv.Itoa(int(now.Add(-1*lookbackPeriod).Unix())))
-	q.Set("until", strconv.Itoa(int(now.Unix())))
+	q.Set("from", strconv.Itoa(int(from)))
+	q.Set("until", strconv.Itoa(int(to)))
 	q.Set("format", "json")
 	q.Set("X-Org-Id", strconv.Itoa(orgId))
 	req.URL.RawQuery = q.Encode()
