@@ -73,13 +73,36 @@ func monitor() {
 			continue
 		}
 
-		var invalid bool
+		seenPartitions := make(map[int]struct{})
+
+		// the response should contain partitionCount series entries, each of which named by a number,
+		// covering each partition exactly once. otherwise is invalid.
+		invalid := len(resp.Decoded) == int(partitionCount)
+
 		for _, s := range resp.Decoded {
-			ok := processPartitionSeries(s, tick)
+			partition, err := strconv.Atoi(s.Target)
+			if err != nil {
+				log.Debug("unable to parse partition", err)
+				invalid = true
+			} else {
+				_, ok := seenPartitions[partition]
+				if ok {
+					// should not see same partition twice!
+					invalid = true
+				} else {
+					processPartitionSeries(s.Datapoints, partition, tick)
+				}
+			}
+		}
+
+		// check whether we encountered all partitions we expected
+		for p := 0; p < int(partitionCount); p++ {
+			_, ok := seenPartitions[p]
 			if !ok {
 				invalid = true
 			}
 		}
+
 		if invalid {
 			invalidError.Inc()
 		}
@@ -87,13 +110,7 @@ func monitor() {
 	}
 }
 
-func processPartitionSeries(s graphite.Series, now time.Time) bool {
-	partition, err := strconv.Atoi(s.Target)
-	if err != nil {
-		log.Debug("unable to parse partition", err)
-		return false
-	}
-
+func processPartitionSeries(points []graphite.Point, partition int, now time.Time) {
 	lastTs := align.Forward(uint32(now.Unix()), uint32(testMetricsInterval.Seconds()))
 
 	var nans, nonMatching, lastSeen uint32
@@ -101,9 +118,9 @@ func processPartitionSeries(s graphite.Series, now time.Time) bool {
 
 	goodSpacing := true
 
-	for i, dp := range s.Datapoints {
+	for i, dp := range points {
 		if i > 0 {
-			prev := s.Datapoints[i-1]
+			prev := points[i-1]
 			if dp.Ts-prev.Ts != uint32(testMetricsInterval.Seconds()) {
 				goodSpacing = false
 			}
@@ -127,11 +144,9 @@ func processPartitionSeries(s graphite.Series, now time.Time) bool {
 	metrics.lag.SetUint32(lag)
 	metrics.deltaSum.Set(int(math.Ceil(deltaSum)))
 	metrics.numNonMatching.SetUint32(nonMatching)
-	metrics.correctNumPoints.Set(len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval))
-	metrics.correctAlignment.Set(s.Datapoints[len(s.Datapoints)-1].Ts == lastTs)
+	metrics.correctNumPoints.Set(len(points) == int(lookbackPeriod/testMetricsInterval))
+	metrics.correctAlignment.Set(points[len(points)-1].Ts == lastTs)
 	metrics.correctSpacing.Set(goodSpacing)
-
-	return true
 }
 
 func buildRequest(now time.Time) *http.Request {
