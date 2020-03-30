@@ -75,9 +75,6 @@ var parrotCmd = &cobra.Command{
 		}
 
 		validateDurationsInSeconds()
-		if int(lookbackPeriod.Seconds())%int(testMetricsInterval.Seconds()) != 0 {
-			log.Fatal("lookback period must be evenly divisible by test metrics interval")
-		}
 
 		log.SetLevel(lvl)
 		parsePartitionMethod()
