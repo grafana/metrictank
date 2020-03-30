@@ -100,11 +100,6 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 		invalidError.Inc()
 		return
 	}
-	if len(s.Datapoints) < 2 {
-		log.Debugf("partition has invalid number of datapoints: %d", len(s.Datapoints))
-		invalidError.Inc()
-		return
-	}
 
 	serStats := seriesInfo{}
 	lastTs := align.Forward(uint32(now.Unix()), uint32(testMetricsInterval.Seconds()))
