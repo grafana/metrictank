@@ -36,12 +36,12 @@ func (s *FuncRemoveEmptySeries) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
+	if math.IsNaN(s.xFilesFactor) {
+		s.xFilesFactor = 0.0
+	}
+
 	var output []models.Series
 	for _, serie := range series {
-		if math.IsNaN(s.xFilesFactor) {
-			s.xFilesFactor = 0.0
-		}
-
 		serie.Target = fmt.Sprintf("removeEmptySeries(%s, %g)", serie.Target, s.xFilesFactor)
 		serie.QueryPatt = serie.Target
 
