@@ -77,7 +77,7 @@ var parrotCmd = &cobra.Command{
 		validateDurationsInSeconds()
 
 		log.SetLevel(lvl)
-		parsePartitionMethod()
+		mustParsePartitionMethod()
 		initGateway()
 		initStats()
 
@@ -88,9 +88,9 @@ var parrotCmd = &cobra.Command{
 	},
 }
 
-//parsePartitionMethod parses the partitionScheme cli flag,
-//exiting if an invalid partition schema is entered or if org based partitioning is used (not currently allowed by parrot).
-func parsePartitionMethod() {
+// mustParsePartitionMethod parses the partitionScheme cli flag,
+// exiting if an invalid partition schema is entered or if org based partitioning is used (not currently allowed by parrot).
+func mustParsePartitionMethod() {
 	var err error
 	partitionMethod, err = schema.PartitonMethodFromString(partitionMethodString)
 	if err != nil {
