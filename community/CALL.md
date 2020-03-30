@@ -34,7 +34,7 @@ Discussions / Demos
 
 * Out of respect for everyone’s time, we ask that you be fully prepared for your announcement. Make sure slides are clear if applicable, and the link to them is posted in the meeting agenda.
 * Your announcement should provide clear, valuable information to the community without being commercial in nature. Typical sales pitches are not permitted, and could potentially alienate your audience.
-* You are required to show up 10 minutes before the meeting to verify your audio and screensharing capabilities with the hosts. If you cannot make and keep this commitment, you will not be allowed to proceed with your announcement until such time you can.
+* You are required to show up 10 minutes before the meeting to verify your audio and screensharing capabilities with the hosts. If you cannot make and keep this commitment, you will not be allowed to proceed with your announcement until such time as you can.
 * You are also required to commit to being available the week before your announcement date in case there is an issue with that week's announcement.
 * The use of a headset or other high-quality audio equipment is strongly encouraged. Typing on a laptop while using the system microphone is distracting, so please insulate your microphone from key noises.
 * Ensure you are presenting from a quiet environment.
