@@ -48,7 +48,7 @@ type partitionMetrics struct {
 
 func monitor() {
 	initMetricsBySeries()
-	for tick := range clock.AlignedTickLossless(queryInterval) {
+	for tick := range clock.AlignedTickLossy(queryInterval) {
 
 		query := graphite.ExecuteRenderQuery(buildRequest(tick))
 		if query.HTTPErr != nil {
