@@ -2,15 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/clock"
-	"github.com/grafana/metrictank/stacktest/graphite"
-	"github.com/grafana/metrictank/stats"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"github.com/grafana/metrictank/clock"
+	"github.com/grafana/metrictank/stacktest/graphite"
+	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util/align"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
