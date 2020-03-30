@@ -1,6 +1,10 @@
 package main
 
 import (
+	"os"
+	"strings"
+	"time"
+
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/gnet"
 	"github.com/grafana/metrictank/logger"
@@ -9,9 +13,6 @@ import (
 	"github.com/raintank/met/statsd"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"os"
-	"strings"
-	"time"
 )
 
 var (
@@ -66,7 +67,7 @@ func main() {
 
 var parrotCmd = &cobra.Command{
 	Use:   "mt-parrot",
-	Short: "generate deterministic metrics for each metrictank partition",
+	Short: "generate deterministic metrics for each metrictank partition, query them back and report on correctness",
 	Run: func(cmd *cobra.Command, args []string) {
 		lvl, err := log.ParseLevel(logLevel)
 		if err != nil {
