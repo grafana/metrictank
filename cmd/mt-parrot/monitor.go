@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	httpError    = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=http")
-	decodeError  = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=decode")
-	invalidError = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=invalid")
+	httpError    = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=http")    // could not execute http request
+	decodeError  = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=decode")  // could not decode http response
+	invalidError = stats.NewCounter32WithTags("parrot.monitoring.error", ";error=invalid") // any other problem with the response itself
 )
 
 var metricsBySeries []partitionMetrics
@@ -33,6 +33,7 @@ type partitionMetrics struct {
 	lag              *stats.Gauge32 // time since the last value was recorded
 	deltaSum         *stats.Gauge32 // total amount of drift between expected value and actual values
 	numNans          *stats.Gauge32 // number of missing values for each series
+	numPostNans      *stats.Gauge32 // number of non-null values for each series that come after a nan value
 	numNonMatching   *stats.Gauge32 // number of points where value != ts
 	correctNumPoints *stats.Bool    // whether the expected number of points were received
 	correctAlignment *stats.Bool    // whether the last ts matches `now`
@@ -48,6 +49,8 @@ func NewPartitionMetrics(p int) partitionMetrics {
 		deltaSum: stats.NewGauge32WithTags("parrot.monitoring.deltaSum", fmt.Sprintf(";partition=%d", p)),
 		// parrot.monitoring.nans is the number of missing values for each series
 		numNans: stats.NewGauge32WithTags("parrot.monitoring.nans", fmt.Sprintf(";partition=%d", p)),
+		// parrot.monitoring.postnans is the number of non-null values for each series that come after a nan value
+		numPostNans: stats.NewGauge32WithTags("parrot.monitoring.postnans", fmt.Sprintf(";partition=%d", p)),
 		// parrot.monitoring.nonmatching is the total number of entries where drift occurred
 		numNonMatching: stats.NewGauge32WithTags("parrot.monitoring.nonmatching", fmt.Sprintf(";partition=%d", p)),
 		// parrot.monitoring.correctNumPoints is whether the expected number of points were received
@@ -76,7 +79,7 @@ func monitor() {
 		seenPartitions := make(map[int]struct{})
 
 		// the response should contain partitionCount series entries, each of which named by a number,
-		// covering each partition exactly once. otherwise is invalid.
+		// covering each partition exactly once. and each partition series should be correct. otherwise is invalid.
 		invalid := len(resp.Decoded) == int(partitionCount)
 
 		for _, s := range resp.Decoded {
@@ -90,7 +93,10 @@ func monitor() {
 					// should not see same partition twice!
 					invalid = true
 				} else {
-					processPartitionSeries(s.Datapoints, partition, tick)
+					ok := processPartitionSeries(s.Datapoints, partition, tick)
+					if !ok {
+						invalid = true
+					}
 				}
 			}
 		}
@@ -110,19 +116,23 @@ func monitor() {
 	}
 }
 
-func processPartitionSeries(points []graphite.Point, partition int, now time.Time) {
+// a,b,c,null,null <-- valid response. just a bit laggy
+// a,null,c,d,null <- invalid response.
+
+func processPartitionSeries(points []graphite.Point, partition int, now time.Time) bool {
 	lastTs := align.Forward(uint32(now.Unix()), uint32(testMetricsInterval.Seconds()))
 
 	var nans, nonMatching, lastSeen uint32
 	var deltaSum float64
+	var postNanPoints uint32
 
-	goodSpacing := true
+	correctSpacing := true
 
 	for i, dp := range points {
 		if i > 0 {
 			prev := points[i-1]
 			if dp.Ts-prev.Ts != uint32(testMetricsInterval.Seconds()) {
-				goodSpacing = false
+				correctSpacing = false
 			}
 		}
 
@@ -130,6 +140,11 @@ func processPartitionSeries(points []graphite.Point, partition int, now time.Tim
 			nans++
 			continue
 		}
+
+		if nans > 0 {
+			postNanPoints++
+		}
+
 		lastSeen = dp.Ts
 		if diff := dp.Val - float64(dp.Ts); diff != 0 {
 			log.Debugf("partition=%d dp.Val=%f dp.Ts=%d diff=%f", partition, dp.Val, dp.Ts, diff)
@@ -139,14 +154,25 @@ func processPartitionSeries(points []graphite.Point, partition int, now time.Tim
 	}
 
 	metrics := metricsBySeries[partition]
-	metrics.numNans.SetUint32(nans)
 	lag := uint32(atomic.LoadInt64(&lastPublish)) - lastSeen
+
 	metrics.lag.SetUint32(lag)
 	metrics.deltaSum.Set(int(math.Ceil(deltaSum)))
+	metrics.numNans.SetUint32(nans)
+	metrics.numPostNans.SetUint32(postNanPoints)
 	metrics.numNonMatching.SetUint32(nonMatching)
-	metrics.correctNumPoints.Set(len(points) == int(lookbackPeriod/testMetricsInterval))
-	metrics.correctAlignment.Set(points[len(points)-1].Ts == lastTs)
-	metrics.correctSpacing.Set(goodSpacing)
+
+	correctNumPoints := len(points) == int(lookbackPeriod/testMetricsInterval)
+	correctAlignment := points[len(points)-1].Ts == lastTs
+
+	metrics.correctNumPoints.Set(correctNumPoints)
+	metrics.correctAlignment.Set(correctAlignment)
+	metrics.correctSpacing.Set(correctSpacing)
+
+	// we allow for lag and nans, that's subjective and should be monitored separately.
+	// but we will say it's invalid if any of the clear-cut signals say so.
+	return postNanPoints == 0 && nonMatching == 0 && correctNumPoints && correctAlignment && correctSpacing
+
 }
 
 func buildRequest(now time.Time) *http.Request {
