@@ -87,6 +87,8 @@ Discussions and votes on personnel matters (including but not limited to team me
 
 For public discussions, anyone interested is encouraged to participate. Formal power to object or vote is limited to team members.
 
+*Special Note:* New team members are not allowed to vote on any open or outstanding matters. This is to avoid any complications in the voting process.
+
 ### Consensus
 
 The default decision making mechanism for the Metrictank project is lazy consensus, which is itself a form of voting. This means that any decision on technical issues is considered supported by the team as long as nobody objects.
