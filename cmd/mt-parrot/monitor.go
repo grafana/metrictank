@@ -50,17 +50,17 @@ func monitor() {
 	initMetricsBySeries()
 	for tick := range clock.AlignedTickLossy(queryInterval) {
 
-		query := graphite.ExecuteRenderQuery(buildRequest(tick))
-		if query.HTTPErr != nil {
+		resp := graphite.ExecuteRenderQuery(buildRequest(tick))
+		if resp.HTTPErr != nil {
 			httpError.Inc()
 			continue
 		}
-		if query.DecodeErr != nil {
+		if resp.DecodeErr != nil {
 			decodeError.Inc()
 			continue
 		}
 
-		for _, s := range query.Decoded {
+		for _, s := range resp.Decoded {
 			processPartitionSeries(s, tick)
 		}
 		statsGraphite.Report(tick)
