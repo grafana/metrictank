@@ -29,19 +29,6 @@ func initMetricsBySeries() {
 	}
 }
 
-type seriesInfo struct {
-	lastTs uint32 // last timestamp seen in the response
-
-	// to generate stats from
-	lastSeen         uint32  // the last seen non-NaN time stamp (to generate lag from)
-	deltaSum         float64 // sum of abs(value - ts) across the time series
-	numNans          int32   // number of missing values for each series
-	numNonMatching   int32   // number of points where value != ts
-	correctNumPoints bool    // whether the expected number of points were received
-	correctAlignment bool    // whether the last ts matches `now`
-	correctSpacing   bool    // whether all points are sorted and 1 period apart
-}
-
 type partitionMetrics struct {
 	lag              *stats.Gauge32 // time since the last value was recorded
 	deltaSum         *stats.Gauge32 // total amount of drift between expected value and actual values
@@ -107,47 +94,43 @@ func processPartitionSeries(s graphite.Series, now time.Time) bool {
 		return false
 	}
 
-	serStats := seriesInfo{}
 	lastTs := align.Forward(uint32(now.Unix()), uint32(testMetricsInterval.Seconds()))
-	serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
-	serStats.correctAlignment = serStats.lastTs == lastTs
-	serStats.correctNumPoints = len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval)
-	serStats.correctSpacing = checkSpacing(s.Datapoints)
 
-	for _, dp := range s.Datapoints {
+	var nans, nonMatching, lastSeen uint32
+	var deltaSum float64
+
+	goodSpacing := true
+
+	for i, dp := range s.Datapoints {
+		if i > 0 {
+			prev := s.Datapoints[i-1]
+			if dp.Ts-prev.Ts != uint32(testMetricsInterval.Seconds()) {
+				goodSpacing = false
+			}
+		}
+
 		if math.IsNaN(dp.Val) {
-			serStats.numNans += 1
+			nans++
 			continue
 		}
-		serStats.lastSeen = dp.Ts
+		lastSeen = dp.Ts
 		if diff := dp.Val - float64(dp.Ts); diff != 0 {
 			log.Debugf("partition=%d dp.Val=%f dp.Ts=%d diff=%f", partition, dp.Val, dp.Ts, diff)
-			serStats.deltaSum += diff
-			serStats.numNonMatching += 1
+			deltaSum += diff
+			nonMatching++
 		}
 	}
 
 	metrics := metricsBySeries[partition]
-	metrics.numNans.Set(int(serStats.numNans))
-	lag := atomic.LoadInt64(&lastPublish) - int64(serStats.lastSeen)
-	metrics.lag.Set(int(lag))
-	metrics.deltaSum.Set(int(math.Ceil(serStats.deltaSum)))
-	metrics.numNonMatching.Set(int(serStats.numNonMatching))
-	metrics.correctNumPoints.Set(serStats.correctNumPoints)
-	metrics.correctAlignment.Set(serStats.correctAlignment)
-	metrics.correctSpacing.Set(serStats.correctSpacing)
+	metrics.numNans.SetUint32(nans)
+	lag := uint32(atomic.LoadInt64(&lastPublish)) - lastSeen
+	metrics.lag.SetUint32(lag)
+	metrics.deltaSum.Set(int(math.Ceil(deltaSum)))
+	metrics.numNonMatching.SetUint32(nonMatching)
+	metrics.correctNumPoints.Set(len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval))
+	metrics.correctAlignment.Set(s.Datapoints[len(s.Datapoints)-1].Ts == lastTs)
+	metrics.correctSpacing.Set(goodSpacing)
 
-	return true
-}
-
-func checkSpacing(points []graphite.Point) bool {
-	for i := 1; i < len(points); i++ {
-		prev := points[i-1].Ts
-		cur := points[i].Ts
-		if cur-prev != uint32(testMetricsInterval.Seconds()) {
-			return false
-		}
-	}
 	return true
 }
 
