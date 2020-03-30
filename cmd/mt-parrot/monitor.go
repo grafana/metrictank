@@ -23,22 +23,24 @@ var (
 
 var metricsBySeries []partitionMetrics
 
-type seriesStats struct {
-	lastTs           uint32
-	nans             int32   // the partition currently being checked - nope?
+type seriesInfo struct {
+	lastTs uint32 // last timestamp seen in the response
+
+	// to generate stats from
+	lastSeen         uint32  // the last seen non-NaN time stamp (to generate lag from)
 	deltaSum         float64 // sum of abs(value - ts) across the time series
-	numNonMatching   int32   // number of timestamps where value != ts
-	lastSeen         uint32  // the last seen non-NaN time stamp (useful for lag)
+	numNans          int32   // number of missing values for each series
+	numNonMatching   int32   // number of points where value != ts
 	correctNumPoints bool    // whether the expected number of points were received
 	correctAlignment bool    // whether the last ts matches `now`
 	correctSpacing   bool    // whether all points are sorted and 1 period apart
 }
 
 type partitionMetrics struct {
-	nanCount         *stats.Gauge32 // the number of missing values for each series
 	lag              *stats.Gauge32 // time since the last value was recorded
-	deltaSum         *stats.Gauge32 // the total amount of drift between expected value and actual values
-	nonMatching      *stats.Gauge32 // total number of entries where drift occurred
+	deltaSum         *stats.Gauge32 // total amount of drift between expected value and actual values
+	numNans          *stats.Gauge32 // number of missing values for each series
+	numNonMatching   *stats.Gauge32 // number of points where value != ts
 	correctNumPoints *stats.Bool    // whether the expected number of points were received
 	correctAlignment *stats.Bool    // whether the last ts matches `now`
 	correctSpacing   *stats.Bool    // whether all points are sorted and 1 period apart
@@ -78,7 +80,7 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 		return
 	}
 
-	serStats := seriesStats{}
+	serStats := seriesInfo{}
 	serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
 	serStats.correctAlignment = int64(serStats.lastTs) == now.Unix()
 	serStats.correctNumPoints = len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval)+1
@@ -86,7 +88,7 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 
 	for _, dp := range s.Datapoints {
 		if math.IsNaN(dp.Val) {
-			serStats.nans += 1
+			serStats.numNans += 1
 			continue
 		}
 		serStats.lastSeen = dp.Ts
@@ -98,11 +100,11 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 	}
 
 	metrics := metricsBySeries[partition]
-	metrics.nanCount.Set(int(serStats.nans))
+	metrics.numNans.Set(int(serStats.numNans))
 	lag := atomic.LoadInt64(&lastPublish) - int64(serStats.lastSeen)
 	metrics.lag.Set(int(lag))
 	metrics.deltaSum.Set(int(serStats.deltaSum))
-	metrics.nonMatching.Set(int(serStats.numNonMatching))
+	metrics.numNonMatching.Set(int(serStats.numNonMatching))
 	metrics.correctNumPoints.Set(serStats.correctNumPoints)
 	metrics.correctAlignment.Set(serStats.correctAlignment)
 	metrics.correctSpacing.Set(serStats.correctSpacing)
@@ -123,14 +125,14 @@ func initMetricsBySeries() {
 	for p := 0; p < int(partitionCount); p++ {
 		metrics := partitionMetrics{
 			//TODO enable metrics2docs by adding 'metric' prefix to each metric
-			// parrot.monitoring.nancount is the number of missing values for each series
-			nanCount: stats.NewGauge32WithTags("parrot.monitoring.nancount", fmt.Sprintf(";partition=%d", p)),
+			// parrot.monitoring.nans is the number of missing values for each series
+			numNans: stats.NewGauge32WithTags("parrot.monitoring.nans", fmt.Sprintf(";partition=%d", p)),
 			// parrot.monitoring.lag is the time since the last value was recorded
 			lag: stats.NewGauge32WithTags("parrot.monitoring.lag", fmt.Sprintf(";partition=%d", p)),
 			// parrot.monitoring.deltaSum is the total amount of drift between expected value and actual values
 			deltaSum: stats.NewGauge32WithTags("parrot.monitoring.deltaSum", fmt.Sprintf(";partition=%d", p)),
-			// parrot.monitoring.nonMatching is the total number of entries where drift occurred
-			nonMatching: stats.NewGauge32WithTags("parrot.monitoring.nonMatching", fmt.Sprintf(";partition=%d", p)),
+			// parrot.monitoring.nonmatching is the total number of entries where drift occurred
+			numNonMatching: stats.NewGauge32WithTags("parrot.monitoring.nonmatching", fmt.Sprintf(";partition=%d", p)),
 			// parrot.monitoring.correctNumPoints is whether the expected number of points were received
 			correctNumPoints: stats.NewBoolWithTags("parrot.monitoring.correctNumPoints", fmt.Sprintf(";partition=%d", p)),
 			// parrot.monitoring.correctAlignment is whether the last ts matches `now`
