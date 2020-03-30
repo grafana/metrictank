@@ -81,8 +81,9 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 	}
 
 	serStats := seriesInfo{}
+	lastTs := align.Forward(uint32(now.Unix()), uint32(testMetricsInterval.Seconds()))
 	serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
-	serStats.correctAlignment = int64(serStats.lastTs) == now.Unix()
+	serStats.correctAlignment = serStats.lastTs == lastTs
 	serStats.correctNumPoints = len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval)
 	serStats.correctSpacing = checkSpacing(s.Datapoints)
 
