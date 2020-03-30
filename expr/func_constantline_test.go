@@ -135,6 +135,7 @@ func testConstantLineWrapper(cases []ConstantLineTestCase, t *testing.T) {
 	day := time.Hour * 24
 	timeRanges := []time.Duration{
 		time.Second,
+		time.Second * 2,
 		time.Minute,
 		time.Hour,
 		day,
@@ -144,22 +145,30 @@ func testConstantLineWrapper(cases []ConstantLineTestCase, t *testing.T) {
 
 	for _, c := range cases {
 		for _, to := range timeRanges {
-			toInt := uint32(to)
+			toInt := uint32(to.Seconds())
 			testConstantLine(c.name, c.value, 0, toInt, makeConstantLineSeries(c.value, 0, toInt), t)
 		}
 	}
 }
 
 func makeConstantLineSeries(value float64, from uint32, to uint32) []models.Series {
+	datapoints := []schema.Point{
+		{Val: value, Ts: from},
+	}
+	diff := to - from
+	if diff > 2 {
+		datapoints = append(datapoints,
+			schema.Point{Val: value, Ts: from + uint32(diff/2.0)},
+			schema.Point{Val: value, Ts: to},
+		)
+	} else if diff == 2 {
+		datapoints = append(datapoints, schema.Point{Val: value, Ts: from + 1})
+	}
 	series := []models.Series{
 		{
-			Target:    fmt.Sprintf("%g", value),
-			QueryPatt: fmt.Sprintf("%g", value),
-			Datapoints: []schema.Point{
-				{Val: value, Ts: from},
-				{Val: value, Ts: from + uint32((to-from)/2.0)},
-				{Val: value, Ts: to},
-			},
+			Target:     fmt.Sprintf("%g", value),
+			QueryPatt:  fmt.Sprintf("%g", value),
+			Datapoints: datapoints,
 		},
 	}
 

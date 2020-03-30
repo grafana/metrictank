@@ -33,11 +33,21 @@ func (s *FuncConstantLine) Context(context Context) Context {
 
 func (s *FuncConstantLine) Exec(dataMap DataMap) ([]models.Series, error) {
 	out := pointSlicePool.Get().([]schema.Point)
-	out = append(out,
-		schema.Point{Val: s.value, Ts: s.from},
-		schema.Point{Val: s.value, Ts: s.from + uint32((s.to-s.from)/2.0)},
-		schema.Point{Val: s.value, Ts: s.to},
-	)
+
+	out = append(out, schema.Point{Val: s.value, Ts: s.from})
+	diff := s.to - s.from
+
+	// edge cases
+	// if from = to - 1, return one datapoint to user, so don't add more points
+	// if from = to - 2, return two datapoints where timestamps are from, from +1
+	if diff > 2 {
+		out = append(out,
+			schema.Point{Val: s.value, Ts: s.from + uint32(diff/2.0)},
+			schema.Point{Val: s.value, Ts: s.to},
+		)
+	} else if diff == 2 {
+		out = append(out, schema.Point{Val: s.value, Ts: s.from + 1})
+	}
 
 	strValue := fmt.Sprintf("%g", s.value)
 

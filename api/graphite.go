@@ -757,7 +757,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	}
 
 	reqRenderSeriesCount.ValueUint32(reqs.cnt)
-	
+
 	meta.RenderStats.SeriesFetch = reqs.cnt
 
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
