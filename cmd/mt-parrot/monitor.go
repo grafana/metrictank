@@ -83,7 +83,7 @@ func processPartitionSeries(s graphite.Series, now time.Time) {
 	serStats := seriesInfo{}
 	serStats.lastTs = s.Datapoints[len(s.Datapoints)-1].Ts
 	serStats.correctAlignment = int64(serStats.lastTs) == now.Unix()
-	serStats.correctNumPoints = len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval)+1
+	serStats.correctNumPoints = len(s.Datapoints) == int(lookbackPeriod/testMetricsInterval)
 	serStats.correctSpacing = checkSpacing(s.Datapoints)
 
 	for _, dp := range s.Datapoints {
@@ -148,7 +148,7 @@ func buildRequest(now time.Time) *http.Request {
 	req, _ := http.NewRequest("GET", fmt.Sprintf("%s/render", gatewayAddress), nil)
 	q := req.URL.Query()
 	q.Set("target", "aliasByNode(parrot.testdata.*.identity.*, 2)")
-	q.Set("from", strconv.Itoa(int(now.Add(-1*lookbackPeriod).Unix()-1)))
+	q.Set("from", strconv.Itoa(int(now.Add(-1*lookbackPeriod).Unix())))
 	q.Set("until", strconv.Itoa(int(now.Unix())))
 	q.Set("format", "json")
 	q.Set("X-Org-Id", strconv.Itoa(orgId))
