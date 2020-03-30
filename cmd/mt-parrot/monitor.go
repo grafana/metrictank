@@ -131,7 +131,7 @@ func processPartitionSeries(s graphite.Series, now time.Time) bool {
 	metrics.numNans.Set(int(serStats.numNans))
 	lag := atomic.LoadInt64(&lastPublish) - int64(serStats.lastSeen)
 	metrics.lag.Set(int(lag))
-	metrics.deltaSum.Set(int(serStats.deltaSum))
+	metrics.deltaSum.Set(int(math.Ceil(serStats.deltaSum)))
 	metrics.numNonMatching.Set(int(serStats.numNonMatching))
 	metrics.correctNumPoints.Set(serStats.correctNumPoints)
 	metrics.correctAlignment.Set(serStats.correctAlignment)
