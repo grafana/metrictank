@@ -80,7 +80,7 @@ func (rbr ReqsByRet) Len() int {
 	return cnt
 }
 
-// GroupData embodies a PNGroup broken down by whether requests are MDP-optimizable, and by retention
+// GroupData embodies a set of requests broken down by whether requests are MDP-optimizable, and by retention
 type GroupData struct {
 	mdpyes ReqsByRet // MDP-optimizable requests
 	mdpno  ReqsByRet // not MDP-optimizable reqs
