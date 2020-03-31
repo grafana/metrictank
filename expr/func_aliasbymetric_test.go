@@ -7,7 +7,7 @@ import (
 )
 
 func TestAliasByMetricWithoutTags(t *testing.T) {
-	var shortMetric string = "report.runtime.d.max"
+	var shortMetric string = "my.test.metric.short"
 
 	testAliasByMetric(
 		[]models.Series{
@@ -58,7 +58,7 @@ func TestAliasByMetricWithTags(t *testing.T) {
 	/* Long metric string with multiple tag values
 	   which can accept chars like [a-zA-Z0-9-_./%@ +<>!]
 	*/
-	var longMetric string = "report.runtime.d.max;cluster=tkap*;datacenter=!or@ngeb%u<>rg1;gutsReportName=guts-timeseries;gutsReporterJobType=localJob;host=tel-kap-pob-r03-n02.bloomberg.com;namespace=gutsReporting;operatingSystem=redhat;operatingSystemVer=7.6;parentCluster=tlmtry;stage=s4;subStage=s4d;timezone=UTC"
+	var longMetric string = "my.test.metric.long;cluster=abc*;datacenter=some@wher8<>far;version=1.2-3_4.%5;stage=toInfinity;subStage=andBeyond;timezone=OST"
 
 	testAliasByMetric(
 		[]models.Series{
