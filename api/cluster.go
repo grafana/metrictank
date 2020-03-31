@@ -11,12 +11,16 @@ import (
 	"sync"
 	"time"
 
+	opentracing "github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
+
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/tracing"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )
@@ -478,7 +482,7 @@ func (s *Server) queryAllPeers(ctx context.Context, data cluster.Traceable, name
 func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
 	result := make(map[string]PeerResponse)
 
-	responseChan, errorChan := s.queryAllShardsGeneric(ctx, func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
+	responseChan, errorChan := s.queryAllShardsGeneric(ctx, name, func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
 		return peer.Post(reqCtx, name, path, data)
 	})
 
@@ -499,7 +503,7 @@ func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, nam
 // are missing the others, try to speculatively query other members of the shard group.
 // ctx:          request context
 // fetchFunc:    function to call to fetch the data from a peer
-func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
+func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
 	peerGroups, err := cluster.MembersForSpeculativeQuery()
 	if err != nil {
 		log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
@@ -509,7 +513,7 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(conte
 		return resultChan, errorChan
 	}
 
-	return queryPeers(ctx, peerGroups, fetchFunc)
+	return queryPeers(ctx, peerGroups, name, fetchFunc)
 }
 
 // queryPeers takes a function and peers grouped by shard. The function
@@ -519,7 +523,7 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, fetchFunc func(conte
 // ctx:          request context
 // peerGroups:   peers grouped by shard
 // fetchFunc:    function to call to fetch the data from a peer
-func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
+func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name string, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
 	resultChan := make(chan GenericPeerResponse)
 	errorChan := make(chan error, 1)
 
@@ -527,8 +531,11 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 		defer close(errorChan)
 		defer close(resultChan)
 
-		reqCtx, cancel := context.WithCancel(ctx)
+		span := opentracing.SpanFromContext(ctx)
+		OpCtx, opSpan := tracing.NewSpan(ctx, span.Tracer(), name)
+		reqCtx, cancel := context.WithCancel(OpCtx)
 		defer cancel()
+		defer opSpan.Finish()
 
 		type response struct {
 			shardGroup int32
@@ -540,15 +547,15 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 		originalPeers := make(map[string]struct{}, len(peerGroups))
 		receivedResponses := make(map[int32]struct{}, len(peerGroups))
 
-		askPeer := func(shardGroup int32, peer cluster.Node) {
+		askPeer := func(shardGroup int32, peer cluster.Node, specCtx context.Context) {
 			//log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
-			resp, err := fetchFunc(reqCtx, peer)
+			resp, err := fetchFunc(specCtx, peer)
 			select {
-			case <-reqCtx.Done():
+			case <-specCtx.Done():
 				return
 			case responses <- response{shardGroup, GenericPeerResponse{peer, resp}, err}:
 			}
-			// Only print if the reqCtx isn't done
+			// Only print if the context isn't done
 			if err != nil {
 				log.Errorf("Peer %s responded with error = %q", peer.GetName(), err.Error())
 			}
@@ -561,9 +568,10 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 			peerGroups[group] = peers[1:]
 
 			originalPeers[nextPeer.GetName()] = struct{}{}
-			go askPeer(group, nextPeer)
+			go askPeer(group, nextPeer, reqCtx)
 		}
 
+		var specSpan opentracing.Span
 		var ticker *time.Ticker
 		var tickChan <-chan time.Time
 		if speculationThreshold != 1 {
@@ -591,7 +599,7 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 						// shift nextPeer from the group
 						peerGroups[resp.shardGroup] = peerGroups[resp.shardGroup][1:]
 
-						go askPeer(resp.shardGroup, nextPeer)
+						go askPeer(resp.shardGroup, nextPeer, reqCtx)
 						continue
 					}
 					// No more peers to try. Cancel the reqCtx, which will cancel all in-flight
@@ -612,6 +620,9 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 					// kick off speculative queries to other members now
 					ticker.Stop()
 					speculativeAttempts.Inc()
+					var specCtx context.Context
+					specCtx, specSpan = tracing.NewSpan(OpCtx, span.Tracer(), "speculative-queries")
+					defer specSpan.Finish()
 					for shardGroup, peers := range peerGroups {
 						if _, ok := receivedResponses[shardGroup]; ok {
 							continue
@@ -628,7 +639,7 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 
 						// send the request to the next peer for the group.
 						speculativeRequests.Inc()
-						go askPeer(shardGroup, nextPeer)
+						go askPeer(shardGroup, nextPeer, specCtx)
 					}
 				}
 			}
@@ -636,6 +647,11 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, fetchF
 
 		if len(originalPeers) > 0 {
 			speculativeWins.Inc()
+			if specSpan != nil {
+				specSpan.LogFields(traceLog.Int32("spec-wins", int32(len(originalPeers))))
+			} else {
+				log.Warnf("Something weird: %v", originalPeers)
+			}
 		}
 	}()
 
