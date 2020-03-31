@@ -41,5 +41,5 @@ Discussions / Demos
 * If you run out of time while performing your announcement, you may ask the audience if they would like a follow-up at a subsequent meeting. If there is enthusiastic support, the community team will help schedule a continuation.
 
 [coc]: https://github.com/grafana/grafana/blob/master/CODE_OF_CONDUCT.md
-[calendar]: https://https://calendar.google.com/calendar/embed?src=grafana.com_n57lluqpn4h4edroeje6199o00%40group.calendar.google.com
+[calendar]: https://calendar.google.com/calendar/embed?src=grafana.com_n57lluqpn4h4edroeje6199o00%40group.calendar.google.com
 [zoom]: https://grafana.zoom.us/j/594084707
