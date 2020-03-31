@@ -61,47 +61,60 @@ var (
 //    For "fairness" across series, and because we used to simply reduce any series without regard for how it would be used, we pick the latter. better would be both
 // 3) subject to max-points-per-req-hard: reject the query if it can't be met
 //
-// note: it is assumed that all requests have the same from & to.
 // also takes a "now" value which we compare the TTL against
 
 // TODO: MDP-yes and max-points-per-req-soft code paths may not take into account that archive 0 may have a different raw interval.
 // see https://github.com/grafana/metrictank/issues/1679 (for MDP-no it does do the right thing)
-func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard int) (*ReqsPlan, error) {
+func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard int) (*ReqsPlan, error) {
 
 	ok, rp := false, NewReqsPlan(*reqs)
 
 	// 1) Initial parameters
+	getTimeWindowSuperSet := func(reqs ReqsByRet) (uint32, uint32) {
+		minFrom := uint32(math.MaxUint32)
+		maxTo := uint32(0)
+		for _, rs := range reqs {
+			for _, r := range rs {
+				minFrom = util.Min(minFrom, r.From)
+				maxTo = util.Max(maxTo, r.To)
+			}
+		}
+		return minFrom, maxTo
+	}
 	for group, split := range rp.pngroups {
+		// Find the minFrom and maxTo of reqs in the same split
 		if split.mdpyes.HasData() {
-			ok = planLowestResForMDPMulti(now, from, to, planMDP, split.mdpyes)
+			groupFrom, groupTo := getTimeWindowSuperSet(split.mdpyes)
+			ok = planLowestResForMDPMulti(now, groupFrom, groupTo, planMDP, split.mdpyes)
 			if !ok {
 				return nil, errUnSatisfiable
 			}
 			rp.pngroups[group] = split
 		}
 		if split.mdpno.HasData() {
-			ok = planHighestResMulti(now, from, to, split.mdpno)
+			groupFrom, groupTo := getTimeWindowSuperSet(split.mdpno)
+			ok = planHighestResMulti(now, groupFrom, groupTo, split.mdpno)
 			if !ok {
 				return nil, errUnSatisfiable
 			}
 		}
 	}
 	for schemaID, reqs := range rp.single.mdpyes {
-		if len(reqs) == 0 {
-			continue
-		}
-		ok = planLowestResForMDPSingles(now, from, to, planMDP, uint16(schemaID), reqs)
-		if !ok {
-			return nil, errUnSatisfiable
+		// Singles should be planned independently
+		for i := range reqs {
+			ok = planLowestResForMDPSingles(now, planMDP, uint16(schemaID), &reqs[i])
+			if !ok {
+				return nil, errUnSatisfiable
+			}
 		}
 	}
 	for schemaID, reqs := range rp.single.mdpno {
-		if len(reqs) == 0 {
-			continue
-		}
-		ok = planHighestResSingles(now, from, to, uint16(schemaID), reqs)
-		if !ok {
-			return nil, errUnSatisfiable
+		// Singles should be planned independently
+		for i := range reqs {
+			ok = planHighestResSingles(now, uint16(schemaID), &reqs[i])
+			if !ok {
+				return nil, errUnSatisfiable
+			}
 		}
 	}
 
@@ -143,7 +156,8 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 			for _, groupID := range pngroupsByLen {
 				data := rp.pngroups[groupID]
 				if len(data.mdpno) > 0 {
-					ok := reduceResMulti(now, from, to, data.mdpno)
+					groupFrom, groupTo := getTimeWindowSuperSet(data.mdpno)
+					ok := reduceResMulti(now, groupFrom, groupTo, data.mdpno)
 					if ok {
 						progress = true
 						if rp.PointsFetch() <= uint32(mpprSoft) {
@@ -153,14 +167,13 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 				}
 			}
 			for schemaID, reqs := range rp.single.mdpno {
-				if len(reqs) > 0 {
-					ok := reduceResSingles(now, from, to, uint16(schemaID), reqs)
-					if ok {
-						progress = true
-						if rp.PointsFetch() <= uint32(mpprSoft) {
-							goto HonoredSoft
-						}
-					}
+				// Singles should be reduced independently (possibly different from/to)
+				for i := range reqs {
+					ok = reduceResSingle(now, uint16(schemaID), &reqs[i])
+					progress = progress || ok
+				}
+				if progress && rp.PointsFetch() <= uint32(mpprSoft) {
+					goto HonoredSoft
 				}
 			}
 		}
@@ -203,47 +216,30 @@ HonoredSoft:
 }
 
 // planHighestResSingles plans all requests of the given retention to their most precise resolution (which may be different for different retentions)
-func planHighestResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) bool {
+func planHighestResSingles(now uint32, schemaID uint16, req *models.Req) bool {
 	rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
-	minTTL := now - from
-	archive, ret, ok := findHighestResRet(rets, from, minTTL)
+	minTTL := now - req.From
+	archive, ret, ok := findHighestResRet(rets, req.From, minTTL)
 	if ok {
-		for i := range reqs {
-			req := &reqs[i]
-			req.Plan(archive, ret)
-		}
+		req.Plan(archive, ret)
 	}
 	return ok
 }
 
 // planLowestResForMDPSingles plans all requests of the given retention to an interval such that requests still return >=mdp/2 points (interval may be different for different retentions)
-func planLowestResForMDPSingles(now, from, to, mdp uint32, schemaID uint16, reqs []models.Req) bool {
-	if len(reqs) == 0 {
-		return true
-	}
+func planLowestResForMDPSingles(now, mdp uint32, schemaID uint16, req *models.Req) bool {
 	rets := mdata.Schemas.Get(uint16(schemaID)).Retentions.Rets
-	var archive int
-	var ret conf.Retention
-	var ok bool
 	for i := len(rets) - 1; i >= 0; i-- {
 		// skip non-ready option.
-		if rets[i].Ready > from {
+		if rets[i].Ready > req.From {
 			continue
 		}
-		archive, ret, ok = i, rets[i], true
-		(&reqs[0]).Plan(i, rets[i])
-		if reqs[0].PointsFetch() >= mdp/2 {
-			break
+		req.Plan(i, rets[i])
+		if req.PointsFetch() >= mdp/2 {
+			return true
 		}
 	}
-	if !ok {
-		return false
-	}
-	for i := range reqs {
-		req := &reqs[i]
-		req.Plan(archive, ret)
-	}
-	return true
+	return false
 }
 
 // planHighestResMulti plans all requests of all retentions to the most precise, common, resolution.
@@ -318,46 +314,24 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rbr ReqsByRet) bool {
 	return true
 }
 
-// reduceResSingles reduces the resolution of all requests of the given retention
-// to the next more coarse, common, interval (which may be different for different retentions)
-// we already assume that each request is setup to request as little as data as possible to yield
+// reduceResSingle reduces the resolution of a given request to the next more coarse, common,
+// interval (which may be different for different retentions)
+// we already assume that the request is setup to request as little as data as possible to yield
 // the desired output interval. Thus the only way to fetch fewer points is to increase the output
 // interval
 // returns whether we were able to reduce
-func reduceResSingles(now, from, to uint32, schemaID uint16, reqs []models.Req) bool {
-	if len(reqs) == 0 {
-		return true
-	}
-
-	curOut := reqs[0].OutInterval
-	minTTL := now - from
-
-	var ok bool
-
-	var archive int
-	var ret conf.Retention
+func reduceResSingle(now uint32, schemaID uint16, req *models.Req) bool {
+	curOut := req.OutInterval
+	minTTL := now - req.From
 
 	rets := mdata.Schemas.Get(schemaID).Retentions.Rets
 	for i, retMaybe := range rets {
-		if retMaybe.Valid(from, minTTL) && uint32(retMaybe.SecondsPerPoint) > curOut {
-			ok = true
-			archive = i
-			ret = retMaybe
-			break
+		if retMaybe.Valid(req.From, minTTL) && uint32(retMaybe.SecondsPerPoint) > curOut {
+			req.Plan(i, retMaybe)
+			return true
 		}
 	}
-
-	if !ok {
-		return false
-	}
-
-	for i := range reqs {
-		req := &reqs[i]
-		req.Plan(archive, ret)
-	}
-
-	return true
-
+	return false
 }
 
 // reduceResMulti reduces the resolution of all requests to the next more coarse, common, interval
@@ -522,7 +496,6 @@ func planToMulti(now, from, to, interval uint32, rbr ReqsByRet) {
 // * is ready for long enough to accommodate `from`
 // * has a long enough TTL, or otherwise the longest TTL
 func findHighestResRet(rets []conf.Retention, from, ttl uint32) (int, conf.Retention, bool) {
-
 	var archive int
 	var ret conf.Retention
 	var ok bool
