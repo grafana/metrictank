@@ -792,7 +792,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	var err error
 	var rp *ReqsPlan
-	rp, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints, maxPointsPerReqSoft, maxPointsPerReqHard)
+	rp, err = planRequests(uint32(time.Now().Unix()), reqs, plan.MaxDataPoints, maxPointsPerReqSoft, maxPointsPerReqHard)
 	if err != nil {
 		return nil, meta, err
 	}

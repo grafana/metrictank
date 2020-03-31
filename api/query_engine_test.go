@@ -49,7 +49,7 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 	// thus SchemasID must accommodate for this!
 	mdata.Schemas = conf.NewSchemas(schemas)
 	//spew.Dump(mdata.Schemas)
-	out, err := planRequests(now, reqs[0].From, reqs[0].To, getReqMap(reqs), 0, maxPointsPerReqSoft, maxPointsPerReqHard)
+	out, err := planRequests(now, getReqMap(reqs), 0, maxPointsPerReqSoft, maxPointsPerReqHard)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
 	}
@@ -315,7 +315,7 @@ func TestPlanRequests_Singles_DifferentTimeRanges(t *testing.T) {
 
 // TestPlanRequestsMaxPointsPerReqSoft tests how maxPointsPerReqSoft gets applied.
 // we validate that:
-// * requests are coarsened, PNGroup by PNGroup (we can predict PNGroup map iteration order, so we only test with 1 PNGroup),
+// * requests are coarsened, PNGroup by PNGroup (we cannot predict PNGroup map iteration order, so we only test with 1 PNGroup),
 //   and singles in groups by retention (in schemaID order)
 // * PNGroups obviously will need a common interval, which gets interesting when using multiple schemas
 // * coarsening continues until all data is fetched at its coarsest. At that point we may breach soft, but never hard
@@ -663,7 +663,7 @@ func BenchmarkPlanRequestsSamePNGroupNoLimits(b *testing.B) {
 	})
 
 	for n := 0; n < b.N; n++ {
-		res, _ = planRequests(14*24*3600, 0, 3600*24*7, reqs, 0, 0, 0)
+		res, _ = planRequests(14*24*3600, reqs, 0, 0, 0)
 	}
 	result = res
 }
