@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/grafana/metrictank/clock"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -90,7 +91,7 @@ func (g *Graphite) Report(now time.Time) {
 }
 
 func (g *Graphite) reporter(interval int) {
-	ticker := tick(time.Duration(interval) * time.Second)
+	ticker := clock.AlignedTickLossy(time.Duration(interval) * time.Second)
 	for now := range ticker {
 		g.Report(now)
 	}

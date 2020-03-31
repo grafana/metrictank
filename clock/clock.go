@@ -1,10 +1,11 @@
 // Package clock provides aligned tickers.
 // An aligned ticker is a channel of time.Time "ticks" similar to time.Ticker,
-// but the ticks will be delivered as shortly as possible after even multiples of the
-// requested period.
+// but the ticks are even multiples of the requested period, and are delivered
+// as shortly as possible after the clock reaching these timestamps.
 // For example, with period=10s, the ticker ticks shortly after the passing of a unix
-// timestamp that is a multiple of 10s.
-// In my testing it ticks about .0001 to 0.0002 seconds later due to scheduling etc.
+// timestamp that is a multiple of 10s, and the values returned are always these multiples.
+// In my testing it practically ticks about .0001 to 0.0002 seconds later due to scheduling etc,
+// but under high load, the delta may be larger. The ticks are always the "ideal" values
 package clock
 
 import "time"
@@ -15,11 +16,13 @@ func AlignedTickLossy(period time.Duration) <-chan time.Time {
 	c := make(chan time.Time)
 	go func() {
 		for {
-			unix := time.Now().UnixNano()
-			diff := time.Duration(period - (time.Duration(unix) % period))
+			now := time.Now()
+			nowUnix := now.UnixNano()
+			diff := period - (time.Duration(nowUnix) % period)
+			ideal := now.Add(diff)
 			time.Sleep(diff)
 			select {
-			case c <- time.Now():
+			case c <- ideal:
 			default:
 			}
 		}
