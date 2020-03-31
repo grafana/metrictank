@@ -84,8 +84,8 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 	}
 
 	// 1) Initial parameters
-
 	for group, split := range rp.pngroups {
+		// Find the minFrom and maxTo of reqs in the same split
 		if split.mdpyes.HasData() {
 			groupFrom, groupTo := getTimeWindowSuperSet(split.mdpyes)
 			ok = planLowestResForMDPMulti(now, groupFrom, groupTo, planMDP, split.mdpyes, rp.archives)
@@ -184,7 +184,6 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 				}
 				if progress && rp.PointsFetch() <= uint32(mpprSoft) {
 					goto HonoredSoft
-
 				}
 			}
 		}
