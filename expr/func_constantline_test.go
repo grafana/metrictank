@@ -151,18 +151,18 @@ func testConstantLineWrapper(cases []ConstantLineTestCase, t *testing.T) {
 	}
 }
 
-func makeConstantLineSeries(value float64, from uint32, to uint32) []models.Series {
+func makeConstantLineSeries(value float64, first uint32, last uint32) []models.Series {
 	datapoints := []schema.Point{
-		{Val: value, Ts: from},
+		{Val: value, Ts: first},
 	}
-	diff := to - from
+	diff := last - first
 	if diff > 2 {
 		datapoints = append(datapoints,
-			schema.Point{Val: value, Ts: from + uint32(diff/2.0)},
-			schema.Point{Val: value, Ts: to},
+			schema.Point{Val: value, Ts: first + uint32(diff/2.0)},
+			schema.Point{Val: value, Ts: last},
 		)
 	} else if diff == 2 {
-		datapoints = append(datapoints, schema.Point{Val: value, Ts: from + 1})
+		datapoints = append(datapoints, schema.Point{Val: value, Ts: first + 1})
 	}
 	series := []models.Series{
 		{
@@ -178,8 +178,8 @@ func makeConstantLineSeries(value float64, from uint32, to uint32) []models.Seri
 func testConstantLine(name string, value float64, from uint32, to uint32, out []models.Series, t *testing.T) {
 	f := NewConstantLine()
 	f.(*FuncConstantLine).value = value
-	f.(*FuncConstantLine).from = from
-	f.(*FuncConstantLine).to = to
+	f.(*FuncConstantLine).first = from
+	f.(*FuncConstantLine).last = to
 	got, err := f.Exec(make(map[Req][]models.Series))
 
 	if err := equalOutput(out, got, nil, err); err != nil {
@@ -241,8 +241,8 @@ func benchmarkConstantLine(b *testing.B, numSeries int, fn0, fn1 func() []schema
 	for i := 0; i < b.N; i++ {
 		f := NewConstantLine()
 		f.(*FuncConstantLine).value = 1.0
-		f.(*FuncConstantLine).from = 1584849600
-		f.(*FuncConstantLine).to = 1584849660
+		f.(*FuncConstantLine).first = 1584849600
+		f.(*FuncConstantLine).last = 1584849660
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)

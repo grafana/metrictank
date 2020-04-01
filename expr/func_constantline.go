@@ -9,8 +9,8 @@ import (
 
 type FuncConstantLine struct {
 	value float64
-	from  uint32
-	to    uint32
+	first  uint32
+	last    uint32
 }
 
 func NewConstantLine() GraphiteFunc {
@@ -26,27 +26,31 @@ func (s *FuncConstantLine) Signature() ([]Arg, []Arg) {
 }
 
 func (s *FuncConstantLine) Context(context Context) Context {
-	s.from = context.from - 1
-	s.to = context.to - 1
+	// Graphite implements constantLine in a non-standard way with repspect to time.
+	// Normally, graphite is from exclusive, to inclusive, but for constantLine,
+	// is from inclusive, to inclusive. This means the first datapoint has a ts 1s
+	// earlier than what it would normally be. We do the same here.
+	s.first = context.from - 1
+	s.last = context.to - 1
 	return context
 }
 
 func (s *FuncConstantLine) Exec(dataMap DataMap) ([]models.Series, error) {
 	out := pointSlicePool.Get().([]schema.Point)
 
-	out = append(out, schema.Point{Val: s.value, Ts: s.from})
-	diff := s.to - s.from
+	out = append(out, schema.Point{Val: s.value, Ts: s.first})
+	diff := s.last - s.first
 
 	// edge cases
-	// if from = to - 1, return one datapoint to user, so don't add more points
-	// if from = to - 2, return two datapoints where timestamps are from, from +1
+	// if first = last - 1, return one datapoint to user, so don't add more points
+	// if first = last - 2, return two datapoints where timestamps are first, first +1
 	if diff > 2 {
 		out = append(out,
-			schema.Point{Val: s.value, Ts: s.from + uint32(diff/2.0)},
-			schema.Point{Val: s.value, Ts: s.to},
+			schema.Point{Val: s.value, Ts: s.first + uint32(diff/2.0)},
+			schema.Point{Val: s.value, Ts: s.last},
 		)
 	} else if diff == 2 {
-		out = append(out, schema.Point{Val: s.value, Ts: s.from + 1})
+		out = append(out, schema.Point{Val: s.value, Ts: s.first + 1})
 	}
 
 	strValue := fmt.Sprintf("%g", s.value)
