@@ -757,9 +757,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	}
 
 	reqRenderSeriesCount.ValueUint32(reqs.cnt)
-	if reqs.cnt == 0 {
-		return nil, meta, nil
-	}
 
 	meta.RenderStats.SeriesFetch = reqs.cnt
 

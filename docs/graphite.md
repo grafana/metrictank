@@ -59,7 +59,7 @@ See also:
 | changed                                                        |              | No         |
 | color                                                          |              | No         |
 | consolidateBy(seriesList, func) seriesList                     |              | Stable     |
-| constantLine                                                   |              | No         |
+| constantLine                                                   |              | Stable     |
 | countSeries(seriesLists) series                                |              | Stable     |
 | cumulative                                                     |              | Stable     |
 | currentAbove                                                   |              | Stable     |
