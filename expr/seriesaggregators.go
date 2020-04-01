@@ -49,29 +49,34 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 // crossSeriesAvg computes the average across all the series
 // using the number of non-null datapoints
 func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
+	counts := make([]int, len(in[0].Datapoints))
+
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		*out = append(*out, in[0].Datapoints[i])
+		if !math.IsNaN(in[0].Datapoints[i].Val) {
+			counts[i]++
+		}
+	}
+
+	for i := 1; i < len(in); i++ {
+		dps := in[i].Datapoints
+		for j := 0; j < len(in[i].Datapoints); j++ {
+			p := dps[j].Val
+			if !math.IsNaN(p) {
+				if math.IsNaN((*out)[j].Val) {
+					(*out)[j].Val = p
+				} else {
+					(*out)[j].Val += p
+				}
+				counts[j]++
+			}
+		}
 	}
 
 	for i := 0; i < len(in[0].Datapoints); i++ {
-		num := 0
-		sum := float64(0)
-		for j := 1; j < len(in); j++ {
-			p := in[j].Datapoints[i].Val
-			if !math.IsNaN(p) {
-				num++
-				sum += p
-			}
+		if !math.IsNaN((*out)[i].Val) {
+			(*out)[i].Val /= float64(counts[i])
 		}
-		if num != 0 {
-			if math.IsNaN((*out)[i].Val) {
-				(*out)[i].Val = sum / float64(num)
-			} else {
-				(*out)[i].Val += sum
-				(*out)[i].Val /= float64(num + 1)
-			}
-		}
-
 	}
 }
 
@@ -81,29 +86,13 @@ func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 // crossSeriesAvg would compute the new datapoint as 4/4=1 while
 // crossSeriesAvgZero would compute it as 4/5=0.8
 func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
+	crossSeriesSum(in, out)
 	for i := 0; i < len(in[0].Datapoints); i++ {
-		*out = append(*out, in[0].Datapoints[i])
-	}
-
-	for i := 0; i < len(in[0].Datapoints); i++ {
-		sum := float64(0)
-		for j := 1; j < len(in); j++ {
-			p := in[j].Datapoints[i].Val
-			if !math.IsNaN(p) {
-				sum += p
-			}
-		}
-		// Cases
-		// original is NaN
-		// num = 0 -> stay same
-		// num !=0 -> sum /
-		// original is Num
-		if math.IsNaN((*out)[i].Val) {
-			(*out)[i].Val = sum
+		if !math.IsNaN((*out)[i].Val) {
+			(*out)[i].Val /= float64(len(in))
 		} else {
-			(*out)[i].Val += sum
+			(*out)[i].Val = 0
 		}
-		(*out)[i].Val /= float64(len(in))
 	}
 }
 

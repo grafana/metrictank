@@ -269,6 +269,33 @@ var rangeabc = []schema.Point{
 	{Val: 1234567886, Ts: 60},
 }
 
+var counta = []schema.Point{
+	{Val: 1, Ts: 10},
+	{Val: 1, Ts: 20},
+	{Val: 1, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: 1, Ts: 60},
+}
+
+var countab = []schema.Point{
+	{Val: 2, Ts: 10},
+	{Val: 2, Ts: 20},
+	{Val: 2, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1, Ts: 50},
+	{Val: 1, Ts: 60},
+}
+
+var countabc = []schema.Point{
+	{Val: 3, Ts: 10},
+	{Val: 3, Ts: 20},
+	{Val: 3, Ts: 30},
+	{Val: 1, Ts: 40},
+	{Val: 2, Ts: 50},
+	{Val: 2, Ts: 60},
+}
+
 // make sure we test with the correct data, don't mask if processing accidentally modifies our input data
 func getCopy(in []schema.Point) []schema.Point {
 	out := make([]schema.Point, len(in))
