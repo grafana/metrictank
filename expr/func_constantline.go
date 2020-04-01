@@ -9,8 +9,8 @@ import (
 
 type FuncConstantLine struct {
 	value float64
-	first  uint32
-	last    uint32
+	first uint32
+	last  uint32
 }
 
 func NewConstantLine() GraphiteFunc {
