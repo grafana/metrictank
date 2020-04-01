@@ -233,6 +233,16 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 			*v.val = append(*v.val, *e.args[pos])
 		}
 		return pos, nil
+	case ArgStringOrInt:
+		if got.etype != etString && got.etype != etInt {
+			return 0, ErrBadArgumentStr{"string or int", got.etype.String()}
+		}
+		for _, va := range v.validator {
+			if err := va(got); err != nil {
+				return 0, generateValidatorError(v.key, err)
+			}
+		}
+		*v.val = *got
 	case ArgQuotelessString:
 		if got.etype != etName {
 			return 0, ErrBadArgumentStr{"quoteless string", got.etype.String()}

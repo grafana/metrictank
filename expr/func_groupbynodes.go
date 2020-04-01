@@ -2,7 +2,6 @@ package expr
 
 import (
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -21,15 +20,15 @@ func NewGroupByNodesConstructor(groupByNode bool) func() GraphiteFunc {
 
 func (s *FuncGroupByNodes) Signature() ([]Arg, []Arg) {
 	// This function supports both groupByNode and groupByNodes,
-    // but the signatures of them are different in Graphite.
-    if !s.byNode {
+	// but the signatures of them are different in Graphite.
+	if !s.byNode {
 		return []Arg{
 			ArgSeriesList{val: &s.in},
 			ArgString{val: &s.aggregator, validator: []Validator{IsAggFunc}},
 			ArgStringsOrInts{val: &s.nodes},
 		}, []Arg{ArgSeries{}}
 	}
-    // groupByNode accepts either an integer node num or a string tag key
+	// groupByNode accepts either an integer node num or a string tag key
 	s.nodes = append(s.nodes, expr{})
 	return []Arg{
 		ArgSeriesList{val: &s.in},
@@ -53,10 +52,6 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		return series, nil
 	}
 
-	if len(s.nodes) == 0 {
-		return nil, errors.NewBadRequest("No nodes specified")
-	}
-
 	type Group struct {
 		s []models.Series
 		m models.SeriesMeta
@@ -64,7 +59,7 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 	groups := make(map[string]Group)
 
 	// Group series by nodes, this is mostly similar to GroupByTags,
-    // except that the group keys are different.
+	// except that the group keys are different.
 	for _, serie := range series {
 		key := aggKey(serie, s.nodes)
 		group := groups[key]

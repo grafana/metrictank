@@ -7,19 +7,9 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
 )
-
-func TestNoNodes(t *testing.T) {
-	in := []models.Series{
-		getModel("name1;tag1=val1", a),
-	}
-	expected := errors.NewBadRequest("No nodes specified")
-
-	testGroupByNodes("ErrNoTags", in, nil, "sum", []expr{}, expected, t)
-}
 
 func TestGroupByNodesSingleSeries(t *testing.T) {
 	in := []models.Series{
@@ -234,11 +224,11 @@ func TestGroupByNodesAllAggregators(t *testing.T) {
 }
 
 func testGroupByNodes(name string, in []models.Series, expected []models.Series, aggr string, nodes []expr, expErr error, t *testing.T) {
-	f := NewGroupByNodesConstructor(true)() 
-    f.(*FuncGroupByNodes).in = NewMock(in)
-    f.(*FuncGroupByNodes).aggregator = aggr
-    f.(*FuncGroupByNodes).nodes = nodes
-    got, err := f.Exec(make(map[Req][]models.Series))
+	f := NewGroupByNodesConstructor(true)()
+	f.(*FuncGroupByNodes).in = NewMock(in)
+	f.(*FuncGroupByNodes).aggregator = aggr
+	f.(*FuncGroupByNodes).nodes = nodes
+	got, err := f.Exec(make(map[Req][]models.Series))
 	if err != expErr {
 		if expErr == nil {
 			t.Fatalf("case %q: expected no error but got %q", name, err)
@@ -400,6 +390,6 @@ func benchmarkGroupByNodes(b *testing.B, numIn, numOut int) {
 		}
 	}
 
-    totalIn := numIn * numOut
+	totalIn := numIn * numOut
 	b.SetBytes(int64(totalIn * len(results[0].Datapoints) * 12))
 }
