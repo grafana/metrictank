@@ -16,7 +16,7 @@ We want to provide a monthly summary of all things Metrictank: major bug fixes, 
 
 All participants are expected to follow the [Metrictank Code Of Conduct][coc]. Please let us know if you encounter any violations of the Code of Conduct at conduct@grafana.com
 
-## Agenda
+## Typical Agenda Outline
 
 Greetings / Host Introduction
 
