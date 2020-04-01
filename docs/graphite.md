@@ -141,7 +141,7 @@ See also:
 | removeBelowPercentile(seriesList, n) seriesList                |              | No         |
 | removeBelowValue(seriesList, n) seriesList                     |              | Stable     |
 | removeBetweenPercentile                                        |              | No         |
-| removeEmptySeries                                              |              | No         |
+| removeEmptySeries                                              |              | Stable     |
 | round                                                          |              | Stable     |
 | scale(seriesList, num) series                                  |              | Stable     |
 | scaleToSeconds(seriesList, seconds) seriesList                 |              | Stable     |

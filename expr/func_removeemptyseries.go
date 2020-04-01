@@ -20,7 +20,7 @@ func (s *FuncRemoveEmptySeries) Signature() ([]Arg, []Arg) {
 
 	return []Arg{
 			ArgSeriesList{val: &s.in},
-			ArgFloat{key: "xFilesFactor", val: &s.xFilesFactor},
+			ArgFloat{key: "xFilesFactor", val: &s.xFilesFactor, validator: []Validator{WithinZeroOneInclusiveInterval}},
 		}, []Arg{
 			ArgSeriesList{},
 		}
@@ -63,14 +63,9 @@ func (s *FuncRemoveEmptySeries) Exec(dataMap DataMap) ([]models.Series, error) {
 
 /*
 xffCheck compares the ratio of notNull to total values with the xFilesFactor.
- xFilesFactor can only take values within interval [0,1]
 */
 func xffCheck(notNull int, total int, xFilesFactor float64) bool {
 	if notNull == 0 || total == 0 {
-		return false
-	}
-
-	if xFilesFactor < 0 || xFilesFactor > 1 {
 		return false
 	}
 

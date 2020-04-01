@@ -207,44 +207,6 @@ func TestRemoveEmptySeriesAllow70PercentNulls(t *testing.T) {
 	)
 }
 
-func TestRemoveEmptySeriesInvalidInputXFilesFactor(t *testing.T) {
-
-	xffs := []float64{-0.5, 50.0, math.MaxFloat64, math.Inf(1), math.Inf(-1)}
-	for _, xff := range xffs {
-		testRemoveEmptySeries(
-			xff, // xFilesFactor
-			[]models.Series{
-				{
-					Interval:   10,
-					QueryPatt:  "30 % nulls",
-					Target:     "a",
-					Datapoints: getCopy(a),
-				},
-				{
-					Interval:   10,
-					QueryPatt:  "all nulls",
-					Target:     "b",
-					Datapoints: getCopy(allNulls),
-				},
-				{
-					Interval:   10,
-					QueryPatt:  "no nulls",
-					Target:     "c",
-					Datapoints: getCopy(c),
-				},
-				{
-					Interval:   10,
-					QueryPatt:  "allZeros",
-					Target:     "d",
-					Datapoints: getCopy(allZeros),
-				},
-			},
-			[]models.Series{},
-			t,
-		)
-	}
-}
-
 func TestRemoveEmptySeriesMissingInputXFilesFactor(t *testing.T) {
 	testRemoveEmptySeries(
 		math.NaN(), // xFilesFactor
