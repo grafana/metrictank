@@ -76,6 +76,8 @@ func init() {
 		"filterSeries":          {NewFilterSeries, true},
 		"grep":                  {NewGrep, true},
 		"group":                 {NewGroup, true},
+		"groupByNode":           {NewGroupByNodesConstructor(true), true},
+		"groupByNodes":          {NewGroupByNodesConstructor(false), true},
 		"groupByTags":           {NewGroupByTags, true},
 		"highest":               {NewHighestLowestConstructor("", true), true},
 		"highestAverage":        {NewHighestLowestConstructor("average", true), true},
