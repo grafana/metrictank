@@ -169,7 +169,7 @@ See also:
 | timeSlice                                                      |              | No         |
 | timeStack                                                      |              | No         |
 | transformNull(seriesList, default=0) seriesList                |              | Stable     |
-| unique                                                         |              | No         |
+| unique                                                         |              | Stable     |
 | useSeriesAbove                                                 |              | No         |
 | verticalLine                                                   |              | No         |
 | weightedAverage                                                |              | No         |
