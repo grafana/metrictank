@@ -25,7 +25,7 @@ MT_KAFKA_MDM_IN_DATA_DIR: /your/data/dir  # MT_<section_title>_<setting_name>
 # Metrictank.ini
 
 
-sample config for Grafana Metrictank  
+sample config for metrictank  
 the defaults here match the default behavior.  
 ## misc ##
 
@@ -265,7 +265,7 @@ max-size = 536870912
 
 ```
 [http]
-# tcp address for Grafana Metrictank to bind to for its HTTP interface
+# tcp address for metrictank to bind to for its HTTP interface
 listen = :6060
 # use gzip compression
 gzip = true
@@ -334,8 +334,8 @@ kafka-version = 2.0.0
 # kafka topic (may be given multiple times as a comma-separated list)
 topics = mdm
 # offset to start consuming from. Can be oldest, newest or a time duration
-# When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), Grafana Metrictank falls back to `oldest`.
-# the further back in time you go, the more old data you can load into Grafana Metrictank, but the longer it takes to catch up to realtime data
+# When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
+# the further back in time you go, the more old data you can load into metrictank, but the longer it takes to catch up to realtime data
 offset = newest
 # kafka partitions to consume. use '*' or a comma separated list of id's
 partitions = *
@@ -455,10 +455,10 @@ topic = metricpersist
 # kafka partitions to consume. use '*' or a comma separated list of id's. Should match kafka-mdm-in's partitions.
 partitions = *
 # offset to start consuming from. Can be oldest, newest or a time duration
-# When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), Grafana Metrictank falls back to `oldest`.
+# When using a duration but the offset request fails (e.g. Kafka doesn't have data so far back), metrictank falls back to `oldest`.
 # Should match your kafka-mdm-in setting
 offset = newest
-# Maximum time backlog processing can block during Grafana Metrictank startup. Setting to a low value may result in data loss
+# Maximum time backlog processing can block during metrictank startup. Setting to a low value may result in data loss
 backlog-process-timeout = 60s
 # Whether to enable TLS
 tls-enabled = false
@@ -717,7 +717,7 @@ max-stale = 0
 # * aggregationMethod specifies the functions used to aggregate values for the next retention level. Legal methods are avg/average, sum, min, max, and last. The default is average.
 # Unlike Graphite, you can specify multiple, as it is often handy to have different summaries available depending on what analysis you need to do.
 # When using multiple, the first one is used for reading.  In the future, we will add capabilities to select the different archives for reading.
-# * the settings configured when Grafana Metrictank starts are what is applied. So you can enable or disable archives by restarting Grafana Metrictank.
+# * the settings configured when metrictank starts are what is applied. So you can enable or disable archives by restarting metrictank.
 #
 # see https://github.com/grafana/metrictank/blob/master/docs/consolidation.md for related info.
 
@@ -736,8 +736,8 @@ aggregationMethod = avg,min,max
 # * You can have 0 to N sections
 # * The first match wins, starting from the top. If no match found, we default to single archive of minutely points, retained for 7 days in 2h chunks
 # * The patterns are unanchored regular expressions, add '^' or '$' to match the beginning or end of a pattern.
-# * When running a cluster of Grafana Metrictank instances, all instances should have the same agg-settings.
-# * Unlike whisper (graphite), the config doesn't stick: if you restart Grafana Metrictank with updated settings, then those
+# * When running a cluster of metrictank instances, all instances should have the same agg-settings.
+# * Unlike whisper (graphite), the config doesn't stick: if you restart metrictank with updated settings, then those
 # will be applied. The configured rollups will be saved by primary nodes and served in responses if they are ready.
 # (note in particular that if you remove archives here, we will no longer read from them)
 # * Retentions must be specified in order of increasing interval and retention
@@ -758,7 +758,7 @@ aggregationMethod = avg,min,max
 #d - day
 #y - year
 #
-# The final 3 fields are specific to Grafana Metrictank and if unspecified, use sane defaults.
+# The final 3 fields are specific to metrictank and if unspecified, use sane defaults.
 # See https://github.com/grafana/metrictank/blob/master/docs/memory-server.md for more details
 #
 # chunkspan: duration of chunks. e.g. 10min, 30min, 1h, 90min...
