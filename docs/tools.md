@@ -108,7 +108,7 @@ Use "mt-fakemetrics [command] --help" for more information about a command.
 
 ```
 mt-gateway
-Provides an HTTP gateway for interacting with metrictank, including metrics ingestion
+Provides an HTTP gateway for interacting with Grafana Metrictank, including metrics ingestion
 
 Usage:
 
@@ -179,7 +179,7 @@ Flags:
 ```
 mt-index-cat
 
-Retrieves a metrictank index and dumps it in the requested format
+Retrieves a Grafana Metrictank index and dumps it in the requested format
 In particular, the vegeta outputs are handy to pipe requests for given series into the vegeta http benchmark tool
 
 Usage:
@@ -189,7 +189,7 @@ Usage:
 global config flags:
 
   -addr string
-    	graphite/metrictank address (default "http://localhost:6060")
+    	Grafana Metrictank/Graphite address (default "http://localhost:6060")
   -from string
     	for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
   -limit int
@@ -346,7 +346,7 @@ Flags:
 ```
 mt-index-prune
 
-Retrieves a metrictank index and moves all deprecated entries into an archive table
+Retrieves a Grafana Metrictank index and moves all deprecated entries into an archive table
 
 Usage:
 
@@ -463,7 +463,7 @@ Inspects what's flowing through kafka (in mdm format) and reports out of order d
 # Mechanism
 * it sniffs points being added on a per-series (metric Id) level
 * for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp
-* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point
+* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which Grafana Metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point
 every event is printed using the specified, respective format based on the message format
 
 # Event formatting
@@ -672,7 +672,7 @@ Flags:
   -cql-protocol-version int
     	cql protocol version to use (default 4)
   -fix int
-    	fix data to this interval like metrictank does quantization. only for points and point-summary format
+    	fix data to this interval like Grafana Metrictank does quantization. only for points and point-summary format
   -from string
     	get data from (inclusive). only for points and point-summary format (default "-24h")
   -groupTTL string
