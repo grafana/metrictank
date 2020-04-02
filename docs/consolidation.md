@@ -3,16 +3,16 @@
 When you request a larger number of points then what is in `maxDataPoints`, the data needs to be consolidated (aggregated)
 There's two pieces to this puzzle - rollups and runtime consolidation - explained below.
 
-In metrictank, runtime consolidation works in concert with the rollup archives (in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series which [often leads to nonsense when combined with runtime consolidation](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation))
+In Grafana Metrictank, runtime consolidation works in concert with the rollup archives (in contrast to whisper and other more limited backends where you can configure only one given roll-up function for each series which [often leads to nonsense when combined with runtime consolidation](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation))
 
-By default, metrictank will consolidate (at query time) like so:
+By default, Grafana Metrictank will consolidate (at query time) like so:
 
 * max if mtype is `counter`.
 * avg for everything else.
 
 But you can override this
 (see [HTTP api](https://github.com/grafana/metrictank/blob/master/docs/http-api.md)) to use avg, min, max, sum.
-Which ever function is used, metrictank will select the appropriate rollup band, and if necessary also perform runtime consolidation to further reduce the dataset.
+Which ever function is used, Grafana Metrictank will select the appropriate rollup band, and if necessary also perform runtime consolidation to further reduce the dataset.
 
 
 ## Rollups
@@ -38,7 +38,7 @@ It supports min, max, sum, average.
 
 ## The request planning algorithm. OUT OF DATE AS OF https://github.com/grafana/metrictank/pull/951
 
-Metrictank uses a function called `alignRequests` which will:
+Grafana Metrictank uses a function called `alignRequests` which will:
 
 * look at all the requested timeseries and the time range
 * figure out the optimal input data (out of raw and rollups) and whether or not runtime consolidation is needed, and which settings to use if so

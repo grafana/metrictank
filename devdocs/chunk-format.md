@@ -95,7 +95,7 @@ The last dod value is rare, so the overhead is negligible.
 
 This is a brainstorm of some ideas on how we might be able to improve our formats in the future.
 
-* metrictank uses fixed intervals, do we even need to store timestamps. could maybe store number of nulls since last point.
+* Grafana Metrictank uses fixed intervals, do we even need to store timestamps. could maybe store number of nulls since last point.
   esp. long chunks also have long fixed delta's. perhaps we can use different chunk format for raw (unquantized data) vs aggregated.
   or instead of storing raw unquantized data and quantizing at readtime, we should probably quantize before storing.
 * go-tsz: last dod case (outside [-2047,2048]) means we use 32bit to store dod. for sparse data, perhaps we can come up with something better

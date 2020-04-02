@@ -57,7 +57,7 @@ fi
 cat << EOF
 # Config
 
-Metrictank comes with an [example main config file](https://github.com/grafana/metrictank/blob/master/metrictank-sample.ini),
+Grafana Metrictank comes with an [example main config file](https://github.com/grafana/metrictank/blob/master/metrictank-sample.ini),
 a [storage-schemas.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-schemas.conf) and
 a [storage-aggregation.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/storage-aggregation.conf)
 an [index-rules.conf file](https://github.com/grafana/metrictank/blob/master/scripts/config/index-rules.conf)

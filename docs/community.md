@@ -1,6 +1,6 @@
 # Community
 
-Welcome to the Metrictank community. Please be sure to read over our [Code Of Conduct][coc].
+Welcome to the Grafana Metrictank community. Please be sure to read over our [Code Of Conduct][coc].
 
 ## Slack
 

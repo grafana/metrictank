@@ -1,6 +1,6 @@
 # Tools
 
-Metrictank comes with a bunch of helper tools.
+Grafana Metrictank comes with a bunch of helper tools.
 
 Here is an overview of them all.
 

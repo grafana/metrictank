@@ -57,7 +57,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println("mt-index-prune")
 		fmt.Println()
-		fmt.Println("Retrieves a metrictank index and moves all deprecated entries into an archive table")
+		fmt.Println("Retrieves a Grafana Metrictank index and moves all deprecated entries into an archive table")
 		fmt.Println()
 		fmt.Printf("Usage:\n\n")
 		fmt.Printf("  mt-index-prune [global config flags] <idxtype> [idx config flags]\n\n")

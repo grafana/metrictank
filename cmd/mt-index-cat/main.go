@@ -49,7 +49,7 @@ func main() {
 	var partitionStr string
 
 	globalFlags := flag.NewFlagSet("global config flags", flag.ExitOnError)
-	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "graphite/metrictank address")
+	globalFlags.StringVar(&addr, "addr", "http://localhost:6060", "Grafana Metrictank/Graphite address")
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
 	globalFlags.StringVar(&suffix, "suffix", "", "only show metrics that have this suffix")
@@ -69,7 +69,7 @@ func main() {
 	flag.Usage = func() {
 		fmt.Println("mt-index-cat")
 		fmt.Println()
-		fmt.Println("Retrieves a metrictank index and dumps it in the requested format")
+		fmt.Println("Retrieves a Grafana Metrictank index and dumps it in the requested format")
 		fmt.Println("In particular, the vegeta outputs are handy to pipe requests for given series into the vegeta http benchmark tool")
 		fmt.Println()
 		fmt.Printf("Usage:\n\n")
@@ -188,7 +188,7 @@ func main() {
 	err := idx.InitBare()
 	perror(err)
 
-	// from should either be a unix timestamp, or a specification that graphite/metrictank will recognize.
+	// from should either be a unix timestamp, or a specification that Grafana Metrictank/Graphite will recognize.
 	_, err = strconv.Atoi(from)
 	if err != nil {
 		_, err = dur.ParseNDuration(from)

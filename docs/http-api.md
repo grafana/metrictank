@@ -199,13 +199,13 @@ POST /render
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
 * format: json, msgp, pickle, or msgpack (default: json). (note: msgp and msgpack are similar, but msgpack is for use with graphite)
 * meta: use 'meta=true' to enable metadata in response (see below).
-* process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
+* process: all, stable, none (default: stable). Controls Grafana Metrictank's eagerness of fulfilling the request with its built-in processing functions
   (as opposed to proxying to the fallback graphite).
   - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
   - stable: process request without fallback if we have all the needed functions and they are marked as stable.
   - none: always defer to graphite for processing.
 
-  If metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
+  If Grafana Metrictank doesn't have a requested function, it always proxies to graphite, irrespective of this setting.
 * optimizations: can override http.pre-normalization and http.mdp-optimization options. empty (default) : no override. either "none" to force no optimizations, or a csv list with either of both of "pn", "mdp" to enable those options.
 
 Data queried for must be stored under the given org or be public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))
@@ -273,7 +273,7 @@ returns a json document with the following fields:
 * "name": the node name
 * "primary": whether the node is a primary node or not
 * "primaryChange": timestamp of when the primary state last changed
-* "version": metrictank version
+* "version": Grafana Metrictank version
 * "state": whether the node is [ready](clustering.md#priority-and-ready-state) to handle requests or not
 * "stateChange": timestamp of when the state last changed
 * "started": timestamp of when the node started up
@@ -384,9 +384,9 @@ posted to this URL which has a set of expressions that doesn't exist yet, a new
 meta record gets created. If its set of query expressions already exists, then the
 existing meta record gets updated. If the new record has no meta tags associated
 with it, then an existing record with the same set of expressions gets deleted.
-If the following calls are made to a Metrictank that uses the Cassandra persistent
+If the following calls are made to a Grafana Metrictank that uses the Cassandra persistent
 index and which has index updating enabled, all modifications also get persisted
-into the Cassandra index, from where they can be loaded by other Metrictanks.
+into the Cassandra index, from where they can be loaded by other Grafana Metrictanks.
 
 ## Example
 
@@ -479,9 +479,9 @@ This endpoint is an alternative to the above "upsert". It accepts a list of meta
 (meta records) and replaces all existing records with the new ones. This is useful for users
 who first generate all of their meta records and then want to swap the present set of records
 out by replacing it with the new one.
-Just like in the case of the above upsert call, if these calls are made to a Metrictank that
+Just like in the case of the above upsert call, if these calls are made to a Grafana Metrictank that
 uses the Cassandra persistent index and which has index updating enabled, all modifications
-also get persisted into the Cassandra index, from where they can be loaded by other Metrictanks.
+also get persisted into the Cassandra index, from where they can be loaded by other Grafana Metrictanks.
 
 ## Example
 

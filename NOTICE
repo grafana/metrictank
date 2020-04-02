@@ -1,15 +1,15 @@
-Copyright 2016-2018 Dieter Plaetinck, Anthony Woods, Jeremy Bingham, Damian Gryski, raintank inc
+Copyright 2016-2020 Dieter Plaetinck, Anthony Woods, Jeremy Bingham, Damian Gryski, raintank inc
 
 
-Metrictank is free software: you can redistribute it and/or modify
+Grafana Metrictank is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-metrictank is distributed in the hope that it will be useful,
+Grafana Metrictank is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with metrictank.  If not, see <http://www.gnu.org/licenses/>.
+along with Grafana Metrictank.  If not, see <http://www.gnu.org/licenses/>.

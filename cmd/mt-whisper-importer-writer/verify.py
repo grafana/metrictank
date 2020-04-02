@@ -16,8 +16,8 @@
 #
 #
 # averaged aggregations are a special case. mt-store-cat only dumps raw series
-# such as sum/cnt/max, but it cannot return an avg series like metrictank does
-# because that data is not kept as a raw series in metrictank. given this
+# such as sum/cnt/max, but it cannot return an avg series like Grafana Metrictank does
+# because that data is not kept as a raw series in Grafana Metrictank. given this
 # limitation the closest thing we can get to validating avg series is getting
 # mt-store-cat to dump the sum series and then divide it by the count to turn
 # it into an average again.

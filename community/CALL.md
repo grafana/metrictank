@@ -1,6 +1,6 @@
-# Metrictank Public Community Call
+# Grafana Metrictank Public Community Call
 
-We host a public community call on the last Wednesday of every month at 16:00 (UTC). You can view the schedule of upcoming calls on the [community calendar][calendar], as well as other Metrictank related events.
+We host a public community call on the last Wednesday of every month at 16:00 (UTC). You can view the schedule of upcoming calls on the [community calendar][calendar], as well as other Grafana Metrictank related events.
 
 ## General Information
 
@@ -10,11 +10,11 @@ Zoom Call Link: [https://grafana.zoom.us/j/594084707][zoom]
 
 ## Why?
 
-We want to provide a monthly summary of all things Metrictank: major bug fixes, breaking changes, upcoming events, and a place to discuss the future of the project.
+We want to provide a monthly summary of all things Grafana Metrictank: major bug fixes, breaking changes, upcoming events, and a place to discuss the future of the project.
 
 ## Code of Conduct
 
-All participants are expected to follow the [Metrictank Code Of Conduct][coc]. Please let us know if you encounter any violations of the Code of Conduct at conduct@grafana.com
+All participants are expected to follow the [Grafana Metrictank Code Of Conduct][coc]. Please let us know if you encounter any violations of the Code of Conduct at conduct@grafana.com
 
 ## Typical Agenda Outline
 

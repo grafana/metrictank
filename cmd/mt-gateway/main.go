@@ -53,7 +53,7 @@ func init() {
 func main() {
 	flag.Usage = func() {
 		fmt.Println("mt-gateway")
-		fmt.Println("Provides an HTTP gateway for interacting with metrictank, including metrics ingestion")
+		fmt.Println("Provides an HTTP gateway for interacting with Grafana Metrictank, including metrics ingestion")
 		fmt.Println()
 		fmt.Println("Usage:")
 		fmt.Println()

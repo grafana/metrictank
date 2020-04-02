@@ -1,4 +1,4 @@
-# Metrictank Governance
+# Grafana Metrictank Governance
 
 This document describes the rules and governance of the project. It is meant to be followed by all the developers of the project and the Metrictank community. Common terminology used in this governance document are listed below:
 
@@ -12,14 +12,14 @@ A loose sense of voting terminology (they are [defined](#voting) in greater deta
 
 ## Values
 
-The Metrictank developers and community are expected to follow the values defined in the [Metrictank Code of Conduct][coc]. Furthermore, the Metrictank community strives for kindness, giving feedback effectively, and building a welcoming environment. The Metrictank Team generally decide by [lazy consensus](#consensus) and only resort to conflict resolution by a [majority](#majority-vote) vote if consensus cannot be reached.
+The Grafana Metrictank developers and community are expected to follow the values defined in the [Grafana Metrictank Code of Conduct][coc]. Furthermore, the Grafana Metrictank community strives for kindness, giving feedback effectively, and building a welcoming environment. The Grafana Metrictank Team generally decide by [lazy consensus](#consensus) and only resort to conflict resolution by a [majority](#majority-vote) vote if consensus cannot be reached.
 
 ## Decision making
 
 ### Summary
 
 * Only Team Members may vote
-* Most voting takes place on the Metrictank [development mailing list][devlist], with the exception of personnel or other private matters
+* Most voting takes place on the Grafana Metrictank [development mailing list][devlist], with the exception of personnel or other private matters
 * Voting is accomplished by [lazy consensus](#consensus) in most cases
 * All issues requiring a vote, including [lazy consensus](#consensus), will be open for at least 14 days or until enough votes have been cast that any more votes cannot further change the outcome
 * Adding or removing Team Members is accomplished by [supermajority](#supermajority-vote) vote
@@ -27,7 +27,7 @@ The Metrictank developers and community are expected to follow the values define
  
 ### Team members
 
-Team member status may be given to those who have made ongoing contributions to the Metrictank project for at least 3 months. This is usually in the form of code improvements and/or notable work on documentation, but organizing events or user support could also be taken into account.
+Team member status may be given to those who have made ongoing contributions to the Grafana Metrictank project for at least 3 months. This is usually in the form of code improvements and/or notable work on documentation, but organizing events or user support could also be taken into account.
 
 New members may be proposed by any existing member by posting on the private [team mailing list][teamlist]. It is highly desirable to reach consensus about acceptance of a new member. However, the proposal is ultimately voted on by a formal [supermajority](#supermajority-vote) vote.
 
@@ -53,7 +53,7 @@ The current team members are:
 
 ### Technical decisions
 
-Technical decisions should be discussed and voted upon on the Metrictank [development mailing list][devlist]. Informal conversations may also be held in *#metrictank-dev* in [slack](#how-do-i-reach-you-on-slack) or in the appropriate Github issue.
+Technical decisions should be discussed and voted upon on the Grafana Metrictank [development mailing list][devlist]. Informal conversations may also be held in *#metrictank-dev* in [slack](#how-do-i-reach-you-on-slack) or in the appropriate Github issue.
 
 Decisions are usually made by [lazy consensus](#consensus). If no consensus can be reached, the matter may be resolved by [majority](#majority-vote) vote.
 
@@ -63,7 +63,7 @@ A pull request which proposes changes aligned with an approved technical decisio
 
 ### Governance changes
 
-Material changes to this document are discussed publicly in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) or on the Metrictank [development mailing list][devlist]. Any change requires a [supermajority](#supermajority-vote) in favor.
+Material changes to this document are discussed publicly in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) or on the Grafana Metrictank [development mailing list][devlist]. Any change requires a [supermajority](#supermajority-vote) in favor.
 
 ### Editorial changes
 
@@ -71,11 +71,11 @@ Editorial changes are changes which fix spelling or grammar, update work affilia
 
 ### Other matters
 
-Any matter that needs a decision, including but not limited to financial matters, may be called to a vote by any member if they deem it necessary. For financial, private, or personnel matters, discussion and voting takes place on the private [team mailing list][teamlist], otherwise on the Metrictank [development mailing list][devlist].
+Any matter that needs a decision, including but not limited to financial matters, may be called to a vote by any member if they deem it necessary. For financial, private, or personnel matters, discussion and voting takes place on the private [team mailing list][teamlist], otherwise on the Grafana Metrictank [development mailing list][devlist].
 
 ## Voting
 
-The Metrictank project usually runs by [lazy consensus](#consensus), however sometimes a formal decision must be made.
+The Grafana Metrictank project usually runs by [lazy consensus](#consensus), however sometimes a formal decision must be made.
 
 Depending on the subject matter, as laid out above, different methods of voting are used.
 
@@ -83,7 +83,7 @@ For all votes, including [lazy consensus](#consensus), voting must be open for a
 
 In all cases, all and only team members are eligible to vote, with the sole exception of the forced removal of a team member, in which said member is not eligible to vote.
 
-Discussions and votes on personnel matters (including but not limited to team membership) are held on the private [team mailing list][teamlist]. All other discussions are held in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack), in their respective Github issues, or on the Metrictank [development mailing list][devlist]. All other votes are held on the Metrictank [development mailing list][devlist].
+Discussions and votes on personnel matters (including but not limited to team membership) are held on the private [team mailing list][teamlist]. All other discussions are held in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack), in their respective Github issues, or on the Grafana Metrictank [development mailing list][devlist]. All other votes are held on the Grafana Metrictank [development mailing list][devlist].
 
 For public discussions, anyone interested is encouraged to participate. Formal power to object or vote is limited to team members.
 
@@ -91,9 +91,9 @@ For public discussions, anyone interested is encouraged to participate. Formal p
 
 ### Consensus
 
-The default decision making mechanism for the Metrictank project is lazy consensus, which is itself a form of voting. This means that any decision on technical issues is considered supported by the team as long as nobody objects.
+The default decision making mechanism for the Grafana Metrictank project is lazy consensus, which is itself a form of voting. This means that any decision on technical issues is considered supported by the team as long as nobody objects.
 
-Silence on any consensus decision is implicit agreement and equivalent to explicit agreement. Explicit agreement may be stated at will. Decisions may, but do not need to be, called out and put up for decision in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) or on the Metrictank [development mailing list][devlist] at any time and by anyone.
+Silence on any consensus decision is implicit agreement and equivalent to explicit agreement. Explicit agreement may be stated at will. Decisions may, but do not need to be, called out and put up for decision in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) or on the Grafana Metrictank [development mailing list][devlist] at any time and by anyone.
 
 Consensus decisions can never override or go against the spirit of an earlier explicit vote.
 
@@ -103,7 +103,7 @@ In case no consensus can be found, but a decision one way or the other must be m
 
 ### Majority vote
 
-Majority votes must be called explicitly on the Metrictank [development mailing list][devlist]. It should reference any discussion leading up to this point.
+Majority votes must be called explicitly on the Grafana Metrictank [development mailing list][devlist]. It should reference any discussion leading up to this point.
 
 Votes may take the form of a single proposal, with the option to vote yes or no, or the form of multiple alternatives.
 
@@ -113,7 +113,7 @@ If there are multiple alternatives, members may vote for one or more alternative
 
 ### Supermajority vote
 
-Supermajority votes must be called explicitly on the Metrictank [development mailing list][devlist]. It should reference any discussion leading up to this point.
+Supermajority votes must be called explicitly on the Grafana Metrictank [development mailing list][devlist]. It should reference any discussion leading up to this point.
 
 Votes may take the form of a single proposal, with the option to vote yes or no, or the form of multiple alternatives.
 
@@ -130,7 +130,7 @@ The On / Offboarding section is informational and can be changed by [lazy consen
 Once a new member is approved they must enable 2 factor authentication for their Github account prior to starting the onboarding process. Then, the new member is:
 
 * Added to the list of team members, ideally by sending a PR of their own, or at least approving said PR
-* Announced in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) and the Metrictank [development mailing list][devlist] by an existing team member
+* Announced in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) and the Grafana Metrictank [development mailing list][devlist] by an existing team member
 * Added to the [Github project][gh] as a collaborator. Optionally, they are added to the community, and related organizations and repositories
 * Added to the private [team mailing list][teamlist]
 
@@ -164,7 +164,7 @@ Open an issue in Github with your motion. If there are objections and no consens
 
 To become an official team member, you should make ongoing contributions to one or more project(s) for at least three months. At that point, a team member may propose you for membership. The discussion about this will be held in private, and you will be informed privately when a decision has been made.
 
-Should the decision be in favor, your new membership will also be announced in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) and on the Metrictank [development mailing list][devlist].
+Should the decision be in favor, your new membership will also be announced in the *#metrictank-dev* channel in [slack](#how-do-i-reach-you-on-slack) and on the Grafana Metrictank [development mailing list][devlist].
 
 ### How do I remove a team member?
 

@@ -1,7 +1,7 @@
 # Clustering
 
 There are some different concerns here.  First we describe the clustering of the underlying store.
-Next is the clustering of metrictank itself, which is really two separate features (partitioning for horizontal scalability, and replication for high availability),
+Next is the clustering of Grafana Metrictank itself, which is really two separate features (partitioning for horizontal scalability, and replication for high availability),
 described separately below, though they can, and should be combined for production clusters.
 
 ## Underlying storage
@@ -10,7 +10,7 @@ For clustering (in all senses of the word) of the underlying store, we rely simp
 * Cassandra has built-in replication and data partitioning to assure both HA and load balancing.
 * Bigtable is a highly available clustered, hosted storage system
 
-## Metrictank itself
+## Grafana Metrictank itself
 
 The cluster topology is defined by how individual nodes behave within it, which happens via 2 key configuration options in the `cluster` section:
 
@@ -20,9 +20,9 @@ The cluster topology is defined by how individual nodes behave within it, which 
      * 'shard': gossip enabled. node receives data and participates in fan-in/fan-out if it receives queries but owns only a part of the data set and spec-exec if enabled. (see below)
      * 'query': gossip enabled. node receives no data and fans out queries to shard nodes (e.g. if you rather not query shard nodes directly)
 
-### Metrictank horizontal scaling (partitioning)
+### Grafana Metrictank horizontal scaling (partitioning)
 
-If single nodes are incapable of handling your volume of metrics, you will want to split up your data in shards or partitions, and have multiple metrictank instances each handle a portion of the stream (e.g. one or a select few shards per instance).
+If single nodes are incapable of handling your volume of metrics, you will want to split up your data in shards or partitions, and have multiple Grafana Metrictank instances each handle a portion of the stream (e.g. one or a select few shards per instance).
 
 * When ingesting data via kafka, you can simply use Kafka partitions.  The partition config setting for the plugin will control which instances consume which partitions.
 * When using carbon, you can route data by setting up the carbon connections manually (possibly using a relay) and align the "partition" configuration of the plugin to reflect your data stream.
@@ -32,11 +32,11 @@ Instances join the cluster by announcing themselves to the `peers` set in their 
 Any pre-existing instances part of the cluster will receive the announcement directly, or via gossip.
 An instance will regularly poll the health of other nodes and involve healthy peers if they host data we might not have locally, aka fan-out.
 
-Please see "Metrictank horizontal scaling plus high availability" below for a caveat.
+Please see "Grafana Metrictank horizontal scaling plus high availability" below for a caveat.
 
-### Metrictank for high availability (replication)
+### Grafana Metrictank for high availability (replication)
 
-Metrictank achieves redundancy and fault tolerance by running multiple instances which receive identical inputs.
+Grafana Metrictank achieves redundancy and fault tolerance by running multiple instances which receive identical inputs.
 One of the instances needs to have the primary role, which means it saves data chunks to Cassandra.   The other instances are secondaries.
 
 Configuration of primary vs secondary:
@@ -61,7 +61,7 @@ The primary sends out persistence messages when it saves chunks to Cassandra.  T
 If you want to be able to promote secondaries to primaries (or restart primaries), it's important they have been ingesting and processing these messages, so that the moment they become primary,
 they don't start saving all the chunks it has in memory, which could be a significant sudden load on Cassandra.
 
-Metrictank supports 1 transports for clustering: kafka, configured in the [clustering transports section in the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#clustering-transports)
+Grafana Metrictank supports 1 transports for clustering: kafka, configured in the [clustering transports section in the config](https://github.com/grafana/metrictank/blob/master/docs/config.md#clustering-transports)
 
 Instances should not become primary when they have incomplete chunks (though in worst case scenario, you might
 have to do just that).  So they expose metrics that describe when they are ready to be upgraded.
@@ -77,12 +77,12 @@ This procedure needs to be done carefully:
 1) assure there is no primary running.  Demote the primary to secondary if it's running. Make sure all the persistence messages made it through the clustering transport into the 
 candidate. Synchronisation over the transport is usually near-instant so waiting a few seconds is usually fine.  But if you want to be careful, assure that the primary stopped sending persistence messages (via the dashboard), and verify that the candidate caught up with the transport (by monitoring the consumption delay from the transport).
 
-2) pick a node that has `cluster.promotion_wait` at zero.  This means the instance has been consuming data long enough to have full data for all the recent chunks that will have to be saved - assuming the primary was able to persist its older chunks to Cassandra.  If that's not the case, just pick the instance that has been consuming data the longest or has a full working set in RAM (e.g. has been for longer than [`chunkspan * numchunks`](https://github.com/grafana/metrictank/blob/master/docs/config.md#data).  (note: when a metrictank process starts, it first does a few maintenance tasks before data consumption starts, such as filling its index when needed)
+2) pick a node that has `cluster.promotion_wait` at zero.  This means the instance has been consuming data long enough to have full data for all the recent chunks that will have to be saved - assuming the primary was able to persist its older chunks to Cassandra.  If that's not the case, just pick the instance that has been consuming data the longest or has a full working set in RAM (e.g. has been for longer than [`chunkspan * numchunks`](https://github.com/grafana/metrictank/blob/master/docs/config.md#data).  (note: when a Grafana Metrictank process starts, it first does a few maintenance tasks before data consumption starts, such as filling its index when needed)
 The `cluster.promotion_wait` is automatically determined based on the largest chunkSpan (typically your coarsest aggregation) and the current time.  From which an instance can derive when it's ready.
 
 3) open the Grafana dashboard and verify that the secondary is able to save chunks 
 
-### Combining metrictank's horizontal scaling plus high availability.
+### Combining Grafana Metrictank's horizontal scaling plus high availability.
 
 If you use both the partitioning (for write load sharding) and replication (for fault tolerance) it is important that the replicas consume the same partitions, and hence, contain the same data.
 We call the "set of consumed shards" a shard group.
@@ -107,7 +107,7 @@ Hence, this is currently **not supported**.
 
 ### Priority and ready state
 
-Priority is a measure of how in-sync a metrictank process is, expressed in seconds.
+Priority is a measure of how in-sync a Grafana Metrictank process is, expressed in seconds.
 
 | input plugin  | priority                 |
 | ------------- | ------------------------ |

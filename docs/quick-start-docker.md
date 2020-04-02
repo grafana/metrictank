@@ -90,7 +90,7 @@ Output will be similar to the following:
 {"name":"default","version":"0.9.0-342-g9c5a12c","primary":true,"primaryChange":"2018-09-07T19:29:10.200078519Z","state":"NodeReady","priority":0,"started":"2018-09-07T19:29:10.196587689Z","stateChange":"2018-09-07T19:29:10.200078795Z","partitions":[0],"apiPort":6060,"apiScheme":"http","updated":"2018-09-07T19:29:11.26049517Z","remoteAddr":""}
 ```
 
-## Working with Grafana and metrictank
+## Working with Grafana and Grafana Metrictank
 
 In your browser, open Grafana at http://localhost:3000 (or your docker-machine address) and log in as `admin:admin`.  
 If Grafana prompts you to change the password, you can skip it, since it doesn't matter for a local test setup.  
@@ -104,7 +104,7 @@ Click on the title of the panel and hit 'edit'.
 In the metrics tab you should see a bunch of metrics already in the root hierarchy:
 
 * `service_is_statsdaemon`: statsdaemon's own internal metrics which it sends to metrictank's carbon port.
-* `metrictank`: internal stats reported by metrictank
+* `metrictank`: internal stats reported by Grafana Metrictank
 * `stats`: metrics aggregated by statsdaemon and sent into metrictank every second. Will only show up if something actually sends
   metrics into statsdaemon (e.g. if graphite receives requests directly, you send stats to statsdaemon, etc)
 

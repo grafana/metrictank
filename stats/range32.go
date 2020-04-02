@@ -51,7 +51,7 @@ func (r *Range32) ValueUint32(val uint32) {
 
 func (r *Range32) WriteGraphiteLine(buf, prefix []byte, now time.Time) []byte {
 	r.Lock()
-	// if no values were seen, don't report anything to graphite
+	// if no values were seen, don't report anything to Graphite
 	if r.valid {
 		buf = WriteUint32(buf, prefix, r.name, []byte(".min.gauge32"), r.tags, r.min, now)
 		buf = WriteUint32(buf, prefix, r.name, []byte(".max.gauge32"), r.tags, r.max, now)

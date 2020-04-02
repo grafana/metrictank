@@ -1,4 +1,4 @@
-# Metrictank
+# Grafana Metrictank
 
 [![Circle CI](https://circleci.com/gh/grafana/metrictank.svg?style=shield)](https://circleci.com/gh/grafana/metrictank)
 [![Go Report Card](https://goreportcard.com/badge/github.com/grafana/metrictank)](https://goreportcard.com/report/github.com/grafana/metrictank)
@@ -6,10 +6,10 @@
 
 ## Introduction
 
-Metrictank is a multi-tenant timeseries engine for Graphite and friends.
+Grafana Metrictank is a multi-tenant timeseries engine for Graphite and friends.
 It provides long term storage, high availability, efficient storage, retrieval and processing for large scale environments.
 
-[GrafanaLabs](http://grafana.com) has been running metrictank in production since December 2015.
+[GrafanaLabs](https://grafana.com) has been running Grafana Metrictank in production since December 2015.
 It currently requires an external datastore like Cassandra or Bigtable, and we highly recommend using Kafka to support clustering, as well
 as a clustering manager like Kubernetes. This makes it non-trivial to operate, though GrafanaLabs has an on-premise product
 that makes this process much easier.
@@ -20,8 +20,8 @@ that makes this process much easier.
 * Inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf).
 Most notably, the heavily compressed chunks dramatically lower cpu, memory and storage requirements.
 * Writeback RAM cache, serving most data out of memory.
-* Graphite is a first class citizen. As of graphite-1.0.1, metrictank can be used as a graphite CLUSTER_SERVER.
-* Can also act as a Graphite server itself, though the functions processing library is only partially implemented, metrictank proxies requests to Graphite if it can't handle the required processing (for those requests it will degrade to just being the backend storage)
+* Graphite is a first class citizen. As of graphite-1.0.1, Grafana Metrictank can be used as a graphite CLUSTER_SERVER.
+* Can also act as a Graphite server itself, though the functions processing library is only partially implemented, Grafana Metrictank proxies requests to Graphite if it can't handle the required processing (for those requests it will degrade to just being the backend storage)
 * Accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
@@ -33,7 +33,7 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 ## Limitations
 
 * No performance/availability isolation between tenants per instance. (only data isolation)
-* Minimum computation locality: we move the data from storage to processing code, which is both metrictank and graphite.
+* Minimum computation locality: we move the data from storage to processing code, which is both Grafana Metrictank and Graphite.
 * Backlog replaying and queries can be made faster. [A Go GC issue may occasionally inflate response times](https://github.com/golang/go/issues/14812).
 * We use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/grafana/metrictank/blob/master/docs/tags.md).
 * can't overwrite old data. We support reordering the most recent time window but that's it. (unless you restart MT)
@@ -101,7 +101,7 @@ Otherwise data loss of current chunks will be incurred.  See [operations guide](
 License
 =======
 
-Copyright 2016-2019 Grafana Labs
+Copyright 2016-2020 Grafana Labs
 
 This software is distributed under the terms of the GNU Affero General Public License.
 

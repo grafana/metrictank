@@ -44,7 +44,7 @@ func (s *FuncScaleToSeconds) Exec(dataMap DataMap) ([]models.Series, error) {
 		factor := float64(s.seconds) / float64(serie.Interval)
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {
-				// round to 6 decimal places to mimic graphite
+				// round to 6 decimal places to mimic Graphite
 				roundingFactor := math.Pow(10, 6)
 				p.Val = math.Round(p.Val*factor*roundingFactor) / roundingFactor
 			}

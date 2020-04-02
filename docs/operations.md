@@ -12,12 +12,12 @@ In particular, pay attention to delays in your kafka queue, if you use it.
 Especially for metric persistence messages which flow from primary to secondary nodes: if those have issues, chunks may be saved multiple times
 when new primaries come online (or get promoted). (see [clustering transport](https://github.com/grafana/metrictank/blob/master/docs/clustering.md))
 
-Metrictank reports metrics about itself. See [the list of documented metrics](https://github.com/grafana/metrictank/blob/master/docs/metrics.md)
+Grafana Metrictank reports metrics about itself. See [the list of documented metrics](https://github.com/grafana/metrictank/blob/master/docs/metrics.md)
 
 ### Dashboard
 
-You can import the [Metrictank dashboard from Grafana.net](https://grafana.net/dashboards/279) into your Grafana.
-this will give instant insights in all the performance metrics of Metrictank.
+You can import the [Grafana Metrictank dashboard from Grafana.net](https://grafana.net/dashboards/279) into your Grafana.
+this will give instant insights in all the performance metrics of Grafana Metrictank.
 
 
 ### Useful metrics to monitor/alert on
@@ -47,7 +47,7 @@ If you expect consistent or predictable load, you may also want to monitor:
 ## Crash
 
 
-Metrictank crashed. What to do?
+Grafana Metrictank crashed. What to do?
 
 ### Diagnosis
 
@@ -76,7 +76,7 @@ Metrictank crashed. What to do?
 If you use the kafka-mdm input (at grafana we do), before restarting check your [offset option](https://github.com/grafana/metrictank/blob/master/docs/config.md#kafka-mdm-input-optional-recommended).   Most of our customers who run a single instance seem to prefer the `last` option: preferring immediately getting realtime insights back, at the cost of missing older data.
 
 
-## Metrictank hangs
+## Grafana Metrictank hangs
 
 if the metrictank process seems "stuck".. not doing anything, but up and running, you can report a bug.
 Please include the following information:
@@ -113,7 +113,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
    * Cassandra (index) - if enabled - which may not keep up with throughput, resulting in backpressure, and a lowered ingestion rate.
    Check the index stats on the dashboard.
 
-2) Saving of chunks.  Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md) (10 minutes in the default docker image)
+2) Saving of chunks.  Grafana Metrictank saves chunks at the rhythm of your [chunkspan](https://github.com/grafana/metrictank/blob/master/docs/memory-server.md) (10 minutes in the default docker image)
    When this happens, it will need to save a bunch of chunks and
    [based on the configuration of your write queues and how many series you have](https://github.com/grafana/metrictank/issues/125) the queues may run full and
    provide ingestion backpressure, also lowering ingestion speed.  
@@ -129,7 +129,7 @@ If metrictank ingestion speed is lower than expected, or decreased for seemingly
 4) doing http requests to metrictank can lower its ingestion performance. (note that the dashboard in the docker stack loads
 from metrictank as well). normally we're talking about hundreds of requests (or very large ones) where you can start to see this effect, but the effect also becomes more apparent with large ingest rates where metrictank gets closer to saturation
 
-## Metrictank uses too much memory
+## Grafana Metrictank uses too much memory
 
 If metrictank consumes too much memory and you want to know why. There are a few usual suspects:
 * the ringbuffers, especially if you have high values for numchunks, chunkspan, especially for rollup archives that use many aggregation functions.
@@ -190,6 +190,6 @@ Time range that MT can replay from Kafka                        |---------------
 
 ## Opentracing
 
-Metrictank supports opentracing via [Jaeger](http://jaeger.readthedocs.io/en/latest/)
+Grafana Metrictank supports opentracing via [Jaeger](http://jaeger.readthedocs.io/en/latest/)
 It can give good insights into why certain requests are slow, and is easy to run.
 To use, enable in the config and point it at a Jaeger collector.

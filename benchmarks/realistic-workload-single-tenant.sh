@@ -1,7 +1,7 @@
 #!/bin/bash
 trap 'kill $(jobs -p)' EXIT
 
-# this script aims to put a somewhat realistic workload on a metrictank instance or cluster
+# this script aims to put a somewhat realistic workload on a Grafana Metrictank instance or cluster
 # (in terms of proportions, not absolute volume)
 # the goal is not to test the limits of MT here or get close to production workloads,
 # but rather use a workload that it can definitely handle

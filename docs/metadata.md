@@ -1,6 +1,6 @@
 # Metadata index
 
-Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
+Grafana Metrictank needs an index to efficiently lookup timeseries details by key or pattern.
 
 Currently there are 3 index options. Only 1 index option can be enabled at a time.
 * Memory-Idx
@@ -24,10 +24,10 @@ enabled = true
 ### Cassandra-Idx
 
 * type: Memory-Idx for search queries, backed by Cassandra for persistence
-* persistence:  persists new metricDefinitions as they are seen and every update-interval.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
+* persistence:  persists new metricDefinitions as they are seen and every update-interval.  At startup, the internal memory index is rebuilt from all metricDefinitions that have been stored in Cassandra.  Grafana Metrictank won’t be considered ready (be able to ingest metrics or handle searches) until the index has been completely rebuilt.
 * efficiency: On low end hardware the index rebuilds at about 70000 metricDefinitions per second. Saving new metrics works pretty fast.
 
-Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suit your deployment.
+Grafana Metrictank will initialize Cassandra with the needed keyspace and tabe.  However if you are running a Cassandra cluster then you should tune the keyspace to suit your deployment.
 Refer to the [cassandra guide](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md) for more details.
 
 #### Configuration

@@ -8,23 +8,23 @@ We'll go over these in more detail below.
   See [Cassandra](https://github.com/grafana/metrictank/blob/master/docs/cassandra.md)
 * The latest (1.0.1 or newer) version of [Graphite](http://graphite.readthedocs.io/en/latest/install.html)
 * Optional: [statsd](https://github.com/etsy/statsd) or something compatible with it.  For instrumentation of graphite.
-* Optional: Kafka, if you want to buffer data in case metrictank goes down. Kafka 2.0.0 is highly recommended.
+* Optional: Kafka, if you want to buffer data in case Grafana Metrictank goes down. Kafka 2.0.0 is highly recommended.
   [more info](https://github.com/grafana/metrictank/blob/master/docs/kafka.md)
 
 Note: Cassandra and Kafka require Java, which will be automatically installed by apt as a dependency when we install Cassandra.
 
 ## How things fit together
 
-metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
+Grafana Metrictank ingest metrics data. The data can be sent into it, or be read from a queue (see
 [Inputs](https://github.com/grafana/metrictank/blob/master/docs/inputs.md)).
-Metrictank will compress the data into chunks in RAM, a configurable number of the most recent data
+Grafana Metrictank will compress the data into chunks in RAM, a configurable number of the most recent data
 is kept in RAM, but the chunks are being saved to Cassandra as well.  You can use a single Cassandra
-instance or a cluster.  Metrictank will also respond to queries: if the data is recent, it'll come out of
+instance or a cluster.  Grafana Metrictank will also respond to queries: if the data is recent, it'll come out of
 RAM, and older data is fetched from cassandra.  This happens transparantly.
-Metrictank maintains an index of metrics metadata, for all series it sees.
+Grafana Metrictank maintains an index of metrics metadata, for all series it sees.
 You can use an index entirely in memory, or backed by Cassandra for persistence.
-You can query metrictank directly (it has fast, but limited built-in processing and will fallback to graphite when needed)
-or you can also just query graphite which will always use graphite's processing but use metrictank as a datastore.
+You can query Grafana Metrictank directly (it has fast, but limited built-in processing and will fallback to graphite when needed)
+or you can also just query graphite which will always use graphite's processing but use Grafana Metrictank as a datastore.
 
 ## Get a machine with root access
 
@@ -32,7 +32,7 @@ We recommend a server with at least 8GB RAM and a few CPU's.
 You need root access. All the commands shown assume you're root.
 
 
-## Metrictank and graphite
+## Grafana Metrictank and Graphite
 
 Grafana Labs provides 2 repositories:
 
@@ -52,7 +52,7 @@ You need to install these packages:
 * metrictank
 
 
-### Install Metrictank
+### Install Grafana Metrictank
 You can enable our repository and install the metrictank package like so:
 (Feel free to use the testing repository instead)
 
@@ -124,7 +124,7 @@ Below are instructions for statsd and statsdaemon.
 
 Note:
  * `<environment>` is however you choose to call your environment. (test, production, dev, ...).
- * Note, statsd/statsdaemon will write to metrictank's carbon port on localhost:2003.
+ * Note, statsd/statsdaemon will write to Grafana Metrictank's carbon port on localhost:2003.
 
 ### Statsdaemon
 
@@ -178,9 +178,9 @@ globalPrefix: "stats.<environment>"
 
 ## Optional: set up kafka
 
-You can run a persistent queue in front of metrictank.
+You can run a persistent queue in front of Grafana Metrictank.
 If your metric instance(s) go down, then a queue is helpful in buffering and saving all the data while your instance(s) is/are down.
-The moment your metrictank instance(s) come(s) back up, they can replay everything they missed (and more, it's useful to load in older data
+The moment your Grafana Metrictank instance(s) come(s) back up, they can replay everything they missed (and more, it's useful to load in older data
 so that you can serve queries for it out of RAM).
 Also, in case you want to make any change to your aggregations, Cassandra cluster, or whatever, it can be useful to re-process older data.
 
@@ -250,7 +250,7 @@ See the `kafka-mdm-in` section, set `enabled` to true.
 See [the Inputs docs for more details](https://github.com/grafana/metrictank/blob/master/docs/inputs.md).
 
 Finally, by default `memory-idx` `enabled` is true, while `cassandra-idx` has `enabled` as false.
-This will use the non-persistent index, starting with a fresh index at every start of metrictank.
+This will use the non-persistent index, starting with a fresh index at every start of Grafana Metrictank.
 You probably want to disable the memory index an enable `cassandra-idx` instead. (just switch the enabled values around).
 See [metadata](https://github.com/grafana/metrictank/blob/master/docs/metadata.md) for more details.
 
@@ -278,13 +278,13 @@ In Grafana, you can now add a graphite datasource with url `http://<ip>:8080`.
 If you access Grafana over https, make sure to use proxy mode, otherwise browsers will refuse to load content from the http datasource.
 
 You can start visualizing the data that's already in there by importing
-* [Metrictank dashboard](https://grafana.net/dashboards/279): visualizes all metrictank's internal performance metrics, which it sends via statsd/statsdaemon, into itself.  This dashboard will not work if you disabled statsd.
-* [Statsdaemon dashboard](https://grafana.net/dashboards/297): if you use statsdaemon, you can visualize its performance metrics, stored in metrictank.
+* [Grafana Metrictank dashboard](https://grafana.net/dashboards/279): visualizes all metrictank's internal performance metrics, which it sends via statsd/statsdaemon, into itself.  This dashboard will not work if you disabled statsd.
+* [Statsdaemon dashboard](https://grafana.net/dashboards/297): if you use statsdaemon, you can visualize its performance metrics, stored in Grafana Metrictank.
 
-You're probably interested in loading in some fake data as well, perhaps to benchmark metrictank.
+You're probably interested in loading in some fake data as well, perhaps to benchmark Grafana Metrictank.
 A full benchmarking guide is out of scope for this installation guide, but here are some suggestions:
 
-* Use the [haggar](https://github.com/gorsuch/haggar) tool, which simulates independent clients, gradually appearing and sending data at randomized intervals into metrictank's carbon input port.  Invoke like so:
+* Use the [haggar](https://github.com/gorsuch/haggar) tool, which simulates independent clients, gradually appearing and sending data at randomized intervals into Grafana Metrictank's carbon input port.  Invoke like so:
 
 ```
 ./haggar -agents 10 -jitter 1ms

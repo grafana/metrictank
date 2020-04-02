@@ -36,7 +36,7 @@ go get github.com/grafana/metrictank/...
 cd $GOPATH/src/github.com/grafana/metrictank
 ```
 
-## Build metrictank
+## Build Grafana Metrictank
 
 Build metrictank and the docker images:
 ```
@@ -84,7 +84,7 @@ your version of `docker-compose` is too old and you need to update to >=1.6.
 
 Wait until the stack is up.
 
-## Working with Grafana and metrictank
+## Working with Grafana and Grafana Metrictank
 
 In your browser, open Grafana at http://localhost:3000 (or your docker-machine address) and log in as `admin:admin`.  
 If Grafana prompts you to change the password, you can skip it, since it doesn't matter for a local test setup.
@@ -93,8 +93,8 @@ If Grafana prompts you to change the password, you can skip it, since it doesn't
 
 This stack has some unique properties not found in the standard stack, such as multiple data sources to choose from including, but not limited to:
 * monitoring and prometheus for data about the stack
-* metrictank to see data in metrictank
-* graphite to see data in metrictank via graphite
+* metrictank to see data in Grafana Metrictank
+* graphite to see data in Grafana Metrictank via Graphite
   
 When using [fakemetrics](https://github.com/raintank/fakemetrics) to generate data you should now use kafka
 * `fakemetrics feed --kafka-mdm-addr localhost:9092`

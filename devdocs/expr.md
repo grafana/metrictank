@@ -1,4 +1,4 @@
-# Considerations when writing a Graphite processing function in metrictank
+# Considerations when writing a Graphite processing function in Grafana Metrictank
 
 ## constructors should return a pointer
 
@@ -71,7 +71,7 @@ for now we assume that multi-steps in a row is not that common, and COW seems mo
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
-Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this library to be easily embeddable in other programs. 
+Note that the expr library can be called by different clients. At this point only Grafana Metrictank uses it, but we intend this library to be easily embeddable in other programs. 
 It's up to the client to instantiate the pool, and set up the default allocation to return point slices of desired point capacity.
 The client can then of course use this pool to store series, which it then feeds to expr.
 expr library does the rest.  It manages the series/pointslices and gets new ones as a basis for the COW.

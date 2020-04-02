@@ -36,7 +36,7 @@ within that size it tries to always keep the most often queried data by using an
 The effectiveness of the chunk cache largely depends on the common query patterns and the configured `max-size` value:
 If a small number of metrics gets queried often, the chunk cache will be effective because it can serve most requests out of its memory.
 On the other hand, if most queries involve metrics that have not been queried for a long time and if they are only queried a small number of times,
-then Metrictank will need to fallback to the store more often.
+then Grafana Metrictank will need to fallback to the store more often.
 
 ## Configuration guidelines
 

@@ -1,4 +1,4 @@
-# Metrictank startup
+# Grafana Metrictank startup
 
 The full startup procedure has many details, but here we cover the main steps if they affect:
 

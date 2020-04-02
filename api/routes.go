@@ -55,7 +55,7 @@ func (s *Server) RegisterRoutes() {
 		ctx.Write(nil)
 	})
 
-	// Miscellaneous Metrictank-only user facing endpoints
+	// Miscellaneous Grafana Metrictank-only user facing endpoints
 	r.Combo("/showplan", cBody, withOrg, ready, bind(models.GraphiteRender{})).Get(s.showPlan).Post(s.showPlan)
 	r.Combo("/tags/terms", ready, bind(models.GraphiteTagTerms{})).Get(s.graphiteTagTerms).Post(s.graphiteTagTerms)
 	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)

@@ -14,7 +14,7 @@ A clear and concise description of what the bug is.
 Add any other context about the problem here.
 
 **Helpful Information**
-Metrictank Version:
+Grafana Metrictank Version:
 Golang Version (if not using an official binary or docker image):
 OS:
 Please also list any other software versions you think would be useful to debug the problem (i.e. Cassandra, Kafka, etc...):

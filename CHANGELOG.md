@@ -11,11 +11,11 @@
   storage schema `1s:35d:10min:7` the cutoff is at `35d*0.1=3.5d`. 
   The limit can be configured by using the parameter `retention.future-tolerance-ratio`, or it can
   be completely disabled by using the parameter `retention.enforce-future-tolerance`. 
-  To predict whether Metrictank would drop incoming data points once the enforcement is turned on,
+  To predict whether Grafana Metrictank would drop incoming data points once the enforcement is turned on,
   the metric `tank.sample-too-far-ahead` can be used, this metric counts the data points which
   would be dropped if the enforcement were turned on while it is off.
   #1572 
-* Prometheus integration removal. As of v0.13.1-97-gd77c5a31, it is no longer possible to use metrictank
+* Prometheus integration removal. As of v0.13.1-97-gd77c5a31, it is no longer possible to use Grafana Metrictank
   to scrape prometheus data, or query data via Promql.  There was not enough usage (or customer interest)
   to keep maintaining this functionality.
   #1613
@@ -27,7 +27,7 @@
   queries don't return the same results as before, if they query for tags as part of the metric
   name.
   #1619
-* as of v0.13.1-250-g21d1dcd1 metrictank no longer excessively aligns all data to the same
+* as of v0.13.1-250-g21d1dcd1 Grafana Metrictank no longer excessively aligns all data to the same
   lowest comon multiple resolution, but rather keeps data at their native resolution when possible.
   1. When queries request mixed resolution data, this will now typically result in larger response datasets,
   with more points, and thus slower responses.
@@ -118,7 +118,7 @@
 ## docker stack
 
 * cleanup docker img versions #1479 
-* remove metrictank bits from graphite-storage-schemas.conf files #1553
+* remove Grafana Metrictank bits from graphite-storage-schemas.conf files #1553
 
 # v0.13.0: Meta tags beta, sharding by tags, new importer (bigtable!), response stats, memory-idx write queue and many fixes. Sept 17, 2019.
 
@@ -128,14 +128,14 @@
   If a user still has the value `50` in their config file we recommend decreasing that, because due to how
   meta tag queries get processed MT may now create multiple pools of workers concurrently to process a single
   query, where each pool consists of `tag-query-workers` threads.
-* as of v0.13.0-75-geaac736a Metrictank requires two new Cassandra tables if the meta tag feature is enabled and the Cassandra index is used. It only creates them automatically if `cassandra-idx-create-keyspace` is set to true.
+* as of v0.13.0-75-geaac736a Grafana Metrictank requires two new Cassandra tables if the meta tag feature is enabled and the Cassandra index is used. It only creates them automatically if `cassandra-idx-create-keyspace` is set to true.
 * as of v0.12.0-404-gc7715cb2 we clean up poorly formatted graphite metrics better. To the extent that they have previously worked, queries may need some adjusting
   #1435
 * version v0.12.0-96-g998933c3 introduces config options for the cassandra/scylladb index table names.
   The default settings and schemas match the previous behavior, but people who have customized the schema-idx template files
   should know that we now no longer only expand the keyspace (and assume a hardcoded table name).
   Now both the `schema_table` and `schema_archive_table` sections in the template name should have 2 `%s` sections which will be
-  expanded to the `keyspace` and `table`, or `keyspace` and `archive-table` settings respectively configured under `cassandra-idx` of the metrictank config file.
+  expanded to the `keyspace` and `table`, or `keyspace` and `archive-table` settings respectively configured under `cassandra-idx` of the Grafana Metrictank config file.
 * version v0.12.0-81-g4ee87166 and later reject metrics with invalid tags on ingest by default, this can be disabled via the `input.reject-invalid-tags` flag.
   if you're unsure whether you're currently sending invalid tags, it's a good idea to first disable the invalid tag rejection and watch the
   new counter called `input.<input name>.metricdata.discarded.invalid_tag`, if invalid tags get ingested this counter will increase without
@@ -267,7 +267,7 @@ see #1243, #1292, #1295
    This release brings a remediation to recover the data at read time, as well
    as a [new chunk format](https://github.com/grafana/metrictank/blob/master/devdocs/chunk-format.md#tszserieslong) that does not suffer from the issue.
    The new chunks are also about 9 bytes shorter in the typical case.
-   While metrictank now writes to the store exclusively using the new format, it can read from the store in any of the formats.
+   While Grafana Metrictank now writes to the store exclusively using the new format, it can read from the store in any of the formats.
    This means readers should be upgraded before writers,
    to avoid the situation where an old reader cannot parse the chunk written by a newer
    writer during an upgrade.  See #1126, #1129
@@ -413,7 +413,7 @@ There was a bug in 0.9 which caused instances to incorrectly encode Id's for tra
 
 ## kafka format upgrade
 
-support for new MetricPoint optimized data format in the kafka mdm topic, resulting in less kafka io, disk usage, GC workload, metrictank and kafka cpu usage, faster backfills. #876 , #885 #890, #891, #894, #911 
+support for new MetricPoint optimized data format in the kafka mdm topic, resulting in less kafka io, disk usage, GC workload, Grafana Metrictank and kafka cpu usage, faster backfills. #876 , #885 #890, #891, #894, #911 
 this also comes with:
 * new dashboard
 * updates of internal representations of keys, archives, index structures, intra-cluster requests, etc.(**so you must do a colored upgrade or new cluster deployment**)
@@ -634,7 +634,7 @@ also relevant is the new `gossip-to-the-dead-time` setting which can help with r
 ## data server / api
 * support a minimal built-in graphite function processing api, proxying to graphite what we cannot do ourselves.
 currently supports alias, aliasByNode, aliasSub, avg, divideSeries, perSecond, scale, sum, transformNull and consolidateBy (which now intelligently controls runtime consolidation and archive selection for consolidated archives).  #575, #623 #637 #640 #641 #643 
-* allow metrictank to run as a graphite-web cluster node. by using graphite-web we get more stability and performance compared to graphite-api. #611 #616 #633 
+* allow Grafana Metrictank to run as a graphite-web cluster node. by using graphite-web we get more stability and performance compared to graphite-api. #611 #616 #633 
 * misc fixes for gzip middleware #619 #621 
 
 ## clustering
@@ -708,7 +708,7 @@ Similarly, there may be more PR's involved to a given feature beside the mention
 
 ## storage
 - new chunk format that contains chunkspan. integrates seamlessly with older chunks. #418 
-- chunk cache as a more effective way for metrictank to cache hot in-memory data, complements the ringbuffers which can now retain less data #417 #455 #461 
+- chunk cache as a more effective way for Grafana Metrictank to cache hot in-memory data, complements the ringbuffers which can now retain less data #417 #455 #461 
 - use different tables based on TTL. #382 #484 
 - set default cassandra keyspace to "metrictank" #460 
 - update gocql
@@ -731,7 +731,7 @@ Similarly, there may be more PR's involved to a given feature beside the mention
 
 ## tools
 
-metrictank now comes with helper tools:
+Grafana Metrictank now comes with helper tools:
 - mt-index-migrate-050-to-054 #451 
 - mt-index-migrate-06-to-07 #425 #451 
 - mt-index-cat #437 
@@ -858,7 +858,7 @@ builds & packaging:
 docs:
 - various docs update, put docs table in readme
 - simplify readme
-- add metrictank dashboard, and add [on grafana.net](https://grafana.net/dashboards/279)
+- add Grafana Metrictank dashboard, and add [on grafana.net](https://grafana.net/dashboards/279)
 
 # 0.5.1
 

@@ -1,5 +1,5 @@
-// Package in provides interfaces, concrete implementations, and utilities
-// to ingest data into metrictank
+// Package input provides interfaces, concrete implementations, and utilities
+// to ingest data into Grafana Metrictank
 package input
 
 import (

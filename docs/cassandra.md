@@ -23,7 +23,7 @@ Here are some settings that are worth elaborating on:
 
 ## Schema
 
-Metrictank comes with these schema files out of the box:
+Grafana Metrictank comes with these schema files out of the box:
 
 * [/etc/metrictank/schema-store-cassandra.toml](https://github.com/grafana/metrictank/blob/master/scripts/config/schema-store-cassandra.toml)
 * [/etc/metrictank/schema-idx-cassandra.toml](https://github.com/grafana/metrictank/blob/master/scripts/config/schema-idx-cassandra.toml)

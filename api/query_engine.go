@@ -112,7 +112,7 @@ func planRequests(now, from, to uint32, reqs *ReqMap, planMDP uint32, mpprSoft, 
 		// in the future we can make this even more aggressive and also try to reduce MDP-optimized series even more
 		//
 		// Note:
-		// A) if metrictank is already handling all, or most of your queries, then we have been able to determine
+		// A) if Grafana Metrictank is already handling all, or most of your queries, then we have been able to determine
 		//    MDP-optimizability very well. In this case we pretty much know that if we need to enforce this option
 		//    it is going to have an adverse effect on your queries, and you should probably not use this option,
 		//    or we should even get rid of it.

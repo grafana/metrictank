@@ -2,7 +2,7 @@
 
 ## tags
 
-[metrictank on dockerhub](https://hub.docker.com/r/grafana/metrictank/)
+[Grafana Metrictank on dockerhub](https://hub.docker.com/r/grafana/metrictank/)
 
 You can use these tags:
 
@@ -12,7 +12,7 @@ You can use these tags:
 ## extra docker stacks
 
 You may have already followed [our docker quickstart guide](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker.md) but in fact,
-the metrictank repository contains a variety of docker stacks for different purposes.
+the Grafana Metrictank repository contains a variety of docker stacks for different purposes.
 
 They can be started by cd'ing into their directory and running `docker-compose up --force-recreate -V`
 
@@ -25,14 +25,14 @@ Note:
 ### docker-standard
 
 plain, basic environment.
-uses metrictank docker image (with baked in binaries and configs), statsdaemon.
+uses Grafana Metrictank docker image (with baked in binaries and configs), statsdaemon.
 Comes with 1 dashboard: the metrictank dashboard
 
 [see our quickstart guide](https://github.com/grafana/metrictank/blob/master/docs/quick-start-docker.md)
 
 ### docker-dev
 
-Similar to docker-standard, but custom metrictank build is loaded, custom configs from scripts/config
+Similar to docker-standard, but custom Grafana Metrictank build is loaded, custom configs from scripts/config
 also: tag support, main+extra dashboards
 
 ### docker-dev-bigtable
@@ -69,7 +69,7 @@ Similar to docker-dev-custom-cfg-kafka
 
 ### docker-cluster-query
 
-A cluster just like docker-cluster, but with an extra query layer (of 1 metrictank instance) in front.
+A cluster just like docker-cluster, but with an extra query layer (of 1 Grafana Metrictank instance) in front.
 
 ### docker-chaos
 

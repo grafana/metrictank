@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/stats"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/grafana/metrictank/stats"
 
 	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
 	"github.com/grafana/metrictank/publish"
@@ -65,7 +66,7 @@ func bulkImportHandler(urls Urls) http.Handler {
 //Builds an http.ServeMux based on the handlers defined in the Api
 func (api Api) Mux() *http.ServeMux {
 	mux := http.NewServeMux()
-	//By default everything is proxied to graphite
+	//By default everything is proxied to Graphite
 	//This includes endpoints under `/metrics` which aren't explicitly rerouted
 	mux.Handle("/", api.graphiteHandler)
 	//`/metrics` is handled locally by the kafka ingester (not yet implemented)

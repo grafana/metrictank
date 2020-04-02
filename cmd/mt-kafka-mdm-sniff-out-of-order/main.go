@@ -159,7 +159,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "# Mechanism")
 		fmt.Fprintln(os.Stderr, "* it sniffs points being added on a per-series (metric Id) level")
 		fmt.Fprintln(os.Stderr, "* for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp")
-		fmt.Fprintln(os.Stderr, "* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point")
+		fmt.Fprintln(os.Stderr, "* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which Grafana Metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point")
 		fmt.Fprintln(os.Stderr, "every event is printed using the specified, respective format based on the message format")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "# Event formatting")

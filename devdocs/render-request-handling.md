@@ -46,7 +46,7 @@ The flow is described below in detail, but basically:
 * the MDP value from the plan is passed through the Context into the expr.Req types. (but is cleared if the optimization is disabled or by certain functions. See "MDP-optimization" above)
 This value is used only to control whether or not to apply MDP-optimization when planning the fetching of the request.
 
-mdp set from GET param, but 0 if came from graphite
+mdp set from GET param, but 0 if came from Graphite
     -> NewPlan()
         -> plan.MaxDatapoints 
         -> Context.MDP, though GR functions like (smart)Summarize set r.MDP =0

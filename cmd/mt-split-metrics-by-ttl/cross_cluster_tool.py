@@ -6,7 +6,7 @@
 # It's intended to be run on the source cluster and it
 # assumes that the new style schema has already been
 # created on the destination cluster by a new instance
-# of metrictank.
+# of Grafana Metrictank.
 # This script does not execute any commands directly,
 # it only prints a shell script that can be piped into
 # a shell.

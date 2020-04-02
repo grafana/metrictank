@@ -32,7 +32,7 @@ var (
 	addThreads           = flag.Int("add-threads", 8, "Number of threads to concurrently try adding metrics into the index")
 	initialIndexSize     = flag.Int("initial-index-size", 1000000, "prepopulate the index with the defined number of metrics before starting the benchmark")
 	queriesPerSec        = flag.Int("queries-per-sec", 100, "Index queries per second")
-	concQueries          = flag.Int("concurrent-queries", 1000, "Max number of concurrent index queries. (note: this limit does not exist in metrictank)")
+	concQueries          = flag.Int("concurrent-queries", 1000, "Max number of concurrent index queries. (note: this limit does not exist in Grafana Metrictank)")
 	runDuration          = flag.Duration("run-duration", time.Minute, "How long we want the test to run")
 	profileNamePrefix    = flag.String("profile-name-prefix", "profile", "Prefix to prepend before profile file names")
 	blockProfileRate     = flag.Int("block-profile-rate", 0, "Sampling rate of block profile, 0 means disabled")

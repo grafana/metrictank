@@ -14,8 +14,8 @@ useful for traditional graphite plaintext protocol.  Does not support pickle for
 
 ** Important: this input requires a
 [carbon storage-schemas.conf](http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf) file.
-Metrictank uses this file to determine the raw interval of the metrics, but it ignores all retention durations
-as well as intervals after the first, raw one since metrictank already has its own config mechanism
+Grafana Metrictank uses this file to determine the raw interval of the metrics, but it ignores all retention durations
+as well as intervals after the first, raw one since Grafana Metrictank already has its own config mechanism
 for retention and aggregation. **
 
 note: it does not implement [carbon2.0](http://metrics20.org/implementations/)
@@ -47,11 +47,11 @@ This format is a hand-written binary format that is much more compact and fast t
 See the [MetricPoint](https://godoc.org/github.com/grafana/metrictank/schema#MetricPoint) documentation for format and implementation details.
 It is a minimal format that only contains the series identifier, value and timestamp.
 As such, it is paramount that MetricPoint messages for each series have been preceded by a MetricData message for that series, so
-that metrictank has had the chance to add the metric information into its index.
-Otherwise metrictank will not recognize the ID and discard the point.
+that Grafana Metrictank has had the chance to add the metric information into its index.
+Otherwise Grafana Metrictank will not recognize the ID and discard the point.
 
 Note that the implementation has encode/decode function for the standard MetricPoint format, as well as a variant that does not encode the org-id
-part of the series id.  For single-tenant environments, you can configure your producers and metrictank to not encode an org-id in all messages
+part of the series id.  For single-tenant environments, you can configure your producers and Grafana Metrictank to not encode an org-id in all messages
 and rather just set it in configuration, this makes the message more compact, but won't work in multi-tenant environments.
 
 ### Future formats

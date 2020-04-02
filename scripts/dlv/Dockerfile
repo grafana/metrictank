@@ -1,7 +1,7 @@
 FROM golang:1.11.4-alpine AS gobase
 RUN apk add --no-cache git bash
 
-# Compile metrictank
+# Compile Grafana Metrictank
 ENV MT_SRC_DIR $GOPATH/src/github.com/grafana/metrictank
 RUN mkdir -p $MT_SRC_DIR
 ADD . $MT_SRC_DIR

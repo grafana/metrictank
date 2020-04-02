@@ -94,7 +94,7 @@ such that they can be used together (for aggregating, merging, etc)
 
 # Optimizations
 
-Metrictank has two specific optimizations that can be enabled with the config settings:
+Grafana Metrictank has two specific optimizations that can be enabled with the config settings:
 
 ```
 [http]
