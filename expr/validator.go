@@ -9,7 +9,7 @@ import (
 var ErrIntPositive = errors.NewBadRequest("integer must be positive")
 var ErrInvalidAggFunc = errors.NewBadRequest("Invalid aggregation func")
 var ErrNonNegativePercent = errors.NewBadRequest("The requested percent is required to be greater than 0")
-var ErrWithinZeroOneInclusiveInterval = errors.NewBadRequest("The floating point must lie within interval [0,1]")
+var ErrWithinZeroOneInclusiveInterval = errors.NewBadRequest("value must lie within interval [0,1]")
 
 // Validator is a function to validate an input
 type Validator func(e *expr) error
