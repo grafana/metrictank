@@ -22,14 +22,13 @@ import (
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/carbon"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/gnet"
-	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/kafkamdam"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/kafkamdm"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/stdout"
 )
 
 func checkOutputs() {
-	if carbonAddr == "" && gnetAddr == "" && kafkaMdmAddr == "" && kafkaMdamAddr == "" && !stdoutOut {
-		log.Fatal(4, "must use at least either carbon, gnet, kafka-mdm, kafka-mdam or stdout")
+	if carbonAddr == "" && gnetAddr == "" && kafkaMdmAddr == "" && !stdoutOut {
+		log.Fatal(4, "must use at least either carbon, gnet, kafka-mdm or stdout")
 	}
 }
 
@@ -68,14 +67,6 @@ func getOutputs() []out.Out {
 		o, err := kafkamdm.New(kafkaMdmTopic, []string{kafkaMdmAddr}, kafkaCompression, 30*time.Second, stats, partitionScheme, kafkaMdmV2)
 		if err != nil {
 			log.Fatal(4, "failed to create kafka-mdm output. %s", err)
-		}
-		outs = append(outs, o)
-	}
-
-	if kafkaMdamAddr != "" {
-		o, err := kafkamdam.New("mdam", []string{kafkaMdamAddr}, kafkaCompression, stats)
-		if err != nil {
-			log.Fatal(4, "failed to create kafka-mdam output. %s", err)
 		}
 		outs = append(outs, o)
 	}

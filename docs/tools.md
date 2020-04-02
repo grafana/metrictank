@@ -87,7 +87,6 @@ Flags:
       --gnet-key string              gnet api key
   -h, --help                         help for mt-fakemetrics
       --kafka-comp string            compression: none|gzip|snappy (default "snappy")
-      --kafka-mdam-addr string       kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092
       --kafka-mdm-addr string        kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092
       --kafka-mdm-topic string       kafka topic for MetricData-Msgp messages (default "mdm")
       --kafka-mdm-v2                 enable MetricPoint optimization (send MetricData first, then optimized MetricPoint payloads) (default true)
