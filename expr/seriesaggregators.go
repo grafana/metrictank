@@ -73,7 +73,7 @@ func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 		}
 	}
 
-	for i := 0; i < len(in[0].Datapoints); i++ {
+	for i := range *out {
 		if !math.IsNaN((*out)[i].Val) {
 			(*out)[i].Val /= float64(counts[i])
 		}
@@ -87,7 +87,7 @@ func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
 // crossSeriesAvgZero would compute it as 4/5=0.8
 func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
 	crossSeriesSum(in, out)
-	for i := 0; i < len(in[0].Datapoints); i++ {
+	for i := range *out {
 		if !math.IsNaN((*out)[i].Val) {
 			(*out)[i].Val /= float64(len(in))
 		} else {
