@@ -240,8 +240,10 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	shardReqs := make(map[int32][]models.Req)
 	for _, nodeReqs := range remoteReqs {
 		shardID := nodeReqs[0].Node.GetPartitions()[0]
-		requiredPeers[shardID] = allPeers[shardID]
-		shardReqs[shardID] = append(shardReqs[shardID], nodeReqs...)
+		if peers := allPeers[shardID]; len(peers) > 0 {
+			requiredPeers[shardID] = peers
+			shardReqs[shardID] = append(shardReqs[shardID], nodeReqs...)
+		}
 	}
 
 	rCtx, cancel := context.WithCancel(ctx)
