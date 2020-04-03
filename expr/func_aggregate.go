@@ -52,6 +52,10 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
+	if len(series) == 0 {
+		return series, nil
+	}
+
 	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
 	series = Normalize(dataMap, series)
 	output := aggregate(series, queryPatts, agg, s.xFilesFactor)
@@ -62,10 +66,6 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 }
 
 func aggregate(series []models.Series, queryPatts []string, agg seriesAggregator, xFilesFactor float64) models.Series {
-	if len(series) == 0 {
-		return models.Series{}
-	}
-
 	if len(series) == 1 {
 		name := agg.name + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
