@@ -563,6 +563,12 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 		}
 
 		for group, peers := range peerGroups {
+			if len(peers) == 0 {
+				errorChan <- fmt.Errorf("peer group %d has no peers", group)
+				delete(peerGroups, group)
+				continue
+			}
+
 			nextPeer := peers[0]
 			// shift nextPeer from the group
 			peerGroups[group] = peers[1:]
