@@ -542,6 +542,8 @@ func shutdown() {
 	if cluster.Mode != cluster.ModeQuery {
 		log.Info("closing store")
 		store.Stop()
+		log.Info("closing index")
+		metricIndex.Stop()
 
 		if memory.MetaTagSupport {
 			switch concrete := metaRecords.(type) {
