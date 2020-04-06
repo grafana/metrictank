@@ -537,7 +537,19 @@ It prints the MKey
 ## mt-parrot
 
 ```
-generate deterministic metrics for each metrictank partition
+generate deterministic metrics for each metrictank partition, query them back and report on correctness and performance
+
+Correctness:
+	Monitor the parrot.monitoring.error series. There's 3 potential issues:
+
+	* parrot.monitoring.error;error=http    // could not execute http request
+	* parrot.monitoring.error;error=decode  // could not decode http response
+	* parrot.monitoring.error;error=invalid // any other problem with the response itself
+
+Performance:
+	In addition to these black-and-white measurements above, there are also more subjective measurements
+	* parrot.monitoring.lag  // how far the response is lagging behind
+	* parrot.monitoring.nans // number of nans included in the response
 
 Usage:
   mt-parrot [flags]
