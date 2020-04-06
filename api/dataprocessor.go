@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/expr"
+	"github.com/grafana/metrictank/util/align"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/cluster"
@@ -55,20 +56,6 @@ type getTargetsResp struct {
 	err    error
 }
 
-// alignForward aligns ts to the next timestamp that divides by the interval, except if it is already aligned
-func alignForward(ts, interval uint32) uint32 {
-	remain := ts % interval
-	if remain == 0 {
-		return ts
-	}
-	return ts + interval - remain
-}
-
-// alignBackward aligns the ts to the previous ts that divides by the interval, even if it is already aligned
-func alignBackward(ts uint32, interval uint32) uint32 {
-	return ts - ((ts-1)%interval + 1)
-}
-
 // Fix assures a series is in quantized form:
 // all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
 // graphite does this quantization before storing, we may want to do that as well at some point
@@ -77,8 +64,8 @@ func alignBackward(ts uint32, interval uint32) uint32 {
 // values to earlier in time.
 func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
-	first := alignForward(from, interval)
-	last := alignBackward(to, interval)
+	first := align.ForwardIfNotAligned(from, interval)
+	last := align.Backward(to, interval)
 
 	if last < first {
 		// the requested range is too narrow for the requested interval
@@ -741,8 +728,8 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// so the caller can just compare rc.From and rc.To and if equal, immediately return [] to the client.
 
 	if req.Archive == 0 {
-		rc.From = alignBackward(req.From, req.ArchInterval) + 1
-		rc.To = alignBackward(req.To, req.ArchInterval) + 1
+		rc.From = align.Backward(req.From, req.ArchInterval) + 1
+		rc.To = align.Backward(req.To, req.ArchInterval) + 1
 		rc.AMKey = schema.AMKey{MKey: req.MKey}
 	} else {
 		rc.From = req.From
@@ -767,7 +754,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// but because we eventually want to consolidate into a point with ts=60, we also need the points that will be fix-adjusted to 40 and 50.
 		// so From needs to be lowered by 20 to become 35 (or 31 if adjusted).
 
-		boundary := alignForward(rc.From, req.OutInterval)
+		boundary := align.ForwardIfNotAligned(rc.From, req.OutInterval)
 		rewind := req.AggNum * req.ArchInterval
 		if boundary < rewind {
 			panic(fmt.Sprintf("Cannot rewind far back enough (trying to rewind by %d from timestamp %d)", rewind, boundary))
@@ -793,7 +780,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// 240       - 211       - ...,210         - 210              - 210                                    - 210
 		//*240->231  - 211       - ...,210         - 210              - 210                                    - 210
 
-		rc.To = alignBackward(rc.To, req.OutInterval) + 1
+		rc.To = align.Backward(rc.To, req.OutInterval) + 1
 	}
 
 	return &rc
