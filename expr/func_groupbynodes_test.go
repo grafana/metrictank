@@ -156,7 +156,7 @@ func TestGroupByNodesMultipleSeriesMissingNameNode(t *testing.T) {
 		in,
 		expected,
 		"sum",
-		[]expr{{etype: etInt, str: "1", int: 3}, {etype: etString, str: "tag1"}},
+		[]expr{{etype: etInt, str: "3", int: 3}, {etype: etString, str: "tag1"}},
 		nil,
 		t)
 }

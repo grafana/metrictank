@@ -57,7 +57,6 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		m models.SeriesMeta
 	}
 	groups := make(map[string]Group)
-
 	// Group series by nodes, this is mostly similar to GroupByTags,
 	// except that the group keys are different.
 	for _, serie := range series {
@@ -67,28 +66,27 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		group.m = group.m.Merge(serie.Meta)
 		groups[key] = group
 	}
-
 	// Similar to FuncGroupByTags, apply aggregate functions to each group
 	output := make([]models.Series, 0, len(groups))
 	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 
 	for key, group := range groups {
-		consolidators, queryConsolidators := summarizeCons(group.s)
+		consolidator, queryConsolidator := summarizeCons(group.s)
 		outSeries := models.Series{
 			Target:       key,
 			QueryPatt:    key,
-			Interval:     series[0].Interval,
-			Consolidator: consolidators,
-			QueryCons:    queryConsolidators,
+			Consolidator: consolidator,
+			QueryCons:    queryConsolidator,
 			QueryFrom:    group.s[0].QueryFrom,
 			QueryTo:      group.s[0].QueryTo,
 			QueryMDP:     group.s[0].QueryMDP,
 			QueryPNGroup: group.s[0].QueryPNGroup,
 			Meta:         group.m,
 		}
+		group.s = Normalize(dataMap, group.s)
+		outSeries.Interval = group.s[0].Interval
 		outSeries.SetTags()
 		outSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
-		group.s = Normalize(dataMap, group.s)
 		aggFunc(group.s, &outSeries.Datapoints)
 		dataMap.Add(Req{}, outSeries)
 		output = append(output, outSeries)
