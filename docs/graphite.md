@@ -78,8 +78,8 @@ See also:
 | filterSeries(seriesList, func, operator, threshold) seriesList |              | Stable     |
 | grep(seriesList, pattern) seriesList                           |              | Stable     |
 | group                                                          |              | Stable     |
-| groupByNode                                                    |              | No         |
-| groupByNodes                                                   |              | No         |
+| groupByNode                                                    |              | Stable     |
+| groupByNodes                                                   |              | Stable     |
 | groupByTags(seriesList, func, tagList) seriesList              |              | Stable     |
 | highest(seriesList, n, func) seriesList                        |              | Stable     |
 | highestAverage(seriesList, n, func) seriesList                 |              | Stable     |
