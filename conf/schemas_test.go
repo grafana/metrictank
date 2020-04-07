@@ -169,11 +169,11 @@ func TestMaxChunkSpan(t *testing.T) {
 	})
 }
 
-func TestMaxRetention(t *testing.T) {
+func TestMaxRawRetention(t *testing.T) {
 	schemas := schemasForTest()
 	Convey("When getting maxRetention", t, func() {
-		max := schemas.MaxRetention()
-		So(max, ShouldEqual, 86400*7)
+		max := schemas.MaxRawRetention()
+		So(max, ShouldEqual, 86400)
 	})
 }
 
