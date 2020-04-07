@@ -267,3 +267,17 @@ func (schemas Schemas) MaxChunkSpan() uint32 {
 	}
 	return max
 }
+
+// MaxRetention returns the largest maximum retention seen amongst all archives of all schemas
+func (schemas Schemas) MaxRetention() int {
+	max := int(0)
+	for _, s := range schemas.raw {
+		for _, r := range s.Retentions.Rets {
+			max = util.MaxInt(max, r.MaxRetention())
+		}
+	}
+	for _, r := range schemas.DefaultSchema.Retentions.Rets {
+		max = util.MaxInt(max, r.MaxRetention())
+	}
+	return max
+}
