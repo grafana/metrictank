@@ -230,7 +230,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	// Note: we can expect remoteReqs to possibly have multiple node string keys that are part of the same shardgroup.
 	// Why? Because a request may need multiple series lookups, and issue multiple, distinct find/find_by_tag calls, each of which may end up using different replicas
 	// within the same shardgroup (due to changing priorities, spec-exec, etc)>
-	// Thus here we we categorize all requests into groups per shard ID, rather than by hostname.
+	// Thus here we categorize all requests into groups per shard ID, rather than by hostname.
 
 	for _, nodeReqs := range remoteReqs {
 		shardID := nodeReqs[0].Node.GetPartitions()[0]
