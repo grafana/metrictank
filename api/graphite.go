@@ -651,7 +651,10 @@ func (s *Server) metricsDeleteLocal(orgId uint32, query string) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		defs := s.MetricIndex.DeleteTagged(orgId, q)
+		defs, err := s.MetricIndex.DeleteTagged(orgId, q)
+		if err != nil {
+			return 0, err
+		}
 		return len(defs), err
 
 	} else {
