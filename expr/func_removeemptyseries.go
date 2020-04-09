@@ -61,9 +61,7 @@ func (s *FuncRemoveEmptySeries) Exec(dataMap DataMap) ([]models.Series, error) {
 	return output, nil
 }
 
-/*
-xffCheck compares the ratio of notNull to total values with the xFilesFactor.
-*/
+// xffCheck returns whether a series with given notNull and total point counts should be included based on the xFilesFactor
 func xffCheck(notNull int, total int, xFilesFactor float64) bool {
 	if notNull == 0 || total == 0 {
 		return false
