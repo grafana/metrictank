@@ -57,7 +57,6 @@ func (s *FuncRemoveEmptySeries) Exec(dataMap DataMap) ([]models.Series, error) {
 		}
 	}
 
-	dataMap.Add(Req{}, series...)
 	return output, nil
 }
 
