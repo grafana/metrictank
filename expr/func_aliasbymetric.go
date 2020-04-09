@@ -1,6 +1,8 @@
 package expr
 
 import (
+	"strings"
+
 	"github.com/grafana/metrictank/api/models"
 )
 
@@ -29,8 +31,13 @@ func (s *FuncAliasByMetric) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 	for i, serie := range series {
 		n := extractMetric(serie.Target)
-		series[i].Target = n
-		series[i].QueryPatt = n
+		m := strings.Split(n, ";")[0]
+		mSlice := strings.Split(m, ".")
+		base := mSlice[len(mSlice)-1]
+
+		series[i].Target = base
+		series[i].QueryPatt = base
+		series[i].Tags = series[i].CopyTagsWith("name", base)
 	}
 	return series, nil
 }
