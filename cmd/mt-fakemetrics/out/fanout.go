@@ -28,6 +28,12 @@ type FanOut struct {
 	outs []Out
 }
 
+func NewFanOut(outs []Out) FanOut {
+	return FanOut{
+		outs: outs,
+	}
+}
+
 func (f FanOut) Close() error {
 	var retErr multiErr
 	for _, o := range f.outs {
