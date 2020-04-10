@@ -19,7 +19,7 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/schema"
-	log "github.com/sirupsen/logrus"
+	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/spf13/cobra"
 )
 
@@ -110,6 +110,9 @@ func generateData(out out.Out) {
 		}
 		md.Time = timestamp
 		md.Value = float64(2.0)
-		out.Flush(sl)
+		err := out.Flush(sl)
+		if err != nil {
+			log.Error(0, err.Error())
+		}
 	}
 }
