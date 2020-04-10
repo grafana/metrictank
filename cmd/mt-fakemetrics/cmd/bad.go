@@ -39,12 +39,8 @@ var badCmd = &cobra.Command{
 	Short: "Sends out invalid/out-of-order/duplicate metric data",
 	Run: func(cmd *cobra.Command, args []string) {
 		initStats(true, "bad")
-		outs := getOutputs()
-		if len(outs) == 0 {
-			log.Fatal("need to define an output")
-		}
-
-		generateData(outs)
+		out := getOutput()
+		generateData(out)
 	},
 }
 
@@ -61,7 +57,7 @@ func init() {
 	badCmd.Flags().BoolVar(&flags.duplicate, "duplicate", false, "send duplicate data")
 }
 
-func generateData(outs []out.Out) {
+func generateData(out out.Out) {
 	md := &schema.MetricData{
 		Name:     "some.id.of.a.metric.0",
 		OrgId:    1,
@@ -114,8 +110,6 @@ func generateData(outs []out.Out) {
 		}
 		md.Time = timestamp
 		md.Value = float64(2.0)
-		for _, o := range outs {
-			o.Flush(sl)
-		}
+		out.Flush(sl)
 	}
 }

@@ -32,7 +32,7 @@ func checkOutputs() {
 	}
 }
 
-func getOutputs() []out.Out {
+func getOutput() out.Out {
 	var outs []out.Out
 
 	if carbonAddr != "" {
@@ -74,6 +74,12 @@ func getOutputs() []out.Out {
 	if stdoutOut {
 		outs = append(outs, stdout.New(stats))
 	}
+	if len(outs) == 0 {
+		log.Fatal("need to define an output")
+	}
+	if len(outs) > 1 {
+		return FanOut{outs}
+	}
+	return outs[0]
 
-	return outs
 }

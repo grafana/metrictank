@@ -27,8 +27,8 @@ var backfillCmd = &cobra.Command{
 		initStats(true, "backfill")
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
-		outs := getOutputs()
-		dataFeed(outs, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, TaggedBuilder{metricName})
+		out := getOutput()
+		dataFeed(out, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, TaggedBuilder{metricName})
 	},
 }
 

@@ -54,10 +54,7 @@ var schemasbackfillCmd = &cobra.Command{
 		initStats(true, "schemasbackfill")
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
-		outs := getOutputs()
-		if len(outs) == 0 {
-			log.Fatal("need to define an output")
-		}
+		out := getOutput()
 		ignoreList := strings.Split(ignore, ",")
 
 		wg.Add(len(schemasList))
@@ -77,7 +74,7 @@ var schemasbackfillCmd = &cobra.Command{
 				name = "default"
 			}
 			go func(name string, period int) {
-				dataFeed(outs, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, SimpleBuilder{name})
+				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, SimpleBuilder{name})
 				wg.Done()
 			}(name, schema.Retentions.Rets[0].SecondsPerPoint)
 		}
