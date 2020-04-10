@@ -108,6 +108,7 @@ func init() {
 		"removeAboveValue":      {NewRemoveAboveBelowValueConstructor(true), true},
 		"removeBelowPercentile": {NewRemoveAboveBelowPercentileConstructor(false), true},
 		"removeBelowValue":      {NewRemoveAboveBelowValueConstructor(false), true},
+		"removeEmptySeries":     {NewRemoveEmptySeries, true},
 		"round":                 {NewRound, true},
 		"scale":                 {NewScale, true},
 		"scaleToSeconds":        {NewScaleToSeconds, true},
