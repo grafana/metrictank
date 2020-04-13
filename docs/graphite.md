@@ -37,7 +37,7 @@ See also:
 | Function name and signature                                    | Alias        | Metrictank |
 | -------------------------------------------------------------- | ------------ | ---------- |
 | absolute                                                       |              | Stable     |
-| aggregate                                                      |              | No         |
+| aggregate                                                      |              | Stable     |
 | aggregateLine                                                  |              | No         |
 | aggregateWithWildcards                                         |              | No         |
 | alias(seriesList, alias) seriesList                            |              | Stable     |
