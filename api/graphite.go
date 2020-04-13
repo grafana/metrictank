@@ -210,7 +210,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
 		// note: any parsing error is always due to bad request
-		if !request.NoProxy {
+		if !request.NoProxy && proxyBadRequests {
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
 			return
@@ -243,13 +243,22 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	if err != nil {
 		fun, isUnknownFunction := err.(expr.ErrUnknownFunction)
 		err := response.WrapError(err)
-		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy {
+		if isUnknownFunction {
+			if request.NoProxy {
+				// note this should never happen:
+				// When graphite issues a request (and sets the request.NoProxy flag),
+				// it should be for raw data only without any function processing.
+				ctx.Error(err.HTTPStatusCode(), err.Error())
+				return
+			}
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
-			if isUnknownFunction {
-				proxyStats.Miss(string(fun))
-			}
+			proxyStats.Miss(string(fun))
 			return
+		}
+		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
+			log.Infof("Proxying to Graphite because of error: %s", err.Error())
+			s.proxyToGraphite(ctx)
 		}
 		ctx.Error(err.HTTPStatusCode(), err.Error())
 		return
@@ -260,7 +269,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, plan)
 	if err != nil {
 		err := response.WrapError(err)
-		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy {
+		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
 			return
