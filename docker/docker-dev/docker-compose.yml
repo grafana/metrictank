@@ -23,6 +23,7 @@ services:
       MT_MEMORY_IDX_TAG_SUPPORT: "true"
     links:
      - cassandra
+     - jaeger
 
   cassandra:
     hostname: cassandra
@@ -51,8 +52,11 @@ services:
       - "3000:3000"
     volumes:
       - ./grafana-datasources:/etc/grafana/provisioning/datasources
+      - ./grafana.ini:/etc/grafana/grafana.ini
       - ../cfg/grafana-dashboards-main-extra-dockprom:/etc/grafana/provisioning/dashboards
       - ../../dashboards:/var/lib/grafana/dashboards
+    links:
+     - jaeger
 
   statsdaemon:
     hostname: statsdaemon

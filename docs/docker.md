@@ -33,7 +33,7 @@ Comes with 1 dashboard: the metrictank dashboard
 ### docker-dev
 
 Similar to docker-standard, but custom metrictank build is loaded, custom configs from scripts/config
-also: tag support, main+extra dashboards
+also: tag support, main+extra dashboards, jaeger enabled
 
 ### docker-dev-bigtable
 
