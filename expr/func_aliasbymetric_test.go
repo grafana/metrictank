@@ -77,7 +77,7 @@ func TestAliasByMetricWithoutTags(t *testing.T) {
 			},
 			{ // Function wrapper - multiple
 				Interval:   10,
-				QueryPatt:  "a",
+				QueryPatt:  shortMetric,
 				Target:     "functionBlah(functionBlahBlah(" + shortMetric + "),funcValue1, funcValue2)",
 				Datapoints: getCopy(a),
 			},
@@ -130,7 +130,7 @@ func TestAliasByMetricWithTags(t *testing.T) {
 			},
 			{ // Function wrapper - multiple
 				Interval:   10,
-				QueryPatt:  "a",
+				QueryPatt:  longMetric,
 				Target:     "functionBlah(functionBlahBlah(" + longMetric + "),funcValue1, funcValue2)",
 				Datapoints: getCopy(a),
 			},
