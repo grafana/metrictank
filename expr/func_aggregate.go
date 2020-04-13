@@ -58,19 +58,16 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
 	series = Normalize(dataMap, series)
-	output := aggregate(series, queryPatts, agg, s.xFilesFactor)
-
-	dataMap.Add(Req{}, output)
-
-	return []models.Series{output}, nil
+	return aggregate(dataMap, series, queryPatts, agg, s.xFilesFactor)
 }
 
-func aggregate(series []models.Series, queryPatts []string, agg seriesAggregator, xFilesFactor float64) models.Series {
+// aggregate aggregates series using the requested aggregator and xFilesFactor and returns an output slice of length 1.
+func aggregate(dataMap DataMap, series []models.Series, queryPatts []string, agg seriesAggregator, xFilesFactor float64) ([]models.Series, error) {
 	if len(series) == 1 {
 		name := agg.name + "Series(" + series[0].QueryPatt + ")"
 		series[0].Target = name
 		series[0].QueryPatt = name
-		return series[0]
+		return series, nil
 	}
 	out := pointSlicePool.Get().([]schema.Point)
 
@@ -117,5 +114,7 @@ func aggregate(series []models.Series, queryPatts []string, agg seriesAggregator
 	output.Consolidator = cons
 	output.Meta = meta
 
-	return output
+	dataMap.Add(Req{}, output)
+
+	return []models.Series{output}, nil
 }
