@@ -30,14 +30,17 @@ func (s *FuncAliasByMetric) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 	for i, serie := range series {
-		n := extractMetric(serie.Target)
-		m := strings.Split(n, ";")[0]
-		mSlice := strings.Split(m, ".")
+		m := strings.SplitN(extractMetric(serie.Target), ";", 2)
+		mSlice := strings.Split(m[0], ".")
 		base := mSlice[len(mSlice)-1]
+
+		// append metric tags to base
+		if len(m) > 1 {
+			base = strings.Join([]string{base, m[1]}, ";")
+		}
 
 		series[i].Target = base
 		series[i].QueryPatt = base
-		series[i].Tags = series[i].CopyTagsWith("name", base)
 	}
 	return series, nil
 }
