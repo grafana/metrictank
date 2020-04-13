@@ -36,7 +36,7 @@ func TestSeriesAggregatorsIdentity(t *testing.T) {
 	testSeriesAggregate("identity", "range", input, zeroOutput, t)
 	testSeriesAggregate("identity", "last", input, getCopy(a), t)
 	testSeriesAggregate("identity", "count", input, getCopy(counta), t)
-	testSeriesAggregate("identity", "avg_zero", input, getCopy(aZero), t)
+	testSeriesAggregate("identity", "avg_zero", input, getCopy(avgZeroa), t)
 }
 
 func TestSeriesAggregate2series(t *testing.T) {
@@ -65,7 +65,7 @@ func TestSeriesAggregate2series(t *testing.T) {
 	testSeriesAggregate("2Series", "range", input, getCopy(rangeab), t)
 	testSeriesAggregate("2Series", "last", input, lastOutput, t)
 	testSeriesAggregate("2Series", "count", input, getCopy(countab), t)
-	testSeriesAggregate("2Series", "avg_zero", input, getCopy(avgabZero), t)
+	testSeriesAggregate("2Series", "avg_zero", input, getCopy(avgZeroab), t)
 }
 
 func TestSeriesAggregate3series(t *testing.T) {
@@ -95,7 +95,7 @@ func TestSeriesAggregate3series(t *testing.T) {
 	testSeriesAggregate("3Series", "range", input, getCopy(rangeabc), t)
 	testSeriesAggregate("3Series", "last", input, getCopy(c), t)
 	testSeriesAggregate("3Series", "count", input, getCopy(countabc), t)
-	testSeriesAggregate("3Series", "avg_zero", input, getCopy(avgabcZero), t)
+	testSeriesAggregate("3Series", "avg_zero", input, getCopy(avgZeroabc), t)
 }
 
 func testSeriesAggregate(name, agg string, in []models.Series, out []schema.Point, t *testing.T) {

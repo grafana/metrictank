@@ -16,7 +16,7 @@ var a = []schema.Point{
 	{Val: 1234567890, Ts: 60},
 }
 
-var aZero = []schema.Point{
+var avgZeroa = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: 0, Ts: 20},
 	{Val: 5.5, Ts: 30},
@@ -116,12 +116,12 @@ var avgab = []schema.Point{
 	{Val: 1234567890, Ts: 60},
 }
 
-var avgabZero = []schema.Point{
+var avgZeroab = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64 / 2, Ts: 20},
 	{Val: (math.MaxFloat64 - 14.5) / 2, Ts: 30},
 	{Val: 0, Ts: 40},
-	{Val: 617283945, Ts: 50}, // in accordance with graphite, avg(5,null) = 5
+	{Val: 617283945, Ts: 50},
 	{Val: 617283945, Ts: 60},
 }
 
@@ -134,7 +134,7 @@ var avgabc = []schema.Point{
 	{Val: float64(1234567894) / 2, Ts: 60},
 }
 
-var avgabcZero = []schema.Point{
+var avgZeroabc = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64 / 3, Ts: 20},
 	{Val: (math.MaxFloat64 - 13.5) / 3, Ts: 30},
