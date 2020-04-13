@@ -11,9 +11,10 @@ func skipCrossSeriesXff(xFilesFactor float64) bool {
 	return math.IsNaN(xFilesFactor) || xFilesFactor == 0
 }
 
-// crossSeriesXff returns a boolean indicating if the []models.series
-// is valid. It is valid if the ratio of non-null points to total points
-// in a window (specified by index) >= minimum ratio (xFilesFactor)
+// crossSeriesXff returns a boolean indicating whether the set of points
+// at the given index across all input series is valid.
+// It is valid if the ratio of non-null points to total points
+// >= minimum ratio (xFilesFactor)
 func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
 	if skipCrossSeriesXff(xFilesFactor) {
 		return true
