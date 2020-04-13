@@ -13,6 +13,7 @@ import (
 	cassandra_idx "github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/jaeger"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/store/cassandra"
 	opentracing "github.com/opentracing/opentracing-go"
@@ -185,7 +186,7 @@ func main() {
 		}
 	}
 
-	store, err := cassandra.NewCassandraStore(storeConfig, nil)
+	store, err := cassandra.NewCassandraStore(storeConfig, nil, chunk.MaxConfigurableSpan())
 	if err != nil {
 		log.Fatalf("failed to initialize cassandra. %s", err.Error())
 	}

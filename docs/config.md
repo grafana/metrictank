@@ -184,6 +184,8 @@ disable-initial-host-lookup = false
 connection-check-interval = 5s
 # maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval.
 connection-check-timeout = 30s
+# Maximum chunkspan size used.
+max-chunkspan = 24h
 ```
 
 ## Bigtable backend Store Settings ##
