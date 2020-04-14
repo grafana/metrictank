@@ -266,12 +266,12 @@ func metaRecordFilterInverted(metaRecordFilters []tagquery.MetricDefinitionFilte
 				decision = defaultDecision
 			}
 
-			if decision == tagquery.Fail {
-				return tagquery.Pass
+			if decision == tagquery.Pass {
+				return tagquery.Fail
 			}
 		}
 
-		return tagquery.Fail
+		return tagquery.Pass
 	}
 }
 
