@@ -202,12 +202,14 @@ func TestFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag(t *tes
 }
 
 func testFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag(t *testing.T) {
-	// matches ids 3, 5, 6
 	metaTagExpressions, err := tagquery.ParseExpressions([]string{"tag1=value3", "tag1=value4", "tag1=value5"})
 	if err != nil {
 		t.Fatalf("Unexpected error when parsing expressions: %s", err)
 	}
 
+	// one meta tag with 3 underlying meta records,
+	// it matches all metrics which satisfy one of these conditions:
+	// tag1=value3 or tag1=value4 or tag1=value5
 	metaRecords := []tagquery.MetaTagRecord{
 		{
 			MetaTags: []tagquery.Tag{
