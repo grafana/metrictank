@@ -139,6 +139,8 @@ func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
+	var metricValue float64
+
 	if mpo*speedup%period != 0 {
 		panic("not a good fit. mpo*speedup must divide by period, to compute clean rate/s/org")
 	}
@@ -160,6 +162,17 @@ func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, sto
 	if numUniqueCustomTags > len(customTags) || numUniqueCustomTags < 0 {
 		panic(fmt.Sprintf("num-unique-custom-tags must be a value between 0 and %d, you entered %d", len(customTags), numUniqueCustomTags))
 	}
+
+	if useFixedValue && (useFixedValues || useTsValue) || (useFixedValues && useTsValue) {
+		panic("can only use one value option (use-fixed-value, use-fixed-values, use-ts-value)")
+	}
+
+	if useFixedValue {
+		metricValue = fixedValue
+	}
+
+	lenValues := len(fixedValues)
+	idxValues := 0
 
 	ratePerS := ratePerSPerOrg * orgs
 	ratePerFlush := ratePerFlushPerOrg * orgs
@@ -211,9 +224,28 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 				// we already sent, so we must increase the timestamp
 				if m == 0 {
 					ts += mp
+					// if we are using fixed values we will also adjust the index of the slice
+					if useFixedValues {
+						if (idxValues + 1) >= lenValues {
+							idxValues = 0
+						} else {
+							idxValues++
+						}
+					}
 				}
 				metricData.Time = ts
-				metricData.Value = rand.Float64() * float64(m+1)
+
+				if useFixedValue {
+					// metricValue already set
+				} else if useFixedValues {
+					metricValue = fixedValues[idxValues]
+				} else if useTsValue {
+					metricValue = float64(ts)
+				} else {
+					metricValue = rand.Float64() * float64(m+1)
+				}
+				metricData.Value = metricValue
+
 				data = append(data, &metricData)
 			}
 			startFrom = (m + 1) % mpo

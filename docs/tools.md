@@ -83,6 +83,8 @@ Flags:
       --carbon-addr string           carbon TCP address. e.g. localhost:2003
       --config string                config file (default is $HOME/.mt-fakemetrics.yaml)
       --custom-tags strings          A list of comma separated tags (i.e. "tag1=value1,tag2=value2")(default empty) conflicts with add-tags
+      --fixed-value float            the value to use for all metrics (default 1)
+      --fixed-values float64Slice    the repeating values to use for all metrics (default [1.000000,2.000000,3.000000,4.000000,5.000000,6.000000,7.000000,8.000000,9.000000])
       --gnet-addr string             gnet address. e.g. http://localhost:8081
       --gnet-key string              gnet api key
   -h, --help                         help for mt-fakemetrics
@@ -98,6 +100,9 @@ Flags:
       --statsd-addr string           statsd TCP address. e.g. 'localhost:8125'
       --statsd-type string           statsd type: standard or datadog (default "standard")
       --stdout                       enable emitting metrics to stdout
+      --use-fixed-value              use a single value for all metrics
+      --use-fixed-values             use repeating values for all metrics
+      --use-ts-value                 use timestamp as value for metrics
 
 Use "mt-fakemetrics [command] --help" for more information about a command.
 ```
