@@ -259,6 +259,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
+			return
 		}
 		ctx.Error(err.HTTPStatusCode(), err.Error())
 		return
