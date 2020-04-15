@@ -50,7 +50,7 @@ You can specify a Value Policy with the `--value-policy` flag. Currently the fol
 * multiple
 * timestamp
 
-This flag can be useful when testing your deployment to ensure you have everything setup properly (i.e. aggregations, storage, etc...)
+This flag can be useful when it is important to know what data fakemetrics generates to verify correctness of the data returned
 
 ### Single
 
