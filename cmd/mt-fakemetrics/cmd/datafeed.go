@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -161,6 +162,19 @@ func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, sto
 		panic(fmt.Sprintf("num-unique-custom-tags must be a value between 0 and %d, you entered %d", len(customTags), numUniqueCustomTags))
 	}
 
+	vp, err := policy.ParseValuePolicy(valuePolicy)
+	if err != nil {
+		panic(err)
+	}
+
+	lenValues := len(vp.Values)
+	idxValues := 0
+	var metricValue float64
+
+	if vp.Policy == policy.Single {
+		metricValue = vp.Value
+	}
+
 	ratePerS := ratePerSPerOrg * orgs
 	ratePerFlush := ratePerFlushPerOrg * orgs
 
@@ -211,9 +225,30 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 				// we already sent, so we must increase the timestamp
 				if m == 0 {
 					ts += mp
+					if vp.Policy == policy.Multiple {
+						if (idxValues + 1) >= lenValues {
+							idxValues = 0
+						} else {
+							idxValues++
+						}
+					}
 				}
 				metricData.Time = ts
-				metricData.Value = rand.Float64() * float64(m+1)
+
+				switch vp.Policy {
+				case policy.None:
+					metricValue = rand.Float64() * float64(m+1)
+				case policy.Single:
+					break
+				case policy.Multiple:
+					metricValue = vp.Values[idxValues]
+				case policy.Timestamp:
+					metricValue = float64(ts)
+				default:
+					metricValue = rand.Float64() * float64(m+1)
+				}
+				metricData.Value = metricValue
+
 				data = append(data, &metricData)
 			}
 			startFrom = (m + 1) % mpo
