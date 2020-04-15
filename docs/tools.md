@@ -98,6 +98,7 @@ Flags:
       --statsd-addr string           statsd TCP address. e.g. 'localhost:8125'
       --statsd-type string           statsd type: standard or datadog (default "standard")
       --stdout                       enable emitting metrics to stdout
+      --value-policy string          a value policy (i.e. "single:1" "multiple:1,2,3,4,5" "timestamp")
 
 Use "mt-fakemetrics [command] --help" for more information about a command.
 ```
