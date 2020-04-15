@@ -167,6 +167,10 @@ func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, sto
 		panic("can only use one value option (use-fixed-value, use-fixed-values, use-ts-value)")
 	}
 
+	if useFixedValues && len(fixedValues) < 2 {
+		panic("you must specify at least 2 values when using fixed-values")
+	}
+
 	if useFixedValue {
 		metricValue = fixedValue
 	}
