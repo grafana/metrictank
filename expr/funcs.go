@@ -55,6 +55,7 @@ func init() {
 		"absolute":              {NewAbsolute, true},
 		"aggregate":             {NewAggregate, true},
 		"alias":                 {NewAlias, true},
+		"aliasByMetric":         {NewAliasByMetric, true},
 		"aliasByTags":           {NewAliasByNode, true},
 		"aliasByNode":           {NewAliasByNode, true},
 		"aliasSub":              {NewAliasSub, true},
