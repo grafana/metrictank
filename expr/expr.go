@@ -186,7 +186,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		re, err := regexp.Compile(got.str)
 		if err != nil {
-			return 0, err
+			return 0, ErrBadRegex{err}
 		}
 		*v.val = re
 	case ArgSeries, ArgSeriesList:
