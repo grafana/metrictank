@@ -65,7 +65,7 @@ func init() {
 		"averageBelow":          {NewFilterSeriesConstructor("average", "<="), true},
 		"averageSeries":         {NewAggregateConstructor("average"), true},
 		"consolidateBy":         {NewConsolidateBy, true},
-		"constantLine":          {NewConstantLine, true},
+		"constantLine":          {NewConstantLine, false},
 		"countSeries":           {NewCountSeries, true},
 		"cumulative":            {NewConsolidateByConstructor("sum"), true},
 		"currentAbove":          {NewFilterSeriesConstructor("last", ">"), true},
