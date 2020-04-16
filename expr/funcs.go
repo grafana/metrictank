@@ -87,6 +87,7 @@ func init() {
 		"highestCurrent":        {NewHighestLowestConstructor("current", true), true},
 		"highestMax":            {NewHighestLowestConstructor("max", true), true},
 		"integral":              {NewIntegral, true},
+		"invert":                {NewInvert, true},
 		"isNonNull":             {NewIsNonNull, true},
 		"keepLastValue":         {NewKeepLastValue, true},
 		"lowest":                {NewHighestLowestConstructor("", false), true},
