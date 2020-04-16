@@ -20,6 +20,7 @@ import (
 
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/conf"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,6 +39,7 @@ func init() {
 	schemasbackfillCmd.Flags().IntVar(&speedup, "speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
 	schemasbackfillCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
 	schemasbackfillCmd.Flags().DurationVar(&periodDur, "period", time.Second, "period between metric points (must be a multiple of 1s)")
+	schemasbackfillCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\")")
 }
 
 // schemasbackfillCmd represents the schemasbackfill command
@@ -74,7 +76,11 @@ var schemasbackfillCmd = &cobra.Command{
 				name = "default"
 			}
 			go func(name string, period int) {
-				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, SimpleBuilder{name})
+				vp, err := policy.ParseValuePolicy(valuePolicy)
+				if err != nil {
+					panic(err)
+				}
+				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, SimpleBuilder{name}, vp)
 				wg.Done()
 			}(name, schema.Retentions.Rets[0].SecondsPerPoint)
 		}

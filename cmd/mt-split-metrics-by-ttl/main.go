@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/store/cassandra"
 	"github.com/raintank/dur"
 )
@@ -64,7 +65,7 @@ func main() {
 		panic(fmt.Sprintf("Error creating directory: %s", err))
 	}
 
-	store, err := cassandra.NewCassandraStore(storeConfig, ttls)
+	store, err := cassandra.NewCassandraStore(storeConfig, ttls, chunk.MaxConfigurableSpan())
 	if err != nil {
 		panic(fmt.Sprintf("Failed to instantiate cassandra: %s", err))
 	}

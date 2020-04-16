@@ -284,7 +284,8 @@ func main() {
 		store.SetTracer(tracer)
 	}
 	if cassandraStore.CliConfig.Enabled {
-		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs())
+		schemaMaxChunkSpan := mdata.MaxChunkSpan()
+		store, err = cassandraStore.NewCassandraStore(cassandraStore.CliConfig, mdata.TTLs(), schemaMaxChunkSpan)
 		if err != nil {
 			log.Fatalf("failed to initialize cassandra backend store. %s", err)
 		}

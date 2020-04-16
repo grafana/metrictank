@@ -18,13 +18,15 @@ type crossSeriesAggFunc func(in []models.Series, out *[]schema.Point)
 
 func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 	switch c {
-	case "avg", "average":
+	case "average", "avg":
 		return crossSeriesAvg
+	case "avg_zero":
+		return crossSeriesAvgZero
 	case "min":
 		return crossSeriesMin
 	case "max":
 		return crossSeriesMax
-	case "sum":
+	case "sum", "total":
 		return crossSeriesSum
 	case "multiply":
 		return crossSeriesMultiply
@@ -36,31 +38,61 @@ func getCrossSeriesAggFunc(c string) crossSeriesAggFunc {
 		return crossSeriesStddev
 	case "rangeOf", "range":
 		return crossSeriesRange
+	case "last", "current":
+		return crossSeriesLast
+	case "count":
+		return crossSeriesCount
 	}
 	return nil
 }
 
+// crossSeriesAvg computes the average across all the series
+// using the number of non-null datapoints
 func crossSeriesAvg(in []models.Series, out *[]schema.Point) {
+	counts := make([]int, len(in[0].Datapoints))
+
 	for i := 0; i < len(in[0].Datapoints); i++ {
-		num := 0
-		sum := float64(0)
-		for j := 0; j < len(in); j++ {
-			p := in[j].Datapoints[i].Val
+		*out = append(*out, in[0].Datapoints[i])
+		if !math.IsNaN(in[0].Datapoints[i].Val) {
+			counts[i]++
+		}
+	}
+
+	for i := 1; i < len(in); i++ {
+		dps := in[i].Datapoints
+		for j := 0; j < len(in[i].Datapoints); j++ {
+			p := dps[j].Val
 			if !math.IsNaN(p) {
-				num++
-				sum += p
+				if math.IsNaN((*out)[j].Val) {
+					(*out)[j].Val = p
+				} else {
+					(*out)[j].Val += p
+				}
+				counts[j]++
 			}
 		}
-		point := schema.Point{
-			Ts: in[0].Datapoints[i].Ts,
-		}
-		if num == 0 {
-			point.Val = math.NaN()
-		} else {
-			point.Val = sum / float64(num)
-		}
+	}
 
-		*out = append(*out, point)
+	for i := range *out {
+		if !math.IsNaN((*out)[i].Val) {
+			(*out)[i].Val /= float64(counts[i])
+		}
+	}
+}
+
+// crossSeriesAvgZero computes the average across all the series
+// treating nulls as valid points with value 0.
+// So, if the original datapoints were [1, 1, 1, 1, null],
+// crossSeriesAvg would compute the new datapoint as 4/4=1 while
+// crossSeriesAvgZero would compute it as 4/5=0.8
+func crossSeriesAvgZero(in []models.Series, out *[]schema.Point) {
+	crossSeriesSum(in, out)
+	for i := range *out {
+		if !math.IsNaN((*out)[i].Val) {
+			(*out)[i].Val /= float64(len(in))
+		} else {
+			(*out)[i].Val = 0
+		}
 	}
 }
 
@@ -213,5 +245,34 @@ func crossSeriesRange(in []models.Series, out *[]schema.Point) {
 
 	for i := 0; i < len(in[0].Datapoints); i++ {
 		(*out)[i].Val -= mins[i].Val
+	}
+}
+
+func crossSeriesLast(in []models.Series, out *[]schema.Point) {
+	for i := 0; i < len(in[len(in)-1].Datapoints); i++ {
+		dp := in[len(in)-1].Datapoints[i]
+		for j := len(in) - 2; j >= 0 && math.IsNaN(dp.Val); j-- {
+			dp = in[j].Datapoints[i]
+		}
+		*out = append(*out, dp)
+	}
+}
+
+func crossSeriesCount(in []models.Series, out *[]schema.Point) {
+
+	for i := 0; i < len(in[0].Datapoints); i++ {
+		point := schema.Point{
+			Ts: in[0].Datapoints[i].Ts,
+		}
+		point.Val = 0
+		for j := 0; j < len(in); j++ {
+			if !math.IsNaN(in[j].Datapoints[i].Val) {
+				point.Val++
+			}
+		}
+		if point.Val == 0 {
+			point.Val = math.NaN()
+		}
+		*out = append(*out, point)
 	}
 }

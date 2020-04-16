@@ -69,6 +69,7 @@ var (
 	numUniqueCustomTags int
 
 	filterStrings []string
+	valuePolicy string
 
 	kafkaMdmAddr     string
 	kafkaMdmTopic    string
