@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 	// TODO: should probably use -V flag here.
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
-	cmd = exec.Command("docker-compose", "up", "--force-recreate")
+	cmd = exec.Command("docker-compose", "up", "--force-recreate", "metrictank", "graphite", "statsdaemon", "bigtable", "grafana")
 	cmd.Dir = test.Path("docker/docker-dev-bigtable")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
