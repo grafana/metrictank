@@ -33,7 +33,7 @@ Comes with 1 dashboard: the metrictank dashboard
 ### docker-dev
 
 Similar to docker-standard, but custom metrictank build is loaded, custom configs from scripts/config
-also: tag support, main+extra dashboards, jaeger enabled
+also: tag support, main+extra dashboards, jaeger tracing and prometheus monitoring for the system and docker containers
 
 ### docker-dev-bigtable
 
@@ -54,7 +54,6 @@ Also:
 * kafka input and clustering backend
 * short chunkspan & numchunks 
   (benefits: easy to trigger mem and mem_and_cass requests, frequent cass saves, notifier messages etc)
-* prometheus monitoring and jaeger tracing
 * caddy-proxied endpooints/datasources to check with different org-id auth headers
 * tsdb-gw
 
