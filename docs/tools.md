@@ -83,6 +83,7 @@ Flags:
       --carbon-addr string           carbon TCP address. e.g. localhost:2003
       --config string                config file (default is $HOME/.mt-fakemetrics.yaml)
       --custom-tags strings          A list of comma separated tags (i.e. "tag1=value1,tag2=value2")(default empty) conflicts with add-tags
+      --filter strings               A list of comma separated filters to apply. E.g. 'offset:-1h,offset:12h'
       --gnet-addr string             gnet address. e.g. http://localhost:8081
       --gnet-key string              gnet api key
   -h, --help                         help for mt-fakemetrics

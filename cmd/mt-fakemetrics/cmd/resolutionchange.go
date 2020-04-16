@@ -36,10 +36,7 @@ var resolutionchangeCmd = &cobra.Command{
 		}
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
-		outs := getOutputs()
-		if len(outs) == 0 {
-			log.Fatal("need to define an output")
-		}
+		out := getOutput()
 		to := time.Now().Unix()
 		from := to - 24*60*60
 
@@ -47,7 +44,7 @@ var resolutionchangeCmd = &cobra.Command{
 		for i := 0; i < mpo; i++ {
 			metrics = append(metrics, buildResChangeMetric("mt-fakemetrics.reschange.%d", i, 1))
 		}
-		runResolutionChange(metrics, from, to, outs)
+		runResolutionChange(metrics, from, to, out)
 	},
 }
 
@@ -68,7 +65,7 @@ func buildResChangeMetric(name string, i, org int) *schema.MetricData {
 	out.SetId()
 	return out
 }
-func runResolutionChange(metrics []*schema.MetricData, from, to int64, outs []out.Out) {
+func runResolutionChange(metrics []*schema.MetricData, from, to int64, out out.Out) {
 	ts := from
 	interval := int64(1)
 	for ts <= to {
@@ -96,11 +93,9 @@ func runResolutionChange(metrics []*schema.MetricData, from, to int64, outs []ou
 			metrics[i].Time = ts
 			metrics[i].Value = float64(ts % 10)
 		}
-		for _, out := range outs {
-			err := out.Flush(metrics)
-			if err != nil {
-				log.Error(err.Error())
-			}
+		err := out.Flush(metrics)
+		if err != nil {
+			log.Error(err.Error())
 		}
 		ts += interval
 	}

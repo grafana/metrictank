@@ -68,7 +68,8 @@ var (
 	customTags          []string
 	numUniqueCustomTags int
 
-	valuePolicy string
+	filterStrings []string
+	valuePolicy   string
 
 	kafkaMdmAddr     string
 	kafkaMdmTopic    string
@@ -108,6 +109,8 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&numUniqueTags, "num-unique-tags", 1, "a number between 0 and 10. when using add-tags this will add a unique number to some built-in tags")
 	rootCmd.PersistentFlags().StringSliceVar(&customTags, "custom-tags", []string{}, "A list of comma separated tags (i.e. \"tag1=value1,tag2=value2\")(default empty) conflicts with add-tags")
 	rootCmd.PersistentFlags().IntVar(&numUniqueCustomTags, "num-unique-custom-tags", 0, "a number between 0 and the length of custom-tags. when using custom-tags this will make the tags unique (default 0)")
+
+	rootCmd.PersistentFlags().StringSliceVar(&filterStrings, "filter", []string{}, "A list of comma separated filters to apply. E.g. 'offset:-1h,offset:12h'")
 
 	rootCmd.PersistentFlags().StringVar(&kafkaMdmAddr, "kafka-mdm-addr", "", "kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092")
 	rootCmd.PersistentFlags().StringVar(&kafkaMdmTopic, "kafka-mdm-topic", "mdm", "kafka topic for MetricData-Msgp messages")

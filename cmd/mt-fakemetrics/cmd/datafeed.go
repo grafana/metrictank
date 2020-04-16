@@ -136,7 +136,7 @@ func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 // period in seconds
 // flush  in ms
 // offset in seconds
-func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder, vp policy.ValuePolicy) {
+func dataFeed(out out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder, vp policy.ValuePolicy) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
 	if mpo*speedup%period != 0 {
@@ -221,11 +221,9 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		}
 
 		preFlush := time.Now()
-		for _, out := range outs {
-			err := out.Flush(data)
-			if err != nil {
-				log.Error(0, err.Error())
-			}
+		err := out.Flush(data)
+		if err != nil {
+			log.Error(0, err.Error())
 		}
 		flushDuration.Value(time.Since(preFlush))
 

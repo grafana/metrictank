@@ -28,14 +28,14 @@ var feedCmd = &cobra.Command{
 		initStats(true, "feed")
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
-		outs := getOutputs()
+		out := getOutput()
 
 		vp, err := policy.ParseValuePolicy(valuePolicy)
 		if err != nil {
 			panic(err)
 		}
 
-		dataFeed(outs, orgs, mpo, period, flush, 0, 1, false, TaggedBuilder{metricName}, vp)
+		dataFeed(out, orgs, mpo, period, flush, 0, 1, false, TaggedBuilder{metricName}, vp)
 
 	},
 }
