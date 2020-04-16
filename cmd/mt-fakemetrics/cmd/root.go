@@ -109,8 +109,6 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVar(&customTags, "custom-tags", []string{}, "A list of comma separated tags (i.e. \"tag1=value1,tag2=value2\")(default empty) conflicts with add-tags")
 	rootCmd.PersistentFlags().IntVar(&numUniqueCustomTags, "num-unique-custom-tags", 0, "a number between 0 and the length of custom-tags. when using custom-tags this will make the tags unique (default 0)")
 
-	rootCmd.PersistentFlags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\")")
-
 	rootCmd.PersistentFlags().StringVar(&kafkaMdmAddr, "kafka-mdm-addr", "", "kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092")
 	rootCmd.PersistentFlags().StringVar(&kafkaMdmTopic, "kafka-mdm-topic", "mdm", "kafka topic for MetricData-Msgp messages")
 	rootCmd.PersistentFlags().BoolVar(&kafkaMdmV2, "kafka-mdm-v2", true, "enable MetricPoint optimization (send MetricData first, then optimized MetricPoint payloads)")

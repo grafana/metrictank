@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -137,7 +136,7 @@ func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 // period in seconds
 // flush  in ms
 // offset in seconds
-func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder) {
+func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder, vp policy.ValuePolicy) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
 	if mpo*speedup%period != 0 {
@@ -160,19 +159,6 @@ func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, sto
 
 	if numUniqueCustomTags > len(customTags) || numUniqueCustomTags < 0 {
 		panic(fmt.Sprintf("num-unique-custom-tags must be a value between 0 and %d, you entered %d", len(customTags), numUniqueCustomTags))
-	}
-
-	vp, err := policy.ParseValuePolicy(valuePolicy)
-	if err != nil {
-		panic(err)
-	}
-
-	lenValues := len(vp.Values)
-	idxValues := 0
-	var metricValue float64
-
-	if vp.Policy == policy.Single {
-		metricValue = vp.Value
 	}
 
 	ratePerS := ratePerSPerOrg * orgs
@@ -225,29 +211,9 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 				// we already sent, so we must increase the timestamp
 				if m == 0 {
 					ts += mp
-					if vp.Policy == policy.Multiple {
-						if (idxValues + 1) >= lenValues {
-							idxValues = 0
-						} else {
-							idxValues++
-						}
-					}
 				}
 				metricData.Time = ts
-
-				switch vp.Policy {
-				case policy.None:
-					metricValue = rand.Float64() * float64(m+1)
-				case policy.Single:
-					break
-				case policy.Multiple:
-					metricValue = vp.Values[idxValues]
-				case policy.Timestamp:
-					metricValue = float64(ts)
-				default:
-					metricValue = rand.Float64() * float64(m+1)
-				}
-				metricData.Value = metricValue
+				metricData.Value = vp.Value(ts)
 
 				data = append(data, &metricData)
 			}

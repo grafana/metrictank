@@ -44,6 +44,8 @@ mt-fakemetrics backfill --kafka-mdm-addr localhost:9092 --offset 5h --period 10s
 
 ## Value Policies
 
+If no Value Policy is specified a random float will be generated
+
 You can specify a Value Policy with the `--value-policy` flag. Currently the following Value Policies are supported:
 
 * single
