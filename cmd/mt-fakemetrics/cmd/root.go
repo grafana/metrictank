@@ -68,8 +68,6 @@ var (
 	customTags          []string
 	numUniqueCustomTags int
 
-	valuePolicy string
-
 	kafkaMdmAddr     string
 	kafkaMdmTopic    string
 	kafkaMdmV2       bool

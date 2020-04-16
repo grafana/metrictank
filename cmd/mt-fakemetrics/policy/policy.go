@@ -8,7 +8,7 @@ import (
 )
 
 type ValuePolicy interface {
-	Value(i int64) float64
+	Value(ts int64) float64
 }
 
 type ValuePolicyNone struct {
