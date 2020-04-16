@@ -17,6 +17,7 @@ package cmd
 import (
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,13 @@ var backfillCmd = &cobra.Command{
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
 		outs := getOutputs()
-		dataFeed(outs, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, TaggedBuilder{metricName})
+
+		vp, err := policy.ParseValuePolicy(valuePolicy)
+		if err != nil {
+			panic(err)
+		}
+
+		dataFeed(outs, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, TaggedBuilder{metricName}, vp)
 	},
 }
 
@@ -41,4 +48,5 @@ func init() {
 	backfillCmd.Flags().IntVar(&speedup, "speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
 	backfillCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
 	backfillCmd.Flags().DurationVar(&periodDur, "period", time.Second, "period between metric points (must be a multiple of 1s)")
+	backfillCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\")")
 }

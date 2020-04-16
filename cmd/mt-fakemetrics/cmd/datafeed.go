@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
@@ -136,7 +136,7 @@ func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 // period in seconds
 // flush  in ms
 // offset in seconds
-func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder) {
+func dataFeed(outs []out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder, vp policy.ValuePolicy) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
 	if mpo*speedup%period != 0 {
@@ -213,7 +213,8 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 					ts += mp
 				}
 				metricData.Time = ts
-				metricData.Value = rand.Float64() * float64(m+1)
+				metricData.Value = vp.Value(ts)
+
 				data = append(data, &metricData)
 			}
 			startFrom = (m + 1) % mpo
