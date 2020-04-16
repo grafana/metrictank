@@ -15,6 +15,7 @@ func (s *Server) RegisterRoutes() {
 	r.Use(middleware.Tracer(s.Tracer))
 	r.Use(middleware.OrgMiddleware(multiTenant))
 	r.Use(middleware.Logger())
+	r.Use(macaron.Recovery())
 	if useGzip {
 		r.Use(gziper.Gziper())
 	}
