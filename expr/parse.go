@@ -51,6 +51,14 @@ func (e ErrBadArgumentStr) HTTPStatusCode() int {
 	return http.StatusBadRequest
 }
 
+type ErrBadRegex struct {
+	error
+}
+
+func (e ErrBadRegex) HTTPStatusCode() int {
+	return http.StatusBadRequest
+}
+
 type ErrUnknownFunction string
 
 func (e ErrUnknownFunction) Error() string {
