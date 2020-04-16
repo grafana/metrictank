@@ -290,6 +290,29 @@ func TestPlanRequestsMultiIntervalsUseRaw(t *testing.T) {
 	})
 }
 
+// 2 identical singles, one requesting older data (> raw TTL).
+// They should be independently planned
+func TestPlanRequests_Singles_DifferentTimeRanges(t *testing.T) {
+	in, out := generate(400, 800, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(10, 0, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true,60s:1200s:5min:2:true"),
+	}
+	adjust(&out[0], 0, 10, 10, 800)
+	adjust(&out[1], 1, 60, 60, 1200)
+	in[1].From, out[1].From = 0, 0
+	in[1].To, out[1].To = 400, 400
+	testPlan(in, rets, out, nil, 1200, 0, 0, t)
+
+	// If soft is slightly breached, only the high res data should be reduced
+	t.Run("WithMaxPointsPerReqSoftJustBreached", func(t *testing.T) {
+		adjust(&out[0], 1, 60, 60, 1200)
+		testPlan(in, rets, out, nil, 1200, 45, 0, t)
+	})
+}
+
 // TestPlanRequestsMaxPointsPerReqSoft tests how maxPointsPerReqSoft gets applied.
 // we validate that:
 // * requests are coarsened, PNGroup by PNGroup (we can predict PNGroup map iteration order, so we only test with 1 PNGroup),
