@@ -11,10 +11,10 @@ type ValuePolicy interface {
 	Value(ts int64) float64
 }
 
-type ValuePolicyNone struct {
+type ValuePolicyRandom struct {
 }
 
-func (v *ValuePolicyNone) Value(ts int64) float64 {
+func (v *ValuePolicyRandom) Value(ts int64) float64 {
 	return rand.Float64() * float64(rand.Int63n(10))
 }
 
@@ -58,7 +58,7 @@ func (v *ValuePolicyMultiple) Value(ts int64) float64 {
 
 func ParseValuePolicy(p string) (ValuePolicy, error) {
 	if p == "" {
-		return &ValuePolicyNone{}, nil
+		return &ValuePolicyRandom{}, nil
 	}
 
 	if strings.TrimSpace(p) == "timestamp" {
