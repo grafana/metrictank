@@ -59,7 +59,7 @@ func agent(id int) {
 	// first sleep an arbitrary time between 0 and period
 	sleep := time.Duration(rand.Intn(int(period)))
 	time.Sleep(sleep)
-	outs := getOutputs()
+	out := getOutput()
 
 	met := make([]*schema.MetricData, metricsPerAgent)
 	for i := 0; i < metricsPerAgent; i++ {
@@ -80,11 +80,9 @@ func agent(id int) {
 			met[i].Time = t.Unix()
 			met[i].Value = float64(id*metricsPerAgent + i)
 		}
-		for _, out := range outs {
-			err := out.Flush(met)
-			if err != nil {
-				log.Error(0, err.Error())
-			}
+		err := out.Flush(met)
+		if err != nil {
+			log.Error(0, err.Error())
 		}
 	}
 

@@ -186,7 +186,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 		}
 		re, err := regexp.Compile(got.str)
 		if err != nil {
-			return 0, err
+			return 0, ErrBadRegex{err}
 		}
 		*v.val = re
 	case ArgSeries, ArgSeriesList:
@@ -262,7 +262,7 @@ func (e expr) consumeBasicArg(pos int, exp Arg) (int, error) {
 
 func generateValidatorError(key string, err error) error {
 	if len(key) == 0 {
-		return err
+		return errors.NewBadRequest(err.Error())
 	}
 	return errors.NewBadRequestf("%s: %s", key, err.Error())
 }
