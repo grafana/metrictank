@@ -7,7 +7,6 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/dur"
-	log "github.com/sirupsen/logrus"
 )
 
 type FuncTimeShift struct {
@@ -58,16 +57,15 @@ func (s *FuncTimeShift) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	negativeOffset := -s.shiftOffset
-	log.Infof("Adding offset %d", negativeOffset)
 
+	formatStr := fmt.Sprintf("timeShift(%%s, \"%s\")", s.timeShift)
 	newName := func(oldName string) string {
-		return fmt.Sprintf("timeShift(%s, \"%s\")", oldName, s.timeShift)
+		return fmt.Sprintf(formatStr, oldName)
 	}
 
 	outputs := make([]models.Series, 0, len(series))
 	for _, serie := range series {
-		out := pointSlicePool.Get().([]schema.Point)
-
+		out := GetPooledSliceAtLeastSize(len(serie.Datapoints))
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: v.Val, Ts: addOffset(v.Ts, negativeOffset)})
 		}
@@ -100,6 +98,9 @@ func (s *FuncTimeShift) getTimeShiftSeconds(context Context) (int, error) {
 	} else if durStr[0] == '+' {
 		sign = 1
 		durStr = durStr[1:]
+	} else {
+		// Normalize timeShift to always include the sign
+		s.timeShift = "-" + s.timeShift
 	}
 
 	interval, err := dur.ParseDuration(durStr)

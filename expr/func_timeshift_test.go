@@ -211,14 +211,16 @@ func benchmarkTimeShift(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 		input = append(input, series)
 	}
 	b.ResetTimer()
+	dataMap := DataMap(make(map[Req][]models.Series))
 	for i := 0; i < b.N; i++ {
 		f := NewTimeShift()
 		f.(*FuncTimeShift).in = NewMock(input)
 		f.(*FuncTimeShift).timeShift = "-1h"
-		got, err := f.Exec(make(map[Req][]models.Series))
+		got, err := f.Exec(dataMap)
 		if err != nil {
 			b.Fatalf("%s", err)
 		}
+		dataMap.Clean()
 		results = got
 	}
 }
