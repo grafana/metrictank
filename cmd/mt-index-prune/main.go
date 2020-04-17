@@ -95,7 +95,9 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	globalFlags.Parse(os.Args[1:cassI])
+
+	err := globalFlags.Parse(os.Args[1:cassI])
+	perror(err)
 
 	indexRules, err := conf.ReadIndexRules(indexRulesFile)
 	if os.IsNotExist(err) {

@@ -2,7 +2,6 @@ package expr
 
 import (
 	"math"
-	"sort"
 	"strconv"
 	"testing"
 
@@ -240,13 +239,6 @@ func testGroupByNodes(name string, in []models.Series, expected []models.Series,
 	if len(got) != len(expected) {
 		t.Fatalf("case %q: output length expected to be %d but got %d", name, len(expected), len(got))
 	}
-
-	sort.Slice(got, func(i, j int) bool {
-		return got[i].Target < got[j].Target
-	})
-	sort.Slice(expected, func(i, j int) bool {
-		return expected[i].Target < expected[j].Target
-	})
 
 	for i, g := range got {
 		o := expected[i]

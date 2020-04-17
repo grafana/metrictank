@@ -184,6 +184,8 @@ disable-initial-host-lookup = false
 connection-check-interval = 5s
 # maximum total time to wait before considering a connection to cassandra invalid. This value should be higher than connection-check-interval.
 connection-check-timeout = 30s
+# Maximum chunkspan size used.
+max-chunkspan = 24h
 ```
 
 ## Bigtable backend Store Settings ##
@@ -285,6 +287,8 @@ max-series-per-req = 250000
 multi-tenant = true
 # in case our /render endpoint does not support the requested processing, proxy the request to this graphite
 fallback-graphite-addr = http://localhost:8080
+# proxy to graphite when metrictank considers the request bad
+proxy-bad-requests = true
 # timezone for interpreting from/until values when needed, specified using [zoneinfo name](https://en.wikipedia.org/wiki/Tz_database#Names_of_time_zones) e.g. 'America/New_York', 'UTC' or 'local' to use local server timezone.
 time-zone = local
 # maximum number of concurrent threads for fetching data on the local node. Each thread handles a single series.

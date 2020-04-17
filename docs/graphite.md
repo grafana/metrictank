@@ -37,11 +37,11 @@ See also:
 | Function name and signature                                    | Alias        | Metrictank |
 | -------------------------------------------------------------- | ------------ | ---------- |
 | absolute                                                       |              | Stable     |
-| aggregate                                                      |              | No         |
+| aggregate                                                      |              | Stable     |
 | aggregateLine                                                  |              | No         |
 | aggregateWithWildcards                                         |              | No         |
 | alias(seriesList, alias) seriesList                            |              | Stable     |
-| aliasByMetric                                                  |              | No         |
+| aliasByMetric                                                  |              | Stable     |
 | aliasByNode(seriesList, nodeList) seriesList                   | aliasByTags  | Stable     |
 | aliasByTags                                                    |              | No         |
 | aliasQuery                                                     |              | No         |

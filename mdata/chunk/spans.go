@@ -45,6 +45,11 @@ func init() {
 	}
 }
 
+// MaxConfigurableSpan returns the largest configurable span.
+func MaxConfigurableSpan() uint32 {
+	return ChunkSpans[len(ChunkSpans)-1]
+}
+
 // SpanOfChunk takes a chunk and tries to determine its span.
 // It returns 0 if it failed to determine the span, this could fail
 // either because the given chunk is invalid or because it has an old format

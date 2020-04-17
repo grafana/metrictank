@@ -56,12 +56,21 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		s []models.Series
 		m models.SeriesMeta
 	}
+
 	groups := make(map[string]Group)
+
+	// list of aggregation keys in order they were seen.
+	// we need to return series in this order
+	var keyList []string
+
 	// Group series by nodes, this is mostly similar to GroupByTags,
 	// except that the group keys are different.
 	for _, serie := range series {
 		key := aggKey(serie, s.nodes)
-		group := groups[key]
+		group, ok := groups[key]
+		if !ok {
+			keyList = append(keyList, key)
+		}
 		group.s = append(group.s, serie)
 		group.m = group.m.Merge(serie.Meta)
 		groups[key] = group
@@ -70,7 +79,8 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 	output := make([]models.Series, 0, len(groups))
 	aggFunc := getCrossSeriesAggFunc(s.aggregator)
 
-	for key, group := range groups {
+	for _, key := range keyList {
+		group := groups[key]
 		consolidator, queryConsolidator := summarizeCons(group.s)
 		outSeries := models.Series{
 			Target:       key,

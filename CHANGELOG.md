@@ -54,6 +54,11 @@
      upgrade query or shard nodes.
   B) do a colored deployment: create a new gossip cluster that has the optimization enabled from the get-go,
      then delete the older deployment.
+* as of v0.13.1-433-g4c801819, metrictank proxies bad requests to graphite.
+  though as of <TODO> this is configurable via the `http.proxy-bad-requests` flag.
+  Leave enabled if your queries are in the grey zone (rejected by MT, tolerated by graphite),
+  disable if you don't like the additional latency.
+  The aspiration is to remove this entire feature once we work out any more kinks in metrictank's request validation.
 
 ## other
 

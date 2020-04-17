@@ -310,8 +310,8 @@ func (s *Store) Search(ctx context.Context, key schema.AMKey, ttl, start, end ui
 	// the beginning. We can't assume we know the chunkSpan so we can't just calculate the t0 >= (start - <some-predefined-number>) because ChunkSpans
 	// may change over time.
 	// We effectively need all chunks with a t0 > start, as well as the last chunk with a t0 <= start.
-	// Bigtable doesn't allow us to fetch the most recent chunk older then start, so instead we just fetch from (start - maxChunkSpan) to enure we get the data. This
-	// will usually result in more data being fetched then is needed, but that is an acceptable tradeoff.
+	// Bigtable doesn't allow us to fetch the most recent chunk older then start, so instead we just fetch from (start - maxChunkSpan) to ensure we get the data.
+	// This will usually result in more data being fetched then is needed, but that is an acceptable tradeoff.
 	adjustedStart := start - uint32(s.cfg.MaxChunkSpan.Seconds())
 
 	// chunkspans are aligned with Month_sec.  If start is > startMonth*Month_sec then the T0 of the chunk that start is in will also be >= startMonth*Month_sec.

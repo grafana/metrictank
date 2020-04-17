@@ -14,6 +14,9 @@ import (
 // Normalize normalizes series to the same common LCM interval - if they don't already have the same interval
 // any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
 func Normalize(dataMap DataMap, in []models.Series) []models.Series {
+	if len(in) < 2 {
+		return in
+	}
 	var intervals []uint32
 	for _, s := range in {
 		if s.Interval == 0 {
