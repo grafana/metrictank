@@ -31,21 +31,35 @@ func (s *FuncInvert) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("invert(%s)", serie.Target)
-		series[i].Tags = serie.CopyTagsWith("invert", "1")
-		series[i].QueryPatt = fmt.Sprintf("invert(%s)", serie.QueryPatt)
-		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
-		for _, p := range serie.Datapoints {
-			if !math.IsNaN(p.Val) && p.Val != 0 {
-				p.Val = math.Pow(p.Val, -1)
-			} else {
-				p.Val = math.NaN()
-			}
-			series[i].Datapoints = append(series[i].Datapoints, p)
+	outputs := make([]models.Series, len(series))
+
+	newVal := func(oldVal float64) float64 {
+		if !math.IsNaN(oldVal) && oldVal != 0 {
+			return math.Pow(oldVal, -1)
 		}
+		return math.NaN()
 	}
 
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	for i, serie := range series {
+		out := pointSlicePool.Get().([]schema.Point)
+
+		for _, p := range serie.Datapoints {
+			out = append(out, schema.Point{Val: newVal(p.Val), Ts: p.Ts})
+		}
+		s := models.Series{
+			Target:       fmt.Sprintf("invert(%s)", serie.Target),
+			QueryPatt:    fmt.Sprintf("invert(%s)", serie.QueryPatt),
+			Tags:         serie.CopyTagsWith("invert", "1"),
+			Datapoints:   out,
+			Interval:     serie.Interval,
+			Meta:         serie.Meta,
+			QueryMDP:     serie.QueryMDP,
+			QueryPNGroup: serie.QueryPNGroup,
+		}
+
+		outputs[i] = s
+	}
+
+	dataMap.Add(Req{}, outputs...)
+	return outputs, nil
 }

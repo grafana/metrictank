@@ -31,16 +31,26 @@ var datapointsInvert = []schema.Point{
 }
 
 func TestInvert(t *testing.T) {
-	f := getNewInvert(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: getCopy(datapoints),
-			},
+	in := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: getCopy(datapoints),
 		},
-	)
+	}
+
+	// store copy of the original input
+	inCopy := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: getCopy(datapoints),
+		},
+	}
+
+	f := getNewInvert(in)
 	out := []models.Series{
 		{
 			Interval:   10,
@@ -52,6 +62,11 @@ func TestInvert(t *testing.T) {
 
 	got, err := f.Exec(make(map[Req][]models.Series))
 	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure input hasn't changed after call to invert
+	if err := equalOutput(in, inCopy, nil, err); err != nil {
 		t.Fatal(err)
 	}
 }
