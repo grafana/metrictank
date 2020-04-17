@@ -40,9 +40,7 @@ func IsIntervalString(e *expr) error {
 
 func IsSignedIntervalString(e *expr) error {
 	durStr := e.str
-	if durStr[0] == '-' {
-		durStr = durStr[1:]
-	} else if durStr[0] == '+' {
+	if durStr[0] == '-' || durStr[0] == '+' {
 		durStr = durStr[1:]
 	}
 	_, err := dur.ParseDuration(durStr)
