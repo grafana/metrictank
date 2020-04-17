@@ -1,7 +1,7 @@
 #!/bin/bash
 
 version=$(git describe --abbrev=7)
-version=$version+617+642
+version=$version-617-642
 version_raw=$(git describe --abbrev=7 | sed 's/^v//')
 gitroot=$(git rev-parse --show-toplevel)
 
