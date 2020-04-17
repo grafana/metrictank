@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -37,6 +36,7 @@ func TestTimeShiftSingle(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
+				Target:     "timeShift(a, \"-10m\")",
 				QueryPatt:  "timeShift(a, \"-10m\")",
 				Datapoints: shiftInput(a, -offset*2),
 			},
@@ -70,11 +70,13 @@ func TestTimeShiftMultiple(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
+				Target:     "timeShift(a, \"-10m\")",
 				QueryPatt:  "timeShift(a, \"-10m\")",
 				Datapoints: shiftInput(a, -offset*2),
 			},
 			{
 				Interval:   10,
+				Target:     "timeShift(b, \"-10m\")",
 				QueryPatt:  "timeShift(b, \"-10m\")",
 				Datapoints: shiftInput(b, -offset*2),
 			},
@@ -102,6 +104,7 @@ func TestTimeShiftPositive(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
+				Target:     "timeShift(a, \"+10m\")",
 				QueryPatt:  "timeShift(a, \"+10m\")",
 				Datapoints: shiftInput(a, 0),
 			},
@@ -133,28 +136,9 @@ func testTimeShift(name string, in []models.Series, out []models.Series, t *test
 		t.Fatalf("case %q: Expected context offset = %d, got %d", name, expectedOffset, actualOffset)
 	}
 
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
-	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: timeShift len output expected %d, got %d", name, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q : expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
-		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
-		}
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal("Failed test:", name, err)
 	}
 }
 
