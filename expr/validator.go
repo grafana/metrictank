@@ -38,6 +38,17 @@ func IsIntervalString(e *expr) error {
 	return err
 }
 
+func IsSignedIntervalString(e *expr) error {
+	durStr := e.str
+	if durStr[0] == '-' {
+		durStr = durStr[1:]
+	} else if durStr[0] == '+' {
+		durStr = durStr[1:]
+	}
+	_, err := dur.ParseDuration(durStr)
+	return err
+}
+
 func IsOperator(e *expr) error {
 	switch e.str {
 	case "=", "!=", ">", ">=", "<", "<=":
