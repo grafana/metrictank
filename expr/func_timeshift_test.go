@@ -37,7 +37,7 @@ func TestTimeShiftSingle(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "timeShift(a, \"10m\")",
+				QueryPatt:  "timeShift(a, \"-10m\")",
 				Datapoints: shiftInput(a, -offset*2),
 			},
 		},
@@ -70,12 +70,12 @@ func TestTimeShiftMultiple(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:   10,
-				QueryPatt:  "timeShift(a, \"10m\")",
+				QueryPatt:  "timeShift(a, \"-10m\")",
 				Datapoints: shiftInput(a, -offset*2),
 			},
 			{
 				Interval:   10,
-				QueryPatt:  "timeShift(b, \"10m\")",
+				QueryPatt:  "timeShift(b, \"-10m\")",
 				Datapoints: shiftInput(b, -offset*2),
 			},
 		},
