@@ -67,14 +67,8 @@ func TestInvertInputUnchanged(t *testing.T) {
 	}
 
 	// store copy of the original input
-	inCopy := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "queryPattHere",
-			Target:     "targetHere",
-			Datapoints: getCopy(datapoints),
-		},
-	}
+	inCopy := make([]models.Series, len(in))
+	copy(inCopy, in)
 
 	f := getNewInvert(in)
 	_, err := f.Exec(make(map[Req][]models.Series))
@@ -85,7 +79,7 @@ func TestInvertInputUnchanged(t *testing.T) {
 	}
 }
 
-func TestInvertEmpty(t *testing.T) {
+func TestInvertZero(t *testing.T) {
 	in := []models.Series{
 		{
 			Interval:   10,
@@ -112,7 +106,7 @@ func TestInvertEmpty(t *testing.T) {
 	}
 }
 
-func TestInvertMultipleSeries(t *testing.T) {
+func TestInvertMultiple(t *testing.T) {
 	in := []models.Series{
 		{
 			Interval:   10,
