@@ -147,7 +147,6 @@ func TestMinMaxSame(t *testing.T) {
 }
 
 func TestMinMaxInputUnchanged(t *testing.T) {
-
 	in := []models.Series{
 		{
 			Interval:   interval,
@@ -158,14 +157,8 @@ func TestMinMaxInputUnchanged(t *testing.T) {
 	}
 
 	// store copy of the original input
-	inCopy := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "queryPattHere",
-			Target:     "targetHere",
-			Datapoints: []schema.Point{},
-		},
-	}
+	inCopy := make([]models.Series, len(in))
+	copy(inCopy, in)
 
 	f := getNewMinMax(in)
 	_, err := f.Exec(make(map[Req][]models.Series))
@@ -202,7 +195,7 @@ func TestMinMaxInfinity(t *testing.T) {
 	}
 }
 
-func TestMinMaxEmpty(t *testing.T) {
+func TestMinMaxZero(t *testing.T) {
 	f := getNewMinMax(
 		[]models.Series{
 			{
@@ -228,7 +221,7 @@ func TestMinMaxEmpty(t *testing.T) {
 	}
 }
 
-func TestMinMaxMultipleSeries(t *testing.T) {
+func TestMinMaxMultiple(t *testing.T) {
 	f := getNewMinMax(
 		[]models.Series{
 			{
