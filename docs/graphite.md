@@ -111,7 +111,7 @@ See also:
 | maxSeries(seriesList) series                                   | max          | Stable     |
 | minimumAbove                                                   |              | Stable     |
 | minimumBelow                                                   |              | Stable     |
-| minMax                                                         |              | No         |
+| minMax                                                         |              | Stable     |
 | minSeries(seriesList) series                                   | min          | Stable     |
 | mostDeviant                                                    |              | No         |
 | movingAverage(seriesLists, windowSize) seriesList              |              | Unstable   |
