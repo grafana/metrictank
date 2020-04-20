@@ -30,18 +30,8 @@ var datapointsInvert = []schema.Point{
 	{Val: math.Pow(math.MaxFloat64, -1), Ts: 70},
 }
 
-func TestInvert(t *testing.T) {
+func TestInvertBasic(t *testing.T) {
 	in := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "queryPattHere",
-			Target:     "targetHere",
-			Datapoints: getCopy(datapoints),
-		},
-	}
-
-	// store copy of the original input
-	inCopy := []models.Series{
 		{
 			Interval:   10,
 			QueryPatt:  "queryPattHere",
@@ -64,9 +54,98 @@ func TestInvert(t *testing.T) {
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestInvertInputUnchanged(t *testing.T) {
+	in := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: getCopy(datapoints),
+		},
+	}
+
+	// store copy of the original input
+	inCopy := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: getCopy(datapoints),
+		},
+	}
+
+	f := getNewInvert(in)
+	_, err := f.Exec(make(map[Req][]models.Series))
 
 	// make sure input hasn't changed after call to invert
 	if err := equalOutput(in, inCopy, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInvertEmpty(t *testing.T) {
+	in := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: []schema.Point{},
+		},
+	}
+
+	f := getNewInvert(in)
+
+	out := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "invert(queryPattHere)",
+			Target:     "invert(targetHere)",
+			Datapoints: []schema.Point{},
+		},
+	}
+
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInvertMultipleSeries(t *testing.T) {
+	in := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: getCopy(datapoints),
+		},
+		{
+			Interval:   20,
+			QueryPatt:  "queryPattHere2",
+			Target:     "targetHere2",
+			Datapoints: getCopy(datapoints),
+		},
+	}
+
+	f := getNewInvert(in)
+	out := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "invert(queryPattHere)",
+			Target:     "invert(targetHere)",
+			Datapoints: getCopy(datapointsInvert),
+		},
+		{
+			Interval:   20,
+			QueryPatt:  "invert(queryPattHere2)",
+			Target:     "invert(targetHere2)",
+			Datapoints: getCopy(datapointsInvert),
+		},
+	}
+
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
 }
