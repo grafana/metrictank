@@ -21,18 +21,36 @@ func shiftInput(in []schema.Point, offset int) []schema.Point {
 	return out
 }
 
-func TestTimeShiftSingle(t *testing.T) {
+func TestTimeShiftZero(t *testing.T) {
 	offset := -600
 	testTimeShift(
-		"identity",
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: shiftInput(a, -offset), // shift forward to avoid underflow
-			},
+		"no_series",
+		[]models.Series{},
+		[]models.Series{},
+		t,
+		offset,
+		"10m",
+		true,
+		false,
+	)
+}
+
+func TestTimeShiftSingle(t *testing.T) {
+	offset := -600
+	input := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "a",
+			Target:     "a",
+			Datapoints: shiftInput(a, -offset), // shift forward to avoid underflow
 		},
+	}
+	inputCopy := make([]models.Series, len(input))
+	copy(inputCopy, input)
+
+	testTimeShift(
+		"identity",
+		input,
 		[]models.Series{
 			{
 				Interval:   10,
@@ -47,6 +65,12 @@ func TestTimeShiftSingle(t *testing.T) {
 		true,
 		false,
 	)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, input, nil, nil); err != nil {
+			t.Fatal("Input was modified: ", err)
+		}
+	})
 }
 
 func TestTimeShiftMultiple(t *testing.T) {
@@ -126,9 +150,14 @@ func testTimeShift(name string, in []models.Series, out []models.Series, t *test
 
 	// Much of the important logic is in the context
 	context := Context{
-		from: in[0].Datapoints[0].Ts,
-		to:   in[0].Datapoints[len(in[0].Datapoints)-1].Ts,
+		from: 1000,
+		to:   2000,
 	}
+	if len(in) > 0 {
+		context.from = in[0].Datapoints[0].Ts
+		context.to = in[0].Datapoints[len(in[0].Datapoints)-1].Ts
+	}
+
 	newContext := f.Context(context)
 
 	actualOffset := int(newContext.from) - int(context.from)
