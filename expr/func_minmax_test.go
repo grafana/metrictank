@@ -146,6 +146,36 @@ func TestMinMaxSame(t *testing.T) {
 	}
 }
 
+func TestMinMaxInputUnchanged(t *testing.T) {
+
+	in := []models.Series{
+		{
+			Interval:   interval,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: []schema.Point{},
+		},
+	}
+
+	// store copy of the original input
+	inCopy := []models.Series{
+		{
+			Interval:   interval,
+			QueryPatt:  "queryPattHere",
+			Target:     "targetHere",
+			Datapoints: []schema.Point{},
+		},
+	}
+
+	f := getNewMinMax(in)
+	_, err := f.Exec(make(map[Req][]models.Series))
+
+	// make sure input hasn't changed after call to minMax
+	if err := equalOutput(in, inCopy, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMinMaxInfinity(t *testing.T) {
 	f := getNewMinMax(
 		[]models.Series{
@@ -163,6 +193,70 @@ func TestMinMaxInfinity(t *testing.T) {
 			QueryPatt:  "minMax(queryPattHere)",
 			Target:     "minMax(targetHere)",
 			Datapoints: getCopy(infinityR),
+		},
+	}
+
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMinMaxEmpty(t *testing.T) {
+	f := getNewMinMax(
+		[]models.Series{
+			{
+				Interval:   interval,
+				QueryPatt:  "queryPattHere",
+				Target:     "targetHere",
+				Datapoints: []schema.Point{},
+			},
+		},
+	)
+	out := []models.Series{
+		{
+			Interval:   interval,
+			QueryPatt:  "minMax(queryPattHere)",
+			Target:     "minMax(targetHere)",
+			Datapoints: []schema.Point{},
+		},
+	}
+
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMinMaxMultipleSeries(t *testing.T) {
+	f := getNewMinMax(
+		[]models.Series{
+			{
+				Interval:   interval,
+				QueryPatt:  "queryPattHere",
+				Target:     "targetHere",
+				Datapoints: getCopy(basic),
+			},
+			{
+				Interval:   20,
+				QueryPatt:  "queryPattHere2",
+				Target:     "targetHere2",
+				Datapoints: getCopy(basic),
+			},
+		},
+	)
+	out := []models.Series{
+		{
+			Interval:   interval,
+			QueryPatt:  "minMax(queryPattHere)",
+			Target:     "minMax(targetHere)",
+			Datapoints: getCopy(basicR),
+		},
+		{
+			Interval:   20,
+			QueryPatt:  "minMax(queryPattHere2)",
+			Target:     "minMax(targetHere2)",
+			Datapoints: getCopy(basicR),
 		},
 	}
 
