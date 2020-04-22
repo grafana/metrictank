@@ -9,12 +9,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
 	"github.com/tinylib/msgp/msgp"
+	"golang.org/x/sync/errgroup"
 	macaron "gopkg.in/macaron.v1"
 
 	"github.com/grafana/metrictank/api/middleware"
@@ -374,49 +374,40 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 }
 
 func (s *Server) metricsExpand(ctx *middleware.Context, request models.GraphiteExpand) {
-	var wg sync.WaitGroup
-	var errAtomic atomic.Value
-
-	reqCtx := ctx.Req.Context()
+	g, errGroupCtx := errgroup.WithContext(ctx.Req.Context())
 	results := make([]map[string]struct{}, len(request.Query))
-	wg.Add(len(request.Query))
-	for queryIdx, query := range request.Query {
-		go func(queryIdx int, query string) {
-			defer wg.Done()
-
-			series, err := s.findSeries(reqCtx, ctx.OrgId, []string{query}, 0)
+	for i, query := range request.Query {
+		i, query := i, query
+		g.Go(func() error {
+			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0)
 			if err != nil {
-				errAtomic.Store(err)
-				return
+				return err
 			}
-
-			results[queryIdx] = make(map[string]struct{})
+			results[i] = make(map[string]struct{})
 			for _, s := range series {
 				for _, n := range s.Series {
 					if request.LeavesOnly && !n.Leaf {
 						continue
 					}
 
-					results[queryIdx][n.Path] = struct{}{}
+					results[i][n.Path] = struct{}{}
 				}
 			}
-		}(queryIdx, query)
+			return nil
+		})
 	}
-	wg.Wait()
+	if err := g.Wait(); err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
 
 	// check to see if the request has been canceled, if so abort now.
 	select {
-	case <-reqCtx.Done():
+	case <-ctx.Req.Context().Done():
 		//request canceled
 		response.Write(ctx, response.RequestCanceledErr)
 		return
 	default:
-	}
-
-	err := errAtomic.Load()
-	if err != nil {
-		response.Write(ctx, response.WrapError(err.(error)))
-		return
 	}
 
 	if request.GroupByExpr {
