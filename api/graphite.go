@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/grafana/metrictank/idx/memory"
@@ -369,6 +370,84 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
+	}
+}
+
+func (s *Server) metricsExpand(ctx *middleware.Context, request models.GraphiteExpand) {
+	var wg sync.WaitGroup
+	var errAtomic atomic.Value
+
+	reqCtx := ctx.Req.Context()
+	results := make([]map[string]struct{}, len(request.Query))
+	wg.Add(len(request.Query))
+	for queryIdx, query := range request.Query {
+		go func(queryIdx int, query string) {
+			defer wg.Done()
+
+			series, err := s.findSeries(reqCtx, ctx.OrgId, []string{query}, 0)
+			if err != nil {
+				errAtomic.Store(err)
+				return
+			}
+
+			results[queryIdx] = make(map[string]struct{})
+			for _, s := range series {
+				for _, n := range s.Series {
+					if request.LeavesOnly && !n.Leaf {
+						continue
+					}
+
+					results[queryIdx][n.Path] = struct{}{}
+				}
+			}
+		}(queryIdx, query)
+	}
+	wg.Wait()
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-reqCtx.Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
+	err := errAtomic.Load()
+	if err != nil {
+		response.Write(ctx, response.WrapError(err.(error)))
+		return
+	}
+
+	if request.GroupByExpr {
+		// keyed by query string
+		resultsGrouped := make(map[string][]string, len(results))
+		for resultIdx, queryResults := range results {
+			// query and results can be associated via their shared idx
+			query := request.Query[resultIdx]
+			resultsGrouped[query] = make([]string, 0, len(queryResults))
+			for queryResult := range queryResults {
+				resultsGrouped[query] = append(resultsGrouped[query], queryResult)
+			}
+			sort.StringSlice(resultsGrouped[query]).Sort()
+		}
+
+		response.Write(ctx, response.NewJson(200, resultsGrouped, request.Jsonp))
+	} else {
+		// all results in one flat list
+		resultsUngrouped := make(map[string]struct{})
+		for _, paths := range results {
+			for path := range paths {
+				resultsUngrouped[path] = struct{}{}
+			}
+		}
+		resultSlice := make([]string, 0, len(resultsUngrouped))
+		for result := range resultsUngrouped {
+			resultSlice = append(resultSlice, result)
+		}
+		sort.StringSlice(resultSlice).Sort()
+
+		response.Write(ctx, response.NewJson(200, resultSlice, request.Jsonp))
 	}
 }
 

@@ -64,6 +64,7 @@ func (s *Server) RegisterRoutes() {
 	// Graphite endpoints
 	r.Combo("/render", cBody, withOrg, ready, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)
 	r.Combo("/metrics/find", withOrg, ready, bind(models.GraphiteFind{})).Get(s.metricsFind).Post(s.metricsFind)
+	r.Combo("/metrics/expand", withOrg, ready, bind(models.GraphiteExpand{})).Get(s.metricsExpand).Post(s.metricsExpand)
 	r.Get("/metrics/index.json", withOrg, ready, s.metricsIndex)
 	r.Post("/metrics/delete", withOrg, ready, bind(models.MetricsDelete{}), s.metricsDelete)
 	r.Combo("/tags/findSeries", withOrg, ready, bind(models.GraphiteTagFindSeries{})).Get(s.graphiteTagFindSeries).Post(s.graphiteTagFindSeries)
