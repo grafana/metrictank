@@ -1,18 +1,19 @@
 # Graphite
 
-Metrictank aims to be a drop-in replacement for Graphite, but also to address a few of Graphite's shortcomings.
-Here are some important functional differences to keep in mind:
-(we specifically do not go into subjective things like performance or scalability here)
+For a general overview of how Metrictank relates and compares to Graphite, please see the [Readme](../README.md)
 
-* currently no support for rewriting old data; for a given key and timestamp first write wins, not last. We aim to fix this.
-* timeseries can change resolution (interval) over time, they will be merged seamlessly at read time.
-* multiple rollup functions are supported and can be selected via consolidateBy() at query time. (except when using functions which change the nature of the data such as perSecond() etc)
-* xFilesfactor is currently not supported
-* will never move observations into the past (e.g. consolidation and rollups will only cause data to get an equal or higher timestamp)
-* graphite timezone defaults to Chicago, we default to server time
-* many functions are not implemented yet in metrictank itself, but it autodetects this and will proxy requests it cannot handle to graphite-web
-  (which then uses metrictank as a simple backend).  See below for details
+## Caveats
 
+There are some small behavioral and functional differences with Graphite:
+
+* Currently no support for rewriting old data; There is a reorder-buffer to support out-of-order writes to an extent.  Full archived data rewriting is on the roadmap.
+* Will never move observations into the past (e.g. consolidation and rollups will only cause data to get an equal or higher timestamp)
+* Graphite timezone defaults to Chicago, we default to server time
+* xFilesfactor is currently not supported for rollups. Fairly easy to address, but haven't had a need for it yet.
+* Graphite supports render formats csv, json, dygraph, msgpack, pickle, png, pdf, raw, rickshaw, svg.
+  Metrictank only implements json, msgp, msgpack, pickle. Grafana only uses json. In particular, Metrictank does not render images, because Grafana renders great.
+* Some less commonly used functions are not implemented yet in metrictank itself, but Metrictank can seamlessly proxy those to graphite-web (see below for details)
+  At Grafana Labs, 90 to 95 % of requests get handled by metrictank without involving Graphite.
 
 
 ## Processing functions
@@ -27,7 +28,8 @@ There are 3 levels of support:
 * Stable : 100% compatible with graphite and vetted
 * Unstable: not fully compatible yet or not vetted enough
 
-When you request functions that metrictank cannot provide, it will automatically proxy requests to graphite for a seamless failover.
+When you request functions that metrictank cannot provide, it will automatically, seamlessly proxy requests to graphite.
+Those requests will not include response metadata, will still use Metrictank as a storage system if Graphite is configured that way, and may return a bit slower.
 You can also choose to enable unstable functions via process=any
 See also:
 * [HTTP api docs for render endpoint](https://github.com/grafana/metrictank/blob/master/docs/http-api.md#graphite-query-api)
@@ -59,7 +61,7 @@ See also:
 | changed                                                        |              | No         |
 | color                                                          |              | No         |
 | consolidateBy(seriesList, func) seriesList                     |              | Stable     |
-| constantLine                                                   |              | Stable     |
+| constantLine                                                   |              | No         |
 | countSeries(seriesLists) series                                |              | Stable     |
 | cumulative                                                     |              | Stable     |
 | currentAbove                                                   |              | Stable     |
