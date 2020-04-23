@@ -46,9 +46,7 @@ There's 2 main ways to deploy Metrictank:
 
 * No performance/availability isolation between tenants per instance. (only data isolation)
 * Minimum computation locality: we move the data from storage to processing code, which is both metrictank and graphite.
-* Backlog replaying and queries can be made faster. [A Go GC issue may occasionally inflate response times](https://github.com/golang/go/issues/14812).
-* We use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/grafana/metrictank/blob/master/docs/tags.md).
-* can't overwrite old data. We support reordering the most recent time window but that's it. (unless you restart MT)
+* Can't overwrite old data. We support reordering the most recent time window but that's it. (unless you restart MT)
 
 ## Interesting design characteristics (feature or limitation... up to you)
 
@@ -56,9 +54,8 @@ There's 2 main ways to deploy Metrictank:
 Otherwise data loss of current chunks will be incurred.  See [operations guide](https://github.com/grafana/metrictank/blob/master/docs/operations.md)
 * clustering works best with an orchestrator like kubernetes. MT itself does not automate master promotions. See [clustering](https://github.com/grafana/metrictank/blob/master/docs/clustering.md) for more.
 * Only float64 values. Ints and bools currently stored as floats (works quite well due to the gorilla compression),
-  No text support.
 * Only uint32 unix timestamps in second resolution.   For higher resolution, consider [streaming directly to grafana](https://grafana.com/blog/2016/03/31/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
-* No data locality: doesn't seem needed yet to put related series together.
+* We distribute data by hashing keys, like many similar systems. This means no data locality (data that will be often used together may not live together)
 
 ## Docs
 
