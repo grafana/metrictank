@@ -9,11 +9,11 @@ There are some small behavioral and functional differences with Graphite:
 * Currently no support for rewriting old data; There is a reorder-buffer to support out-of-order writes to an extent.  Full archived data rewriting is on the roadmap.
 * Will never move observations into the past (e.g. consolidation and rollups will only cause data to get an equal or higher timestamp)
 * Graphite timezone defaults to Chicago, we default to server time
-* xFilesfactor is currently not supported for rollups. Fairly easy to address, but haven't had a need for it yet.
-* Graphite supports render formats csv, json, dygraph, msgpack, pickle, png, pdf, raw, rickshaw, svg.
-  Metrictank only implements json, msgp, msgpack, pickle. Grafana only uses json. In particular, Metrictank does not render images, because Grafana renders great.
-* Some less commonly used functions are not implemented yet in metrictank itself, but Metrictank can seamlessly proxy those to graphite-web (see below for details)
-  At Grafana Labs, 90 to 95 % of requests get handled by metrictank without involving Graphite.
+* xFilesfactor is currently not supported for rollups. It is fairly easy to address, but we haven't had a need for it yet.
+* Graphite supports the following render formats: csv, json, dygraph, msgpack, pickle, png, pdf, raw, rickshaw, and svg.
+  Metrictank only implements json, msgp, msgpack, and pickle. Grafana only uses json. In particular, Metrictank does not render images, because Grafana renders great.
+* Some less commonly used functions are not implemented yet in Metrictank itself, but Metrictank can seamlessly proxy those to graphite-web (see below for details)
+  At Grafana Labs, 90 to 95 % of requests get handled by Metrictank without involving Graphite.
 
 
 ## Processing functions
@@ -28,7 +28,7 @@ There are 3 levels of support:
 * Stable : 100% compatible with graphite and vetted
 * Unstable: not fully compatible yet or not vetted enough
 
-When you request functions that metrictank cannot provide, it will automatically, seamlessly proxy requests to graphite.
+When you request functions that Metrictank cannot provide, it will automatically, seamlessly proxy requests to graphite.
 Those requests will not include response metadata, will still use Metrictank as a storage system if Graphite is configured that way, and may return a bit slower.
 You can also choose to enable unstable functions via process=any
 See also:

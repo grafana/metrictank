@@ -6,7 +6,7 @@
 
 ## Introduction
 
-Metrictank is a multi-tenant timeseries platform, that can be used as a backend or replacement for Graphite.
+Metrictank is a multi-tenant timeseries platform that can be used as a backend or replacement for Graphite.
 It provides long term storage, high availability, efficient storage, retrieval and processing for large scale environments.
 
 [GrafanaLabs](http://grafana.com) has been running metrictank in production since December 2015.
@@ -17,7 +17,7 @@ that makes this process much easier.
 ## Features
 
 * 100% open source
-* Heavily compressed chunks (inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf)) dramatically lower cpu, memory and storage requirements and get much greater performance out of Cassandra than other Cassandra based solutions.
+* Heavily compressed chunks (inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf)) dramatically lower cpu, memory, and storage requirements and get much greater performance out of Cassandra than other solutions.
 * Writeback RAM buffers and chunk caches, serving most data out of memory.
 * Multiple rollup functions can be configured per serie (or group of series). E.g. min/max/sum/count/average, which can be selected at query time via consolidateBy().
 So we can do consolidation (combined runtime+archived) accurately and correctly,
