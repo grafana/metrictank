@@ -8,67 +8,55 @@ import (
 	"github.com/grafana/metrictank/api/models"
 )
 
+func TestAliasSubZero(t *testing.T) {
+	testAliasSub("n", "z", []string{}, []string{}, t)
+
+}
+
 func TestAliasSub(t *testing.T) {
-	cases := []struct {
-		search  string
-		replace string
-		in      []string
-		out     []string
-	}{
-		{
-			"this",
-			"that",
-			[]string{"series.name.this.ok"},
-			[]string{"series.name.that.ok"},
-		},
-		{
-			`^.*TCP(\d+)`,
-			`\1`,
-			[]string{"ip-foobar-TCP25", "ip-foobar-TCPfoo"},
-			[]string{"25", "ip-foobar-TCPfoo"},
-		},
-		{
-			".*\\.([^\\.]+)\\.metrics_received.*",
-			"\\1 in",
-			[]string{"metrictank.stats.env.instance.input.pluginname.metrics_received.counter32"},
-			[]string{"pluginname in"},
-		},
-		{
-			".*host=([^;]+)(;.*)?",
-			"\\1",
-			[]string{"foo.bar.baz;a=b;host=ab1"},
-			[]string{"ab1"},
-		},
+	testAliasSub("this", "that", []string{"series.name.this.ok"}, []string{"series.name.that.ok"}, t)
+	testAliasSub(`^.*TCP(\d+)`, `\1`, []string{"ip-foobar-TCP25", "ip-foobar-TCPfoo"}, []string{"25", "ip-foobar-TCPfoo"}, t)
+	testAliasSub(".*\\.([^\\.]+)\\.metrics_received.*", "\\1 in", []string{"metrictank.stats.env.instance.input.pluginname.metrics_received.counter32"}, []string{"pluginname in"}, t)
+	testAliasSub(".*host=([^;]+)(;.*)?", "\\1", []string{"foo.bar.baz;a=b;host=ab1"}, []string{"ab1"}, t)
+}
+
+func testAliasSub(search, replace string, inStr, outStr []string, t *testing.T) {
+	var in, out []models.Series
+	for i := range inStr {
+		in = append(in, getQuerySeries(inStr[i], a))
+		out = append(out, getQuerySeries(outStr[i], a))
 	}
-	for i, c := range cases {
-		f := NewAliasSub()
-		alias := f.(*FuncAliasSub)
-		alias.search = regexp.MustCompile(c.search)
-		alias.replace = c.replace
-		var in []models.Series
-		for _, name := range c.in {
-			in = append(in, models.Series{
-				Target: name,
-			})
-		}
-		alias.in = NewMock(in)
-		got, err := f.Exec(make(map[Req][]models.Series))
-		if err != nil {
-			t.Fatalf("case %d: err should be nil. got %q", i, err)
-		}
-		if len(got) != len(in) {
-			t.Fatalf("case %d: alias output should be same amount of series as input: %d, not %d", i, len(in), len(got))
-		}
-		for i, o := range c.out {
-			g := got[i]
-			if o != g.Target {
-				t.Fatalf("case %d: expected target %q, got %q", i, o, g.Target)
-			}
-			if o != g.Tags["name"] {
-				t.Fatalf("case %d: expected name tag %q, got %q", i, o, g.Tags["name"])
-			}
-		}
+
+	f := NewAliasSub()
+	alias := f.(*FuncAliasSub)
+	alias.search = regexp.MustCompile(search)
+	alias.replace = replace
+	alias.in = NewMock(in)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	name := search + "->" + replace
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 func BenchmarkAliasSub_1(b *testing.B) {

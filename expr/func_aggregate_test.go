@@ -10,6 +10,14 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
+func TestAggregateZero(t *testing.T) {
+	f := makeAggregate("sum", [][]models.Series{}, 0)
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput([]models.Series{}, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAggregateIdentity(t *testing.T) {
 	testAggregate(
 		"identity",
@@ -236,34 +244,46 @@ func TestAggregateXFilesFactor(t *testing.T) {
 	)
 }
 
-func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
+func makeAggregate(agg string, in [][]models.Series, xFilesFactor float64) GraphiteFunc {
 	f := NewAggregateConstructor(agg)()
 	avg := f.(*FuncAggregate)
 	for _, i := range in {
 		avg.in = append(avg.in, NewMock(i))
 	}
 	avg.xFilesFactor = xFilesFactor
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+	return f
+}
+
+func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
+	// Copy input to check that it is unchanged later
+	inputCopy := make([][]models.Series, len(in))
+	for i := range in {
+		inputCopy[i] = make([]models.Series, len(in[i]))
+		copy(inputCopy[i], in[i])
 	}
-	if len(got) != 1 {
-		t.Fatalf("case %q: Aggregate output should be only 1 thing (a series) not %d", name, len(got))
+
+	f := makeAggregate(agg, in, xFilesFactor)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput([]models.Series{out}, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	g := got[0]
-	if g.Target != out.Target {
-		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
-	}
-	if len(g.Datapoints) != len(out.Datapoints) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(g.Datapoints))
-	}
-	for j, p := range g.Datapoints {
-		bothNaN := math.IsNaN(p.Val) && math.IsNaN(out.Datapoints[j].Val)
-		if (bothNaN || p.Val == out.Datapoints[j].Val) && p.Ts == out.Datapoints[j].Ts {
-			continue
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		for i := range inputCopy {
+			if err := equalOutput(inputCopy[i], in[i], nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+			}
 		}
-		t.Fatalf("case %q: output point %d - expected %v got %v", name, j, out.Datapoints[j], p)
-	}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 func BenchmarkAggregate10k_1NoNulls(b *testing.B) {
