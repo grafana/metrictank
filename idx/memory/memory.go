@@ -881,7 +881,7 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		return res
 	}
 
-	res = append(res, m.getOrgMetaTagIndex(orgId).tags.getTagsByFilter(filter)...)
+	res = append(res, m.getOrgMetaTagIndex(orgId).hierarchy.getTagsByFilter(filter)...)
 	sort.Strings(res)
 
 	return res
@@ -917,7 +917,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 
 	metaTagIdx := m.getOrgMetaTagIndex(orgId)
 
-	for value, recordIds := range metaTagIdx.tags.getTagValuesByRegex(key, filter) {
+	for value, recordIds := range metaTagIdx.hierarchy.getTagValuesByRegex(key, filter) {
 		for _, recordId := range recordIds {
 			record, ok := metaTagIdx.records.getMetaRecordById(recordId)
 			if !ok {
@@ -977,7 +977,7 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		return m.finalizeResult(res, limit, false)
 	}
 
-	metaTags := m.getOrgMetaTagIndex(orgId).tags.getTagsByPrefix(prefix)
+	metaTags := m.getOrgMetaTagIndex(orgId).hierarchy.getTagsByPrefix(prefix)
 	if len(metaTags) == 0 {
 		return m.finalizeResult(res, limit, false)
 	}
@@ -1091,7 +1091,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		return m.finalizeResult(res, limit, false)
 	}
 
-	metaTagValues := metaTagIdx.tags.getTagValuesByTagAndPrefix(tag, prefix)
+	metaTagValues := metaTagIdx.hierarchy.getTagValuesByTagAndPrefix(tag, prefix)
 	if len(metaTagValues) == 0 {
 		return m.finalizeResult(res, limit, false)
 	}
@@ -1188,7 +1188,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query tagquery.Quer
 	go func() {
 		if useMeta && MetaTagSupport {
 			metaTagIdx := m.getOrgMetaTagIndex(orgId)
-			queryCtx.Run(tags, m.defById, metaTagIdx.tags, metaTagIdx.records, idCh)
+			queryCtx.Run(tags, m.defById, metaTagIdx.hierarchy, metaTagIdx.records, idCh)
 		} else {
 			queryCtx.Run(tags, m.defById, nil, nil, idCh)
 		}

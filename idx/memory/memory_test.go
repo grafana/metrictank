@@ -1116,7 +1116,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 	}
 
 	compareRecordCount := func(expression string, expectedRecordCount int) {
-		recordCount := len(ix.metaTagIdx.getOrgMetaTagIndex(1).tags.getByTagValue(parseExpressionsMustCompile(t, []string{expression})[0], false))
+		recordCount := len(ix.metaTagIdx.getOrgMetaTagIndex(1).hierarchy.getByTagValue(parseExpressionsMustCompile(t, []string{expression})[0], false))
 		if recordCount != expectedRecordCount {
 			t.Fatalf("Expected that there are %d record(s) associated with expression %s, but there were %d", expectedRecordCount, expression, recordCount)
 		}

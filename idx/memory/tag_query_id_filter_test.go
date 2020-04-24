@@ -33,7 +33,7 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 		ctx = &TagQueryContext{
 			index:          index.tags[1],
 			byId:           index.defById,
-			metaTagIndex:   metaTagIdx.tags,
+			metaTagIndex:   metaTagIdx.hierarchy,
 			metaTagRecords: metaTagIdx.records,
 		}
 	} else {

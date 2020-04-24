@@ -100,18 +100,18 @@ type orgMetaTagIdx struct {
 	// swapMutex is only used to ensure that no two upsert/swap operations run concurrently
 	swapMutex sync.Mutex
 
-	tags     *metaTagHierarchy
-	records  *metaTagRecords
-	enricher *metaTagEnricher
+	hierarchy *metaTagHierarchy
+	records   *metaTagRecords
+	enricher  *metaTagEnricher
 }
 
 type idLookup func(tagquery.Query, chan schema.MKey, bool)
 
 func newOrgMetaTagIndex(idLookup idLookup) *orgMetaTagIdx {
 	return &orgMetaTagIdx{
-		tags:     newMetaTagHierarchy(),
-		records:  newMetaTagRecords(),
-		enricher: newEnricher(idLookup),
+		hierarchy: newMetaTagHierarchy(),
+		records:   newMetaTagRecords(),
+		enricher:  newEnricher(idLookup),
 	}
 }
 
@@ -156,13 +156,13 @@ func (m *metaTagIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.Met
 		// if so we remove all references to it from the enricher
 		// and from the meta tag index
 		idx.enricher.delMetaRecord(oldId)
-		idx.tags.deleteRecord(oldRecord.MetaTags, oldId)
+		idx.hierarchy.deleteRecord(oldRecord.MetaTags, oldId)
 	}
 
 	// add the newly inserted meta record into the enricher and the
 	// meta tag index
 	idx.enricher.addMetaRecord(id, query)
-	idx.tags.insertRecord(upsertRecord.MetaTags, id)
+	idx.hierarchy.insertRecord(upsertRecord.MetaTags, id)
 
 	return nil
 }
@@ -216,7 +216,7 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			// we first delete it and then re-add it
 			recordsModified++
 			idx.enricher.delMetaRecord(status.currentId)
-			idx.tags.deleteRecord(status.currentMetaTags, status.currentId)
+			idx.hierarchy.deleteRecord(status.currentMetaTags, status.currentId)
 		} else {
 			// record does not exist, so it will be added
 			recordsAdded++
@@ -234,7 +234,7 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			continue
 		}
 		idx.enricher.addMetaRecord(newRecordId, query)
-		idx.tags.insertRecord(newRecords[i].MetaTags, newRecordId)
+		idx.hierarchy.insertRecord(newRecords[i].MetaTags, newRecordId)
 
 		// adding the new record id to recordIdsToKeep to prevent that
 		// it gets pruned further down
@@ -261,7 +261,7 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 		// tag index and the enricher
 		for recordId, record := range pruned {
 			idx.enricher.delMetaRecord(recordId)
-			idx.tags.deleteRecord(record.MetaTags, recordId)
+			idx.hierarchy.deleteRecord(record.MetaTags, recordId)
 		}
 	}
 

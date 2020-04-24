@@ -323,7 +323,7 @@ func TestMetaTagRecordSwap(t *testing.T) {
 	idx, _ := getTestIndexWithMetaTags(t, []tagquery.MetaTagRecord{record1, record2}, 3, nil)
 	orgIdx := idx.getOrgMetaTagIndex(1)
 	mtr := orgIdx.records
-	mti := orgIdx.tags
+	mti := orgIdx.hierarchy
 
 	record1Id, exists, equal := mtr.recordExistsAndIsEqual(record1)
 	if !(exists && equal) {
