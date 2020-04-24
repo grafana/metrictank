@@ -695,11 +695,23 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
+	// Map identical series expressions to reduce round trips. For the purpose of resolving series
+	// queries/patterns to matching series, uniqueness is determined by only Query, From, and To.
+	resolveSeriesRequests := make(map[expr.Req][]expr.Req)
+	for i, r := range plan.Reqs {
+		strippedreq := expr.Req{
+			Query: r.Query,
+			From:  r.From,
+			To:    r.To,
+		}
+		resolveSeriesRequests[strippedreq] = append(resolveSeriesRequests[strippedreq], plan.Reqs[i])
+	}
+
 	// note that different patterns to query can have different from / to, so they require different index lookups
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
 	pre := time.Now()
-	for _, r := range plan.Reqs {
+	for r, rawReqs := range resolveSeriesRequests {
 		select {
 		case <-ctx.Done():
 			//request canceled
@@ -728,27 +740,29 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		for _, s := range series {
 			for _, metric := range s.Series {
 				for _, archive := range metric.Defs {
-					var cons consolidation.Consolidator
-					consReq := r.Cons
-					if consReq == 0 {
-						// we will use the primary method dictated by the storage-aggregations rules
-						// note:
-						// * we can't just let the expr library take care of normalization, as we may have to fetch targets
-						//   from cluster peers; it's more efficient to have them normalize the data at the source.
-						// * a pattern may expand to multiple series, each of which can have their own aggregation method.
-						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
-					} else {
-						// user specified a runtime consolidation function via consolidateBy()
-						// get the consolidation method of the most appropriate rollup based on the consolidation method
-						// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
-						// use 'avg'.
-						cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
-					}
+					for _, rawReq := range rawReqs {
+						var cons consolidation.Consolidator
+						consReq := rawReq.Cons
+						if consReq == 0 {
+							// we will use the primary method dictated by the storage-aggregations rules
+							// note:
+							// * we can't just let the expr library take care of normalization, as we may have to fetch targets
+							//   from cluster peers; it's more efficient to have them normalize the data at the source.
+							// * a pattern may expand to multiple series, each of which can have their own aggregation method.
+							fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
+							cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+						} else {
+							// user specified a runtime consolidation function via consolidateBy()
+							// get the consolidation method of the most appropriate rollup based on the consolidation method
+							// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
+							// use 'avg'.
+							cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
+						}
 
-					newReq := r.ToModel()
-					newReq.Init(archive, cons, s.Node)
-					reqs.Add(newReq)
+						newReq := rawReq.ToModel()
+						newReq.Init(archive, cons, s.Node)
+						reqs.Add(newReq)
+					}
 				}
 
 				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
