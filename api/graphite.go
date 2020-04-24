@@ -695,7 +695,8 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
-	// Map identical series expressions to reduce round trips
+	// Map identical series expressions to reduce round trips. For the purpose of resolving series
+	// queries/patterns to matching series, uniqueness is determined by only Query, From, and To.
 	resolveSeriesRequests := make(map[expr.Req][]expr.Req)
 	for i, r := range plan.Reqs {
 		strippedreq := expr.Req{
