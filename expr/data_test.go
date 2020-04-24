@@ -312,8 +312,18 @@ func getCopy(in []schema.Point) []schema.Point {
 	return out
 }
 
+func getSeries(target, patt string, data []schema.Point) models.Series {
+	return models.Series{
+		Target:     target,
+		QueryPatt:  patt,
+		Datapoints: getCopy(data),
+		Interval:   10,
+	}
+}
+
 func getQuerySeries(patt string, data []schema.Point) models.Series {
 	return models.Series{
+		Target:     patt,
 		QueryPatt:  patt,
 		Datapoints: getCopy(data),
 		Interval:   10,
@@ -323,6 +333,7 @@ func getQuerySeries(patt string, data []schema.Point) models.Series {
 func getTargetSeries(target string, data []schema.Point) models.Series {
 	return models.Series{
 		Target:     target,
+		QueryPatt:  target,
 		Datapoints: getCopy(data),
 		Interval:   10,
 	}
