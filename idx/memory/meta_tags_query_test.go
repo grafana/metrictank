@@ -379,6 +379,8 @@ func TestMetaTagRecordSwap(t *testing.T) {
 	if len(mti.tags["meta1"]) != 1 {
 		t.Fatalf("Expected metaTagIndex to have 1 value for tag \"meta1\", but id had %d", len(mti.tags["meta1"]))
 	}
+
+	waitForMetaTagEnrichers(t, idx)
 }
 
 func BenchmarkMetaTagEnricher(b *testing.B) {
