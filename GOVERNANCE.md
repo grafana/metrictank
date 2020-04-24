@@ -50,6 +50,7 @@ The current team members are:
 * Florian Boucault ([Grafana Labs](https://grafana.com)) (florian.boucault@grafana.com)
 * Mauro Stettler ([Grafana Labs](https://grafana.com)) (mauro.stettler@grafana.com)
 * Robert Milan ([Grafana Labs](https://grafana.com)) (robert@grafana.com)
+* Sean Hanson ([Bloomberg LP](https://bloomberg.com)) (shanson7@bloomberg.net)
 
 ### Technical decisions
 
