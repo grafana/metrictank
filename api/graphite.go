@@ -696,14 +696,14 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
 	// Map identical series expressions to reduce round trips
-	resolveSeriesRequests := make(map[expr.Req][]*expr.Req)
+	resolveSeriesRequests := make(map[expr.Req][]expr.Req)
 	for i, r := range plan.Reqs {
 		strippedreq := expr.Req{
 			Query: r.Query,
 			From:  r.From,
 			To:    r.To,
 		}
-		resolveSeriesRequests[strippedreq] = append(resolveSeriesRequests[strippedreq], &plan.Reqs[i])
+		resolveSeriesRequests[strippedreq] = append(resolveSeriesRequests[strippedreq], plan.Reqs[i])
 	}
 
 	// note that different patterns to query can have different from / to, so they require different index lookups
