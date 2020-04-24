@@ -6,7 +6,27 @@ import (
 	"github.com/grafana/metrictank/api/models"
 )
 
-func getNewFallbackSeries(in []models.Series, fallback []models.Series) *FuncFallbackSeries {
+func TestFallbackSeriesNo(t *testing.T) {
+	testFallbackSeries(
+		"NoFallback",
+		[]models.Series{getQuerySeries("a", a)},
+		[]models.Series{getQuerySeries("b", b)},
+		[]models.Series{getQuerySeries("a", a)},
+		t,
+	)
+}
+
+func TestFallbackSeriesYes(t *testing.T) {
+	testFallbackSeries(
+		"zeroIn",
+		[]models.Series{},
+		[]models.Series{getQuerySeries("b", b)},
+		[]models.Series{getQuerySeries("b", b)},
+		t,
+	)
+}
+
+func makeFallbackSeries(in []models.Series, fallback []models.Series) *FuncFallbackSeries {
 	f := NewFallbackSeries()
 	s := f.(*FuncFallbackSeries)
 	s.in = NewMock(in)
@@ -14,63 +34,34 @@ func getNewFallbackSeries(in []models.Series, fallback []models.Series) *FuncFal
 	return s
 }
 
-func TestFallbackSeriesNo(t *testing.T) {
-	f := getNewFallbackSeries(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-		},
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-		},
-	)
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "a",
-			Target:     "a",
-			Datapoints: getCopy(a),
-		},
-	}
+func testFallbackSeries(name string, in, fallback, out []models.Series, t *testing.T) {
+	f := makeFallbackSeries(in, fallback)
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+	fallbackCopy := make([]models.Series, len(fallback))
+	copy(fallbackCopy, fallback)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestFallbackSeriesYes(t *testing.T) {
-	f := getNewFallbackSeries(
-		[]models.Series{},
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-		},
-	)
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "b",
-			Target:     "b",
-			Datapoints: getCopy(b),
-		},
+		t.Fatalf("Case %s: %s", name, err)
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+		if err := equalOutput(fallbackCopy, fallback, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }

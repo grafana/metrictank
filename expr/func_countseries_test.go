@@ -9,6 +9,10 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
+func TestCountSeriesZero(t *testing.T) {
+	testCountSeries("zero", [][]models.Series{}, []models.Series{}, t)
+}
+
 func TestCountSeriesFive(t *testing.T) {
 	out := []schema.Point{
 		{Val: 5, Ts: 10},
@@ -20,52 +24,20 @@ func TestCountSeriesFive(t *testing.T) {
 	}
 	testCountSeries(
 		"five",
-		[][]models.Series{{
+		[][]models.Series{
 			{
-				Interval:   10,
-				QueryPatt:  "abc",
-				Datapoints: getCopy(a),
+				getQuerySeries("abc", a),
+				getQuerySeries("abc", b),
+				getQuerySeries("abc", c),
 			},
 			{
-				Interval:   10,
-				QueryPatt:  "abc",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abc",
-				Datapoints: getCopy(c),
+				getQuerySeries("ad", d),
+				getQuerySeries("ad", a),
 			},
 		},
-			{
-				{
-					Interval:   10,
-					QueryPatt:  "ad",
-					Datapoints: getCopy(d),
-				},
-				{
-					Interval:   10,
-					QueryPatt:  "ad",
-					Datapoints: getCopy(a),
-				},
-			}},
-
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "countSeries(abc,ad)",
-				Datapoints: out,
-			},
+			getQuerySeries("countSeries(abc,ad)", out),
 		},
-		t,
-	)
-}
-func TestCountSeriesNone(t *testing.T) {
-	testCountSeries(
-		"none",
-		[][]models.Series{},
-
-		[]models.Series{},
 		t,
 	)
 }
@@ -75,28 +47,33 @@ func testCountSeries(name string, in [][]models.Series, out []models.Series, t *
 	for _, i := range in {
 		f.(*FuncCountSeries).in = append(f.(*FuncCountSeries).in, NewMock(i))
 	}
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([][]models.Series, len(in))
+	for i := range in {
+		inputCopy[i] = make([]models.Series, len(in[i]))
+		copy(inputCopy[i], in[i])
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: isNonNull len output expected %d, got %d", name, len(out), len(gots))
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
-		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			if (p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		for i := range inputCopy {
+			if err := equalOutput(inputCopy[i], in[i], nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
 		}
-	}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 func BenchmarkCountSeries10k_1NoNulls(b *testing.B) {
