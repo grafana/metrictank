@@ -1,6 +1,11 @@
 package expr
 
-import "github.com/grafana/metrictank/api/models"
+import (
+	"fmt"
+
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/schema"
+)
 
 // Datamap contains all series to feed into the processing chain or generated therein:
 // * fetched series, grouped by their expr.Req, such that expr.FuncGet can find the data it needs and feed it into subsequent expr.GraphiteFunc functions
@@ -24,4 +29,30 @@ func (dm DataMap) Clean() {
 			pointSlicePool.Put(serie.Datapoints[:0])
 		}
 	}
+}
+
+// CheckForOverlappingPoints runs through all series in the pool and makes sure there
+// are no series that are overlapping (otherwise returning them would cause issues)
+// This is not efficient and should probably only be called from tests
+func (dm DataMap) CheckForOverlappingPoints() error {
+	// First flatten series to make the logic easier
+	flatseries := make([]models.Series, 0, len(dm))
+	for _, series := range dm {
+		flatseries = append(flatseries, series...)
+	}
+
+	slicesOverlap := func(x, y []schema.Point) bool {
+		return cap(x) > 0 && cap(y) > 0 && &x[0:cap(x)][cap(x)-1] ==
+			&y[0:cap(y)][cap(y)-1]
+	}
+
+	for i := range flatseries {
+		for j := i + 1; j < len(flatseries); j++ {
+			if slicesOverlap(flatseries[i].Datapoints, flatseries[j].Datapoints) {
+				return fmt.Errorf("Found overlapping series at position %d and %d", i, j)
+			}
+		}
+	}
+
+	return nil
 }
