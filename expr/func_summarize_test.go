@@ -860,32 +860,28 @@ func testSummarize(name string, in []models.Series, out []models.Series, interva
 	summarize.fn = fn
 	summarize.alignToFrom = alignToFrom
 
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
 
-	if len(gots) != len(out) {
-		t.Fatalf("case %q (%q, %q, %t): len output expected %d, got %d", name, intervalString, fn, alignToFrom, len(out), len(gots))
-	}
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
 
-	for i, got := range gots {
-		exp := out[i]
-		if got.Target != exp.Target {
-			t.Fatalf("case %q (%q, %q, %t): expected target %q, got %q", name, intervalString, fn, alignToFrom, exp.Target, got.Target)
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		if len(got.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%q, %q, %t): len output expected %v, got %v", name, intervalString, fn, alignToFrom, (exp.Datapoints), (got.Datapoints))
-		}
-		for j, p := range exp.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(got.Datapoints[j].Val)
-			if (bothNaN || p.Val == got.Datapoints[j].Val) && p.Ts == got.Datapoints[j].Ts {
-				continue
-			}
-
-			t.Fatalf("case %q (%q, %q, %t): output point %d - expected %v got %v", name, intervalString, fn, alignToFrom, j, p, got.Datapoints[j])
-		}
-	}
+	})
 }
 
 func BenchmarkSummarize10k_1NoNulls(b *testing.B) {

@@ -49,19 +49,11 @@ func TestPerSecondSingle(t *testing.T) {
 		"identity",
 		[][]models.Series{
 			{
-				{
-					Interval:   10,
-					QueryPatt:  "a",
-					Datapoints: getCopy(a),
-				},
+				getQuerySeries("a", a),
 			},
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "perSecond(a)",
-				Datapoints: getCopy(aPerSecond),
-			},
+			getQuerySeries("perSecond(a)", aPerSecond),
 		},
 		0,
 		t,
@@ -73,19 +65,11 @@ func TestPerSecondSingleMaxValue(t *testing.T) {
 		"identity-counter8bit",
 		[][]models.Series{
 			{
-				{
-					Interval:   10,
-					QueryPatt:  "counter8bit",
-					Datapoints: getCopy(d),
-				},
+				getQuerySeries("counter8bit", d),
 			},
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "perSecond(counter8bit)",
-				Datapoints: getCopy(dPerSecondMax255),
-			},
+			getQuerySeries("perSecond(counter8bit)", dPerSecondMax255),
 		},
 		255,
 		t,
@@ -97,27 +81,13 @@ func TestPerSecondMulti(t *testing.T) {
 		"multiple-series",
 		[][]models.Series{
 			{
-				{
-					Interval:   10,
-					QueryPatt:  "a",
-					Datapoints: getCopy(a),
-				},
-				{
-					Interval:   10,
-					QueryPatt:  "b.*",
-					Datapoints: getCopy(b),
-				},
+				getQuerySeries("a", a),
+				getQuerySeries("b.*", b),
 			},
 		},
 		[]models.Series{
-			{
-				QueryPatt:  "perSecond(a)",
-				Datapoints: getCopy(aPerSecond),
-			},
-			{
-				QueryPatt:  "perSecond(b.*)",
-				Datapoints: getCopy(bPerSecond),
-			},
+			getQuerySeries("perSecond(a)", aPerSecond),
+			getQuerySeries("perSecond(b.*)", bPerSecond),
 		},
 		0,
 		t,
@@ -128,38 +98,17 @@ func TestPerSecondMultiMulti(t *testing.T) {
 		"multiple-serieslists",
 		[][]models.Series{
 			{
-				{
-					Interval:   10,
-					QueryPatt:  "a",
-					Datapoints: getCopy(a),
-				},
-				{
-					Interval:   10,
-					QueryPatt:  "b.foo{bar,baz}",
-					Datapoints: getCopy(b),
-				},
+				getQuerySeries("a", a),
+				getQuerySeries("b.foo{bar,baz}", b),
 			},
 			{
-				{
-					Interval:   10,
-					QueryPatt:  "movingAverage(bar, '1min')",
-					Datapoints: getCopy(c),
-				},
+				getQuerySeries("movingAverage(bar, '1min')", c),
 			},
 		},
 		[]models.Series{
-			{
-				QueryPatt:  "perSecond(a)",
-				Datapoints: getCopy(aPerSecond),
-			},
-			{
-				QueryPatt:  "perSecond(b.foo{bar,baz})",
-				Datapoints: getCopy(bPerSecond),
-			},
-			{
-				QueryPatt:  "perSecond(movingAverage(bar, '1min'))",
-				Datapoints: getCopy(cPerSecond),
-			},
+			getQuerySeries("perSecond(a)", aPerSecond),
+			getQuerySeries("perSecond(b.foo{bar,baz})", bPerSecond),
+			getQuerySeries("perSecond(movingAverage(bar, '1min'))", cPerSecond),
 		},
 		0,
 		t,
@@ -173,27 +122,31 @@ func testPerSecond(name string, in [][]models.Series, out []models.Series, max i
 		ps.in = append(ps.in, NewMock(in[i]))
 		ps.maxValue = max
 	}
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([][]models.Series, len(in))
+	for i := range in {
+		inputCopy[i] = make([]models.Series, len(in[i]))
+		copy(inputCopy[i], in[i])
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: perSecond len output expected %d, got %d", name, len(out), len(gots))
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
-		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		for i := range inputCopy {
+			if err := equalOutput(inputCopy[i], in[i], nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
 		}
-	}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }

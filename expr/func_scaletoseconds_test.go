@@ -14,19 +14,10 @@ func TestScaleToSecondsSingle(t *testing.T) {
 	testScaleToSeconds(
 		"identity",
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
+			getSeries("a", "a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "scaleToSeconds(a,10)",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("scaleToSeconds(a,10)", a),
 		},
 		t,
 		10,
@@ -46,19 +37,10 @@ func TestScaleToSecondsSingleAllNonNull(t *testing.T) {
 	testScaleToSeconds(
 		"identity-largeseconds",
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "d",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("d", "d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "scaleToSeconds(d,9223372036854774784)",
-				Datapoints: out,
-			},
+			getQuerySeries("scaleToSeconds(d,9223372036854774784)", out),
 		},
 		t,
 		9223372036854774784,
@@ -85,28 +67,12 @@ func TestScaleToSecondsMulti(t *testing.T) {
 	testScaleToSeconds(
 		"multiple-series-subseconds",
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "b.*",
-				Target:     "b.*",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "c.foo{bar,baz}",
-				Target:     "c.foo{bar,baz}",
-				Datapoints: getCopy(c),
-			},
+			getSeries("b.*", "b.*", b),
+			getSeries("c.foo{bar,baz}", "c.foo{bar,baz}", c),
 		},
 		[]models.Series{
-			{
-				QueryPatt:  "scaleToSeconds(b.*,0)",
-				Datapoints: out1,
-			},
-			{
-				QueryPatt:  "scaleToSeconds(c.foo{bar,baz},0)",
-				Datapoints: out2,
-			},
+			getQuerySeries("scaleToSeconds(b.*,0)", out1),
+			getQuerySeries("scaleToSeconds(c.foo{bar,baz},0)", out2),
 		},
 		t,
 		0.001,
@@ -117,29 +83,29 @@ func testScaleToSeconds(name string, in []models.Series, out []models.Series, t 
 	f := NewScaleToSeconds()
 	f.(*FuncScaleToSeconds).in = NewMock(in)
 	f.(*FuncScaleToSeconds).seconds = seconds
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q (%f): err should be nil. got %q", name, seconds, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q (%f): isNonNull len output expected %d, got %d", name, seconds, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q (%f): expected target %q, got %q", name, seconds, exp.QueryPatt, g.QueryPatt)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%f) len output expected %d, got %d", name, seconds, len(exp.Datapoints), len(g.Datapoints))
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q (%f): output point %d - expected %v got %v", name, seconds, j, exp.Datapoints[j], p)
-		}
-	}
+	})
 }
 
 func BenchmarkScaleToSeconds10k_1NoNulls(b *testing.B) {

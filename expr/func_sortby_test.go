@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -16,18 +15,10 @@ func TestSortByAverage(t *testing.T) {
 		"average",
 		false,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("a", a),
 		},
 		t,
 	)
@@ -39,38 +30,14 @@ func TestSortByAverageReverse(t *testing.T) {
 		"average",
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("c", c),
+			getQuerySeries("b", b),
+			getQuerySeries("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
+			getQuerySeries("b", b),
+			getQuerySeries("a", a),
+			getQuerySeries("c", c),
 		},
 		t,
 	)
@@ -82,78 +49,22 @@ func TestSortByCurrent(t *testing.T) {
 		"current",
 		false,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("avg4a2b", avg4a2b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
+			getQuerySeries("sum4a2b", sum4a2b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
+			getQuerySeries("avg4a2b", avg4a2b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
+			getQuerySeries("b", b),
+			getQuerySeries("sum4a2b", sum4a2b),
 		},
 		t,
 	)
@@ -165,28 +76,12 @@ func TestSortByCurrentReverse(t *testing.T) {
 		"current",
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sumab",
-				Datapoints: getCopy(sumab),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("sumab", sumab),
+			getQuerySeries("b", b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sumab",
-				Datapoints: getCopy(sumab),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("sumab", sumab),
+			getQuerySeries("b", b),
 		},
 		t,
 	)
@@ -198,38 +93,14 @@ func TestSortByMax(t *testing.T) {
 		"max",
 		false,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getQuerySeries("avg4a2b", avg4a2b),
+			getQuerySeries("sum4a2b", sum4a2b),
+			getQuerySeries("b", b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
+			getQuerySeries("b", b),
+			getQuerySeries("avg4a2b", avg4a2b),
+			getQuerySeries("sum4a2b", sum4a2b),
 		},
 		t,
 	)
@@ -241,58 +112,18 @@ func TestSortByMaxReverseLong(t *testing.T) {
 		"current",
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "d",
-				Datapoints: getCopy(d),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sumabc",
-				Datapoints: getCopy(sumabc),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("c", c),
+			getQuerySeries("d", d),
+			getQuerySeries("sumabc", sumabc),
+			getQuerySeries("sum4a2b", sum4a2b),
+			getQuerySeries("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sumabc",
-				Datapoints: getCopy(sumabc),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "d",
-				Datapoints: getCopy(d),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
+			getQuerySeries("sum4a2b", sum4a2b),
+			getQuerySeries("sumabc", sumabc),
+			getQuerySeries("a", a),
+			getQuerySeries("d", d),
+			getQuerySeries("c", c),
 		},
 		t,
 	)
@@ -301,29 +132,32 @@ func TestSortByMaxReverseLong(t *testing.T) {
 func testSortBy(name string, fn string, reverse bool, in []models.Series, out []models.Series, t *testing.T) {
 	f := NewSortByConstructor(fn, reverse)()
 	f.(*FuncSortBy).in = NewMock(in)
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
-		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
+
+	/*
+		TODO - Is sorting modification?
+		t.Run("DidNotModifyInput", func(t *testing.T) {
+			if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
+		})
+	*/
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-	}
+	})
 }
 
 func BenchmarkSortBy10k_1NoNulls(b *testing.B) {

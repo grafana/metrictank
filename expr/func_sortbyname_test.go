@@ -98,7 +98,13 @@ func TestSortByName(t *testing.T) {
 			sort.natural = e.natural
 			sort.in = NewMock(in)
 
-			got, err := f.Exec(make(map[Req][]models.Series))
+			// Copy input to check that it is unchanged later
+			inputCopy := make([]models.Series, len(in))
+			copy(inputCopy, in)
+
+			dataMap := DataMap(make(map[Req][]models.Series))
+
+			got, err := f.Exec(dataMap)
 			if err != nil {
 				t.Fatalf("case %d (nat=%t, rev=%t): err should be nil. got %q", i, e.natural, e.reverse, err)
 			}
@@ -111,6 +117,21 @@ func TestSortByName(t *testing.T) {
 					t.Fatalf("case %d (nat=%t, rev=%t): Mismatch at pos %d. Expected target %q, got %q", i, e.natural, e.reverse, j, o, g.Target)
 				}
 			}
+
+			/*
+				TODO - Is sorting modification?
+				t.Run("DidNotModifyInput", func(t *testing.T) {
+					if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+						t.Fatalf("Input was modified, err = %s", err)
+					}
+				})
+			*/
+
+			t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+				if err := dataMap.CheckForOverlappingPoints(); err != nil {
+					t.Fatalf("Point slices in datamap overlap, err = %s", err)
+				}
+			})
 		}
 	}
 }
