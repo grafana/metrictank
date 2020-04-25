@@ -9,6 +9,26 @@ import (
 
 var results []models.Series
 
+func equalTags(exp, got []models.Series) error {
+	for i, g := range got {
+		o := exp[i]
+		if len(g.Tags) != len(o.Tags) {
+			return fmt.Errorf("series %d: len tags expected %d, got %d", i, len(o.Tags), len(g.Tags))
+		}
+		for k, v := range g.Tags {
+			expectedVal, ok := o.Tags[k]
+			if !ok {
+				return fmt.Errorf("series %d: got unknown tag key '%s'", i, k)
+			}
+
+			if v != expectedVal {
+				return fmt.Errorf("series %d: key '%s' had wrong value: expected '%s', got '%s'", i, k, expectedVal, v)
+			}
+		}
+	}
+	return nil
+}
+
 func equalOutput(exp, got []models.Series, expErr, gotErr error) error {
 	if expErr == nil && gotErr != nil {
 		return fmt.Errorf("err should be nil. got %q", gotErr)
@@ -60,6 +80,7 @@ func equalSeries(exp, got models.Series) error {
 		}
 		return fmt.Errorf("point %d - expected %v got %v", j, exp.Datapoints[j], p)
 	}
+	// TODO - compare Tags?
 	return nil
 }
 
