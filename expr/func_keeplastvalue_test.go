@@ -24,18 +24,10 @@ func TestKeepLastValueAll(t *testing.T) {
 		"keepAll",
 		math.MaxInt64,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "keepLastValue(a)",
-				Datapoints: out,
-			},
+			getQuerySeries("keepLastValue(a)", out),
 		},
 		t,
 	)
@@ -47,18 +39,10 @@ func TestKeepLastValueNone(t *testing.T) {
 		"keepNone",
 		0,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
+			getQuerySeries("sum4a2b", sum4a2b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "keepLastValue(sum4a2b)",
-				Datapoints: getCopy(sum4a2b),
-			},
+			getQuerySeries("keepLastValue(sum4a2b)", sum4a2b),
 		},
 		t,
 	)
@@ -78,28 +62,12 @@ func TestKeepLastValueOne(t *testing.T) {
 		"keepOne",
 		1,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("b", b),
+			getQuerySeries("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "keepLastValue(b)",
-				Datapoints: out,
-			},
-			{
-				Interval:   10,
-				Target:     "keepLastValue(a)",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("keepLastValue(b)", out),
+			getQuerySeries("keepLastValue(a)", a),
 		},
 		t,
 	)
@@ -109,29 +77,29 @@ func testKeepLastValue(name string, limit int64, in []models.Series, out []model
 	f := NewKeepLastValue()
 	f.(*FuncKeepLastValue).in = NewMock(in)
 	f.(*FuncKeepLastValue).limit = limit
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q (%d): err should be nil. got %q", name, limit, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q (%d): isNonNull len output expected %d, got %d", name, limit, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.Target != exp.Target {
-			t.Fatalf("case %q (%d): expected target %q, got %q", name, limit, exp.Target, g.Target)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%d) len output expected %d, got %d", name, limit, len(exp.Datapoints), len(g.Datapoints))
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q (%d): output point %d - expected %v got %v", name, limit, j, exp.Datapoints[j], p)
-		}
-	}
+	})
 }
 
 func BenchmarkKeepLastValue10k_1NoNulls(b *testing.B) {

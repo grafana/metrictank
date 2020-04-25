@@ -15,80 +15,48 @@ func TestNonNegativeDerivativeNoMax(t *testing.T) {
 		"no-max-value",
 		math.NaN(),
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", b),
+			getSeries("c", "abcd", c),
+			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+			getQuerySeries(
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 5.5, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 60}}),
+			getQuerySeries(
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: math.MaxFloat64, Ts: 20},
 					{Val: 0, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 60}}),
+			getQuerySeries(
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 1, Ts: 30},
 					{Val: 1, Ts: 40},
 					{Val: 1, Ts: 50},
-					{Val: 1, Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: 1, Ts: 60}}),
+			getQuerySeries(
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 33, Ts: 20},
 					{Val: 166, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: 51, Ts: 50},
-					{Val: 170, Ts: 60},
-				},
-			},
+					{Val: 170, Ts: 60}}),
 		},
 		t,
 	)
@@ -99,80 +67,40 @@ func TestNonNegativeDerivativeWithMax(t *testing.T) {
 		"with-max-value",
 		199,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", b),
+			getSeries("c", "abcd", c),
+			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: 0, Ts: 20},
-					{Val: 5.5, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: math.NaN(), Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: 0, Ts: 20},
-					{Val: 1, Ts: 30},
-					{Val: 1, Ts: 40},
-					{Val: 1, Ts: 50},
-					{Val: 1, Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: 33, Ts: 20},
-					{Val: 166, Ts: 30},
-					{Val: 30, Ts: 40},
-					{Val: 51, Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
+			getQuerySeries("nonNegativeDerivative(abcd)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: 0, Ts: 20},
+				{Val: 5.5, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
+			getQuerySeries("nonNegativeDerivative(abcd)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: math.NaN(), Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
+			getQuerySeries("nonNegativeDerivative(abcd)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: 0, Ts: 20},
+				{Val: 1, Ts: 30},
+				{Val: 1, Ts: 40},
+				{Val: 1, Ts: 50},
+				{Val: 1, Ts: 60}}),
+			getQuerySeries("nonNegativeDerivative(abcd)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: 33, Ts: 20},
+				{Val: 166, Ts: 30},
+				{Val: 30, Ts: 40},
+				{Val: 51, Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
 		},
 		t,
 	)

@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"sort"
 	"strconv"
 	"testing"
@@ -196,18 +195,15 @@ func testGroupByTags(name string, in []models.Series, out []models.Series, agg s
 	gby.aggregator = agg
 	gby.tags = tags
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != expectedErr {
-		if expectedErr == nil {
-			t.Fatalf("case %q: expected no error but got %q", name, err)
-		} else if err == nil || err.Error() != expectedErr.Error() {
-			t.Fatalf("case %q: expected error %q but got %q", name, expectedErr, err)
-		}
-	}
-	if len(got) != len(out) {
-		t.Fatalf("case %q: GroupByTags output expected to be %d but actually %d", name, len(out), len(got))
-	}
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
 
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+
+	// TODO - should order be consistent?
 	// Make sure got and out are in the same order
 	sort.Slice(got, func(i, j int) bool {
 		return got[i].Target < got[j].Target
@@ -215,36 +211,25 @@ func testGroupByTags(name string, in []models.Series, out []models.Series, agg s
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Target < out[j].Target
 	})
-	for i, g := range got {
-		o := out[i]
-		if g.Target != o.Target {
-			t.Fatalf("case %q: expected target %q, got %q", name, o.Target, g.Target)
-		}
-		if len(g.Datapoints) != len(o.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(o.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(o.Datapoints[j].Val)
-			if (bothNaN || p.Val == o.Datapoints[j].Val) && p.Ts == o.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, o.Datapoints[j], p)
-		}
-		if len(g.Tags) != len(o.Tags) {
-			t.Fatalf("case %q: len tags expected %d, got %d", name, len(o.Tags), len(g.Tags))
-		}
-		for k, v := range g.Tags {
-			expectedVal, ok := o.Tags[k]
 
-			if !ok {
-				t.Fatalf("case %q: Got unknown tag key '%s'", name, k)
-			}
-
-			if v != expectedVal {
-				t.Fatalf("case %q: Key '%s' had wrong value: expected '%s', got '%s'", name, k, expectedVal, v)
-			}
-		}
+	if err := equalOutput(out, got, expectedErr, err); err != nil {
+		t.Fatal(err)
 	}
+	if err := equalTags(out, got); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 // Benchmarks:

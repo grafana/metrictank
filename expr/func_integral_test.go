@@ -10,13 +10,6 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-func getNewIntegral(in []models.Series) *FuncIntegral {
-	f := NewIntegral()
-	ps := f.(*FuncIntegral)
-	ps.in = NewMock(in)
-	return ps
-}
-
 var aIntegral = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: 0, Ts: 20},
@@ -36,56 +29,61 @@ var cIntegral = []schema.Point{
 }
 
 func TestIntegralNoNulls(t *testing.T) {
-	f := getNewIntegral(
+	testIntegral(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
+			getSeries("c", "c", c),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "integral(c)",
-			Target:     "integral(c)",
-			Datapoints: cIntegral,
+		[]models.Series{
+			getSeries("integral(c)", "integral(c)", cIntegral),
 		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+		t)
 }
 
 func TestIntegralWithNulls(t *testing.T) {
-	f := getNewIntegral(
+	testIntegral(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
+			getSeries("a", "a", a),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "integral(a)",
-			Target:     "integral(a)",
-			Datapoints: aIntegral,
+		[]models.Series{
+			getSeries("integral(a)", "integral(a)", aIntegral),
 		},
-	}
+		t)
+}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+func getNewIntegral(in []models.Series) *FuncIntegral {
+	f := NewIntegral()
+	ps := f.(*FuncIntegral)
+	ps.in = NewMock(in)
+	return ps
+}
+
+func testIntegral(in []models.Series, out []models.Series, t *testing.T) {
+	f := getNewIntegral(in)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Input was modified, err = %s", err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Point slices in datamap overlap, err = %s", err)
+		}
+	})
 }
+
 func BenchmarkIntegral10k_1NoNulls(b *testing.B) {
 	benchmarkIntegral(b, 1, test.RandFloats10k, test.RandFloats10k)
 }

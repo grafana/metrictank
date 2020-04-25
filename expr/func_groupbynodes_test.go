@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"strconv"
 	"testing"
 
@@ -227,48 +226,32 @@ func testGroupByNodes(name string, in []models.Series, expected []models.Series,
 	f.(*FuncGroupByNodes).in = NewMock(in)
 	f.(*FuncGroupByNodes).aggregator = aggr
 	f.(*FuncGroupByNodes).nodes = nodes
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != expErr {
-		if expErr == nil {
-			t.Fatalf("case %q: expected no error but got %q", name, err)
-		} else if err == nil || err.Error() != expErr.Error() {
-			t.Fatalf("case %q: expected error %q but got %q", name, expErr, err)
-		}
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(expected, got, expErr, err); err != nil {
+		t.Fatal(err)
+	}
+	if err := equalTags(expected, got); err != nil {
+		t.Fatal(err)
 	}
 
-	if len(got) != len(expected) {
-		t.Fatalf("case %q: output length expected to be %d but got %d", name, len(expected), len(got))
-	}
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Input was modified, err = %s", err)
+		}
+	})
 
-	for i, g := range got {
-		o := expected[i]
-		if g.Target != o.Target {
-			t.Fatalf("case %q: expected target %q, but got %q", name, o.Target, g.Target)
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Point slices in datamap overlap, err = %s", err)
 		}
-		if len(g.Datapoints) != len(o.Datapoints) {
-			t.Fatalf("case %q: expected output length %d, but got %d", name, len(o.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(o.Datapoints[j].Val)
-			if (bothNaN || p.Val == o.Datapoints[j].Val) && p.Ts == o.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, o.Datapoints[j], p)
-		}
-		if len(g.Tags) != len(o.Tags) {
-			t.Fatalf("case %q: len tags expected %d, got %d", name, len(o.Tags), len(g.Tags))
-		}
-		for k, v := range g.Tags {
-			expectedVal, ok := o.Tags[k]
-			if !ok {
-				t.Fatalf("case %q: Got unknown tag key '%s'", name, k)
-			}
-
-			if v != expectedVal {
-				t.Fatalf("case %q: Key '%s' had wrong value: expected '%s', got '%s'", name, k, expectedVal, v)
-			}
-		}
-	}
+	})
 }
 
 func BenchmarkGroupByNodes1in1out(b *testing.B) {

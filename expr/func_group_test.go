@@ -9,6 +9,31 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
+func TestGroup(t *testing.T) {
+	testGroup("basic",
+		[][]models.Series{
+			{
+				getSeries("a", "a", a),
+			},
+			{
+				getSeries("b", "b", b),
+			},
+			{
+				getSeries("abc", "abc", a),
+				getSeries("abc", "abc", b),
+				getSeries("abc", "abc", c),
+			},
+		},
+		[]models.Series{
+			getSeries("a", "a", a),
+			getSeries("b", "b", b),
+			getSeries("abc", "abc", a),
+			getSeries("abc", "abc", b),
+			getSeries("abc", "abc", c),
+		},
+		t)
+}
+
 func getNewGroup(in [][]models.Series) *FuncGroup {
 	f := NewGroup()
 	s := f.(*FuncGroup)
@@ -18,84 +43,37 @@ func getNewGroup(in [][]models.Series) *FuncGroup {
 	return s
 }
 
-func TestGroup(t *testing.T) {
-	f := getNewGroup([][]models.Series{
-		{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-		},
-		{
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-		},
-		{
-			{
-				Interval:   10,
-				QueryPatt:  "abc",
-				Target:     "abc",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abc",
-				Target:     "abc",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abc",
-				Target:     "abc",
-				Datapoints: getCopy(c),
-			},
-		},
-	},
-	)
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "a",
-			Target:     "a",
-			Datapoints: getCopy(a),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "b",
-			Target:     "b",
-			Datapoints: getCopy(b),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "abc",
-			Target:     "abc",
-			Datapoints: getCopy(a),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "abc",
-			Target:     "abc",
-			Datapoints: getCopy(b),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "abc",
-			Target:     "abc",
-			Datapoints: getCopy(c),
-		},
+func testGroup(name string, in [][]models.Series, out []models.Series, t *testing.T) {
+	f := getNewGroup(in)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([][]models.Series, len(in))
+	for i := range in {
+		inputCopy[i] = make([]models.Series, len(in[i]))
+		copy(inputCopy[i], in[i])
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+	dataMap := DataMap(make(map[Req][]models.Series))
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Case %s: %s", name, err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		for i := range inputCopy {
+			if err := equalOutput(inputCopy[i], in[i], nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+			}
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
+
 func BenchmarkGroup10k_1NoNulls(b *testing.B) {
 	benchmarkGroup(b, 1, test.RandFloats10k, test.RandFloats10k)
 }

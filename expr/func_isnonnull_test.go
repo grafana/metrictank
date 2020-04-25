@@ -40,18 +40,10 @@ func TestIsNonNullSingle(t *testing.T) {
 	testIsNonNull(
 		"identity",
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getQuerySeries("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "isNonNull(a)",
-				Datapoints: getCopy(aIsNonNull),
-			},
+			getQuerySeries("isNonNull(a)", aIsNonNull),
 		},
 		t,
 	)
@@ -61,18 +53,10 @@ func TestIsNonNullSingleAllNonNull(t *testing.T) {
 	testIsNonNull(
 		"identity-counter8bit",
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "counter8bit",
-				Datapoints: getCopy(d),
-			},
+			getQuerySeries("counter8bit", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "isNonNull(counter8bit)",
-				Datapoints: getCopy(cdIsNonNull),
-			},
+			getQuerySeries("isNonNull(counter8bit)", cdIsNonNull),
 		},
 		t,
 	)
@@ -82,26 +66,10 @@ func TestIsNonNullMulti(t *testing.T) {
 	testIsNonNull(
 		"multiple-series",
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b.*",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "c.foo{bar,baz}",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "movingAverage(bar, '1min')",
-				Datapoints: getCopy(d),
-			},
+			getQuerySeries("a", a),
+			getQuerySeries("b.*", b),
+			getQuerySeries("c.foo{bar,baz}", c),
+			getQuerySeries("movingAverage(bar, '1min')", d),
 		},
 		[]models.Series{
 			{
@@ -128,28 +96,29 @@ func TestIsNonNullMulti(t *testing.T) {
 func testIsNonNull(name string, in []models.Series, out []models.Series, t *testing.T) {
 	f := NewIsNonNull()
 	f.(*FuncIsNonNull).in = NewMock(in)
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: isNonNull len output expected %d, got %d", name, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		for j, p := range g.Datapoints {
-			if (p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
-		}
-	}
+	})
 }
 
 func BenchmarkIsNonNull10k_1NoNulls(b *testing.B) {

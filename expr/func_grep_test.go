@@ -34,46 +34,60 @@ func TestGrep(t *testing.T) {
 			[]string{"series.cpu1.ok", "series.cpu.notok", "series.cpu3.ok"},
 		},
 	}
-	for i, c := range cases {
-		var in []models.Series
-		for _, name := range c.in {
-			in = append(in, models.Series{
-				Target: name,
-			})
-		}
-
-		{
-			f := NewGrep()
-			grep := f.(*FuncGrep)
-			grep.pattern = regexp.MustCompile(c.pattern)
-			grep.in = NewMock(in)
-			checkGrepOutput(t, f, i, c.matches)
-		}
-
-		{
-			f := NewExclude()
-			grep := f.(*FuncGrep)
-			grep.pattern = regexp.MustCompile(c.pattern)
-			grep.in = NewMock(in)
-			checkGrepOutput(t, f, i, c.nonmatches)
-		}
+	for _, c := range cases {
+		testGrep(c.pattern, false, c.in, c.matches, t)
+		testGrep(c.pattern, true, c.in, c.nonmatches, t)
 	}
 }
 
-func checkGrepOutput(t *testing.T, f GraphiteFunc, i int, expected []string) {
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %d: err should be nil. got %q", i, err)
+func makeGrepOrExclude(in []models.Series, pattern string, exclude bool) GraphiteFunc {
+	var f GraphiteFunc
+	if exclude {
+		f = NewExclude()
+	} else {
+		f = NewGrep()
 	}
-	if len(got) != len(expected) {
-		t.Fatalf("case %d: expected %d output series, got %d", i, len(expected), len(got))
+
+	grep := f.(*FuncGrep)
+	grep.pattern = regexp.MustCompile(pattern)
+	grep.in = NewMock(in)
+	return f
+}
+
+func testGrep(pattern string, exclude bool, inStr, outStr []string, t *testing.T) {
+	in := make([]models.Series, 0, len(inStr))
+	for _, s := range inStr {
+		in = append(in, getQuerySeries(s, a))
 	}
-	for i, o := range expected {
-		g := got[i]
-		if o != g.Target {
-			t.Fatalf("case %d: expected target %q, got %q", i, o, g.Target)
+
+	out := make([]models.Series, 0, len(outStr))
+	for _, s := range outStr {
+		out = append(out, getQuerySeries(s, a))
+	}
+	f := makeGrepOrExclude(in, pattern, exclude)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Input was modified, err = %s", err)
 		}
-	}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Point slices in datamap overlap, err = %s", err)
+		}
+	})
 }
 
 func BenchmarkGrep_1(b *testing.B) {
