@@ -45,11 +45,15 @@ func (s *FuncConsolidateBy) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 	consolidator := consolidation.FromConsolidateBy(s.by)
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.Target, s.by)
-		series[i].QueryPatt = fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.QueryPatt, s.by)
-		series[i].Consolidator = consolidator
-		series[i].QueryCons = consolidator
+
+	out := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		serie.Target = fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.Target, s.by)
+		serie.QueryPatt = fmt.Sprintf("consolidateBy(%s,\"%s\")", serie.QueryPatt, s.by)
+		serie.Consolidator = consolidator
+		serie.QueryCons = consolidator
+
+		out = append(out, serie)
 	}
-	return series, nil
+	return out, nil
 }

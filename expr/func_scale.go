@@ -34,15 +34,20 @@ func (s *FuncScale) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i, serie := range series {
+
+	output := make([]models.Series, 0, len(series))
+	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: v.Val * s.factor, Ts: v.Ts})
 		}
-		series[i].Target = fmt.Sprintf("scale(%s,%f)", serie.Target, s.factor)
-		series[i].QueryPatt = fmt.Sprintf("scale(%s,%f)", serie.QueryPatt, s.factor)
-		series[i].Datapoints = out
+
+		serie.Target = fmt.Sprintf("scale(%s,%g)", serie.Target, s.factor)
+		serie.QueryPatt = fmt.Sprintf("scale(%s,%g)", serie.QueryPatt, s.factor)
+		serie.Datapoints = out
+
+		output = append(output, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, output...)
+	return output, nil
 }

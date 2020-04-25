@@ -40,7 +40,8 @@ func (s *FuncPerSecond) Exec(dataMap DataMap) ([]models.Series, error) {
 	if s.maxValue > 0 {
 		maxValue = float64(s.maxValue)
 	}
-	var outputs []models.Series
+
+	outSeries := make([]models.Series, 0, len(series))
 	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 		for i, v := range serie.Datapoints {
@@ -58,18 +59,13 @@ func (s *FuncPerSecond) Exec(dataMap DataMap) ([]models.Series, error) {
 				out[i].Val = math.NaN()
 			}
 		}
-		s := models.Series{
-			Target:       fmt.Sprintf("perSecond(%s)", serie.Target),
-			QueryPatt:    fmt.Sprintf("perSecond(%s)", serie.QueryPatt),
-			Tags:         serie.Tags,
-			Datapoints:   out,
-			Interval:     serie.Interval,
-			Meta:         serie.Meta,
-			QueryMDP:     serie.QueryMDP,
-			QueryPNGroup: serie.QueryPNGroup,
-		}
-		outputs = append(outputs, s)
-		dataMap.Add(Req{}, s)
+		serie.Target = fmt.Sprintf("perSecond(%s)", serie.Target)
+		serie.QueryPatt = fmt.Sprintf("perSecond(%s)", serie.QueryPatt)
+		serie.Datapoints = out
+
+		outSeries = append(outSeries, serie)
 	}
-	return outputs, nil
+
+	dataMap.Add(Req{}, outSeries...)
+	return outSeries, nil
 }

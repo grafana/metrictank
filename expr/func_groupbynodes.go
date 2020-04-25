@@ -98,8 +98,9 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		outSeries.SetTags()
 		outSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
 		aggFunc(group.s, &outSeries.Datapoints)
-		dataMap.Add(Req{}, outSeries)
 		output = append(output, outSeries)
 	}
+
+	dataMap.Add(Req{}, output...)
 	return output, nil
 }

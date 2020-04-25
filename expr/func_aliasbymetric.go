@@ -29,7 +29,9 @@ func (s *FuncAliasByMetric) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i, serie := range series {
+
+	out := make([]models.Series, 0, len(series))
+	for _, serie := range series {
 		m := strings.SplitN(extractMetric(serie.Target), ";", 2)
 		mSlice := strings.Split(m[0], ".")
 		base := mSlice[len(mSlice)-1]
@@ -39,8 +41,10 @@ func (s *FuncAliasByMetric) Exec(dataMap DataMap) ([]models.Series, error) {
 			base = strings.Join([]string{base, m[1]}, ";")
 		}
 
-		series[i].Target = base
-		series[i].QueryPatt = base
+		serie.Target = base
+		serie.QueryPatt = base
+
+		out = append(out, serie)
 	}
-	return series, nil
+	return out, nil
 }

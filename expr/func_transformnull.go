@@ -39,23 +39,26 @@ func (s *FuncTransformNull) Exec(dataMap DataMap) ([]models.Series, error) {
 		custom = false
 	}
 
-	for i, serie := range series {
-		var target string
-		if custom {
-			target = fmt.Sprintf("transFormNull(%s,%f)", serie.Target, s.def)
-		} else {
-			target = fmt.Sprintf("transFormNull(%s)", serie.Target)
-		}
-		series[i].Target = target
-		series[i].QueryPatt = target
-		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
+	output := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		out := pointSlicePool.Get().([]schema.Point)
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = s.def
 			}
-			series[i].Datapoints = append(series[i].Datapoints, p)
+			out = append(out, p)
 		}
+
+		if custom {
+			serie.Target = fmt.Sprintf("transformNull(%s,%g)", serie.Target, s.def)
+		} else {
+			serie.Target = fmt.Sprintf("transformNull(%s)", serie.Target)
+		}
+		serie.QueryPatt = serie.Target
+		serie.Datapoints = out
+
+		output = append(output, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, output...)
+	return output, nil
 }

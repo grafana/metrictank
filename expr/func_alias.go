@@ -29,10 +29,14 @@ func (s *FuncAlias) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := range series {
-		series[i].Target = s.alias
-		series[i].QueryPatt = s.alias
-		series[i].Tags = series[i].CopyTagsWith("name", s.alias)
+
+	out := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		serie.Target = s.alias
+		serie.QueryPatt = s.alias
+		serie.Tags = serie.CopyTagsWith("name", s.alias)
+
+		out = append(out, serie)
 	}
-	return series, nil
+	return out, nil
 }

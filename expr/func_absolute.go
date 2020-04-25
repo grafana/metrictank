@@ -31,16 +31,19 @@ func (s *FuncAbsolute) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("absolute(%s)", serie.Target)
-		series[i].Tags = serie.CopyTagsWith("absolute", "1")
-		series[i].QueryPatt = fmt.Sprintf("absolute(%s)", serie.QueryPatt)
-		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
+	outSeries := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		serie.Target = fmt.Sprintf("absolute(%s)", serie.Target)
+		serie.Tags = serie.CopyTagsWith("absolute", "1")
+		serie.QueryPatt = fmt.Sprintf("absolute(%s)", serie.QueryPatt)
+		out := pointSlicePool.Get().([]schema.Point)
 		for _, p := range serie.Datapoints {
 			p.Val = math.Abs(p.Val)
-			series[i].Datapoints = append(series[i].Datapoints, p)
+			out = append(out, p)
 		}
+		serie.Datapoints = out
+		outSeries = append(outSeries, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, outSeries...)
+	return outSeries, nil
 }

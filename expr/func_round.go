@@ -38,26 +38,21 @@ func (s *FuncRound) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	outputs := make([]models.Series, len(series))
+	outputs := make([]models.Series, 0, len(series))
 	precisionMult := float64(math.Pow10(int(s.precision)))
-	for i, serie := range series {
+	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: roundToPrecision(v.Val, precisionMult, int(s.precision)), Ts: v.Ts})
 		}
 
-		s := models.Series{
-			Target:       fmt.Sprintf("round(%s,%d)", serie.Target, s.precision),
-			QueryPatt:    fmt.Sprintf("round(%s,%d)", serie.Target, s.precision),
-			Tags:         serie.CopyTagsWith("round", strconv.Itoa(int(s.precision))),
-			Datapoints:   out,
-			Interval:     serie.Interval,
-			Meta:         serie.Meta,
-			QueryMDP:     serie.QueryMDP,
-			QueryPNGroup: serie.QueryPNGroup,
-		}
-		outputs[i] = s
+		serie.Target = fmt.Sprintf("round(%s,%d)", serie.Target, s.precision)
+		serie.QueryPatt = fmt.Sprintf("round(%s,%d)", serie.QueryPatt, s.precision)
+		serie.Tags = serie.CopyTagsWith("round", strconv.Itoa(int(s.precision)))
+		serie.Datapoints = out
+
+		outputs = append(outputs, serie)
 	}
 	dataMap.Add(Req{}, outputs...)
 	return outputs, nil
