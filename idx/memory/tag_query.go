@@ -70,14 +70,19 @@ func (q *TagQueryContext) useMetaTagIndex() bool {
 
 func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 	costs := make([]expressionCost, len(q.query.Expressions))
-	useMetaTagIndex := q.useMetaTagIndex()
+
+	var metaTagWg sync.WaitGroup
+	if q.useMetaTagIndex() {
+		metaTagWg.Add(1)
+		go func() {
+			defer metaTagWg.Done()
+			q.metaTagIndex.updateExpressionCosts(costs, q.query.Expressions)
+		}()
+	}
 
 	for i, expr := range q.query.Expressions {
 		costs[i].expressionIdx = i
 		costs[i].operatorCost = expr.GetOperatorCost()
-		if useMetaTagIndex {
-			costs[i].metaTag = q.metaTagIndex.hasMatchesByExpression(expr)
-		}
 
 		if expr.OperatesOnTag() {
 			if expr.MatchesExactly() {
@@ -93,6 +98,9 @@ func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 			}
 		}
 	}
+
+	// wait for meta tag index to update expression costs
+	metaTagWg.Wait()
 
 	sort.Slice(costs, func(i, j int) bool {
 		// if one of the two is a meta tag, but the other isn't, then we always

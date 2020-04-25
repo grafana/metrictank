@@ -869,58 +869,48 @@ func (m *metaTagHierarchy) insertRecord(tags tagquery.Tags, id recordId) {
 	}
 }
 
-func (m *metaTagHierarchy) hasMatchesByExpression(expr tagquery.Expression) bool {
+func (m *metaTagHierarchy) updateExpressionCosts(costs []expressionCost, exprs tagquery.Expressions) {
+	if len(costs) != len(exprs) {
+		log.Warnf("metaTagHierarchy.UpdateExpressionCosts: Invalid pair of expression costs and expressions")
+		return
+	}
+
+	m.RLock()
+	defer m.RUnlock()
+
+	for i := range costs {
+		costs[i].metaTag = m.hasMatchesForExpression(exprs[i])
+	}
+}
+
+func (m *metaTagHierarchy) hasMatchesForExpression(expr tagquery.Expression) bool {
+	var res bool
+
 	if expr.OperatesOnTag() {
 		if expr.MatchesExactly() {
-			return m.hasKey(expr.GetKey())
+			_, res = m.tags[expr.GetKey()]
+		} else {
+			for key := range m.tags {
+				if expr.ResultIsSmallerWhenInverted() == !expr.Matches(key) {
+					res = true
+					break
+				}
+			}
 		}
-		return m.hasKeyMatches(expr.Matches)
 	} else {
 		if expr.MatchesExactly() {
-			return m.hasKeyValue(expr.GetKey(), expr.GetValue())
-		}
-		return m.hasKeyValueMatches(expr.GetKey(), expr.Matches)
-	}
-}
-
-func (m *metaTagHierarchy) hasKey(key string) bool {
-	m.RLock()
-	_, ok := m.tags[key]
-	m.RUnlock()
-	return ok
-}
-
-func (m *metaTagHierarchy) hasKeyValue(key, value string) bool {
-	m.RLock()
-	_, ok := m.tags[key][value]
-	m.RUnlock()
-	return ok
-}
-
-func (m *metaTagHierarchy) hasKeyMatches(matcher func(string) bool) bool {
-	m.RLock()
-	defer m.RUnlock()
-
-	for key := range m.tags {
-		if matcher(key) {
-			return true
+			_, res = m.tags[expr.GetKey()][expr.GetValue()]
+		} else {
+			for value := range m.tags[expr.GetKey()] {
+				if expr.ResultIsSmallerWhenInverted() == !expr.Matches(value) {
+					res = true
+					break
+				}
+			}
 		}
 	}
 
-	return false
-}
-
-func (m *metaTagHierarchy) hasKeyValueMatches(key string, matcher func(string) bool) bool {
-	m.RLock()
-	defer m.RUnlock()
-
-	for value := range m.tags[key] {
-		if matcher(value) {
-			return true
-		}
-	}
-
-	return false
+	return res
 }
 
 // getMetaRecordIdsByExpression takes an expression and a bool, it returns all meta record

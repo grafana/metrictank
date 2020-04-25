@@ -601,12 +601,12 @@ func testGetByTag(t *testing.T) {
 // resulting order is as expected.
 func TestExpressionSortingByCost(t *testing.T) {
 	query, err := tagquery.NewQueryFromStrings([]string{
-		"a=~b", // meta tag             expected to be 6.
-		"c!=d", // metric tag           expected to be 2.
-		"e!=f", // meta tag             expected to be 5.
-		"g=h",  // metric tag           expected to be 1.
-		"i=~j", // metric tag           expected to be 3.
-		"k=l",  // metric and meta tag  expected to be 4.
+		"a=~b", // meta tag
+		"c!=d", // metric tag
+		"e!=f", // meta tag
+		"g=h",  // metric tag
+		"i=~j", // metric tag
+		"k=l",  // metric and meta tag
 	}, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query: %s", err)
@@ -639,7 +639,16 @@ func TestExpressionSortingByCost(t *testing.T) {
 	expectedIdxPositions := []int{3, 1, 4, 5, 2, 0}
 	for i, expectedIdxPosition := range expectedIdxPositions {
 		if costs[i].expressionIdx != expectedIdxPosition {
-			t.Fatalf("Order of expressions is not as expected\nExpected:\n%+v\nGot:\n%+v\n", expectedIdxPositions, costs[i].expressionIdx)
+			t.Fatalf("Order of expressions is not as expected with Meta Tag Support\nExpected:\n%+v\nGot:\n%+v\n", expectedIdxPositions[i], costs[i].expressionIdx)
+		}
+	}
+
+	MetaTagSupport = false
+	costs = queryCtx.evaluateExpressionCosts()
+	expectedIdxPositions = []int{3, 5, 2, 1, 0, 4}
+	for i, expectedIdxPosition := range expectedIdxPositions {
+		if costs[i].expressionIdx != expectedIdxPosition {
+			t.Fatalf("Order of expressions is not as expected without Meta Tag Support\nExpected:\n%+v\nGot:\n%+v\n", expectedIdxPositions[i], costs[i].expressionIdx)
 		}
 	}
 }
