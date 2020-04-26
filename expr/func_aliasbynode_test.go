@@ -47,7 +47,7 @@ func makeAliasByNode(in []models.Series, nodes []expr) GraphiteFunc {
 }
 
 func testAliasByNode(name string, in []models.Series, out []models.Series, t *testing.T) {
-	f := makeAliasByNode(in, []expr{expr{etype: etInt, int: 0}})
+	f := makeAliasByNode(in, []expr{{etype: etInt, int: 0}})
 
 	// Copy input to check that it is unchanged later
 	inputCopy := make([]models.Series, len(in))
@@ -99,7 +99,7 @@ func benchmarkAliasByNode(b *testing.B, numSeries int) {
 	for i := 0; i < b.N; i++ {
 		f := NewAliasByNode()
 		aliasbynode := f.(*FuncAliasByNode)
-		aliasbynode.nodes = []expr{expr{etype: etInt, int: 0}}
+		aliasbynode.nodes = []expr{{etype: etInt, int: 0}}
 		aliasbynode.in = NewMock(input)
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
