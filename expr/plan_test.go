@@ -625,7 +625,7 @@ func TestConsolidateBy(t *testing.T) {
 			},
 			nil,
 			[]models.Series{
-				{QueryPatt: `scale(consolidateBy(a,"sum"),1.000000)`, Consolidator: consolidation.Sum},
+				{QueryPatt: `scale(consolidateBy(a,"sum"),1)`, Consolidator: consolidation.Sum},
 			},
 		},
 		{
@@ -647,7 +647,7 @@ func TestConsolidateBy(t *testing.T) {
 			},
 			nil,
 			[]models.Series{
-				{QueryPatt: `consolidateBy(scale(a,1.000000),"sum")`, Consolidator: consolidation.Sum},
+				{QueryPatt: `consolidateBy(scale(a,1),"sum")`, Consolidator: consolidation.Sum},
 			},
 		},
 		{

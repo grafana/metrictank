@@ -72,22 +72,10 @@ func TestIsNonNullMulti(t *testing.T) {
 			getQuerySeries("movingAverage(bar, '1min')", d),
 		},
 		[]models.Series{
-			{
-				QueryPatt:  "isNonNull(a)",
-				Datapoints: getCopy(aIsNonNull),
-			},
-			{
-				QueryPatt:  "isNonNull(b.*)",
-				Datapoints: getCopy(bIsNonNull),
-			},
-			{
-				QueryPatt:  "isNonNull(c.foo{bar,baz})",
-				Datapoints: getCopy(cdIsNonNull),
-			},
-			{
-				QueryPatt:  "isNonNull(movingAverage(bar, '1min'))",
-				Datapoints: getCopy(cdIsNonNull),
-			},
+			getQuerySeries("isNonNull(a)", aIsNonNull),
+			getQuerySeries("isNonNull(b.*)", bIsNonNull),
+			getQuerySeries("isNonNull(c.foo{bar,baz})", cdIsNonNull),
+			getQuerySeries("isNonNull(movingAverage(bar, '1min'))", cdIsNonNull),
 		},
 		t,
 	)

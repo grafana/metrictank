@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -61,6 +62,8 @@ func (s *FuncPerSecond) Exec(dataMap DataMap) ([]models.Series, error) {
 		}
 		serie.Target = fmt.Sprintf("perSecond(%s)", serie.Target)
 		serie.QueryPatt = fmt.Sprintf("perSecond(%s)", serie.QueryPatt)
+		serie.Consolidator = consolidation.None
+		serie.QueryCons = consolidation.None
 		serie.Datapoints = out
 
 		outSeries = append(outSeries, serie)
