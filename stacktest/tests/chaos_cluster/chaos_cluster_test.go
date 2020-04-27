@@ -112,6 +112,8 @@ func TestClusterStartup(t *testing.T) {
 		{Str: "metrictank4_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "grafana.*HTTP Server Listen.*3000"},
+		{Str: "zookeeper entered RUNNING state"},
+		{Str: "kafka entered RUNNING state"},
 	}
 	select {
 	case <-tracker.Match(matchers, true):

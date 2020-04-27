@@ -138,27 +138,53 @@ type Matcher struct {
 	match  bool
 }
 
-type MatcherCtx struct {
+// MatcherSet encapsulates a set of matchers
+// when all of them match, `done` will be closed.
+type MatcherSet struct {
 	matchers []Matcher
+	verbose  bool
 	done     chan struct{}
 }
 
-// returns true when all matchers matched
-func (m *MatcherCtx) Match(str string, stderr bool) bool {
+func NewMatcherSet(matchers []Matcher, verbose bool) MatcherSet {
+	for i, m := range matchers {
+		matchers[i].r = regexp.MustCompile(m.Str)
+	}
+	return MatcherSet{
+		matchers: matchers,
+		verbose:  verbose,
+		done:     make(chan struct{}),
+	}
+}
+
+// Match returns whether all matchers either:
+// * currently match the string and stream type (stdout/stderr)
+// * have matched previously
+// and closes the `done` channel if so.
+func (m *MatcherSet) Match(str string, stderr bool) bool {
 	allMatch := true
 	for i, matcher := range m.matchers {
+
+		// check whether the string's stream (stdout/stderr) even applies to the matcher
+		// if not, skip the matching, but honor previous outcome, if any.
 		if matcher.Stderr != stderr {
-			// if matcher is for stderr but str is stdout (or vice versa), don't try to match
 			if !matcher.match {
 				allMatch = false
 			}
-		} else if matcher.match {
-			// matcher is for same fd but already matched previously
-		} else if matcher.r.MatchString(str) {
-			// matcher is for same fd (good), so try to match
+			continue
+		}
+
+		// if already matched previously, nothing left to do
+		if matcher.match {
+			continue
+		}
+
+		if matcher.r.MatchString(str) {
+			if m.verbose {
+				fmt.Println("Matcher matched:", matcher.Str)
+			}
 			m.matchers[i].match = true
 		} else {
-			// no match
 			allMatch = false
 		}
 	}
@@ -168,17 +194,11 @@ func (m *MatcherCtx) Match(str string, stderr bool) bool {
 	return allMatch
 }
 
-// Match returns a channel that will be closed when all matchers have matched
-func (t *Tracker) Match(matchers []Matcher) chan struct{} {
-	for i, m := range matchers {
-		matchers[i].r = regexp.MustCompile(m.Str)
-	}
-	c := MatcherCtx{
-		matchers: matchers,
-		done:     make(chan struct{}),
-	}
-	t.newMatcherCtx <- c
-	return c.done
+// Match creates a MatcherSet, registers it and returns a channel that will be closed when all matchers have matched
+func (t *Tracker) Match(matchers []Matcher, verbose bool) chan struct{} {
+	m := NewMatcherSet(matchers, verbose)
+	t.newMatcherSet <- m
+	return m.done
 }
 
 func (t *Tracker) LogStdout(b bool) {
