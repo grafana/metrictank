@@ -114,7 +114,7 @@ func TestClusterStartup(t *testing.T) {
 		{Str: "grafana.*HTTP Server Listen.*3000"},
 	}
 	select {
-	case <-tracker.Match(matchers):
+	case <-tracker.Match(matchers, true):
 		log.Println("stack now running.")
 		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
 	case <-time.After(time.Second * 80):

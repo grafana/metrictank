@@ -17,7 +17,7 @@ type Tracker struct {
 	stdoutChan    chan string
 	stderrChan    chan string
 	errChan       chan error
-	newMatcherCtx chan MatcherCtx
+	newMatcherSet chan MatcherSet
 	logStdout     chan bool
 	logStderr     chan bool
 	prefixStdout  string
@@ -40,7 +40,7 @@ func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixSt
 		make(chan string),
 		make(chan string),
 		make(chan error),
-		make(chan MatcherCtx),
+		make(chan MatcherSet),
 		make(chan bool),
 		make(chan bool),
 		prefixStdout,
@@ -60,6 +60,8 @@ func NewTracker(cmd *exec.Cmd, logStdout, logStderr bool, prefixStdout, prefixSt
 	return t, nil
 }
 
+// track sends every line read from `in` to the channel `out`.
+// if an error is encountered, it goes to `errChan` and `out` is closed.
 func (t *Tracker) track(in io.ReadCloser, out chan string) {
 	scanner := bufio.NewScanner(in)
 	for scanner.Scan() {
@@ -76,15 +78,18 @@ func (t *Tracker) track(in io.ReadCloser, out chan string) {
 func (t *Tracker) manage(logStdout, logStderr bool) {
 	var doneStdout bool
 	var doneStderr bool
-	var matcherCtx []MatcherCtx
+
+	// all matcherSets that are not wholely matched yet
+	var matcherSet []MatcherSet
+
 	for {
 		select {
 		case t := <-t.logStdout:
 			logStdout = t
 		case t := <-t.logStderr:
 			logStderr = t
-		case m := <-t.newMatcherCtx:
-			matcherCtx = append(matcherCtx, m)
+		case m := <-t.newMatcherSet:
+			matcherSet = append(matcherSet, m)
 		case str, ok := <-t.stdoutChan:
 			if !ok {
 				doneStdout = true
@@ -93,13 +98,13 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			if logStdout {
 				fmt.Println(t.prefixStdout, str)
 			}
-			var tmp []MatcherCtx
-			for _, m := range matcherCtx {
+			var tmp []MatcherSet
+			for _, m := range matcherSet {
 				if !m.Match(str, false) {
 					tmp = append(tmp, m)
 				}
 			}
-			matcherCtx = tmp
+			matcherSet = tmp
 		case str, ok := <-t.stderrChan:
 			if !ok {
 				doneStderr = true
@@ -108,13 +113,13 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 			if logStderr {
 				fmt.Println(t.prefixStderr, str)
 			}
-			var tmp []MatcherCtx
-			for _, m := range matcherCtx {
+			var tmp []MatcherSet
+			for _, m := range matcherSet {
 				if !m.Match(str, true) {
 					tmp = append(tmp, m)
 				}
 			}
-			matcherCtx = tmp
+			matcherSet = tmp
 		case err := <-t.errChan:
 			panic(err)
 		}
@@ -125,6 +130,7 @@ func (t *Tracker) manage(logStdout, logStderr bool) {
 	}
 }
 
+// Matcher describes the matching of a given string on a certain stream (stdout or stderr)
 type Matcher struct {
 	Str    string
 	Stderr bool
