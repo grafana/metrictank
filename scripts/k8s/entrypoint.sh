@@ -56,9 +56,13 @@ if [ ! -z "$LABEL_SELECTOR" ]; then
 
 	_PODS=$(curl -s $CA -H "$AUTH" $PROTO://${HOST}:${PORT}/api/v1/namespaces/${POD_NAMESPACE}/pods?labelSelector=$LABEL_SELECTOR|jq .items[].status.podIP|sed -e "s/\"//g")
 	LIST=
+
 	for server in $_PODS; do
-	 LIST="${LIST}$server,"
+		if [ "$server" != "null" ] ; then
+			LIST="${LIST}$server,"
+		fi
 	done
+
 	export MT_CLUSTER_PEERS=$(echo $LIST | sed 's/,$//')
 fi
 

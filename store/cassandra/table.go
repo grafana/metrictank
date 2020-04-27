@@ -5,7 +5,7 @@ import (
 	"math"
 )
 
-const QueryFmtRead = "SELECT ts, data FROM %s WHERE key IN ? AND ts < ?"
+const QueryFmtRead = "SELECT ts, data FROM %s WHERE key IN ? AND ts >= ? AND ts < ?"
 const QueryFmtWrite = "INSERT INTO %s (key, ts, data) values(?,?,?) USING TTL ?"
 const Table_name_format = `metric_%d`
 

@@ -2,6 +2,10 @@
 
 We host a public community call on the last Wednesday of every month at 16:00 (UTC). You can view the schedule of upcoming calls on the [community calendar][calendar], as well as other Metrictank related events.
 
+***NOTE***
+
+These calls are recorded. If you do not wish to be recorded, you are free to disable your audio and/or video feed, or to join under a pseudonym. We will publish and link the recordings from this document so you can consume them anonymously if you prefer.
+
 ## General Information
 
 Agenda: The agenda can be found in the [community calendar][calendar] entry for each month

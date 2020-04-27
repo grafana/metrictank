@@ -116,6 +116,8 @@ func (a SeriesMeta) CopyWithChange(fn func(in SeriesMetaProperties) SeriesMetaPr
 	return out
 }
 
+// SetTags fills in the Tags property with tags parsed out of s.Target
+// the "name" tag is always set from s.Target, overriding any attempted override
 func (s *Series) SetTags() {
 	numTags := strings.Count(s.Target, ";")
 
@@ -338,11 +340,11 @@ func (meta SeriesMeta) MarshalJSONFast(b []byte) ([]byte, error) {
 		b = strconv.AppendUint(b, uint64(exp.ArchInterval), 10)
 		b = append(b, `,"aggnum-norm":`...)
 		b = strconv.AppendUint(b, uint64(exp.AggNumNorm), 10)
-		b = append(b, `,"consolidate-normfetch":"`...)
+		b = append(b, `,"consolidator-normfetch":"`...)
 		b = append(b, exp.ConsolidatorNormFetch.String()...)
 		b = append(b, `","aggnum-rc":`...)
 		b = strconv.AppendUint(b, uint64(exp.AggNumRC), 10)
-		b = append(b, `,"consolidate-rc":"`...)
+		b = append(b, `,"consolidator-rc":"`...)
 		b = append(b, exp.ConsolidatorRC.String()...)
 		b = append(b, `","count":`...)
 		b = strconv.AppendUint(b, uint64(exp.Count), 10)

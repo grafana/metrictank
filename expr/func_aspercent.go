@@ -180,6 +180,9 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMa
 // * multiple series -> must match len(series), sort and match up in pairs to input series
 // * nil             -> generate total by summing the inputs
 func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap DataMap) ([]models.Series, error) {
+	if len(in) == 0 {
+		return in, nil
+	}
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {

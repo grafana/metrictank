@@ -9,7 +9,7 @@ services:
      - "2003:2003"
     volumes:
       - ../../build/metrictank:/usr/bin/metrictank
-      - ../../scripts/config/metrictank-docker.ini:/etc/metrictank/metrictank.ini
+      - ../../scripts/config/metrictank-docker-dev.ini:/etc/metrictank/metrictank.ini
       - ../../scripts/config/index-rules.conf:/etc/metrictank/index-rules.conf
       - ../../scripts/config/storage-aggregation.conf:/etc/metrictank/storage-aggregation.conf
       - ../../scripts/config/storage-schemas.conf:/etc/metrictank/storage-schemas.conf
@@ -23,6 +23,7 @@ services:
       MT_MEMORY_IDX_TAG_SUPPORT: "true"
     links:
      - cassandra
+     - jaeger
 
   cassandra:
     hostname: cassandra
@@ -51,8 +52,11 @@ services:
       - "3000:3000"
     volumes:
       - ./grafana-datasources:/etc/grafana/provisioning/datasources
+      - ./grafana.ini:/etc/grafana/grafana.ini
       - ../cfg/grafana-dashboards-main-extra-dockprom:/etc/grafana/provisioning/dashboards
       - ../../dashboards:/var/lib/grafana/dashboards
+    links:
+     - jaeger
 
   statsdaemon:
     hostname: statsdaemon

@@ -16,6 +16,15 @@ var a = []schema.Point{
 	{Val: 1234567890, Ts: 60},
 }
 
+var avgZeroa = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 5.5, Ts: 30},
+	{Val: 0, Ts: 40},
+	{Val: 0, Ts: 50},
+	{Val: 1234567890, Ts: 60},
+}
+
 var b = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64, Ts: 20},
@@ -60,6 +69,15 @@ var d = []schema.Point{
 	{Val: 29, Ts: 40}, // overflowed
 	{Val: 80, Ts: 50},
 	{Val: 250, Ts: 60},
+}
+
+var allZeros = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 0, Ts: 30},
+	{Val: 0, Ts: 40},
+	{Val: 0, Ts: 50},
+	{Val: 0, Ts: 60},
 }
 
 var allNulls = []schema.Point{
@@ -107,6 +125,15 @@ var avgab = []schema.Point{
 	{Val: 1234567890, Ts: 60},
 }
 
+var avgZeroab = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64 / 2, Ts: 20},
+	{Val: (math.MaxFloat64 - 14.5) / 2, Ts: 30},
+	{Val: 0, Ts: 40},
+	{Val: 617283945, Ts: 50},
+	{Val: 617283945, Ts: 60},
+}
+
 var avgabc = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: math.MaxFloat64 / 3, Ts: 20},
@@ -114,6 +141,15 @@ var avgabc = []schema.Point{
 	{Val: 2, Ts: 40},
 	{Val: float64(1234567893) / 2, Ts: 50},
 	{Val: float64(1234567894) / 2, Ts: 60},
+}
+
+var avgZeroabc = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: math.MaxFloat64 / 3, Ts: 20},
+	{Val: (math.MaxFloat64 - 13.5) / 3, Ts: 30},
+	{Val: float64(2) / 3, Ts: 40},
+	{Val: float64(1234567893) / 3, Ts: 50},
+	{Val: float64(1234567894) / 3, Ts: 60},
 }
 
 var maxab = []schema.Point{
@@ -240,6 +276,33 @@ var rangeabc = []schema.Point{
 	{Val: 0, Ts: 40},
 	{Val: 1234567887, Ts: 50},
 	{Val: 1234567886, Ts: 60},
+}
+
+var counta = []schema.Point{
+	{Val: 1, Ts: 10},
+	{Val: 1, Ts: 20},
+	{Val: 1, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: 1, Ts: 60},
+}
+
+var countab = []schema.Point{
+	{Val: 2, Ts: 10},
+	{Val: 2, Ts: 20},
+	{Val: 2, Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: 1, Ts: 50},
+	{Val: 1, Ts: 60},
+}
+
+var countabc = []schema.Point{
+	{Val: 3, Ts: 10},
+	{Val: 3, Ts: 20},
+	{Val: 3, Ts: 30},
+	{Val: 1, Ts: 40},
+	{Val: 2, Ts: 50},
+	{Val: 2, Ts: 60},
 }
 
 // make sure we test with the correct data, don't mask if processing accidentally modifies our input data

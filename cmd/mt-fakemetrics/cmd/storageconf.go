@@ -36,10 +36,7 @@ var storageconfCmd = &cobra.Command{
 		}
 		period = int(periodDur.Seconds())
 		flush = int(flushDur.Nanoseconds() / 1000 / 1000)
-		outs := getOutputs()
-		if len(outs) == 0 {
-			log.Fatal("need to define an output")
-		}
+		out := getOutput()
 		to := time.Now().Unix()
 		from := to - 24*60*60
 
@@ -62,7 +59,7 @@ var storageconfCmd = &cobra.Command{
 				metrics = append(metrics, buildMetric(name, set, 1))
 			}
 		}
-		do(metrics, from, to, outs)
+		do(metrics, from, to, out)
 	},
 }
 
@@ -83,7 +80,7 @@ func buildMetric(name string, set, org int) *schema.MetricData {
 	out.SetId()
 	return out
 }
-func do(metrics []*schema.MetricData, from, to int64, outs []out.Out) {
+func do(metrics []*schema.MetricData, from, to int64, out out.Out) {
 	for ts := from; ts < to; ts++ {
 		if ts%3600 == 0 {
 			fmt.Println("doing ts", ts)
@@ -92,11 +89,9 @@ func do(metrics []*schema.MetricData, from, to int64, outs []out.Out) {
 			metrics[i].Time = int64(ts)
 			metrics[i].Value = float64(ts % 10)
 		}
-		for _, out := range outs {
-			err := out.Flush(metrics)
-			if err != nil {
-				log.Error(err.Error())
-			}
+		err := out.Flush(metrics)
+		if err != nil {
+			log.Error(err.Error())
 		}
 	}
 }

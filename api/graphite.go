@@ -208,7 +208,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	exprs, err := expr.ParseMany(request.Targets)
 	if err != nil {
 		// note: any parsing error is always due to bad request
-		if !request.NoProxy {
+		if !request.NoProxy && proxyBadRequests {
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
 			return
@@ -241,12 +241,22 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	if err != nil {
 		fun, isUnknownFunction := err.(expr.ErrUnknownFunction)
 		err := response.WrapError(err)
-		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy {
+		if isUnknownFunction {
+			if request.NoProxy {
+				// note this should never happen:
+				// When graphite issues a request (and sets the request.NoProxy flag),
+				// it should be for raw data only without any function processing.
+				ctx.Error(err.HTTPStatusCode(), err.Error())
+				return
+			}
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
-			if isUnknownFunction {
-				proxyStats.Miss(string(fun))
-			}
+			proxyStats.Miss(string(fun))
+			return
+		}
+		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
+			log.Infof("Proxying to Graphite because of error: %s", err.Error())
+			s.proxyToGraphite(ctx)
 			return
 		}
 		ctx.Error(err.HTTPStatusCode(), err.Error())
@@ -258,7 +268,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, plan)
 	if err != nil {
 		err := response.WrapError(err)
-		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy {
+		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
 			log.Infof("Proxying to Graphite because of error: %s", err.Error())
 			s.proxyToGraphite(ctx)
 			return
@@ -681,11 +691,23 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
+	// Map identical series expressions to reduce round trips. For the purpose of resolving series
+	// queries/patterns to matching series, uniqueness is determined by only Query, From, and To.
+	resolveSeriesRequests := make(map[expr.Req][]expr.Req)
+	for i, r := range plan.Reqs {
+		strippedreq := expr.Req{
+			Query: r.Query,
+			From:  r.From,
+			To:    r.To,
+		}
+		resolveSeriesRequests[strippedreq] = append(resolveSeriesRequests[strippedreq], plan.Reqs[i])
+	}
+
 	// note that different patterns to query can have different from / to, so they require different index lookups
 	// e.g. target=movingAvg(foo.*, "1h")&target=foo.*
 	// note that in this case we fetch foo.* twice. can be optimized later
 	pre := time.Now()
-	for _, r := range plan.Reqs {
+	for r, rawReqs := range resolveSeriesRequests {
 		select {
 		case <-ctx.Done():
 			//request canceled
@@ -711,27 +733,29 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 		for _, s := range series {
 			for _, metric := range s.Series {
 				for _, archive := range metric.Defs {
-					var cons consolidation.Consolidator
-					consReq := r.Cons
-					if consReq == 0 {
-						// we will use the primary method dictated by the storage-aggregations rules
-						// note:
-						// * we can't just let the expr library take care of normalization, as we may have to fetch targets
-						//   from cluster peers; it's more efficient to have them normalize the data at the source.
-						// * a pattern may expand to multiple series, each of which can have their own aggregation method.
-						fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-						cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
-					} else {
-						// user specified a runtime consolidation function via consolidateBy()
-						// get the consolidation method of the most appropriate rollup based on the consolidation method
-						// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
-						// use 'avg'.
-						cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
-					}
+					for _, rawReq := range rawReqs {
+						var cons consolidation.Consolidator
+						consReq := rawReq.Cons
+						if consReq == 0 {
+							// we will use the primary method dictated by the storage-aggregations rules
+							// note:
+							// * we can't just let the expr library take care of normalization, as we may have to fetch targets
+							//   from cluster peers; it's more efficient to have them normalize the data at the source.
+							// * a pattern may expand to multiple series, each of which can have their own aggregation method.
+							fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
+							cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+						} else {
+							// user specified a runtime consolidation function via consolidateBy()
+							// get the consolidation method of the most appropriate rollup based on the consolidation method
+							// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
+							// use 'avg'.
+							cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
+						}
 
-					newReq := r.ToModel()
-					newReq.Init(archive, cons, s.Node)
-					reqs.Add(newReq)
+						newReq := rawReq.ToModel()
+						newReq.Init(archive, cons, s.Node)
+						reqs.Add(newReq)
+					}
 				}
 
 				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
@@ -750,6 +774,9 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) 
 	}
 
 	reqRenderSeriesCount.ValueUint32(reqs.cnt)
+	if reqs.cnt == 0 {
+		return nil, meta, nil
+	}
 
 	meta.RenderStats.SeriesFetch = reqs.cnt
 

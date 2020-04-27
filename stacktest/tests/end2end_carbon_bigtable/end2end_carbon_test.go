@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 	// TODO: should probably use -V flag here.
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
-	cmd = exec.Command("docker-compose", "up", "--force-recreate")
+	cmd = exec.Command("docker-compose", "up", "--force-recreate", "metrictank", "graphite", "statsdaemon", "bigtable", "grafana")
 	cmd.Dir = test.Path("docker/docker-dev-bigtable")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
@@ -105,7 +105,8 @@ func TestStartup(t *testing.T) {
 	case <-tracker.Match(matchers):
 		log.Println("stack now running.")
 		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
-	case <-time.After(time.Second * 180):
+	case <-time.After(time.Second * 300):
+		// we can probably reduce this time on CircleCI by stripping out some non-essential containers
 		grafana.PostAnnotation("TestStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
 	}

@@ -68,10 +68,12 @@ var (
 	customTags          []string
 	numUniqueCustomTags int
 
+	filterStrings []string
+	valuePolicy   string
+
 	kafkaMdmAddr     string
 	kafkaMdmTopic    string
 	kafkaMdmV2       bool
-	kafkaMdamAddr    string
 	kafkaCompression string
 	partitionScheme  string
 	carbonAddr       string
@@ -108,10 +110,11 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVar(&customTags, "custom-tags", []string{}, "A list of comma separated tags (i.e. \"tag1=value1,tag2=value2\")(default empty) conflicts with add-tags")
 	rootCmd.PersistentFlags().IntVar(&numUniqueCustomTags, "num-unique-custom-tags", 0, "a number between 0 and the length of custom-tags. when using custom-tags this will make the tags unique (default 0)")
 
+	rootCmd.PersistentFlags().StringSliceVar(&filterStrings, "filter", []string{}, "A list of comma separated filters to apply. E.g. 'offset:-1h,offset:12h'")
+
 	rootCmd.PersistentFlags().StringVar(&kafkaMdmAddr, "kafka-mdm-addr", "", "kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092")
 	rootCmd.PersistentFlags().StringVar(&kafkaMdmTopic, "kafka-mdm-topic", "mdm", "kafka topic for MetricData-Msgp messages")
 	rootCmd.PersistentFlags().BoolVar(&kafkaMdmV2, "kafka-mdm-v2", true, "enable MetricPoint optimization (send MetricData first, then optimized MetricPoint payloads)")
-	rootCmd.PersistentFlags().StringVar(&kafkaMdamAddr, "kafka-mdam-addr", "", "kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092")
 	rootCmd.PersistentFlags().StringVar(&kafkaCompression, "kafka-comp", "snappy", "compression: none|gzip|snappy")
 	rootCmd.PersistentFlags().StringVar(&partitionScheme, "partition-scheme", "bySeries", "method used for partitioning metrics (kafka-mdm-only). (byOrg|bySeries|bySeriesWithTags|bySeriesWithTagsFnv|lastNum)")
 	rootCmd.PersistentFlags().StringVar(&carbonAddr, "carbon-addr", "", "carbon TCP address. e.g. localhost:2003")

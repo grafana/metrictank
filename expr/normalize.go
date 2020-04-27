@@ -8,11 +8,15 @@ import (
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/util/align"
 )
 
 // Normalize normalizes series to the same common LCM interval - if they don't already have the same interval
 // any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
 func Normalize(dataMap DataMap, in []models.Series) []models.Series {
+	if len(in) < 2 {
+		return in
+	}
 	var intervals []uint32
 	for _, s := range in {
 		if s.Interval == 0 {
@@ -66,7 +70,7 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	// or more generally (you can follow any example vertically):
 	//  5 10 15 20 25 30 35 40 45 50 <-- if any of these timestamps are your first point in `in`
 	//  5  5  5 20 20 20 35 35 35 50 <-- then these are the corresponding timestamps of the first values we want as input for the consolidator
-	// 15 15 15 30 30 30 45 45 45 60 <-- which, when fed through alignForward(), result in these numbers
+	// 15 15 15 30 30 30 45 45 45 60 <-- which, when fed through alignForwardIfNotAligned(), result in these numbers
 	//  5  5  5 20 20 20 35 35 35 50 <-- subtract (aggnum-1)* in.interval or equivalent -interval + in.Interval = -15 + 5 = -10. these are our desired numbers!
 
 	// now, for the final value, it's important to be aware of cases like this:
@@ -75,7 +79,7 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	// (it breaches `to`, and may have more points than other series it needs to be combined with)
 	// thus, we also need to potentially trim points from the back until the last point has the same Ts as a canonical series would
 
-	for ts := alignForward(in.Datapoints[0].Ts, interval) - interval + in.Interval; ts < in.Datapoints[0].Ts; ts += interval {
+	for ts := align.ForwardIfNotAligned(in.Datapoints[0].Ts, interval) - interval + in.Interval; ts < in.Datapoints[0].Ts; ts += interval {
 		datapoints = append(datapoints, schema.Point{Val: math.NaN(), Ts: ts})
 	}
 
@@ -89,13 +93,4 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	in.Interval = interval
 	dataMap.Add(Req{}, in)
 	return in
-}
-
-// alignForward aligns ts to the next timestamp that divides by the interval, except if it is already aligned
-func alignForward(ts, interval uint32) uint32 {
-	remain := ts % interval
-	if remain == 0 {
-		return ts
-	}
-	return ts + interval - remain
 }

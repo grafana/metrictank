@@ -169,6 +169,14 @@ func TestMaxChunkSpan(t *testing.T) {
 	})
 }
 
+func TestMaxRawRetention(t *testing.T) {
+	schemas := schemasForTest()
+	Convey("When getting maxRetention", t, func() {
+		max := schemas.MaxRawRetention()
+		So(max, ShouldEqual, 86400)
+	})
+}
+
 func TestReadSchemas(t *testing.T) {
 	tests := []struct {
 		name    string

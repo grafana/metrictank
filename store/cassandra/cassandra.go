@@ -89,6 +89,7 @@ type CassandraStore struct {
 	tracer           opentracing.Tracer
 	shutdown         chan struct{}
 	wg               sync.WaitGroup
+	cfg              *StoreConfig
 }
 
 // ConvertTimeout provides backwards compatibility for values that used to be specified as integers,
@@ -106,7 +107,12 @@ func ConvertTimeout(timeout string, defaultUnit time.Duration) time.Duration {
 }
 
 // NewCassandraStore creates a new cassandra store, using the provided retention ttl's in seconds
-func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, error) {
+func NewCassandraStore(config *StoreConfig, ttls []uint32, schemaMaxChunkSpan uint32) (*CassandraStore, error) {
+	// Hopefully the caller has already validated their config, but just in case,
+	// lets make sure.
+	if err := config.Validate(schemaMaxChunkSpan); err != nil {
+		return nil, err
+	}
 	stats.NewGauge32("store.cassandra.write_queue.size").Set(config.WriteQueueSize)
 	stats.NewGauge32("store.cassandra.num_writers").Set(config.WriteConcurrency)
 
@@ -209,6 +215,7 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32) (*CassandraStore, err
 		TTLTables:        ttlTables,
 		tracer:           opentracing.NoopTracer{},
 		shutdown:         make(chan struct{}),
+		cfg:              config,
 	}
 
 	for i := 0; i < config.WriteConcurrency; i++ {
@@ -453,6 +460,9 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 
 	pre := time.Now()
 
+	startMonth := start / Month_sec   // starting row has to be at, or before, requested start
+	endMonth := (end - 1) / Month_sec // ending row has to include the last point we might need (end-1)
+
 	// unfortunately in the database we only have the t0's of all chunks.
 	// this means we can easily make sure to include the correct last chunk (just query for a t0 < end, the last chunk will contain the last needed data)
 	// but it becomes hard to find which should be the first chunk to include. we can't just query for start <= t0 because then we will miss some data at
@@ -485,21 +495,25 @@ func (c *CassandraStore) SearchTable(ctx context.Context, key schema.AMKey, tabl
 	// how do we query for all the chunks we need and not many more? knowing that chunkspan is not known?
 	// for end, we can simply search for t0 < 7555000 in row 2, which gives us all chunks we need
 	// for start, the best we can do is search for t0 <= 5222000 in row 1
-	// note that this may include up to 4 weeks of unneeded data if start falls late within a month.  NOTE: we can set chunkspan "hints" via config
+	// note that this may include up to 4 weeks of unneeded data if start falls late within a month.
+	// NOTE: we can set max chunkspan "hint" via config to limit the amount of extra data pulled in.
+	adjustedStart := start - uint32(c.cfg.MaxChunkSpan.Seconds())
 
-	results := make(chan readResult, 1)
+	// chunkspans are aligned with Month_sec. If adjustedStart puts us in the previous month, we know
+	// that we can just limit the query to the original start month.
+	adjustedStart = util.Max(adjustedStart, startMonth*Month_sec)
 
-	startMonth := start / Month_sec   // starting row has to be at, or before, requested start
-	endMonth := (end - 1) / Month_sec // ending row has to include the last point we might need (end-1)
 	rowKeys := make([]string, endMonth-startMonth+1)
 	i := 0
 	for num := startMonth; num <= endMonth; num++ {
 		rowKeys[i] = fmt.Sprintf("%s_%d", key, num)
 		i++
 	}
+
+	results := make(chan readResult, 1)
 	crr := ChunkReadRequest{
 		q:         table.QueryRead,
-		p:         []interface{}{rowKeys, end},
+		p:         []interface{}{rowKeys, adjustedStart, end},
 		timestamp: pre,
 		out:       results,
 		ctx:       ctx,

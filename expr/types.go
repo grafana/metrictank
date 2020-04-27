@@ -144,6 +144,17 @@ type ArgStringsOrInts struct {
 func (a ArgStringsOrInts) Key() string    { return a.key }
 func (a ArgStringsOrInts) Optional() bool { return a.opt }
 
+// mixed string or int
+type ArgStringOrInt struct {
+	key       string
+	opt       bool
+	validator []Validator
+	val       *expr
+}
+
+func (a ArgStringOrInt) Key() string    { return a.key }
+func (a ArgStringOrInt) Optional() bool { return a.opt }
+
 // When an argument is a special value without quotes (such as None or INF)
 // This should NOT be used together with ArgSeries, ArgSeriesList, ArgSeriesLists inside an ArgIn as that causes ambiguity
 type ArgQuotelessString struct {

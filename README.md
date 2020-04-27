@@ -6,7 +6,7 @@
 
 ## Introduction
 
-Metrictank is a multi-tenant timeseries engine for Graphite and friends.
+Metrictank is a multi-tenant timeseries platform that can be used as a backend or replacement for Graphite.
 It provides long term storage, high availability, efficient storage, retrieval and processing for large scale environments.
 
 [GrafanaLabs](http://grafana.com) has been running metrictank in production since December 2015.
@@ -17,26 +17,36 @@ that makes this process much easier.
 ## Features
 
 * 100% open source
-* Inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf).
-Most notably, the heavily compressed chunks dramatically lower cpu, memory and storage requirements.
-* Writeback RAM cache, serving most data out of memory.
-* Graphite is a first class citizen. As of graphite-1.0.1, metrictank can be used as a graphite CLUSTER_SERVER.
-* Can also act as a Graphite server itself, though the functions processing library is only partially implemented, metrictank proxies requests to Graphite if it can't handle the required processing (for those requests it will degrade to just being the backend storage)
-* Accurate, flexible rollups by storing min/max/sum/count (which also gives us average).
+* Heavily compressed chunks (inspired by the [Facebook gorilla paper](http://www.vldb.org/pvldb/vol8/p1816-teller.pdf)) dramatically lower cpu, memory, and storage requirements and get much greater performance out of Cassandra than other solutions.
+* Writeback RAM buffers and chunk caches, serving most data out of memory.
+* Multiple rollup functions can be configured per serie (or group of series). E.g. min/max/sum/count/average, which can be selected at query time via consolidateBy().
 So we can do consolidation (combined runtime+archived) accurately and correctly,
 [unlike most other graphite backends like whisper](https://grafana.com/blog/2016/03/03/25-graphite-grafana-and-statsd-gotchas/#runtime.consolidation)
 * Flexible tenancy: can be used as single tenant or multi tenant. Selected data can be shared across all tenants.
-* Input options: carbon, metrics2.0, kafka (soon: json or msgpack over http)
-* Guards against excessive data requests
+* Input options: carbon, metrics2.0, kafka.
+* Guards against excessively large queries. (per-request series/points restrictions)
 * Data backfill/import from whisper
+* Speculative Execution means you can use replicas not only for High Availability but also to reduce query latency.
+* Write-Ahead buffer based on Kafka facilitates robust clustering and enables other analytics use cases.
+* Tags and Meta Tags support
+* Render response metadata: performance statistics, series lineage information and rollup indicator visible through Grafana
+* Index pruning (hide inactive/stale series)
+* Timeseries can change resolution (interval) over time, they will be merged seamlessly at read time. No need for any data migrations.
+
+## Relation to Graphite
+
+The goal of Metrictank is to provide a more scalable, secure, resource efficient and performant version of Graphite that is backwards compatible, while also adding some novel functionality.
+(see Features, above)
+
+There's 2 main ways to deploy Metrictank:
+* as a backend for Graphite-web, by setting the `CLUSTER_SERVER` configuration value.
+* as an alternative to a Graphite stack. This enables most of the additional functionality.  Note that Metrictank's API is not quite on par yet with Graphite-web:  some less commonly used functions are not implemented natively yet, in which case Metrictank relies on a graphite-web process to handle those requests. See [our graphite comparison page](docs/graphite.md) for more details.
 
 ## Limitations
 
 * No performance/availability isolation between tenants per instance. (only data isolation)
 * Minimum computation locality: we move the data from storage to processing code, which is both metrictank and graphite.
-* Backlog replaying and queries can be made faster. [A Go GC issue may occasionally inflate response times](https://github.com/golang/go/issues/14812).
-* We use metrics2.0 in native input protocol and indexes, but [barely do anything with it yet](https://github.com/grafana/metrictank/blob/master/docs/tags.md).
-* can't overwrite old data. We support reordering the most recent time window but that's it. (unless you restart MT)
+* Can't overwrite old data. We support reordering the most recent time window but that's it. (unless you restart MT)
 
 ## Interesting design characteristics (feature or limitation... up to you)
 
@@ -44,10 +54,8 @@ So we can do consolidation (combined runtime+archived) accurately and correctly,
 Otherwise data loss of current chunks will be incurred.  See [operations guide](https://github.com/grafana/metrictank/blob/master/docs/operations.md)
 * clustering works best with an orchestrator like kubernetes. MT itself does not automate master promotions. See [clustering](https://github.com/grafana/metrictank/blob/master/docs/clustering.md) for more.
 * Only float64 values. Ints and bools currently stored as floats (works quite well due to the gorilla compression),
-  No text support.
 * Only uint32 unix timestamps in second resolution.   For higher resolution, consider [streaming directly to grafana](https://grafana.com/blog/2016/03/31/using-grafana-with-intels-snap-for-ad-hoc-metric-exploration/)
-* No data locality: doesn't seem needed yet to put related series together.
-
+* We distribute data by hashing keys, like many similar systems. This means no data locality (data that will be often used together may not live together)
 
 ## Docs
 

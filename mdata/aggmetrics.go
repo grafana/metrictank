@@ -49,11 +49,14 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bo
 // periodically scan chunks and close any that have not received data in a while
 func (ms *AggMetrics) GC() {
 	for {
+		var purged int
+
 		unix := time.Duration(time.Now().UnixNano())
 		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
-		log.Info("checking for stale chunks that need persisting.")
-		now := uint32(time.Now().Unix())
+		log.Info("Aggmetrics: checking for stale chunks that need persisting.")
+		nowTime := time.Now()
+		now := uint32(nowTime.Unix())
 		chunkMinTs := now - uint32(ms.chunkMaxStale)
 		metricMinTs := now - uint32(ms.metricMaxStale)
 
@@ -84,6 +87,7 @@ func (ms *AggMetrics) GC() {
 				if stale {
 					log.Debugf("metric %s is stale. Purging data from memory.", key)
 					ms.Lock()
+					purged++
 					delete(ms.Metrics[org], key)
 					orgActiveMetrics.Set(float64(len(ms.Metrics[org])))
 					// note: this is racey. if a metric has just become unstale, it may have created a new chunk,
@@ -118,6 +122,8 @@ func (ms *AggMetrics) GC() {
 		}
 		ms.RUnlock()
 		metricsActive.Set(totalActive)
+
+		log.Infof("Aggmetrics: finished GC %s. number of purged (deleted) metrics from tank: %d", time.Since(nowTime), purged)
 	}
 }
 

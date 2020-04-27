@@ -10,7 +10,8 @@ import (
 // Out submits metricdata to a destination
 type Out interface {
 	Close() error
-	//output completely handles the data so that caller can reuse
+	// Flush completely handles the metrics, does not keep references into it, so that caller can reuse
+	// Filter outputs reserve the right to make in-place modifications
 	Flush(metrics []*schema.MetricData) error
 }
 

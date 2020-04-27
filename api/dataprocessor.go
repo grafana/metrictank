@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/expr"
+	"github.com/grafana/metrictank/util/align"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/cluster"
@@ -55,20 +56,6 @@ type getTargetsResp struct {
 	err    error
 }
 
-// alignForward aligns ts to the next timestamp that divides by the interval, except if it is already aligned
-func alignForward(ts, interval uint32) uint32 {
-	remain := ts % interval
-	if remain == 0 {
-		return ts
-	}
-	return ts + interval - remain
-}
-
-// alignBackward aligns the ts to the previous ts that divides by the interval, even if it is already aligned
-func alignBackward(ts uint32, interval uint32) uint32 {
-	return ts - ((ts-1)%interval + 1)
-}
-
 // Fix assures a series is in quantized form:
 // all points are nicely aligned (quantized) and padded with nulls in case there's gaps in data
 // graphite does this quantization before storing, we may want to do that as well at some point
@@ -77,8 +64,8 @@ func alignBackward(ts uint32, interval uint32) uint32 {
 // values to earlier in time.
 func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
-	first := alignForward(from, interval)
-	last := alignBackward(to, interval)
+	first := align.ForwardIfNotAligned(from, interval)
+	last := align.Backward(to, interval)
 
 	if last < first {
 		// the requested range is too narrow for the requested interval
@@ -227,8 +214,7 @@ func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs [
 	return out, nil
 }
 
-// getTargetsRemote issues the requests on other nodes
-// it's nothing more than a thin network wrapper around getTargetsLocal of a peer.
+// getTargetsRemote issues the requests - keyed by node name - on other nodes
 func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[string][]models.Req) ([]models.Series, error) {
 
 	allPeers, err := cluster.MembersForSpeculativeQuery()
@@ -236,11 +222,23 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 		return nil, err
 	}
 
+	// will contain all replicas for each shardgroup
+	// (though typically only one replica is used per shardgroup unless spec-exec kicks in)
 	requiredPeers := make(map[int32][]cluster.Node)
 	shardReqs := make(map[int32][]models.Req)
+
+	// Note: we can expect remoteReqs to possibly have multiple node string keys that are part of the same shardgroup.
+	// Why? Because a request may need multiple series lookups, and issue multiple, distinct find/find_by_tag calls, each of which may end up using different replicas
+	// within the same shardgroup (due to changing priorities, spec-exec, etc)>
+	// Thus here we categorize all requests into groups per shard ID, rather than by hostname.
+
 	for _, nodeReqs := range remoteReqs {
 		shardID := nodeReqs[0].Node.GetPartitions()[0]
-		requiredPeers[shardID] = allPeers[shardID]
+		peers := allPeers[shardID]
+		if len(peers) == 0 {
+			return nil, fmt.Errorf("Shard %d has gone unavailable before /getdata", shardID)
+		}
+		requiredPeers[shardID] = peers
 		shardReqs[shardID] = append(shardReqs[shardID], nodeReqs...)
 	}
 
@@ -251,7 +249,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 		var resp models.GetDataRespV1
 		reqs, ok := shardReqs[node.GetPartitions()[0]]
 		if !ok {
-			log.Warnf("Unexpected shard group, node = %q", node)
+			log.Warnf("DP Unexpected shard group, node = %q", node)
 			// Return empty response, no error
 			return resp, nil
 		}
@@ -458,7 +456,7 @@ func (s *Server) getSeries(ctx *requestContext, ss *models.StorageStats) (mdata.
 	}
 	ss.IncChunksFromTank(uint32(len(res.Iters)))
 
-	log.Debugf("oldest from aggmetrics is %d", res.Oldest)
+	log.Debugf("DP oldest from aggmetrics is %d", res.Oldest)
 	span := opentracing.SpanFromContext(ctx.ctx)
 
 	if res.Oldest <= ctx.From {
@@ -474,7 +472,7 @@ func (s *Server) getSeries(ctx *requestContext, ss *models.StorageStats) (mdata.
 	if err != nil {
 		tracing.Failure(span)
 		tracing.Error(span, err)
-		log.Errorf("getSeriesCachedStore: %s", err.Error())
+		log.Errorf("DP getSeriesCachedStore: %s", err.Error())
 		return res, err
 	}
 	res.Iters = append(fromCache, res.Iters...)
@@ -539,12 +537,12 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 	reqSpanBoth.ValueUint32(ctx.To - ctx.From)
 	logLoad("cassan", ctx.AMKey, ctx.From, ctx.To)
 
-	log.Debugf("cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
+	log.Debugf("DP cache: searching query key %s, from %d, until %d", ctx.AMKey, ctx.From, until)
 	cacheRes, err := s.Cache.Search(ctx.ctx, ctx.AMKey, ctx.From, until)
 	if err != nil {
 		return iters, fmt.Errorf("Cache.Search() failed: %+v", err.Error())
 	}
-	log.Debugf("cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
+	log.Debugf("DP cache: result start %d, end %d", len(cacheRes.Start), len(cacheRes.End))
 	ss.IncCacheResult(cacheRes.Type)
 
 	// check to see if the request has been canceled, if so abort now.
@@ -741,8 +739,8 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 	// so the caller can just compare rc.From and rc.To and if equal, immediately return [] to the client.
 
 	if req.Archive == 0 {
-		rc.From = alignBackward(req.From, req.ArchInterval) + 1
-		rc.To = alignBackward(req.To, req.ArchInterval) + 1
+		rc.From = align.Backward(req.From, req.ArchInterval) + 1
+		rc.To = align.Backward(req.To, req.ArchInterval) + 1
 		rc.AMKey = schema.AMKey{MKey: req.MKey}
 	} else {
 		rc.From = req.From
@@ -767,7 +765,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// but because we eventually want to consolidate into a point with ts=60, we also need the points that will be fix-adjusted to 40 and 50.
 		// so From needs to be lowered by 20 to become 35 (or 31 if adjusted).
 
-		boundary := alignForward(rc.From, req.OutInterval)
+		boundary := align.ForwardIfNotAligned(rc.From, req.OutInterval)
 		rewind := req.AggNum * req.ArchInterval
 		if boundary < rewind {
 			panic(fmt.Sprintf("Cannot rewind far back enough (trying to rewind by %d from timestamp %d)", rewind, boundary))
@@ -793,7 +791,7 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		// 240       - 211       - ...,210         - 210              - 210                                    - 210
 		//*240->231  - 211       - ...,210         - 210              - 210                                    - 210
 
-		rc.To = alignBackward(rc.To, req.OutInterval) + 1
+		rc.To = align.Backward(rc.To, req.OutInterval) + 1
 	}
 
 	return &rc

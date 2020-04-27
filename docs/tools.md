@@ -83,11 +83,11 @@ Flags:
       --carbon-addr string           carbon TCP address. e.g. localhost:2003
       --config string                config file (default is $HOME/.mt-fakemetrics.yaml)
       --custom-tags strings          A list of comma separated tags (i.e. "tag1=value1,tag2=value2")(default empty) conflicts with add-tags
+      --filter strings               A list of comma separated filters to apply. E.g. 'offset:-1h,offset:12h'
       --gnet-addr string             gnet address. e.g. http://localhost:8081
       --gnet-key string              gnet api key
   -h, --help                         help for mt-fakemetrics
       --kafka-comp string            compression: none|gzip|snappy (default "snappy")
-      --kafka-mdam-addr string       kafka TCP address for MetricDataArray-Msgp messages. e.g. localhost:9092
       --kafka-mdm-addr string        kafka TCP address for MetricData-Msgp messages. e.g. localhost:9092
       --kafka-mdm-topic string       kafka topic for MetricData-Msgp messages (default "mdm")
       --kafka-mdm-v2                 enable MetricPoint optimization (send MetricData first, then optimized MetricPoint payloads) (default true)
@@ -542,6 +542,44 @@ It prints the MKey
 ```
 
 
+## mt-parrot
+
+```
+generate deterministic metrics for each metrictank partition, query them back and report on correctness and performance
+
+Correctness:
+	Monitor the parrot.monitoring.error series. There's 3 potential issues:
+
+	* parrot.monitoring.error;error=http    // could not execute http request
+	* parrot.monitoring.error;error=decode  // could not decode http response
+	* parrot.monitoring.error;error=invalid // any other problem with the response itself
+
+Performance:
+	In addition to these black-and-white measurements above, there are also more subjective measurements
+	* parrot.monitoring.lag  // how far the response is lagging behind
+	* parrot.monitoring.nans // number of nans included in the response
+
+Usage:
+  mt-parrot [flags]
+
+Flags:
+      --gateway-address string           the url of the metrics gateway (default "http://localhost:6059")
+      --gateway-key string               the bearer token to include with gateway requests
+  -h, --help                             help for mt-parrot
+      --log-level string                 log level. panic|fatal|error|warning|info|debug (default "info")
+      --lookback-period duration         how far to look back when validating metrics (default 5m0s)
+      --org-id int                       org id to publish parrot metrics to (default 1)
+      --partition-count int32            number of kafka partitions in use (default 8)
+      --partition-method string          the partition method in use on the gateway, must be one of bySeries|bySeriesWithTags|bySeriesWithTagsFnv (default "bySeries")
+      --query-interval duration          interval to query to validate metrics (default 10s)
+      --stats-address string             address to send monitoring statistics to (default "localhost:2003")
+      --stats-buffer-size int            how many messages (holding all measurements from one interval) to buffer up in case graphite endpoint is unavailable. (default 20000)
+      --stats-prefix string              stats prefix (will add trailing dot automatically if needed)
+      --stats-timeout duration           timeout after which a write is considered not successful (default 10s)
+      --test-metrics-interval duration   interval to send test metrics (default 10s)
+```
+
+
 ## mt-schemas-explain
 
 ```
@@ -852,6 +890,8 @@ to see UTC times, just prefix command with TZ=UTC
 
 ```
 Usage of ./mt-whisper-importer-reader:
+  -custom-headers string
+    	headers to add to every request, in the format "<name>:<value>;<name>:<value>"
   -dst-schemas string
     	The filename of the output schemas definition file
   -http-auth string
