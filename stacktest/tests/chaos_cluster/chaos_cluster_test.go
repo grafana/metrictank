@@ -160,10 +160,10 @@ func TestQueryWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestQueryWorkload:begin")
 	validators := []graphite.Validator{graphite.ValidateCorrect(12)}
 
-	got := graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 6000, validators...)
+	got := graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 600, validators...)
 	exp := graphite.CheckResults{
 		Validators: validators,
-		Valid:      []int{6000},
+		Valid:      []int{600},
 		Empty:      0,
 		Timeout:    0,
 		Other:      0,
@@ -182,7 +182,7 @@ func TestQueryWorkload(t *testing.T) {
 // but also before it does, but fails to get data via clustered requests from peers)
 func TestIsolateOneInstance(t *testing.T) {
 	grafana.PostAnnotation("TestIsolateOneInstance:begin")
-	numReqMt4 := 1200
+	numReqMt4 := 120
 	validatorsOther := []graphite.Validator{graphite.ValidateCorrect(12)}
 	mt4ResultsChan := make(chan graphite.CheckResults, 1)
 	otherResultsChan := make(chan graphite.CheckResults, 1)
@@ -191,7 +191,7 @@ func TestIsolateOneInstance(t *testing.T) {
 		mt4ResultsChan <- graphite.CheckMT([]int{6064}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, numReqMt4, graphite.ValidateCorrect(12), graphite.ValidateCode(503))
 	}()
 	go func() {
-		otherResultsChan <- graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, validatorsOther...)
+		otherResultsChan <- graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 600, validatorsOther...)
 	}()
 
 	// now go ahead and isolate for 30s
@@ -213,7 +213,7 @@ func TestIsolateOneInstance(t *testing.T) {
 	// validate results of other cluster nodes
 	exp := graphite.CheckResults{
 		Validators: validatorsOther,
-		Valid:      []int{6000},
+		Valid:      []int{600},
 		Empty:      0,
 		Timeout:    0,
 		Other:      0,
