@@ -27,6 +27,16 @@ Important differences with stock Graphite to be aware of:
 * the platform is optimized for append-only workloads. While historical data can be imported, we generally don't support out of order writes.
 * timeseries can change resolution (interval) over time, they will be merged automatically.
 
+### My query results have a lower resolution than expected
+
+In our Hosted Metrics platform we limit how many data points a single query may process. By default, if a query involves 1M to 20M data points, then the query engine uses lower resolution aggregates to keep the number of data points to be processed below 1M. If the query involves more than 20M data points it gets rejected.
+
+Example:
+
+A Hosted Metrics instance uses the storage-schema `1s:8d,30m:2y`, then a user queries for `sumSeries(<metric name pattern>)` with a time range of `24h`. A metric with `1s` resolution has `86400` data points in a `24h` period, so if `<metric name pattern>` matches `12` or more metrics then the query engine will choose to use the lower resolution aggregates with `30min` resolution because `12*86400=1036800`.
+
+To avoid that the query engine uses low resolution aggregates due to this limitation, we recommend creating an aggregator in carbon-relay-ng to generate pre-aggregated series. This is [documented here](https://github.com/grafana/carbon-relay-ng/blob/master/docs/aggregation.md)
+
 ## Do I have to use hosted grafana or exclusively the hosted platform?
 
 No, the hosted platform is a datasource that you can use however you like. E.g. in combination with other datasources, and queried from any Grafana instance or other client.
