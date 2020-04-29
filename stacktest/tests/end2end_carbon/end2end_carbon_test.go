@@ -73,6 +73,11 @@ func TestMain(m *testing.M) {
 		log.Fatal(err.Error())
 	}
 
+	// note: if docker-compose didn't start properly - e.g. it bails out due to unsupported config -
+	// what typically happens is the tests will fail and we will exit, and not see the docker-compose problem
+	// until further manual inspection or reproducing.
+	// in a future version, we should add more rigorous checks to make sure dockor-compose didn't exit >0 and that the containers started properly
+	// we may want to use 'docker-compose up -d' for that
 	retcode := m.Run()
 	fm.Close()
 
@@ -102,7 +107,7 @@ func TestStartup(t *testing.T) {
 		{Str: "grafana.*HTTP Server Listen.*3000"},
 	}
 	select {
-	case <-tracker.Match(matchers):
+	case <-tracker.Match(matchers, true):
 		log.Println("stack now running.")
 		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
 	case <-time.After(time.Second * 180):
