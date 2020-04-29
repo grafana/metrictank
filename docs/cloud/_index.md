@@ -160,10 +160,3 @@ You can paste the below into the file to get started:
 
 Once configured, you can send metrics to the relay in carbon/Graphite format in port 2003,
 and they should show up in Grafana.
-
-
-## Deleting metrics
-
-If required, metrics can be removed from the index using the command below:
-
-    curl -u "api_key:<Your Grafana.com API Key>" https://<instance URL>.hosted-metrics.grafana.net/metrics/delete -d query=some.series.to.delete.*
