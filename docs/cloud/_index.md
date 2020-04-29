@@ -54,13 +54,13 @@ this also provides increased resiliency to connectivity issues.
 
 `carbon-relay-ng` is available for most Linux platforms, and is easy to install.
 
-* [EL6 (Red Hat 6.x, CentOS 6.x, and CloudLinux 6.x)](https://packagecloud.io/raintank/raintank/packages/el/6/carbon-relay-ng-0.11.0-1.x86_64.rpm)
-* [EL7 (Red Hat 7.x, CentOS 7.x, and CloudLinux 7.x.)](https://packagecloud.io/raintank/raintank/packages/el/7/carbon-relay-ng-0.11.0-1.x86_64.rpm)
-* [Debian Jessie](https://packagecloud.io/raintank/raintank/packages/debian/jessie/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Debian Stretch](https://packagecloud.io/raintank/raintank/packages/debian/stretch/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Debian Buster](https://packagecloud.io/raintank/raintank/packages/debian/buster/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Ubuntu Xenial](https://packagecloud.io/raintank/raintank/packages/ubuntu/xenial/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Ubuntu Trusty](https://packagecloud.io/raintank/raintank/packages/ubuntu/trusty/carbon-relay-ng_0.11.0-1_amd64.deb)
+* [EL6 (Red Hat 6.x, CentOS 6.x, and CloudLinux 6.x)](https://packagecloud.io/raintank/raintank/packages/el/6/carbon-relay-ng-0.12.0-1.x86_64.rpm)
+* [EL7 (Red Hat 7.x, CentOS 7.x, and CloudLinux 7.x.)](https://packagecloud.io/raintank/raintank/packages/el/7/carbon-relay-ng-0.12.0-1.x86_64.rpm)
+* [Debian Jessie](https://packagecloud.io/raintank/raintank/packages/debian/jessie/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Debian Stretch](https://packagecloud.io/raintank/raintank/packages/debian/stretch/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Debian Buster](https://packagecloud.io/raintank/raintank/packages/debian/buster/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Ubuntu Xenial](https://packagecloud.io/raintank/raintank/packages/ubuntu/xenial/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Ubuntu Trusty](https://packagecloud.io/raintank/raintank/packages/ubuntu/trusty/carbon-relay-ng_0.12.0-1_amd64.deb)
 
 We recommend installing the latest version.
 Once installed, you can configure the relay in two steps:
