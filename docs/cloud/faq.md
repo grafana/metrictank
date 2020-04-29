@@ -24,18 +24,24 @@ The hosted platform is built on top of [metrictank](/oss/metrictank) and [graphi
 Important differences with stock Graphite to be aware of:
 
 * support for meta tags
-* the platform is optimized for append-only workloads. While historical data can be imported, we generally don't support out of order writes.
+* the platform is optimized for append-only workloads. While historical data can be imported, and we can allow for some out-of-orderness in the recent window (e.g. last 10 or 60 points), we currently don't support out of order writes (overwriting old data)
 * timeseries can change resolution (interval) over time, they will be merged automatically.
+* Response metadata: performance statistics, series lineage information and rollup indicator (all visualized through grafana)
+* Index pruning (hide inactive/stale series)
+
 
 ### My query results have a lower resolution than expected
 
-In our Hosted Metrics platform we limit how many data points a single query may process. By default, if a query involves 1M to 20M data points, then the query engine uses lower resolution aggregates to keep the number of data points to be processed below 1M. If the query involves more than 20M data points it gets rejected.
+By default, if a query tries to fetch more than 1 million datapoints, we will pick lower resolution data (rollups) for that query, to try to get the number under 1 million.
+If the query, no matter which rollup we try to choose, still tries to fetch more than 20 million datapoints, we reject it.
 
 Example:
 
-A Hosted Metrics instance uses the storage-schema `1s:8d,30m:2y`, then a user queries for `sumSeries(<metric name pattern>)` with a time range of `24h`. A metric with `1s` resolution has `86400` data points in a `24h` period, so if `<metric name pattern>` matches `12` or more metrics then the query engine will choose to use the lower resolution aggregates with `30min` resolution because `12*86400=1036800`.
+Let's say you use the standard GrafanaCloud retention: `1s:8d,1m:60d,30m:2y`, and a query is issued for `sumSeries(<metric name pattern>)` and a time range of `24h`.
+A metric with `1s` resolution has `86400` data points in a `24h` period, so if `<metric name pattern>` matches `12` or more metrics then `12*86400=1036800` which exceeds the threshold,
+so we will pick the minutely data instead. This way you typically still get high enough resolution (in this case 1440 points per serie), but higher query performance.
 
-To avoid that the query engine uses low resolution aggregates due to this limitation, we recommend creating an aggregator in carbon-relay-ng to generate pre-aggregated series. This is [documented here](https://github.com/grafana/carbon-relay-ng/blob/master/docs/aggregation.md)
+Note that on custom plans, these settings can be adjusted. You can also [pre-aggregate data in carbon-relay-ng](https://github.com/grafana/carbon-relay-ng/blob/master/docs/aggregation.md) to load fewer series.
 
 ## Do I have to use hosted grafana or exclusively the hosted platform?
 
