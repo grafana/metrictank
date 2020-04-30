@@ -79,7 +79,8 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	// (it breaches `to`, and may have more points than other series it needs to be combined with)
 	// thus, we also need to potentially trim points from the back until the last point has the same Ts as a canonical series would
 
-	for ts := align.ForwardIfNotAligned(in.Datapoints[0].Ts, interval) - interval + in.Interval; ts < in.Datapoints[0].Ts; ts += interval {
+	canonicalStart := align.ForwardIfNotAligned(in.Datapoints[0].Ts, interval) - interval + in.Interval
+	for ts := canonicalStart; ts < in.Datapoints[0].Ts; ts += in.Interval {
 		datapoints = append(datapoints, schema.Point{Val: math.NaN(), Ts: ts})
 	}
 
