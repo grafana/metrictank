@@ -65,6 +65,8 @@ func TestMain(m *testing.M) {
 	// but circleCI machine image still stuck with 1.14.0
 	cmd = exec.Command("docker-compose", "up", "--force-recreate")
 	cmd.Dir = test.Path("docker/docker-chaos")
+	// note we rely on this technique to pass this setting on to all MT's
+	// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
