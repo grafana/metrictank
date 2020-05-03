@@ -13,7 +13,7 @@ type Builder interface {
 	Build(orgs, mpo, period int) [][]schema.MetricData
 }
 
-// uses no tags
+// Simple builds simple metrics by name
 type Simple struct {
 	MetricName string
 }
@@ -42,7 +42,7 @@ func (s Simple) Build(orgs, mpo, period int) [][]schema.MetricData {
 	return out
 }
 
-// uses tags
+// Tagged builds metrics with a name and various tag related options
 type Tagged struct {
 	MetricName          string
 	CustomTags          []string
