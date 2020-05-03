@@ -1,8 +1,18 @@
+// package metricbuilder provides various methods to build metrics, or more specifically MetricData structures
+// be aware of this behavior when it comes to the MetricName property:
+// | mpo | metricName has %d directive? |                           outcome |
+// |-----|------------------------------|-----------------------------------|
+// |   1 |                          Yes | use directive to always print 1   |
+// |  >1 |                          Yes | use directive to print the number |
+// |   1 |                           No |               don't use directive |
+// |  >1 |                           No |               invalid: will panic |
+//
 package metricbuilder
 
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/grafana/metrictank/schema"
 )
@@ -23,11 +33,20 @@ func (s Simple) Info() string {
 }
 
 func (s Simple) Build(orgs, mpo, period int) [][]schema.MetricData {
+
+	hasDirective := strings.Contains(s.MetricName, "%d")
+	if mpo > 1 && !hasDirective {
+		panic("MetricName directive must contain %d when using mpo >1")
+	}
+
 	out := make([][]schema.MetricData, orgs)
 	for o := 0; o < orgs; o++ {
 		metrics := make([]schema.MetricData, mpo)
 		for m := 0; m < mpo; m++ {
-			name := fmt.Sprintf("%s.%d", s.MetricName, m+1)
+			name := s.MetricName
+			if hasDirective {
+				name = fmt.Sprintf(name, m+1)
+			}
 			metrics[m] = schema.MetricData{
 				Name:     name,
 				OrgId:    o + 1,
@@ -56,12 +75,21 @@ func (tb Tagged) Info() string {
 }
 
 func (tb Tagged) Build(orgs, mpo, period int) [][]schema.MetricData {
+
+	hasDirective := strings.Contains(tb.MetricName, "%d")
+	if mpo > 1 && !hasDirective {
+		panic("MetricName directive must contain %d when using mpo >1")
+	}
+
 	out := make([][]schema.MetricData, orgs)
 	for o := 0; o < orgs; o++ {
 		metrics := make([]schema.MetricData, mpo)
 		for m := 0; m < mpo; m++ {
 			var tags []string
-			name := fmt.Sprintf("%s.%d", tb.MetricName, m+1)
+			name := tb.MetricName
+			if hasDirective {
+				name = fmt.Sprintf(name, m+1)
+			}
 
 			localTags := []string{
 				"secondkey=anothervalue",

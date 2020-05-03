@@ -50,7 +50,7 @@ var backfillCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(backfillCmd)
-	backfillCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric", "the metric name to use")
+	backfillCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric.%d", "the metric name to use")
 	backfillCmd.Flags().DurationVar(&offset, "offset", 0, "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc). must be a multiple of 1s")
 	backfillCmd.Flags().IntVar(&orgs, "orgs", 1, "how many orgs to simulate")
 	backfillCmd.Flags().IntVar(&mpo, "mpo", 100, "how many metrics per org to simulate")

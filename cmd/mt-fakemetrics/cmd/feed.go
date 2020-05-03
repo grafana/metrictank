@@ -51,7 +51,7 @@ var feedCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(feedCmd)
-	feedCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric", "the metric name to use")
+	feedCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric.%d", "the metric name to use")
 	feedCmd.Flags().IntVar(&orgs, "orgs", 1, "how many orgs to simulate")
 	feedCmd.Flags().IntVar(&mpo, "mpo", 100, "how many metrics per org to simulate")
 	feedCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
