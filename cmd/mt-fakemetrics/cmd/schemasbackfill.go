@@ -20,7 +20,6 @@ import (
 
 	"time"
 
-	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/conf"
 	log "github.com/sirupsen/logrus"
@@ -34,6 +33,7 @@ var schemasFile = "/etc/metrictank/storage-schemas.conf"
 func init() {
 	rootCmd.AddCommand(schemasbackfillCmd)
 	schemasbackfillCmd.Flags().IntVar(&mpr, "mpr", 10, "how many metrics so simulate per rule")
+	schemasbackfillCmd.Flags().StringVar(&metricBuilder, "metricbuilder", "simple", "the metric builder to use. (simple|tagged)")
 	schemasbackfillCmd.Flags().StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
 	schemasbackfillCmd.Flags().StringVar(&ignore, "ignore", "default", "comma separated list of section names to exclude")
 	schemasbackfillCmd.Flags().DurationVar(&offset, "offset", 0, "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc). must be a multiple of 1s")
@@ -81,7 +81,7 @@ var schemasbackfillCmd = &cobra.Command{
 				if err != nil {
 					panic(err)
 				}
-				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, metricbuilder.Simple{name}, vp)
+				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, getBuilder(metricBuilder, name), vp)
 				wg.Done()
 			}(name, schema.Retentions.Rets[0].SecondsPerPoint)
 		}

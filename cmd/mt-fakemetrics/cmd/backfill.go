@@ -17,7 +17,6 @@ package cmd
 import (
 	"time"
 
-	builder "github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/spf13/cobra"
 )
@@ -36,21 +35,14 @@ var backfillCmd = &cobra.Command{
 			panic(err)
 		}
 
-		builder := builder.Tagged{
-			MetricName:          metricName,
-			CustomTags:          customTags,
-			AddTags:             addTags,
-			NumUniqueCustomTags: numUniqueCustomTags,
-			NumUniqueTags:       numUniqueTags,
-		}
-
-		dataFeed(out, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, builder, vp)
+		dataFeed(out, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, getBuilder(metricBuilder, metricName), vp)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(backfillCmd)
 	backfillCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric.%d", "the metric name to use")
+	backfillCmd.Flags().StringVar(&metricBuilder, "metricbuilder", "simple", "the metric builder to use. (simple|tagged)")
 	backfillCmd.Flags().DurationVar(&offset, "offset", 0, "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc). must be a multiple of 1s")
 	backfillCmd.Flags().IntVar(&orgs, "orgs", 1, "how many orgs to simulate")
 	backfillCmd.Flags().IntVar(&mpo, "mpo", 100, "how many metrics per org to simulate")

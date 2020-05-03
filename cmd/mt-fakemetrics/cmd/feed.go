@@ -17,7 +17,6 @@ package cmd
 import (
 	"time"
 
-	builder "github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/spf13/cobra"
 )
@@ -36,15 +35,7 @@ var feedCmd = &cobra.Command{
 			panic(err)
 		}
 
-		builder := builder.Tagged{
-			MetricName:          metricName,
-			CustomTags:          customTags,
-			AddTags:             addTags,
-			NumUniqueCustomTags: numUniqueCustomTags,
-			NumUniqueTags:       numUniqueTags,
-		}
-
-		dataFeed(out, orgs, mpo, period, flush, 0, 1, false, builder, vp)
+		dataFeed(out, orgs, mpo, period, flush, 0, 1, false, getBuilder(metricBuilder, metricName), vp)
 
 	},
 }
@@ -52,6 +43,7 @@ var feedCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(feedCmd)
 	feedCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric.%d", "the metric name to use")
+	feedCmd.Flags().StringVar(&metricBuilder, "metricbuilder", "simple", "the metric builder to use. (simple|tagged)")
 	feedCmd.Flags().IntVar(&orgs, "orgs", 1, "how many orgs to simulate")
 	feedCmd.Flags().IntVar(&mpo, "mpo", 100, "how many metrics per org to simulate")
 	feedCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
