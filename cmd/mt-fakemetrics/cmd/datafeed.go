@@ -2,124 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
-
-type MetricPayloadBuilder interface {
-	Info() string
-	// Build builds a slice of slices of MetricData's( per orgid), with time and value not set yet.
-	Build(orgs, mpo, period int) [][]schema.MetricData
-}
-
-// uses no tags
-type SimpleBuilder struct {
-	metricName string
-}
-
-func (tb SimpleBuilder) Info() string {
-	return "metricName=" + tb.metricName
-}
-
-func (tb SimpleBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
-	out := make([][]schema.MetricData, orgs)
-	for o := 0; o < orgs; o++ {
-		metrics := make([]schema.MetricData, mpo)
-		for m := 0; m < mpo; m++ {
-			name := fmt.Sprintf("%s.%d", tb.metricName, m+1)
-			metrics[m] = schema.MetricData{
-				Name:     name,
-				OrgId:    o + 1,
-				Interval: period,
-				Unit:     "ms",
-				Mtype:    "gauge",
-			}
-			metrics[m].SetId()
-		}
-		out[o] = metrics
-	}
-	return out
-}
-
-// uses tags
-type TaggedBuilder struct {
-	metricName string
-}
-
-func (tb TaggedBuilder) Info() string {
-	return "metricName=" + tb.metricName
-}
-
-func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
-	out := make([][]schema.MetricData, orgs)
-	for o := 0; o < orgs; o++ {
-		metrics := make([]schema.MetricData, mpo)
-		for m := 0; m < mpo; m++ {
-			var tags []string
-			name := fmt.Sprintf("%s.%d", metricName, m+1)
-
-			localTags := []string{
-				"secondkey=anothervalue",
-				"thirdkey=onemorevalue",
-				"region=west",
-				"os=ubuntu",
-				"anothertag=somelongervalue",
-				"manymoreother=lotsoftagstointern",
-				"afewmoretags=forgoodmeasure",
-				"onetwothreefourfivesix=seveneightnineten",
-				"lotsandlotsoftags=morefunforeveryone",
-				"goodforpeoplewhojustusetags=forbasicallyeverything",
-			}
-
-			if len(customTags) > 0 {
-				if numUniqueCustomTags > 0 {
-					var j int
-					for j = 0; j < numUniqueCustomTags; j++ {
-						tags = append(tags, customTags[j]+strconv.Itoa(m+1))
-					}
-					for j < len(customTags) {
-						tags = append(tags, customTags[j])
-						j++
-					}
-
-				} else {
-					tags = customTags
-				}
-			}
-
-			if addTags {
-				if numUniqueTags > 0 {
-					var j int
-					for j = 0; j < numUniqueTags; j++ {
-						tags = append(tags, localTags[j]+strconv.Itoa(m+1))
-					}
-					for j < len(localTags) {
-						tags = append(tags, localTags[j])
-						j++
-					}
-				} else {
-					tags = localTags
-				}
-			}
-			metrics[m] = schema.MetricData{
-				Name:     name,
-				OrgId:    o + 1,
-				Interval: period,
-				Unit:     "ms",
-				Mtype:    "gauge",
-				Tags:     tags,
-			}
-			metrics[m].SetId()
-		}
-		out[o] = metrics
-	}
-	return out
-}
 
 // examples (everything perOrg)
 // num metrics - flush (s) - period (s) - speedup -> ratePerSPerOrg      -> ratePerFlushPerOrg
@@ -136,7 +26,7 @@ func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 // period in seconds
 // flush  in ms
 // offset in seconds
-func dataFeed(out out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder, vp policy.ValuePolicy) {
+func dataFeed(out out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder metricbuilder.Builder, vp policy.ValuePolicy) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
 	if mpo*speedup%period != 0 {

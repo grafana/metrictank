@@ -20,6 +20,7 @@ import (
 
 	"time"
 
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/conf"
 	log "github.com/sirupsen/logrus"
@@ -80,7 +81,7 @@ var schemasbackfillCmd = &cobra.Command{
 				if err != nil {
 					panic(err)
 				}
-				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, SimpleBuilder{name}, vp)
+				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, metricbuilder.Simple{name}, vp)
 				wg.Done()
 			}(name, schema.Retentions.Rets[0].SecondsPerPoint)
 		}

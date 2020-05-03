@@ -17,6 +17,7 @@ package cmd
 import (
 	"time"
 
+	builder "github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +36,15 @@ var backfillCmd = &cobra.Command{
 			panic(err)
 		}
 
-		dataFeed(out, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, TaggedBuilder{metricName}, vp)
+		builder := builder.Tagged{
+			MetricName:          metricName,
+			CustomTags:          customTags,
+			AddTags:             addTags,
+			NumUniqueCustomTags: numUniqueCustomTags,
+			NumUniqueTags:       numUniqueTags,
+		}
+
+		dataFeed(out, orgs, mpo, period, flush, int(offset.Seconds()), speedup, true, builder, vp)
 	},
 }
 
