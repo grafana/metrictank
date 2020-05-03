@@ -48,5 +48,5 @@ func init() {
 	feedCmd.Flags().IntVar(&mpo, "mpo", 100, "how many metrics per org to simulate")
 	feedCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
 	feedCmd.Flags().DurationVar(&periodDur, "period", time.Second, "period between metric points (must be a multiple of 1s)")
-	feedCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\")")
+	feedCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\" \"daily-sine:<peak>,<offset>,<stdev>\")")
 }
