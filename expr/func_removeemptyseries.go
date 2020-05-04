@@ -45,26 +45,10 @@ func (s *FuncRemoveEmptySeries) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.Target = fmt.Sprintf("removeEmptySeries(%s, %g)", serie.Target, s.xFilesFactor)
 		serie.QueryPatt = serie.Target
 
-		notNull := 0
-		for _, p := range serie.Datapoints {
-			if !math.IsNaN(p.Val) {
-				notNull++
-			}
-		}
-
-		if xffCheck(notNull, len(serie.Datapoints), s.xFilesFactor) {
+		if pointsXffCheck(serie.Datapoints, s.xFilesFactor) {
 			output = append(output, serie)
 		}
 	}
 
 	return output, nil
-}
-
-// xffCheck returns whether a series with given notNull and total point counts should be included based on the xFilesFactor
-func xffCheck(notNull int, total int, xFilesFactor float64) bool {
-	if notNull == 0 || total == 0 {
-		return false
-	}
-
-	return float64(notNull)/float64(total) >= xFilesFactor
 }

@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/schema"
 )
 
 func skipCrossSeriesXff(xFilesFactor float64) bool {
@@ -26,6 +27,20 @@ func crossSeriesXff(in []models.Series, index int, xFilesFactor float64) bool {
 		}
 	}
 	return xff(nonNull, len(in), xFilesFactor)
+}
+
+// pointsXffCheck returns a boolean indicating whether the set of points
+// is valid or not
+// It is valid if the ratio of non-null points to total points
+// >= minimum ratio (xFilesFactor)
+func pointsXffCheck(in []schema.Point, xFilesFactor float64) bool {
+	notNull := 0
+	for _, p := range in {
+		if !math.IsNaN(p.Val) {
+			notNull++
+		}
+	}
+	return xff(notNull, len(in), xFilesFactor)
 }
 
 // xff returns a boolean indicating if the ratio of non-null values
