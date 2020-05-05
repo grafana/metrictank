@@ -8,6 +8,7 @@ import (
 type MetaTagRecord struct {
 	MetaTags    Tags        `json:"metaTags"`
 	Expressions Expressions `json:"expressions"`
+	mdFilter    MetricDefinitionFilter
 }
 
 func ParseMetaTagRecord(metaTags []string, expressions []string) (MetaTagRecord, error) {
@@ -99,6 +100,10 @@ func (m *MetaTagRecord) HasMetaTags() bool {
 }
 
 func (m *MetaTagRecord) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefinitionFilter {
+	if m.mdFilter != nil {
+		return m.mdFilter
+	}
+
 	filters := make([]MetricDefinitionFilter, len(m.Expressions))
 	defaultDecisions := make([]FilterDecision, len(m.Expressions))
 	for i, expr := range m.Expressions {
@@ -106,7 +111,7 @@ func (m *MetaTagRecord) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefi
 		defaultDecisions[i] = expr.GetDefaultDecision()
 	}
 
-	return func(id schema.MKey, name string, tags []string) FilterDecision {
+	m.mdFilter = func(id schema.MKey, name string, tags []string) FilterDecision {
 		for i := range filters {
 			decision := filters[i](id, name, tags)
 
@@ -125,4 +130,6 @@ func (m *MetaTagRecord) GetMetricDefinitionFilter(lookup IdTagLookup) MetricDefi
 
 		return Pass
 	}
+
+	return m.mdFilter
 }
