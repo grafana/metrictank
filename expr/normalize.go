@@ -30,6 +30,22 @@ func Normalize(dataMap DataMap, in []models.Series) []models.Series {
 			in[i] = NormalizeTo(dataMap, s, lcm)
 		}
 	}
+
+	// TODO - Remove. Short-term hack for https://github.com/grafana/metrictank/issues/1811
+	// Some functions (e.g. summarize) can break the expectations of alignment / num datapoints
+	// that we have here, so do another final pass to align timestamps based (arbitrarily) on our first series
+	targetDps := in[0].Datapoints
+	for i := 1; i < len(in); i++ {
+		// Add dps if needed
+		for len(in[i].Datapoints) < len(targetDps) {
+			dp := targetDps[len(in[i].Datapoints)]
+			dp.Val = math.NaN()
+			in[i].Datapoints = append(in[i].Datapoints, dp)
+		}
+		// Trim DPs if needed
+		in[i].Datapoints = in[i].Datapoints[:len(targetDps)]
+	}
+
 	return in
 }
 
