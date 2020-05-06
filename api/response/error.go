@@ -96,4 +96,6 @@ func (r *ErrorResp) Headers() (headers map[string]string) {
 	return headers
 }
 
-var RequestCanceledErr = NewError(499, "request canceled")
+const HttpClientClosedRequest = 499
+
+var RequestCanceledErr = NewError(HttpClientClosedRequest, "request canceled")
