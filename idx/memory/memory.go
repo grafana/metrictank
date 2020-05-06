@@ -897,6 +897,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 
 	tags, ok := m.tags[orgId]
 	if !ok {
+		m.RUnlock()
 		return nil
 	}
 
