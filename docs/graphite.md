@@ -96,7 +96,7 @@ See also:
 | integral                                                       |              | Stable     |
 | integralByInterval                                             |              | No         |
 | interpolate                                                    |              | No         |
-| invert                                                         |              | No         |
+| invert                                                         |              | Stable     |
 | isNonNull(seriesList) seriesList                               |              | Stable     |
 | keepLastValue(seriesList, limit) seriesList                    |              | Stable     |
 | legendValue                                                    |              | No         |
