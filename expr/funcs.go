@@ -99,6 +99,7 @@ func init() {
 		"min":                   {NewAggregateConstructor("min"), true},
 		"minimumAbove":          {NewFilterSeriesConstructor("min", ">"), true},
 		"minimumBelow":          {NewFilterSeriesConstructor("min", "<="), true},
+		"minMax":                {NewMinMax, true},
 		"minSeries":             {NewAggregateConstructor("min"), true},
 		"multiplySeries":        {NewAggregateConstructor("multiply"), true},
 		"movingAverage":         {NewMovingAverage, false},
