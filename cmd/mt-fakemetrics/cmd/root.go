@@ -69,6 +69,7 @@ var (
 	numUniqueCustomTags int
 
 	filterStrings []string
+	metricBuilder string
 	valuePolicy   string
 
 	kafkaMdmAddr     string

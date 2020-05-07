@@ -35,17 +35,18 @@ var feedCmd = &cobra.Command{
 			panic(err)
 		}
 
-		dataFeed(out, orgs, mpo, period, flush, 0, 1, false, TaggedBuilder{metricName}, vp)
+		dataFeed(out, orgs, mpo, period, flush, 0, 1, false, getBuilder(metricBuilder, metricName), vp)
 
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(feedCmd)
-	feedCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric", "the metric name to use")
+	feedCmd.Flags().StringVar(&metricName, "metricname", "some.id.of.a.metric.%d", "the metric name to use")
+	feedCmd.Flags().StringVar(&metricBuilder, "metricbuilder", "simple", "the metric builder to use. (simple|tagged)")
 	feedCmd.Flags().IntVar(&orgs, "orgs", 1, "how many orgs to simulate")
 	feedCmd.Flags().IntVar(&mpo, "mpo", 100, "how many metrics per org to simulate")
 	feedCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
 	feedCmd.Flags().DurationVar(&periodDur, "period", time.Second, "period between metric points (must be a multiple of 1s)")
-	feedCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\")")
+	feedCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\" \"daily-sine:<peak>,<offset>,<stdev>\")")
 }
