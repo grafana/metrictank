@@ -49,8 +49,6 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		filters: make([]expressionFilter, len(expressions)),
 	}
 
-	useMetaTags := MetaTagSupport && ctx.metaTagIndex != nil && ctx.metaTagRecords != nil
-
 	for i, expr := range expressions {
 		res.filters[i] = expressionFilter{
 			expr:             expr,
@@ -58,7 +56,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			defaultDecision:  expr.GetDefaultDecision(),
 		}
 
-		if !useMetaTags {
+		if !ctx.useMetaTagIndex() {
 			continue
 		}
 
@@ -95,7 +93,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		singleExprPerRecord := true
 		records := make([]tagquery.MetaTagRecord, 0, len(metaRecordIds))
 		for _, id := range metaRecordIds {
-			record, ok := ctx.metaTagRecords.records[id]
+			record, ok := ctx.metaTagRecords.getMetaRecordById(id)
 			if !ok {
 				corruptIndex.Inc()
 				log.Errorf("TagQueryContext: Tried to lookup a meta tag record id that does not exist, index is corrupted")

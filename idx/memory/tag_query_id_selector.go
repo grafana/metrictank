@@ -53,7 +53,7 @@ func (i *idSelector) getIds(resCh chan schema.MKey, stopCh chan struct{}) {
 	// if meta tag support is enabled and we create subqueries out of looked up meta
 	// records, then its possible that we will end up with duplicate results. to
 	// prevent this we spawn a separate worker process which deduplicates them
-	deduplicateResults := MetaTagSupport && !i.ctx.subQuery
+	deduplicateResults := i.ctx.useMetaTagIndex()
 
 	var dedupWg sync.WaitGroup
 	if deduplicateResults {
@@ -104,11 +104,7 @@ func (i *idSelector) deduplicateRawResults(dedupWg *sync.WaitGroup, resCh chan s
 func (i *idSelector) byTagValue() {
 	go i.byTagValueFromMetricTagIndex()
 
-	// if this is a sub query we want to ignore the meta tag index,
-	// otherwise we'd risk to create a loop of sub queries creating
-	// each other
-	// same when meta tag support is disabled in the config
-	if !MetaTagSupport || i.ctx.subQuery {
+	if !i.ctx.useMetaTagIndex() {
 		i.workerWg.Done()
 		return
 	}
@@ -170,34 +166,13 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 func (i *idSelector) byTagValueFromMetaTagIndex() {
 	defer i.workerWg.Done()
 
-	// if expression matches value exactly we can directly look up the ids by it as key.
-	// this is faster than having to call expr.Matches on each value
-	if i.expr.MatchesExactly() {
-		for _, metaRecordId := range i.ctx.metaTagIndex[i.expr.GetKey()][i.expr.GetValue()] {
-			select {
-			case <-i.stopCh:
-				return
-			default:
-			}
-			i.evaluateMetaRecord(metaRecordId)
-		}
-		return
-	}
-
-	for value, records := range i.ctx.metaTagIndex[i.expr.GetKey()] {
+	for _, recordId := range i.ctx.metaTagIndex.getByTagValue(i.expr, false) {
 		select {
 		case <-i.stopCh:
 			return
 		default:
 		}
-
-		if !i.expr.Matches(value) {
-			continue
-		}
-
-		for _, metaRecordId := range records {
-			i.evaluateMetaRecord(metaRecordId)
-		}
+		i.evaluateMetaRecord(recordId)
 	}
 }
 
@@ -207,11 +182,7 @@ func (i *idSelector) byTagValueFromMetaTagIndex() {
 func (i *idSelector) byTag() {
 	go i.byTagFromMetricTagIndex()
 
-	// if this is a sub query we want to ignore the meta tag index,
-	// otherwise we'd risk to create a loop of sub queries creating
-	// each other
-	// same when meta tag support is disabled in the config
-	if !MetaTagSupport || i.ctx.subQuery {
+	if !i.ctx.useMetaTagIndex() {
 		i.workerWg.Done()
 		return
 	}
@@ -272,40 +243,27 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 func (i *idSelector) byTagFromMetaTagIndex() {
 	defer i.workerWg.Done()
 
-	if i.expr.MatchesExactly() {
-		for _, records := range i.ctx.metaTagIndex[i.expr.GetKey()] {
-			for _, metaRecordId := range records {
-				i.evaluateMetaRecord(metaRecordId)
-			}
+	for _, recordId := range i.ctx.metaTagIndex.getByTag(i.expr, false) {
+		select {
+		case <-i.stopCh:
+			return
+		default:
 		}
-
-		return
-	}
-
-	for tag := range i.ctx.metaTagIndex {
-		if !i.expr.Matches(tag) {
-			continue
-		}
-
-		for _, records := range i.ctx.metaTagIndex[tag] {
-			for _, metaRecordId := range records {
-				i.evaluateMetaRecord(metaRecordId)
-			}
-		}
+		i.evaluateMetaRecord(recordId)
 	}
 }
 
 // evaluateMetaRecord takes a meta record id, it then looks up the corresponding
 // meta record, builds a sub query from its expressions and executes the sub query
 func (i *idSelector) evaluateMetaRecord(id recordId) {
-	record, ok := i.ctx.metaTagRecords.records[id]
+	record, ok := i.ctx.metaTagRecords.getMetaRecordById(id)
 	if !ok {
-		corruptIndex.Inc()
 		return
 	}
 
 	query, err := i.subQueryFromExpressions(record.Expressions)
 	if err != nil {
+		corruptIndex.Inc()
 		return
 	}
 
@@ -339,6 +297,6 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 // directly pushed into it
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
-	query.RunBlocking(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
+	query.Run(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
 	<-i.concGate
 }
