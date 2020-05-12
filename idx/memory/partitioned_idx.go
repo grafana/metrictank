@@ -529,50 +529,6 @@ func (p *PartitionedMemoryIdx) add(archive *idx.Archive) {
 	p.Partition[archive.Partition].add(archive)
 }
 
-func (p *PartitionedMemoryIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
-	for _, m := range p.Partition {
-		// all partitions should have all meta records
-		return m.MetaTagRecordList(orgId)
-	}
-	return nil
-}
-
-func (p *PartitionedMemoryIdx) MetaTagRecordUpsert(orgId uint32, rawRecord tagquery.MetaTagRecord) error {
-	g, _ := errgroup.WithContext(context.Background())
-
-	for _, m := range p.Partition {
-		m := m
-		g.Go(func() error {
-			return m.MetaTagRecordUpsert(orgId, rawRecord)
-		})
-	}
-
-	err := g.Wait()
-	if err != nil {
-		log.Errorf("memory-idx: failed to upsert meta tag record in at least one partition: %s", err)
-	}
-
-	return err
-}
-
-func (p *PartitionedMemoryIdx) MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error {
-	g, _ := errgroup.WithContext(context.Background())
-
-	for _, m := range p.Partition {
-		m := m
-		g.Go(func() error {
-			return m.MetaTagRecordSwap(orgId, records)
-		})
-	}
-
-	err := g.Wait()
-	if err != nil {
-		log.Errorf("memory-idx: failed to swap meta tag records in at least one partition: %s", err)
-	}
-
-	return err
-}
-
 func mergePartitionStringResults(partitionResults [][]string) []string {
 	// merge our results into the unique set of strings
 	merged := map[string]struct{}{}

@@ -382,12 +382,14 @@ func main() {
 	}
 
 	if memory.MetaTagSupport && cluster.Mode != cluster.ModeQuery {
-		if memory.Enabled {
-			metaRecords = memIndex
-		}
+		metaTagIdx := memory.NewMetaTagIndex()
+
+		// if memory.Enabled {
+		// 	metaRecords = memIndex
+		// }
 
 		if metatagsCass.CliConfig.Enabled {
-			metatagsCassIdx := metatagsCass.NewCassandraMetaRecordIdx(metatagsCass.CliConfig, memIndex)
+			metatagsCassIdx := metatagsCass.NewCassandraMetaRecordIdx(metatagsCass.CliConfig, metaTagIdx)
 			err = metatagsCassIdx.Init()
 			if err != nil {
 				log.Fatalf("Failed to initialize cassandra meta tag index: %s", err)
@@ -397,7 +399,7 @@ func main() {
 		}
 
 		if metatagsBt.CliConfig.Enabled {
-			metarecordBtIdx := metatagsBt.NewBigTableMetaRecordIdx(metatagsBt.CliConfig, memIndex)
+			metarecordBtIdx := metatagsBt.NewBigTableMetaRecordIdx(metatagsBt.CliConfig, metaTagIdx)
 			err = metarecordBtIdx.Init()
 			if err != nil {
 				log.Fatalf("Failed to initialize bigtable meta tag index: %s", err)
@@ -405,6 +407,8 @@ func main() {
 			metarecordBtIdx.Start()
 			metaRecords = metarecordBtIdx
 		}
+
+		metricIndex.SetMetaTagIdx(metaTagIdx)
 	}
 
 	/***********************************

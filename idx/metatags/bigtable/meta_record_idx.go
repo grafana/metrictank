@@ -509,5 +509,9 @@ func (m *MetaRecordIdx) deleteMetaRecord(orgId uint32, batchId metatags.UUID, re
 }
 
 func (m *MetaRecordIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
-	return m.memoryIdx.MetaTagRecordList(orgId)
+	queryable := m.memoryIdx.GetMetaTagQueryable(orgId)
+	if queryable != nil {
+		return queryable.MetaTagRecordList()
+	}
+	return nil
 }

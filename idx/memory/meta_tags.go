@@ -54,10 +54,11 @@ type metaTagIdx struct {
 	idLookup func(uint32, tagquery.Query, chan schema.MKey)
 }
 
-func newMetaTagIndex(idLookup func(uint32, tagquery.Query, chan schema.MKey)) *metaTagIdx {
+//func NewMetaTagIndex(idLookup func(uint32, tagquery.Query, chan schema.MKey)) *metaTagIdx {
+func NewMetaTagIndex() *metaTagIdx {
 	return &metaTagIdx{
-		byOrg:    make(map[uint32]*orgMetaTagIdx),
-		idLookup: idLookup,
+		byOrg: make(map[uint32]*orgMetaTagIdx),
+		//idLookup: idLookup,
 	}
 }
 
@@ -68,6 +69,10 @@ func (m *metaTagIdx) stop() {
 	}
 	m.byOrg = make(map[uint32]*orgMetaTagIdx)
 	m.Unlock()
+}
+
+func (m *metaTagIdx) SetIdLookupCallback(idLookup func(uint32, tagquery.Query, chan schema.MKey)) {
+	m.idLookup = idLookup
 }
 
 func (m *metaTagIdx) getOrgMetaTagIndex(orgId uint32) *orgMetaTagIdx {
@@ -639,7 +644,7 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 				queryCtx = NewTagQueryContext(e.queriesByRecord[record])
 				idCh := make(chan schema.MKey, 100)
 				go func() {
-					queryCtx.Run(tags, defById, nil, nil, idCh)
+					queryCtx.Run(tags, defById, nil, idCh)
 					close(idCh)
 				}()
 				for id := range idCh {

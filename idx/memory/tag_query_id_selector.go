@@ -3,6 +3,8 @@ package memory
 import (
 	"sync"
 
+	"github.com/grafana/metrictank/idx"
+
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
 )
@@ -166,7 +168,7 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 func (i *idSelector) byTagValueFromMetaTagIndex() {
 	defer i.workerWg.Done()
 
-	for _, recordId := range i.ctx.metaTagIndex.getByTagValue(i.expr, false) {
+	for _, recordId := range i.ctx.metaTagQueryable.GetMetaRecordIdsByExpression(i.expr, false) {
 		select {
 		case <-i.stopCh:
 			return
@@ -243,7 +245,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 func (i *idSelector) byTagFromMetaTagIndex() {
 	defer i.workerWg.Done()
 
-	for _, recordId := range i.ctx.metaTagIndex.getByTag(i.expr, false) {
+	for _, recordId := range i.ctx.metaTagQueryable.GetMetaRecordIdsByExpression(i.expr, false) {
 		select {
 		case <-i.stopCh:
 			return
@@ -255,8 +257,8 @@ func (i *idSelector) byTagFromMetaTagIndex() {
 
 // evaluateMetaRecord takes a meta record id, it then looks up the corresponding
 // meta record, builds a sub query from its expressions and executes the sub query
-func (i *idSelector) evaluateMetaRecord(id recordId) {
-	record, ok := i.ctx.metaTagRecords.getMetaRecordById(id)
+func (i *idSelector) evaluateMetaRecord(id idx.MetaRecordId) {
+	record, ok := i.ctx.metaTagQueryable.GetMetaRecordById(id)
 	if !ok {
 		return
 	}
@@ -297,6 +299,6 @@ func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (
 // directly pushed into it
 func (i *idSelector) runSubQuery(query TagQueryContext) {
 	defer i.workerWg.Done()
-	query.Run(i.ctx.index, i.ctx.byId, i.ctx.metaTagIndex, i.ctx.metaTagRecords, i.rawResCh)
+	query.Run(i.ctx.index, i.ctx.byId, i.ctx.metaTagQueryable, i.rawResCh)
 	<-i.concGate
 }

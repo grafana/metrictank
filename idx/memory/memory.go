@@ -131,7 +131,6 @@ func ConfigProcess() {
 // this is needed to support unit tests.
 type MemoryIndex interface {
 	idx.MetricIndex
-	idx.MetaTagIdx
 	LoadPartition(int32, []schema.MetricDefinition) int
 	UpdateArchiveLastSave(schema.MKey, int32, uint32)
 	add(*idx.Archive)
@@ -267,7 +266,7 @@ func (n *Node) String() string {
 
 type UnpartitionedMemoryIdx struct {
 	sync.RWMutex
-	*metaTagIdx
+	metaTagIdx idx.MetaTagIdx
 
 	// used for both hierarchy and tag index, so includes all MDs, with
 	// and without tags. It also mixes all orgs into one flat map.
@@ -293,26 +292,27 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 		tags:        make(map[uint32]TagIndex),
 	}
 
-	if MetaTagSupport {
-		m.metaTagIdx = newMetaTagIndex(
-			// used by the meta tag enricher to lookup ids from query
-			// expressions on the main tag index
-			func(orgId uint32, query tagquery.Query, idCh chan schema.MKey) {
-				m.RLock()
-				defer m.RUnlock()
-				defer close(idCh)
-
-				tags, ok := m.tags[orgId]
-				if !ok {
-					return
-				}
-
-				queryCtx := NewTagQueryContext(query)
-				queryCtx.Run(tags, m.defById, nil, nil, idCh)
-			})
-	}
-
 	return m
+}
+
+func (m *UnpartitionedMemoryIdx) SetMetaTagIdx(mti idx.MetaTagIdx) {
+	m.metaTagIdx = mti
+
+	m.metaTagIdx.SetIdLookupCallback(
+		func(orgId uint32, query tagquery.Query, idCh chan schema.MKey) {
+			m.RLock()
+			defer m.RUnlock()
+			defer close(idCh)
+
+			tags, ok := m.tags[orgId]
+			if !ok {
+				return
+			}
+
+			queryCtx := NewTagQueryContext(query)
+			queryCtx.Run(tags, m.defById, nil, idCh)
+		},
+	)
 }
 
 func (m *UnpartitionedMemoryIdx) Init() error {
@@ -338,7 +338,7 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 
 	if MetaTagSupport && m.metaTagIdx != nil {
 		m.Lock()
-		m.metaTagIdx.stop()
+		m.metaTagIdx.Stop()
 		m.metaTagIdx = nil
 		m.Unlock()
 	}
@@ -507,13 +507,13 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 	m.defByTagSet.add(def)
 
-	if MetaTagSupport {
+	if m.metaTagIdx != nil {
 		// it is important to release the lock for a short time, otherwise
 		// it's possible that the enricher can't process its queue because
 		// it could be blocked on waiting for the read lock on the index
 		// which would lead to deadlock.
 		m.Unlock()
-		m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
+		m.metaTagIdx.AddMetric(*def)
 		m.Lock()
 	}
 }
@@ -543,13 +543,13 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 
 	m.defByTagSet.del(def)
 
-	if MetaTagSupport {
+	if m.metaTagIdx != nil {
 		// it is important to release the lock for a short time, otherwise
 		// it's possible that the enricher can't process its queue because
 		// it could be blocked on waiting for the read lock on the index
 		// which would lead to deadlock.
 		m.Unlock()
-		m.getOrgMetaTagIndex(def.OrgId).enricher.delMetric(def)
+		m.metaTagIdx.DelMetric(*def)
 		m.Lock()
 	}
 
@@ -717,6 +717,13 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	return
 }
 
+func (m *UnpartitionedMemoryIdx) getMetaTagQueryable(orgId uint32) idx.MetaTagQueryable {
+	if m.metaTagIdx == nil {
+		return nil
+	}
+	return m.metaTagIdx.GetMetaTagQueryable(orgId)
+}
+
 func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	pre := time.Now()
 	m.RLock()
@@ -756,14 +763,7 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		return nil
 	}
 
-	var metaTagIdx *orgMetaTagIdx
-	if MetaTagSupport {
-		metaTagIdx = m.getOrgMetaTagIndex(orgId)
-		if metaTagIdx.enricher.countMetricsWithMetaTags() == 0 {
-			metaTagIdx = nil
-		}
-	}
-
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
 	resCh := make(chan schema.MKey, 100)
 
 	m.RLock()
@@ -787,8 +787,8 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 				HasChildren: false,
 				Defs:        []idx.Archive{CloneArchive(def)},
 			}
-			if metaTagIdx != nil {
-				byPath[nameWithTags].MetaTags = metaTagIdx.getMetaTagsById(def.Id.Key)
+			if metaTagQueryable != nil {
+				byPath[nameWithTags].MetaTags = metaTagQueryable.GetMetaTagsById(def.Id.Key)
 			}
 		} else {
 			existing.Defs = append(existing.Defs, CloneArchive(def))
@@ -893,12 +893,13 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 
 	m.RUnlock()
 
-	if !MetaTagSupport {
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
+	if metaTagQueryable == nil {
 		sort.Strings(res)
 		return res
 	}
 
-	res = append(res, m.getOrgMetaTagIndex(orgId).hierarchy.getTagsByFilter(filter)...)
+	res = append(res, metaTagQueryable.GetMetaTagsByRegex(filter)...)
 	sort.Strings(res)
 
 	return res
@@ -927,16 +928,15 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		res[value] += uint64(len(ids))
 	}
 
-	if !MetaTagSupport {
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
+	if metaTagQueryable == nil {
 		m.RUnlock()
 		return res
 	}
 
-	metaTagIdx := m.getOrgMetaTagIndex(orgId)
-
-	for value, recordIds := range metaTagIdx.hierarchy.getTagValuesByRegex(key, filter) {
+	for value, recordIds := range metaTagQueryable.GetMetaTagValuesByRegex(key, filter) {
 		for _, recordId := range recordIds {
-			record, ok := metaTagIdx.records.getMetaRecordById(recordId)
+			record, ok := metaTagQueryable.GetMetaRecordById(recordId)
 			if !ok {
 				continue
 			}
@@ -992,11 +992,12 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 	}
 
 	m.RUnlock()
-	if !MetaTagSupport {
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
+	if metaTagQueryable == nil {
 		return m.finalizeResult(res, limit, false)
 	}
 
-	metaTags := m.getOrgMetaTagIndex(orgId).hierarchy.getTagsByPrefix(prefix)
+	metaTags := metaTagQueryable.GetMetaTagsByPrefix(prefix)
 	if len(metaTags) == 0 {
 		return m.finalizeResult(res, limit, false)
 	}
@@ -1015,17 +1016,9 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		return nil
 	}
 
-	var metaTagIdx *orgMetaTagIdx
-	if MetaTagSupport {
-		metaTagIdx = m.getOrgMetaTagIndex(orgId)
-		if metaTagIdx.enricher.countMetricsWithMetaTags() == 0 {
-			// if the enricher is empty we set the index back to nil so it doesn't even get called
-			metaTagIdx = nil
-		}
-	}
-
 	resMap := make(map[string]struct{})
 	resCh := make(chan schema.MKey, 100)
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
 
 	m.RLock()
 	m.idsByTagQuery(orgId, query, resCh, true)
@@ -1051,9 +1044,8 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 			}
 		}
 
-		if metaTagIdx != nil {
-			metaTags := metaTagIdx.getMetaTagsById(def.Id.Key)
-			for _, tag := range metaTags {
+		if metaTagQueryable != nil {
+			for _, tag := range metaTagQueryable.GetMetaTagsById(def.Id.Key) {
 				if len(prefix) == 0 || strings.HasPrefix(tag.Key, prefix) {
 					resMap[tag.Key] = struct{}{}
 				}
@@ -1101,16 +1093,9 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 
 	m.RUnlock()
 
-	if !MetaTagSupport {
-		return m.finalizeResult(res, limit, false)
-	}
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
 
-	metaTagIdx := m.getOrgMetaTagIndex(orgId)
-	if metaTagIdx.enricher.countMetricsWithMetaTags() == 0 {
-		return m.finalizeResult(res, limit, false)
-	}
-
-	metaTagValues := metaTagIdx.hierarchy.getTagValuesByTagAndPrefix(tag, prefix)
+	metaTagValues := metaTagQueryable.GetMetaTagValuesByPrefix(tag, prefix)
 	if len(metaTagValues) == 0 {
 		return m.finalizeResult(res, limit, false)
 	}
@@ -1124,17 +1109,9 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return nil
 	}
 
-	var metaTagIdx *orgMetaTagIdx
-	if MetaTagSupport {
-		metaTagIdx = m.getOrgMetaTagIndex(orgId)
-		if metaTagIdx.enricher.countMetricsWithMetaTags() == 0 {
-			// if the enricher is empty we set the index back to nil so it doesn't even get called
-			metaTagIdx = nil
-		}
-	}
-
 	resMap := make(map[string]struct{})
 	resCh := make(chan schema.MKey, 100)
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
 
 	m.RLock()
 	m.idsByTagQuery(orgId, query, resCh, true)
@@ -1169,8 +1146,8 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 				resMap[tagValue[1]] = struct{}{}
 			}
 
-			if metaTagIdx != nil {
-				metaTags := metaTagIdx.getMetaTagsById(def.Id.Key)
+			if metaTagQueryable != nil {
+				metaTags := metaTagQueryable.GetMetaTagsById(def.Id.Key)
 				for _, metaTag := range metaTags {
 					if metaTag.Key == tag && strings.HasPrefix(metaTag.Value, prefix) {
 						resMap[metaTag.Value] = struct{}{}
@@ -1205,13 +1182,10 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query tagquery.Quer
 		return
 	}
 
+	metaTagQueryable := m.getMetaTagQueryable(orgId)
+
 	go func() {
-		if useMeta && MetaTagSupport {
-			metaTagIdx := m.getOrgMetaTagIndex(orgId)
-			queryCtx.Run(tags, m.defById, metaTagIdx.hierarchy, metaTagIdx.records, idCh)
-		} else {
-			queryCtx.Run(tags, m.defById, nil, nil, idCh)
-		}
+		queryCtx.Run(tags, m.defById, metaTagQueryable, idCh)
 		close(idCh)
 	}()
 }

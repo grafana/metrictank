@@ -42,7 +42,7 @@ type MetaRecordIdx struct {
 
 func NewCassandraMetaRecordIdx(cfg *Config, memoryIdx idx.MetaTagIdx) *MetaRecordIdx {
 	if err := cfg.Validate(); err != nil {
-		log.Fatalf("cass-meta-record-idx: %s", err)	
+		log.Fatalf("cass-meta-record-idx: %s", err)
 	}
 	cluster := gocql.NewCluster(strings.Split(cfg.hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(cfg.consistency)
@@ -244,7 +244,11 @@ func (m *MetaRecordIdx) pruneBatch(orgId uint32, batchId gocql.UUID) error {
 }
 
 func (m *MetaRecordIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
-	return m.memoryIdx.MetaTagRecordList(orgId)
+	queryable := m.memoryIdx.GetMetaTagQueryable(orgId)
+	if queryable != nil {
+		return queryable.MetaTagRecordList()
+	}
+	return nil
 }
 
 func (m *MetaRecordIdx) MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error {

@@ -152,6 +152,8 @@ type MetricIndex interface {
 	DeleteTagged(orgId uint32, query tagquery.Query) ([]Archive, error)
 }
 
+type MetaRecordId uint32
+
 type MetaTagIdx interface {
 	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
 	// whether it already exists or is new. The identity of a record is determined
@@ -163,11 +165,31 @@ type MetaTagIdx interface {
 	// because a meta record has no effect without meta tags.
 	MetaTagRecordUpsert(orgId uint32, record tagquery.MetaTagRecord) error
 
-	// MetaTagRecordList takes an org id and returns the list of all meta tag records
-	// of that given org.
-	MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord
-
 	// MetaTagRecordSwap takes a set of meta tag records and completely replaces
 	// the existing ones with the new ones.
 	MetaTagRecordSwap(orgId uint32, records []tagquery.MetaTagRecord) error
+
+	GetMetaTagQueryable(orgId uint32) MetaTagQueryable
+
+	AddMetric(schema.MetricDefinition)
+	DelMetric(schema.MetricDefinition)
+
+	SetIdLookupCallback(func(uint32, tagquery.Query, chan schema.MKey))
+
+	Stop()
+}
+
+type MetaTagQueryable interface {
+	// MetaTagRecordList returns the list of all meta tag records of this org
+	MetaTagRecordList() []tagquery.MetaTagRecord
+
+	GetMetaTagsById(key schema.Key) tagquery.Tags
+	GetMetaTagsByRegex(re *regexp.Regexp) []string
+	GetMetaTagsByPrefix(prefix string) []string
+	GetMetaTagValuesByRegex(tag string, re *regexp.Regexp) map[string][]MetaRecordId
+	GetMetaTagValuesByPrefix(tag string, prefix string) []string
+	GetMetaRecordById(MetaRecordId) (tagquery.MetaTagRecord, bool)
+	GetMetaRecordIdsByExpression(tagquery.Expression, bool) []MetaRecordId
+	ExpressionsUseMetaTags(exprs tagquery.Expressions) []bool
+	Stop()
 }

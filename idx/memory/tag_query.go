@@ -23,12 +23,11 @@ type TagQueryContext struct {
 	selector *idSelector
 	filter   *idFilter
 
-	index          TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
-	byId           map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
-	metaTagIndex   *metaTagHierarchy            // the meta tag index
-	metaTagRecords *metaTagRecords              // meta tag records keyed by their recordID
-	startWith      int                          // the expression index to start with
-	subQuery       bool                         // true if this is a subquery created from the expressions of a meta tag record
+	index            TagIndex                     // the tag index, hierarchy of tags & values, set by Run()/RunGetTags()
+	byId             map[schema.MKey]*idx.Archive // the metric index by ID, set by Run()/RunGetTags()
+	metaTagQueryable idx.MetaTagQueryable         // the meta tag index
+	startWith        int                          // the expression index to start with
+	subQuery         bool                         // true if this is a subquery created from the expressions of a meta tag record
 }
 
 // NewTagQueryContext takes a tag query and wraps it into all the
@@ -65,7 +64,7 @@ func (q *TagQueryContext) useMetaTagIndex() bool {
 	// if this is a sub query we want to ignore the meta tag index,
 	// otherwise we'd risk to create a loop of sub queries creating
 	// each other
-	return MetaTagSupport && !q.subQuery && q.metaTagIndex != nil && q.metaTagRecords != nil
+	return MetaTagSupport && !q.subQuery && q.metaTagQueryable != nil
 }
 
 func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
@@ -76,7 +75,9 @@ func (q *TagQueryContext) evaluateExpressionCosts() []expressionCost {
 		metaTagWg.Add(1)
 		go func() {
 			defer metaTagWg.Done()
-			q.metaTagIndex.updateExpressionCosts(costs, q.query.Expressions)
+			for i, exprUsesMetaTag := range q.metaTagQueryable.ExpressionsUseMetaTags(q.query.Expressions) {
+				costs[i].metaTag = exprUsesMetaTag
+			}
 		}()
 	}
 
@@ -182,11 +183,10 @@ func (q *TagQueryContext) filterIdsFromChan(idCh, resCh chan schema.MKey) {
 
 // Run executes this query on the given indexes and passes the results into the given result channel.
 // It blocks until query execution is finished, but it does not close the result channel.
-func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive, mti *metaTagHierarchy, mtr *metaTagRecords, resCh chan schema.MKey) {
+func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive, mtq idx.MetaTagQueryable, resCh chan schema.MKey) {
 	q.index = index
 	q.byId = byId
-	q.metaTagIndex = mti
-	q.metaTagRecords = mtr
+	q.metaTagQueryable = mtq
 	q.prepareExpressions()
 
 	// no initial expression has been chosen, returning empty result
