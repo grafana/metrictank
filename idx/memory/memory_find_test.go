@@ -21,7 +21,7 @@ import (
 
 var (
 	ix                   MemoryIndex
-	metaRecordIdx        idx.MetaRecordIdx
+	metaRecordIdx        idx.MetaTagIdx
 	currentIndex         int  // 1 small; 2 large
 	currentlyPartitioned bool // was the last call to New() for a partitioned or un-partitioned index.
 )

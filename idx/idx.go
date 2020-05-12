@@ -152,7 +152,7 @@ type MetricIndex interface {
 	DeleteTagged(orgId uint32, query tagquery.Query) ([]Archive, error)
 }
 
-type MetaRecordIdx interface {
+type MetaTagIdx interface {
 	// MetaTagRecordUpsert inserts, updates or deletes a meta record, depending on
 	// whether it already exists or is new. The identity of a record is determined
 	// by its queries.

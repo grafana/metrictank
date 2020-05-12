@@ -35,14 +35,14 @@ type MetaRecordIdx struct {
 	shutdown  chan struct{}
 	cfg       *Config
 	status    metatags.MetaRecordStatusByOrg
-	memoryIdx idx.MetaRecordIdx
+	memoryIdx idx.MetaTagIdx
 	cluster   *gocql.ClusterConfig
 	session   *cassUtils.Session
 }
 
-func NewCassandraMetaRecordIdx(cfg *Config, memoryIdx idx.MetaRecordIdx) *MetaRecordIdx {
+func NewCassandraMetaRecordIdx(cfg *Config, memoryIdx idx.MetaTagIdx) *MetaRecordIdx {
 	if err := cfg.Validate(); err != nil {
-		log.Fatalf("cass-meta-record-idx: %s", err)
+		log.Fatalf("cass-meta-record-idx: %s", err)	
 	}
 	cluster := gocql.NewCluster(strings.Split(cfg.hosts, ",")...)
 	cluster.Consistency = gocql.ParseConsistency(cfg.consistency)

@@ -27,14 +27,14 @@ type MetaRecordIdx struct {
 	shutdown             chan struct{}
 	cfg                  *Config
 	status               metatags.MetaRecordStatusByOrg
-	memoryIdx            idx.MetaRecordIdx
+	memoryIdx            idx.MetaTagIdx
 	client               *bigtable.Client
 	adminClient          *bigtable.AdminClient
 	metaRecordTable      *bigtable.Table
 	metaRecordBatchTable *bigtable.Table
 }
 
-func NewBigTableMetaRecordIdx(cfg *Config, memoryIdx idx.MetaRecordIdx) *MetaRecordIdx {
+func NewBigTableMetaRecordIdx(cfg *Config, memoryIdx idx.MetaTagIdx) *MetaRecordIdx {
 	return &MetaRecordIdx{
 		shutdown:  make(chan struct{}),
 		cfg:       cfg,

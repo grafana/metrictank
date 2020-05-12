@@ -53,7 +53,7 @@ var (
 	apiServer   *api.Server
 	inputs      []input.Plugin
 	store       mdata.Store
-	metaRecords idx.MetaRecordIdx
+	metaRecords idx.MetaTagIdx
 
 	// Misc:
 	instance    = flag.String("instance", "default", "instance identifier. must be unique. used in clustering messages, for naming queue consumers and emitted metrics")
