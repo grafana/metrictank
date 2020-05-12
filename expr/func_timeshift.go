@@ -70,20 +70,12 @@ func (s *FuncTimeShift) Exec(dataMap DataMap) ([]models.Series, error) {
 			out = append(out, schema.Point{Val: v.Val, Ts: addOffset(v.Ts, negativeOffset)})
 		}
 
-		output := models.Series{
-			Target:       newName(serie.Target),
-			QueryPatt:    newName(serie.QueryPatt),
-			QueryFrom:    serie.QueryFrom,
-			QueryTo:      serie.QueryTo,
-			QueryMDP:     serie.QueryMDP,
-			QueryPNGroup: serie.QueryPNGroup,
-			Tags:         serie.CopyTagsWith("timeShift", s.timeShift),
-			Datapoints:   out,
-			Interval:     serie.Interval,
-			Meta:         serie.Meta,
-		}
+		serie.Target = newName(serie.Target)
+		serie.QueryPatt = newName(serie.QueryPatt)
+		serie.Tags = serie.CopyTagsWith("timeShift", s.timeShift)
+		serie.Datapoints = out
 
-		outputs = append(outputs, output)
+		outputs = append(outputs, serie)
 	}
 	dataMap.Add(Req{}, outputs...)
 	return outputs, nil
