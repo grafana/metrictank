@@ -4,26 +4,21 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/api/models"
 )
 
 var results []models.Series
 
 func equalTags(exp, got []models.Series) error {
-	for i, g := range got {
-		o := exp[i]
-		if len(g.Tags) != len(o.Tags) {
-			return fmt.Errorf("series %d: len tags expected %d, got %d", i, len(o.Tags), len(g.Tags))
-		}
-		for k, v := range g.Tags {
-			expectedVal, ok := o.Tags[k]
-			if !ok {
-				return fmt.Errorf("series %d: got unknown tag key '%s'", i, k)
-			}
+	if len(exp) != len(got) {
+		return fmt.Errorf("len output expected %d, got %d", len(exp), len(got))
+	}
 
-			if v != expectedVal {
-				return fmt.Errorf("series %d: key '%s' had wrong value: expected '%s', got '%s'", i, k, expectedVal, v)
-			}
+	for i, g := range got {
+		want := exp[i]
+		if diff := cmp.Diff(want.Tags, g.Tags); diff != "" {
+			return fmt.Errorf("Tag mismatch (-want +got):\n%s", diff)
 		}
 	}
 	return nil
