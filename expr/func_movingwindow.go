@@ -82,9 +82,9 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 	for _, serie := range series {
 
 		serie.Target = newName(serie.Target)
-		serie.QueryPatt = newName(serie.Target)
+		serie.QueryPatt = newName(serie.QueryPatt)
 		serie.Tags = serie.CopyTagsWith(aggFuncName, s.windowSize)
-		serie.Datapoints = aggregateOnWindow(serie, aggFunc, s.shiftOffset, s.xFilesFactor)
+		serie.QueryFrom, serie.Datapoints = aggregateOnWindow(serie, aggFunc, s.shiftOffset, s.xFilesFactor)
 
 		outputs = append(outputs, serie)
 	}
@@ -93,25 +93,27 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 	return outputs, nil
 }
 
-func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint32, xFilesFactor float64) []schema.Point {
+func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint32, xFilesFactor float64) (uint32, []schema.Point) {
 	out := pointSlicePool.Get().([]schema.Point)
 
 	numPoints := len(serie.Datapoints)
-	var serieStart, serieEnd uint32 = serie.QueryFrom, serie.QueryTo
+	serieStart, serieEnd := serie.QueryFrom, serie.QueryTo
 	queryStart := uint32(serieStart + interval)
 
-	// Find index of Point which corresponds to the start of the query
 	ptIdx := 0
-	for ptIdx < numPoints && serie.Datapoints[ptIdx].Ts <= queryStart {
+	for ptIdx < numPoints-1 {
+		if queryStart >= serie.Datapoints[ptIdx].Ts &&
+			queryStart < serie.Datapoints[ptIdx+1].Ts {
+			break
+		}
 		ptIdx++
 	}
 
 	for ptTs, stIdx := queryStart, 0; ptTs <= serieEnd && ptIdx < numPoints && stIdx < ptIdx; stIdx++ {
 		ptTs = serie.Datapoints[ptIdx].Ts
 
-		points := serie.Datapoints[stIdx:ptIdx]
+		points := serie.Datapoints[stIdx : ptIdx+1]
 		aggPoint := schema.Point{Val: math.NaN(), Ts: ptTs}
-		aggPoint.Val = math.NaN()
 
 		if pointsXffCheck(points, xFilesFactor) {
 			aggPoint.Val = aggFunc(points)
@@ -121,23 +123,21 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 		out = append(out, aggPoint)
 	}
 
-	return out
+	return queryStart, out
 }
 
 func (s *FuncMovingWindow) getWindowSeconds(context Context) (uint32, error) {
 
 	// Discard the sign, if present, since we need to consider
-	// preceeding datapoints for each point on the graph
+	// preceding datapoints for each point on the graph
 	durStr := s.windowSize
-	if durStr[0] == '-' {
-		durStr = durStr[1:]
-	} else if durStr[0] == '+' {
+	if durStr[0] == '-' || durStr[0] == '+' {
 		durStr = durStr[1:]
 	}
 
 	// Note: s.windowSize is not overwritten and will be appended as is to the
-	// new Target. QueryPatt and Tags (as is the behavior on graphite)
-	// This implies a widow size of '-2min' or '+2min' will be captured as is.
+	// new Target, QueryPatt and Tags (as is the behavior on graphite)
+	// This implies a window size of '-2min' or '+2min' will be captured as is.
 	// If this is unwanted behavior uncomment line below
 	// s.windowSize = durStr
 
