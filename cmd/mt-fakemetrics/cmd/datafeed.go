@@ -123,7 +123,6 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		}
 		flushDuration.Value(time.Since(preFlush))
 
-		log.ConsoleErrorf("ts: %v - now: %v - nowT: %v", ts, now, nowT)
 		if ts >= now && stopAtNow {
 			return
 		}
