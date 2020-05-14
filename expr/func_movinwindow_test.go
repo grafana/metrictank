@@ -21,33 +21,34 @@ var seriesA = []schema.Point{
 	{Val: 8, Ts: 80},
 }
 
-var avgALast10mins = []schema.Point{
-	{Val: 1.5, Ts: 20},
-	{Val: 2.5, Ts: 30},
-	{Val: 3.5, Ts: 40},
-	{Val: 4.5, Ts: 50},
-	{Val: 5.5, Ts: 60},
-	{Val: 6.5, Ts: 70},
-	{Val: 7.5, Ts: 80},
-}
-
-var sumALast10mins = []schema.Point{
-	{Val: 3, Ts: 20},
-	{Val: 5, Ts: 30},
-	{Val: 7, Ts: 40},
-	{Val: 9, Ts: 50},
-	{Val: 11, Ts: 60},
-	{Val: 13, Ts: 70},
-	{Val: 15, Ts: 80},
-}
-
-var avgALast20mins = []schema.Point{
+var resSinglePtInA = []schema.Point{
+	{Val: 1, Ts: 20},
 	{Val: 2, Ts: 30},
 	{Val: 3, Ts: 40},
 	{Val: 4, Ts: 50},
 	{Val: 5, Ts: 60},
 	{Val: 6, Ts: 70},
 	{Val: 7, Ts: 80},
+}
+
+var avg2PtsA = []schema.Point{
+	{Val: 1.5, Ts: 30},
+	{Val: 2.5, Ts: 40},
+	{Val: 3.5, Ts: 50},
+	{Val: 4.5, Ts: 60},
+	{Val: 5.5, Ts: 70},
+	{Val: 6.5, Ts: 80},
+}
+
+var allNullPts = []schema.Point{
+	{Val: math.NaN(), Ts: 10},
+	{Val: math.NaN(), Ts: 20},
+	{Val: math.NaN(), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: math.NaN(), Ts: 60},
+	{Val: math.NaN(), Ts: 70},
+	{Val: math.NaN(), Ts: 80},
 }
 
 var seriesB = []schema.Point{
@@ -61,241 +62,165 @@ var seriesB = []schema.Point{
 	{Val: math.NaN(), Ts: 80},
 }
 
-var sumBLast20minsWithOneThirdNullsInWindowAllowed = []schema.Point{
-	{Val: 3, Ts: 30},
-	{Val: math.NaN(), Ts: 40},
-	{Val: 9, Ts: 50},
-	{Val: math.NaN(), Ts: 60},
-	{Val: 15, Ts: 70},
-	{Val: math.NaN(), Ts: 80},
-}
-
-var sumBLast20minsWithTwoThirdNullsInWindowAllowed = []schema.Point{
-	{Val: 3, Ts: 30},
+var res2PtsB = []schema.Point{
+	{Val: 0, Ts: 30},
 	{Val: 3, Ts: 40},
-	{Val: 9, Ts: 50},
+	{Val: 3, Ts: 50},
 	{Val: 6, Ts: 60},
-	{Val: 15, Ts: 70},
+	{Val: 6, Ts: 70},
 	{Val: 9, Ts: 80},
 }
 
+var resSinglePtInB = []schema.Point{
+	{Val: 0, Ts: 20},
+	{Val: math.NaN(), Ts: 30},
+	{Val: 3, Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: 6, Ts: 60},
+	{Val: math.NaN(), Ts: 70},
+	{Val: 9, Ts: 80},
+}
+
+var allNullsB = []schema.Point{
+	{Val: math.NaN(), Ts: 30},
+	{Val: math.NaN(), Ts: 40},
+	{Val: math.NaN(), Ts: 50},
+	{Val: math.NaN(), Ts: 60},
+	{Val: math.NaN(), Ts: 70},
+	{Val: math.NaN(), Ts: 80},
+}
+
+func getNamedSeries(target, patt string, from, to uint32, data ...[]schema.Point) []models.Series {
+
+	if len(data) == 0 {
+		panic("Needs at least one array of schema.Points")
+	}
+
+	outputs := make([]models.Series, 0, len(data))
+	for _, datum := range data {
+		serie := models.Series{
+			Target:     target,
+			QueryPatt:  patt,
+			QueryFrom:  from,
+			QueryTo:    to,
+			Datapoints: getCopy(datum),
+		}
+		outputs = append(outputs, serie)
+	}
+	return outputs
+}
+
 func TestMovingWindowWithDefaultValues(t *testing.T) {
-	offset10mins := uint32(10)
+	offset10s := uint32(10)
 	testMovingWindow(
-		"Multiple Series With Defaults, 10 min window",
-		[]models.Series{
-			{
-				Target:     "first",
-				QueryPatt:  "first",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-			{
-				Target:     "second",
-				QueryPatt:  "second",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-		},
-		[]models.Series{
-			{
-				Target:     "movingAverage(first,\"10min\")",
-				QueryPatt:  "movingAverage(first,\"10min\")",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(avgALast10mins),
-			},
-			{
-				Target:     "movingAverage(second,\"10min\")",
-				QueryPatt:  "movingAverage(second,\"10min\")",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(avgALast10mins),
-			},
-		},
-		offset10mins,
-		"10min",
-		"",         // Use default aggregate function
-		math.NaN(), // Use default xFilesFactor value
+		"defaults",
+		getNamedSeries("t", "p", 10, 80, seriesA, seriesB),
+		getNamedSeries("movingAverage(t,\"10s\")", "movingAverage(p,\"10s\")",
+			10+offset10s, 80, resSinglePtInA, resSinglePtInB),
+		offset10s,
+		"10s",
+		"",         // defaults to "average"
+		math.NaN(), // defaults to 0
 		t)
 
-	offset20mins := uint32(20)
+	offset20s := uint32(20)
 	testMovingWindow(
-		"Single Series With Defaults, 20min window",
-		[]models.Series{
-			{
-				Target:     "first",
-				QueryPatt:  "first",
-				QueryFrom:  10 + offset20mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-		},
-		[]models.Series{
-			{
-				Target:     "movingAverage(first,\"20min\")",
-				QueryPatt:  "movingAverage(first,\"20min\")",
-				QueryFrom:  10 + offset20mins,
-				QueryTo:    80,
-				Datapoints: getCopy(avgALast20mins),
-			},
-		},
-		offset20mins,
-		"20min",
-		"",         // Use default aggregate function
-		math.NaN(), // Use default xFilesFactor value
+		"defaults",
+		getNamedSeries("t", "p", 10, 80, seriesA, seriesB),
+		getNamedSeries("movingAverage(t,\"20s\")", "movingAverage(p,\"20s\")",
+			10+offset20s, 80, avg2PtsA, res2PtsB),
+		offset20s,
+		"20s",
+		"",         // defaults to "average"
+		math.NaN(), // defaults to 0
 		t)
 }
 
-func TestMovingWindowByFunctionName(t *testing.T) {
-	offset10mins := uint32(10)
+func TestMovingWindowByWindowSizes(t *testing.T) {
+	offset10s := uint32(10)
 	testMovingWindow(
-		"Calling movingAverage",
-		[]models.Series{
-			{
-				Target:     "first",
-				QueryPatt:  "first",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-			{
-				Target:     "second",
-				QueryPatt:  "second",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-		},
-		[]models.Series{
-			{
-				Target:     "movingAverage(first,\"10min\")",
-				QueryPatt:  "movingAverage(first,\"10min\")",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(avgALast10mins),
-			},
-			{
-				Target:     "movingAverage(second,\"10min\")",
-				QueryPatt:  "movingAverage(second,\"10min\")",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(avgALast10mins),
-			},
-		},
-		offset10mins,
-		"10min",
+		"signed window(negative)",
+		getNamedSeries("t", "p", 10, 80, seriesA, seriesA),
+		getNamedSeries("movingAverage(t,\"-10s\")", "movingAverage(p,\"-10s\")",
+			10+offset10s, 80, resSinglePtInA, resSinglePtInA),
+		offset10s,
+		"-10s",
 		"average",
 		1,
 		t)
 
 	testMovingWindow(
-		"Calling movingSum",
-		[]models.Series{
-			{
-				Target:     "first",
-				QueryPatt:  "first",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-			{
-				Target:     "second",
-				QueryPatt:  "second",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesA),
-			},
-		},
-		[]models.Series{
-			{
-				Target:     "movingSum(first,\"10min\")",
-				QueryPatt:  "movingSum(first,\"10min\")",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(sumALast10mins),
-			},
-			{
-				Target:     "movingSum(second,\"10min\")",
-				QueryPatt:  "movingSum(second,\"10min\")",
-				QueryFrom:  10 + offset10mins,
-				QueryTo:    80,
-				Datapoints: getCopy(sumALast10mins),
-			},
-		},
-		offset10mins,
-		"10min",
+		"signed window (positive)",
+		getNamedSeries("t", "p", 10, 80, seriesA, seriesA),
+		getNamedSeries("movingSum(t,\"+10s\")", "movingSum(p,\"+10s\")",
+			10+offset10s, 80, resSinglePtInA, resSinglePtInA),
+		offset10s,
+		"+10s",
 		"sum",
+		1,
+		t)
+
+	offsetZero := uint32(0)
+	testMovingWindow(
+		"empty window",
+		getNamedSeries("t", "p", 10, 80, seriesA, seriesB),
+		getNamedSeries("movingAverage(t,\"0m\")", "movingAverage(p,\"0m\")",
+			10+offsetZero, 80, allNullPts, allNullPts),
+		offsetZero,
+		"0m",
+		"average",
 		1,
 		t)
 }
 
 func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
-	offset20mins := uint32(20)
+	offset20s := uint32(20)
 	testMovingWindow(
-		"movingSum with xFilesFactor 1/3 nulls in window",
-		[]models.Series{
-			{
-				Target:     "first",
-				QueryPatt:  "first",
-				QueryFrom:  10 + offset20mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesB),
-			},
-		},
-		[]models.Series{
-			{
-				Target:     "movingSum(first,\"20min\")",
-				QueryPatt:  "movingSum(first,\"20min\")",
-				QueryFrom:  10 + offset20mins,
-				QueryTo:    80,
-				Datapoints: getCopy(sumBLast20minsWithOneThirdNullsInWindowAllowed),
-			},
-		},
-		offset20mins,
-		"20min",
+		"xFilesFactor > 0.5",
+		getNamedSeries("t", "p", 10, 80, seriesB),
+		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+			10+offset20s, 80, allNullsB),
+		offset20s,
+		"20s",
 		"sum",
-		0.66, // xFilesFactor 2/3 non null
+		0.66,
 		t)
 
 	testMovingWindow(
-		"movingSum with xFilesFactor 2/3 nulls in window",
-		[]models.Series{
-			{
-				Target:     "first",
-				QueryPatt:  "first",
-				QueryFrom:  10 + offset20mins,
-				QueryTo:    80,
-				Datapoints: getCopy(seriesB),
-			},
-		},
-		[]models.Series{
-			{
-				Target:     "movingSum(first,\"20min\")",
-				QueryPatt:  "movingSum(first,\"20min\")",
-				QueryFrom:  10 + offset20mins,
-				QueryTo:    80,
-				Datapoints: getCopy(sumBLast20minsWithTwoThirdNullsInWindowAllowed),
-			},
-		},
-		offset20mins,
-		"20min",
+		"xFilesFactor < 0.5",
+		getNamedSeries("t", "p", 10, 80, seriesB),
+		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+			10+offset20s, 80, res2PtsB),
+		offset20s,
+		"20s",
 		"sum",
-		0.33, // xFilesFactor 1/3 non null
+		0.33,
+		t)
+
+	testMovingWindow(
+		"xFilesFactor 1",
+		getNamedSeries("t", "p", 10, 80, seriesB),
+		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+			10+offset20s, 80, allNullsB),
+		offset20s,
+		"20s",
+		"sum",
+		1,
+		t)
+
+	testMovingWindow(
+		"xFilesFactor 0",
+		getNamedSeries("t", "p", 10, 80, seriesB),
+		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+			10+offset20s, 80, res2PtsB),
+		offset20s,
+		"20s",
+		"sum",
+		0,
 		t)
 }
 
 func testMovingWindow(name string, in []models.Series, out []models.Series, offset uint32, windowSize, fn string, xFilesFactor float64, t *testing.T) {
-
-	// Below we simulate the effect of the time
-	// modifications in the function Context
-	// QueryFrom is reset. QueryTo is left untouched.
-	for i := range in {
-		in[i].QueryFrom = in[i].Datapoints[0].Ts
-	}
-
 	var f GraphiteFunc
 	if fn != "" {
 		f = NewMovingWindowConstructor(fn)()
@@ -303,7 +228,6 @@ func testMovingWindow(name string, in []models.Series, out []models.Series, offs
 	} else {
 		f = NewMovingWindow()
 	}
-
 	f.(*FuncMovingWindow).in = NewMock(in)
 	f.(*FuncMovingWindow).windowSize = windowSize
 	f.(*FuncMovingWindow).shiftOffset = offset
@@ -311,11 +235,25 @@ func testMovingWindow(name string, in []models.Series, out []models.Series, offs
 		f.(*FuncMovingWindow).xFilesFactor = xFilesFactor
 	}
 
+	// Calling Context causes the time shift in QueryFrom
+	callContext(name, f, in[0].QueryFrom, in[0].QueryTo, offset, t)
+
 	got, err := f.Exec(make(map[Req][]models.Series))
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal("Failed test:", name, err)
 	}
 
+}
+
+func callContext(name string, f GraphiteFunc, from, to, offset uint32, t *testing.T) {
+	context := Context{
+		from: from,
+		to:   to,
+	}
+	newContext := f.Context(context)
+	if newContext.from != from-offset {
+		t.Fatalf("case %q: Expected context.from = %d, got %d", name, (from - offset), newContext.from)
+	}
 }
 
 func BenchmarkMovingWindow10k_1NoNulls(b *testing.B) {

@@ -30,13 +30,13 @@ func NewMovingWindowConstructor(name string) func() GraphiteFunc {
 }
 
 func NewMovingWindow() GraphiteFunc {
-	return &FuncMovingWindow{fn: "average"}
+	return &FuncMovingWindow{fn: "average", xFilesFactor: 0}
 }
 
 func (s *FuncMovingWindow) Signature() ([]Arg, []Arg) {
 	return []Arg{
 			ArgSeriesList{val: &s.in},
-			ArgString{key: "windowSize", val: &s.windowSize},
+			ArgString{key: "windowSize", val: &s.windowSize, validator: []Validator{IsSignedIntervalString}},
 			ArgString{key: "func", opt: true, val: &s.fn, validator: []Validator{IsConsolFunc}},
 			ArgFloat{key: "xFilesFactor", opt: true, val: &s.xFilesFactor, validator: []Validator{WithinZeroOneInclusiveInterval}},
 		}, []Arg{
@@ -46,20 +46,15 @@ func (s *FuncMovingWindow) Signature() ([]Arg, []Arg) {
 
 func (s *FuncMovingWindow) Context(context Context) Context {
 	var err error
-	s.shiftOffset, err = s.getWindowSeconds(context)
+	s.shiftOffset, err = s.getWindowSeconds()
 	if err != nil {
-		// panic? - windowSize specified as number of points
+		// shouldn't happen, validated above
 		return context
 	}
 
 	// Adjust to fetch from the shifted context.from with
 	// context.to unchanged
 	context.from -= s.shiftOffset
-
-	if math.IsNaN(s.xFilesFactor) {
-		s.xFilesFactor = 0.0
-	}
-
 	return context
 }
 
@@ -70,7 +65,6 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	aggFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
-
 	aggFuncName := fmt.Sprintf("moving%s", strings.Title(s.fn))
 	formatStr := fmt.Sprintf("%s(%%s,\"%s\")", aggFuncName, s.windowSize)
 
@@ -100,19 +94,19 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 	serieStart, serieEnd := serie.QueryFrom, serie.QueryTo
 	queryStart := uint32(serieStart + interval)
 
+	if queryStart < serieStart {
+		panic("Query start is before the first point in series")
+	}
+
 	ptIdx := 0
-	for ptIdx < numPoints-1 {
-		if queryStart >= serie.Datapoints[ptIdx].Ts &&
-			queryStart < serie.Datapoints[ptIdx+1].Ts {
-			break
-		}
+	for ptIdx < numPoints-1 && serie.Datapoints[ptIdx+1].Ts <= queryStart {
 		ptIdx++
 	}
 
-	for ptTs, stIdx := queryStart, 0; ptTs <= serieEnd && ptIdx < numPoints && stIdx < ptIdx; stIdx++ {
+	for ptTs, stIdx := queryStart, 0; ptTs <= serieEnd && ptIdx < numPoints && stIdx <= ptIdx; stIdx++ {
 		ptTs = serie.Datapoints[ptIdx].Ts
 
-		points := serie.Datapoints[stIdx : ptIdx+1]
+		points := serie.Datapoints[stIdx:ptIdx]
 		aggPoint := schema.Point{Val: math.NaN(), Ts: ptTs}
 
 		if pointsXffCheck(points, xFilesFactor) {
@@ -126,7 +120,7 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 	return queryStart, out
 }
 
-func (s *FuncMovingWindow) getWindowSeconds(context Context) (uint32, error) {
+func (s *FuncMovingWindow) getWindowSeconds() (uint32, error) {
 
 	// Discard the sign, if present, since we need to consider
 	// preceding datapoints for each point on the graph
@@ -136,15 +130,15 @@ func (s *FuncMovingWindow) getWindowSeconds(context Context) (uint32, error) {
 	}
 
 	// Note: s.windowSize is not overwritten and will be appended as is to the
-	// new Target, QueryPatt and Tags (as is the behavior on graphite)
+	// new Target, QueryPatt and Tags (keeping it consistent with graphite)
 	// This implies a window size of '-2min' or '+2min' will be captured as is.
-	// If this is unwanted behavior uncomment line below
+	// However the time operation is always a lookback over preceeding points.
+	// If this needs to be corrected in the native implementation
+	// uncomment the line below.
 	// s.windowSize = durStr
 
-	// Returns the duration in seconds if no errors encountered
-	// Possible errors based on validation above:
-	// 	errUnknownTimeUnit: if duration is specified as number of points
-	// 	or Atoi conversion errors
+	// Input validation and operations above check for empty or signed widowSizes
+	// or for widowSize specified as points. Errors unlikely here
 	shiftOffset, err := dur.ParseDuration(durStr)
 	if err != nil {
 		return 0, err
