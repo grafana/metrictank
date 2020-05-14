@@ -68,6 +68,7 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 
 	mp := int64(period)
 	ts := time.Now().Unix() - int64(offset) - mp
+	startingTs := ts
 	startFrom := 0
 
 	// huh what if we increment ts beyond the now ts?
@@ -90,6 +91,8 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 			// respecting where a previous flush left off, we need to start from
 			// the point after it.
 			var m int
+			ts = startingTs
+		METRICS:
 			for num := 0; num < ratePerFlushPerOrg; num++ {
 				// note that ratePerFlushPerOrg may be any of >, =, < mpo
 				// it all depends on what the user requested
@@ -101,6 +104,9 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 				// we already sent, so we must increase the timestamp
 				if m == 0 {
 					ts += mp
+					if ts >= now && stopAtNow {
+						break METRICS
+					}
 				}
 				metricData.Time = ts
 				metricData.Value = vp.Value(ts)
@@ -117,6 +123,7 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		}
 		flushDuration.Value(time.Since(preFlush))
 
+		log.ConsoleErrorf("ts: %v - now: %v - nowT: %v", ts, now, nowT)
 		if ts >= now && stopAtNow {
 			return
 		}
