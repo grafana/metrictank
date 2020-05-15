@@ -10,9 +10,9 @@ Yes, our platform supports graphite tags as well as [meta tags](https://grafana.
 
 ### Can I import my existing data?
 
-You can import pre-existing data into the hosted platform, from either a Graphite or metrictank installation.
+You can import pre-existing data, from either a Graphite or metrictank installation.
 We either provide you with the tools and instructions, or if provided access, we offer this service for a hands-off experience.
-Grafana dashboards can also be imported if you choose to use a hosted Grafana instance.
+Dashboards can also be imported if you choose to use Grafana Cloud.
 
 ### How do I send data to the service?
 
@@ -20,11 +20,11 @@ See [data ingestion]({{< relref "data-ingestion" >}}).
 
 ### How does this compare to stock graphite?
 
-The hosted platform is built on top of [metrictank](/oss/metrictank) and [graphite](/oss/graphite)
+Grafana Cloud is built on top of [metrictank](/oss/metrictank) and [graphite](/oss/graphite)
 Important differences with stock Graphite to be aware of:
 
 * support for meta tags
-* the platform is optimized for append-only workloads. While historical data can be imported, and we can allow for some out-of-orderness in the recent window (e.g. last 10 or 60 points), we currently don't support out of order writes (overwriting old data)
+* Grafana Cloud is optimized for append-only workloads. While historical data can be imported, and we can allow for some out-of-orderness in the recent window (e.g. last 10 or 60 points), we currently don't support out of order writes (overwriting old data)
 * timeseries can change resolution (interval) over time, they will be merged automatically.
 * Response metadata: performance statistics, series lineage information and rollup indicator (all visualized through grafana)
 * Index pruning (hide inactive/stale series)
@@ -43,6 +43,6 @@ so we will pick the minutely data instead. This way you typically still get high
 
 Note that on custom plans, these settings can be adjusted. You can also [pre-aggregate data in carbon-relay-ng](https://github.com/grafana/carbon-relay-ng/blob/master/docs/aggregation.md) to load fewer series.
 
-## Do I have to use hosted grafana or exclusively the hosted platform?
+## Do I have to exclusively use Grafana Cloud?
 
-No, the hosted platform is a datasource that you can use however you like. E.g. in combination with other datasources, and queried from any Grafana instance or other client.
+No, Grafana Cloud contains a datasource that you can use however you like. E.g. in combination with other datasources, and queried from any Grafana instance or other client.

@@ -19,14 +19,14 @@ Customers typically deploy using either of these 2 options:
 
 If your Graphite stack does not currently contain any relay, then you can simply add carbon-relay-ng, have your clients (statsd, collectd, diamond, etc) send data to the relay, which in turn can send data to your existing graphite server *and* to our platform.
 
-When creating a Hosted Metrics Graphite instance, we provide a carbon-relay-ng config file that you can plug in and be ready to use out of the box.
+When creating a Metrics Graphite instance, we provide a carbon-relay-ng config file that you can plug in and be ready to use out of the box.
 We also have Grafana Labs engineers ready to advise further on set up, if needed.
 
 ## Using carbon-relay-ng as a replacement for carbon-relay or carbon-cache
 
 The most simple way to send your carbon traffic to GrafanaCloud is to use carbon-relay-ng as a replacement for your current carbon-relay or carbon-cache. Carbon-relay-ng has a carbon input which supports the plain text and the pickle protocols, just like carbon-relay and carbon-cache. Note that the consistent-hashing implementation in carbon-relay-ng is different from the one in carbon-relay, so if you're using consistent-hashing then switching from carbon-relay to carbon-relay-ng would re-distribute the metrics among the destinations.
 
-An example configuration to do that can be downloaded from your Hosted Metrics instance's "Details" page. It contains a `grafanaNet` route pointing at your instance.
+An example configuration to do that can be downloaded from your Metrics instance's "Details" page. It contains a `grafanaNet` route pointing at your instance.
 
 ## Sending a copy of your carbon traffic to GrafanaCloud
 
@@ -107,8 +107,8 @@ When distributing traffic among multiple instances of carbon-relay-ng it is impo
 
 ```table
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
-| metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 | 
-|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| 
+| metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 |
+|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
                     \                     \           |                      |          /                     /
                      \                     \          |                      |         /                     /
                       \                     \         |                      |        /                     /
@@ -132,8 +132,8 @@ This setup gives you failure tolerance and scalability:
 
 ```table
 |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
-| metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 | 
-|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------| 
+| metric producer 1 | | metric producer 2 | | metric producer 3 | | metric producer 4 | | metric producer 5 | | metric producer 6 |
+|-------------------| |-------------------| |-------------------| |-------------------| |-------------------| |-------------------|
           \                     /                   /                        \                    /                    /
            \                   /                   /                          \                  /                    /
             \                 / /-----------------/                            \                / /------------------/

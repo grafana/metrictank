@@ -7,7 +7,7 @@ weight: 2
 
 The HTTP API is the same as that of Graphite, with the addition of ingestion, authentication and meta tags.
 
-First of all, there are two endpoints you will be talking to. They are provided on your grafana.com Hosted Metrics instance details page.
+First of all, there are two endpoints you will be talking to. They are provided on your Metrics instance details page.
 
 They will look something like:
 
@@ -62,7 +62,7 @@ Authorization: Basic base64(<instance id>:<api key>)
 Authorization: Bearer <instance id>:<api key>
 ```
 
-Note that you can find the instance ID as the username in the "Using Grafana with Hosted Metrics" section of your Grafana.com instance details page
+Note that you can find the instance ID as the username in the "Using Grafana with Metrics" section of your Grafana.com instance details page
 
 So essentially you can use basic auth with username "api_key" (for dedicated clusters) or your instance ID (for shared clusters) and password the api key that you provisoned
 

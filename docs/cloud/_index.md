@@ -3,9 +3,9 @@ title: Grafana Cloud Graphite
 header: false
 ---
 
-# Hosted Metrics - Graphite
+# Metrics - Graphite
 
-Grafana Labs' Hosted metrics Graphite service offers a graphite-compatible monitoring backend as a service.
+Grafana Labs' metrics Graphite service offers a graphite-compatible monitoring backend as a service.
 It acts and behaves as a regular graphite datasource within Grafana (or other tools), but behind the scenes, it is a sophisticated platform run by a team of dedicated engineers.
 
 * [data ingestion]({{< relref "data-ingestion" >}})
@@ -16,15 +16,15 @@ It acts and behaves as a regular graphite datasource within Grafana (or other to
 
 Several examples below have a `<instance URL>` placeholder.
 To identify your instance URL, login at grafana.com and
-navigate to your Hosted Metrics instance details.
+navigate to your Metrics instance details.
 
 
-## Using Grafana with Hosted Metrics
+## Using Grafana with Metrics
 
-Configuring Grafana for Hosted Metrics works the same way,
-whether you’re using your own Grafana or Hosted Grafana.
+Configuring Grafana for Metrics works the same way,
+whether or not you’re using Grafana Cloud.
 
-Once logged into your Grafana, you need to add a data source for Hosted Metrics
+Once logged into your Grafana, you need to add a data source for Metrics
 with the following details:
 
 **Grafana Data Source settings**
@@ -42,13 +42,13 @@ Field          | Value
 
 ## Sending Data with Carbon-Relay-NG
 
-There are a variety of ways that you can send your data to Hosted Metrics.
+There are a variety of ways that you can send your data to Metrics.
 
 In most situations, you should install a carbon-relay-ng service
 in each of the datacenter or regions that you will be sending metrics from.
 
 This will accept plain-text carbon (Graphite) input,
-and stream your encrypted metrics to the Hosted Metrics.
+and stream your encrypted data to Metrics.
 Since carbon-relay-ng can buffer metric streams in memory,
 this also provides increased resiliency to connectivity issues.
 
