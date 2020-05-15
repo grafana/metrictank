@@ -68,8 +68,7 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 	// set initial conditions
 	mp := int64(period)
 	// set start to now-offset because we add mp back every time we start a cycle going through metrics[o]
-	ts := time.Now().Unix() - int64(offset) - mp
-	startFrom := 0
+	initialTs := time.Now().Unix() - int64(offset) - mp
 
 	// huh what if we increment ts beyond the now ts?
 	// this can only happen if we repeatedly loop, and bump ts each time
@@ -81,6 +80,16 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 	// (ceil(mpo * speedup * flush /period /mpo)-1)*period < flush
 	// (ceil(speedup * flush /period)-1)*period < flush
 	// (ceil(speedup * flush - period ) < flush
+
+	type OrgState struct {
+		startFrom int
+		ts        int64
+	}
+
+	state := make([]OrgState, orgs)
+	for i := range state {
+		state[i].ts = initialTs
+	}
 
 	for nowT := range clock.AlignedTickLossless(flushDur) {
 		now := nowT.Unix()
@@ -94,20 +103,20 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 				// note that ratePerFlushPerOrg may be any of >, =, < mpo
 				// it all depends on what the user requested
 				// we mainly need to ensure both cases properly bump the timestamp
-				m = (startFrom + num) % mpo
+				m = (state[o].startFrom + num) % mpo
 				metricData := metrics[o][m]
 				// every time we cycle through metrics[o], we bump timestamp
+				// note: not every time we tick, because a ts increase may be spread across multiple flushes
 				if m == 0 {
-					ts += mp
+					state[o].ts += mp
 				}
-				metricData.Time = ts
-				metricData.Value = vp.Value(ts)
+				metricData.Time = state[o].ts
+				metricData.Value = vp.Value(state[o].ts)
 
 				data = append(data, &metricData)
 			}
-			// next metrics iteration should start where we left off... but..
-			// it looks like this will affect the next org during the current iteration :?
-			startFrom = (m + 1) % mpo
+			// next metrics iteration should start where we left off
+			state[o].startFrom = (m + 1) % mpo
 		}
 
 		preFlush := time.Now()
@@ -117,7 +126,8 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		}
 		flushDuration.Value(time.Since(preFlush))
 
-		if ts >= now && stopAtNow {
+		// all orgs are treated equally for now. can check just one of them
+		if state[0].ts >= now && stopAtNow {
 			return
 		}
 	}
