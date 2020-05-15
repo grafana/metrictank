@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
@@ -62,52 +64,60 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		flushDur, ratePerFlush, ratePerS, orgs*mpo,
 		orgs, flushDur, ratePerFlush, ratePerS, orgs*mpo)
 
-	tick := time.NewTicker(flushDur)
-
 	metrics := builder.Build(orgs, mpo, period)
 
+	// set initial conditions
 	mp := int64(period)
-	ts := time.Now().Unix() - int64(offset) - mp
-	startFrom := 0
+	// set start to now-offset because we add mp back every time we start a cycle going through metrics[o]
+	now := time.Now().Unix()
+	t0 := now - int64(offset) - mp
 
-	// huh what if we increment ts beyond the now ts?
-	// this can only happen if we repeatedly loop, and bump ts each time
-	// let's say we loop 5 times, so:
-	// ratePerFlushPerOrg == 5 * mpo
-	// then last ts = ts+4*period
-	// (loops-1)*period < flush
-	// (ceil(ratePerFlushPerOrg/mpo)-1)*period < flush
-	// (ceil(mpo * speedup * flush /period /mpo)-1)*period < flush
-	// (ceil(speedup * flush /period)-1)*period < flush
-	// (ceil(speedup * flush - period ) < flush
+	stopAt := int64(math.MaxInt64)
 
-	for nowT := range tick.C {
-		now := nowT.Unix()
+	if stopAtNow {
+		stopAt = now
+	}
+
+	type OrgState struct {
+		startFrom int
+		ts        int64
+	}
+
+	state := make([]OrgState, orgs)
+	for i := range state {
+		state[i].ts = t0
+	}
+
+	for range clock.AlignedTickLossless(flushDur) {
 		var data []*schema.MetricData
 
 		for o := 0; o < len(metrics); o++ {
-			// as seen above, we need to flush ratePerFlushPerOrg
-			// respecting where a previous flush left off, we need to start from
-			// the point after it.
+			// for each org, we need to flush ratePerFlushPerOrg,
+			// starting at wherever a previous flush (if any) left off.
 			var m int
 			for num := 0; num < ratePerFlushPerOrg; num++ {
 				// note that ratePerFlushPerOrg may be any of >, =, < mpo
 				// it all depends on what the user requested
-				// the main thing we need to watch out for here is to bump the timestamp
-				// is properly bumped in both cases
-				m = (startFrom + num) % mpo
+				// we mainly need to ensure both cases properly bump the timestamp
+				m = (state[o].startFrom + num) % mpo
 				metricData := metrics[o][m]
-				// not the very first metric, but we "cycled back" to reusing metrics
-				// we already sent, so we must increase the timestamp
+				// every time we cycle through metrics[o], we bump timestamp
+				// note: not every time we tick, because a ts increase may be spread across multiple flushes
 				if m == 0 {
-					ts += mp
+					state[o].ts += mp
+					// note: all orgs will go into this condition for the same tick iteration
+					// after publishing the same set of metrics
+					if state[o].ts >= stopAt {
+						break
+					}
 				}
-				metricData.Time = ts
-				metricData.Value = vp.Value(ts)
+				metricData.Time = state[o].ts
+				metricData.Value = vp.Value(state[o].ts)
 
 				data = append(data, &metricData)
 			}
-			startFrom = (m + 1) % mpo
+			// next metrics iteration should start where we left off
+			state[o].startFrom = (m + 1) % mpo
 		}
 
 		preFlush := time.Now()
@@ -117,7 +127,8 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		}
 		flushDuration.Value(time.Since(preFlush))
 
-		if ts >= now && stopAtNow {
+		// all orgs are treated equally for now. can check just one of them
+		if state[0].ts >= stopAt {
 			return
 		}
 	}
