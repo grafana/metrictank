@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
@@ -62,8 +63,6 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		flushDur, ratePerFlush, ratePerS, orgs*mpo,
 		orgs, flushDur, ratePerFlush, ratePerS, orgs*mpo)
 
-	tick := time.NewTicker(flushDur)
-
 	metrics := builder.Build(orgs, mpo, period)
 
 	// set initial conditions
@@ -83,7 +82,7 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 	// (ceil(speedup * flush /period)-1)*period < flush
 	// (ceil(speedup * flush - period ) < flush
 
-	for nowT := range tick.C {
+	for nowT := range clock.AlignedTickLossless(flushDur) {
 		now := nowT.Unix()
 		var data []*schema.MetricData
 
