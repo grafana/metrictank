@@ -70,17 +70,6 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 	// set start to now-offset because we add mp back every time we start a cycle going through metrics[o]
 	initialTs := time.Now().Unix() - int64(offset) - mp
 
-	// huh what if we increment ts beyond the now ts?
-	// this can only happen if we repeatedly loop, and bump ts each time
-	// let's say we loop 5 times, so:
-	// ratePerFlushPerOrg == 5 * mpo
-	// then last ts = ts+4*period
-	// (loops-1)*period < flush
-	// (ceil(ratePerFlushPerOrg/mpo)-1)*period < flush
-	// (ceil(mpo * speedup * flush /period /mpo)-1)*period < flush
-	// (ceil(speedup * flush /period)-1)*period < flush
-	// (ceil(speedup * flush - period ) < flush
-
 	type OrgState struct {
 		startFrom int
 		ts        int64
@@ -109,6 +98,11 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 				// note: not every time we tick, because a ts increase may be spread across multiple flushes
 				if m == 0 {
 					state[o].ts += mp
+					// note: all orgs will go into this condition for the same tick iteration
+					// after publishing the same set of metrics
+					if state[o].ts >= now {
+						break
+					}
 				}
 				metricData.Time = state[o].ts
 				metricData.Value = vp.Value(state[o].ts)
