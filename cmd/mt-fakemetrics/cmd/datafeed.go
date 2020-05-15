@@ -66,7 +66,9 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 
 	metrics := builder.Build(orgs, mpo, period)
 
+	// set initial conditions
 	mp := int64(period)
+	// set start to now-offset because we add mp back every time we start a cycle going through metrics[o]
 	ts := time.Now().Unix() - int64(offset) - mp
 	startFrom := 0
 
@@ -86,19 +88,16 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		var data []*schema.MetricData
 
 		for o := 0; o < len(metrics); o++ {
-			// as seen above, we need to flush ratePerFlushPerOrg
-			// respecting where a previous flush left off, we need to start from
-			// the point after it.
+			// for each org, we need to flush ratePerFlushPerOrg,
+			// starting at wherever a previous flush (if any) left off.
 			var m int
 			for num := 0; num < ratePerFlushPerOrg; num++ {
 				// note that ratePerFlushPerOrg may be any of >, =, < mpo
 				// it all depends on what the user requested
-				// the main thing we need to watch out for here is to bump the timestamp
-				// is properly bumped in both cases
+				// we mainly need to ensure both cases properly bump the timestamp
 				m = (startFrom + num) % mpo
 				metricData := metrics[o][m]
-				// not the very first metric, but we "cycled back" to reusing metrics
-				// we already sent, so we must increase the timestamp
+				// every time we cycle through metrics[o], we bump timestamp
 				if m == 0 {
 					ts += mp
 				}
@@ -107,6 +106,8 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 
 				data = append(data, &metricData)
 			}
+			// next metrics iteration should start where we left off... but..
+			// it looks like this will affect the next org during the current iteration :?
 			startFrom = (m + 1) % mpo
 		}
 
