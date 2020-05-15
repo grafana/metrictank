@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/grafana/metrictank/clock"
@@ -68,7 +69,14 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 	// set initial conditions
 	mp := int64(period)
 	// set start to now-offset because we add mp back every time we start a cycle going through metrics[o]
-	initialTs := time.Now().Unix() - int64(offset) - mp
+	now := time.Now().Unix()
+	t0 := now - int64(offset) - mp
+
+	stopAt := int64(math.MaxInt64)
+
+	if stopAtNow {
+		stopAt = now
+	}
 
 	type OrgState struct {
 		startFrom int
@@ -77,11 +85,10 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 
 	state := make([]OrgState, orgs)
 	for i := range state {
-		state[i].ts = initialTs
+		state[i].ts = t0
 	}
 
-	for nowT := range clock.AlignedTickLossless(flushDur) {
-		now := nowT.Unix()
+	for range clock.AlignedTickLossless(flushDur) {
 		var data []*schema.MetricData
 
 		for o := 0; o < len(metrics); o++ {
@@ -100,7 +107,7 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 					state[o].ts += mp
 					// note: all orgs will go into this condition for the same tick iteration
 					// after publishing the same set of metrics
-					if state[o].ts >= now {
+					if state[o].ts >= stopAt {
 						break
 					}
 				}
@@ -121,7 +128,7 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		flushDuration.Value(time.Since(preFlush))
 
 		// all orgs are treated equally for now. can check just one of them
-		if state[0].ts >= now && stopAtNow {
+		if state[0].ts >= stopAt {
 			return
 		}
 	}
