@@ -57,12 +57,12 @@ func makeGrepOrExclude(in []models.Series, pattern string, exclude bool) Graphit
 func testGrep(pattern string, exclude bool, inStr, outStr []string, t *testing.T) {
 	in := make([]models.Series, 0, len(inStr))
 	for _, s := range inStr {
-		in = append(in, getQuerySeries(s, a))
+		in = append(in, getSeriesNamed(s, a))
 	}
 
 	out := make([]models.Series, 0, len(outStr))
 	for _, s := range outStr {
-		out = append(out, getQuerySeries(s, a))
+		out = append(out, getSeriesNamed(s, a))
 	}
 	f := makeGrepOrExclude(in, pattern, exclude)
 

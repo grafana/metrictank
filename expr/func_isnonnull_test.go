@@ -40,10 +40,10 @@ func TestIsNonNullSingle(t *testing.T) {
 	testIsNonNull(
 		"identity",
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("isNonNull(a)", aIsNonNull),
+			getSeriesNamed("isNonNull(a)", aIsNonNull),
 		},
 		t,
 	)
@@ -53,10 +53,10 @@ func TestIsNonNullSingleAllNonNull(t *testing.T) {
 	testIsNonNull(
 		"identity-counter8bit",
 		[]models.Series{
-			getQuerySeries("counter8bit", d),
+			getSeriesNamed("counter8bit", d),
 		},
 		[]models.Series{
-			getQuerySeries("isNonNull(counter8bit)", cdIsNonNull),
+			getSeriesNamed("isNonNull(counter8bit)", cdIsNonNull),
 		},
 		t,
 	)
@@ -66,16 +66,16 @@ func TestIsNonNullMulti(t *testing.T) {
 	testIsNonNull(
 		"multiple-series",
 		[]models.Series{
-			getQuerySeries("a", a),
-			getQuerySeries("b.*", b),
-			getQuerySeries("c.foo{bar,baz}", c),
-			getQuerySeries("movingAverage(bar, '1min')", d),
+			getSeriesNamed("a", a),
+			getSeriesNamed("b.*", b),
+			getSeriesNamed("c.foo{bar,baz}", c),
+			getSeriesNamed("movingAverage(bar, '1min')", d),
 		},
 		[]models.Series{
-			getQuerySeries("isNonNull(a)", aIsNonNull),
-			getQuerySeries("isNonNull(b.*)", bIsNonNull),
-			getQuerySeries("isNonNull(c.foo{bar,baz})", cdIsNonNull),
-			getQuerySeries("isNonNull(movingAverage(bar, '1min'))", cdIsNonNull),
+			getSeriesNamed("isNonNull(a)", aIsNonNull),
+			getSeriesNamed("isNonNull(b.*)", bIsNonNull),
+			getSeriesNamed("isNonNull(c.foo{bar,baz})", cdIsNonNull),
+			getSeriesNamed("isNonNull(movingAverage(bar, '1min'))", cdIsNonNull),
 		},
 		t,
 	)

@@ -15,10 +15,10 @@ func TestConsolidateBySingle(t *testing.T) {
 	testConsolidateBy(
 		"single",
 		[]models.Series{
-			getQuerySeries("foo", a),
+			getSeriesNamed("foo", a),
 		},
 		[]models.Series{
-			getTargetSeries("consolidateBy(foo,\"sum\")", a),
+			getSeriesNamed("consolidateBy(foo,\"sum\")", a),
 		},
 		t,
 	)
@@ -27,12 +27,12 @@ func TestConsolidateByMultiple(t *testing.T) {
 	testConsolidateBy(
 		"multiple",
 		[]models.Series{
-			getQuerySeries("foo-1", a),
-			getQuerySeries("foo-2", b),
+			getSeriesNamed("foo-1", a),
+			getSeriesNamed("foo-2", b),
 		},
 		[]models.Series{
-			getTargetSeries("consolidateBy(foo-1,\"sum\")", a),
-			getTargetSeries("consolidateBy(foo-2,\"sum\")", b),
+			getSeriesNamed("consolidateBy(foo-1,\"sum\")", a),
+			getSeriesNamed("consolidateBy(foo-2,\"sum\")", b),
 		},
 		t,
 	)

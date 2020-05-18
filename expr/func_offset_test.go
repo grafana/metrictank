@@ -28,10 +28,10 @@ func TestOffsetSingle(t *testing.T) {
 		"single",
 		100,
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("offset(a,100)", out),
+			getSeriesNamed("offset(a,100)", out),
 		},
 		t,
 	)
@@ -51,12 +51,12 @@ func TestOffsetMultiple(t *testing.T) {
 		"single",
 		100.11,
 		[]models.Series{
-			getQuerySeries("a", a),
-			getQuerySeries("a2", a),
+			getSeriesNamed("a", a),
+			getSeriesNamed("a2", a),
 		},
 		[]models.Series{
-			getQuerySeries("offset(a,100.11)", out),
-			getQuerySeries("offset(a2,100.11)", out),
+			getSeriesNamed("offset(a,100.11)", out),
+			getSeriesNamed("offset(a2,100.11)", out),
 		},
 		t,
 	)

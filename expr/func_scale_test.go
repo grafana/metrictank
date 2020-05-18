@@ -28,10 +28,10 @@ func TestScaleSingle(t *testing.T) {
 		"single",
 		100,
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("scale(a,100)", out),
+			getSeriesNamed("scale(a,100)", out),
 		},
 		t,
 	)
@@ -51,12 +51,12 @@ func TestScaleMultiple(t *testing.T) {
 		"single",
 		100.11,
 		[]models.Series{
-			getQuerySeries("a", a),
-			getQuerySeries("a2", a),
+			getSeriesNamed("a", a),
+			getSeriesNamed("a2", a),
 		},
 		[]models.Series{
-			getQuerySeries("scale(a,100.11)", out),
-			getQuerySeries("scale(a2,100.11)", out),
+			getSeriesNamed("scale(a,100.11)", out),
+			getSeriesNamed("scale(a2,100.11)", out),
 		},
 		t,
 	)

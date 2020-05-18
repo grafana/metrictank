@@ -321,19 +321,10 @@ func getSeries(target, patt string, data []schema.Point) models.Series {
 	}
 }
 
-func getQuerySeries(patt string, data []schema.Point) models.Series {
+func getSeriesNamed(name string, data []schema.Point) models.Series {
 	return models.Series{
-		Target:     patt,
-		QueryPatt:  patt,
-		Datapoints: getCopy(data),
-		Interval:   10,
-	}
-}
-
-func getTargetSeries(target string, data []schema.Point) models.Series {
-	return models.Series{
-		Target:     target,
-		QueryPatt:  target,
+		Target:     name,
+		QueryPatt:  name,
 		Datapoints: getCopy(data),
 		Interval:   10,
 	}

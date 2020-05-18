@@ -24,10 +24,10 @@ func TestAggregateIdentity(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				getQuerySeries("single", a),
+				getSeriesNamed("single", a),
 			},
 		},
-		getTargetSeries("averageSeries(single)", a),
+		getSeriesNamed("averageSeries(single)", a),
 		t,
 		0,
 	)
@@ -36,10 +36,10 @@ func TestAggregateIdentity(t *testing.T) {
 		"sum",
 		[][]models.Series{
 			{
-				getQuerySeries("single", a),
+				getSeriesNamed("single", a),
 			},
 		},
-		getTargetSeries("sumSeries(single)", a),
+		getSeriesNamed("sumSeries(single)", a),
 		t,
 		0,
 	)
@@ -50,10 +50,10 @@ func TestAggregateQueryToSingle(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
+				getSeriesNamed("foo.*", a),
 			},
 		},
-		getTargetSeries("averageSeries(foo.*)", a),
+		getSeriesNamed("averageSeries(foo.*)", a),
 		t,
 		0,
 	)
@@ -64,11 +64,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
-				getQuerySeries("foo.*", b),
+				getSeriesNamed("foo.*", a),
+				getSeriesNamed("foo.*", b),
 			},
 		},
-		getTargetSeries("averageSeries(foo.*)", avgab),
+		getSeriesNamed("averageSeries(foo.*)", avgab),
 		t,
 		0,
 	)
@@ -77,11 +77,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"sum",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
-				getQuerySeries("foo.*", b),
+				getSeriesNamed("foo.*", a),
+				getSeriesNamed("foo.*", b),
 			},
 		},
-		getTargetSeries("sumSeries(foo.*)", sumab),
+		getSeriesNamed("sumSeries(foo.*)", sumab),
 		t,
 		0,
 	)
@@ -90,11 +90,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"max",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
-				getQuerySeries("foo.*", b),
+				getSeriesNamed("foo.*", a),
+				getSeriesNamed("foo.*", b),
 			},
 		},
-		getTargetSeries("maxSeries(foo.*)", maxab),
+		getSeriesNamed("maxSeries(foo.*)", maxab),
 		t,
 		0,
 	)
@@ -102,11 +102,11 @@ func TestAggregateMultiple(t *testing.T) {
 func TestAggregateMultipleDiffQuery(t *testing.T) {
 	input := [][]models.Series{
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
 		},
 		{
-			getQuerySeries("movingAverage(bar, '1min')", c),
+			getSeriesNamed("movingAverage(bar, '1min')", c),
 		},
 	}
 
@@ -114,7 +114,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"avg-multiple-serieslists",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*,movingAverage(bar, '1min'))", avgabc),
+		getSeriesNamed("averageSeries(foo.*,movingAverage(bar, '1min'))", avgabc),
 		t,
 		0,
 	)
@@ -122,7 +122,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"sum-multiple-serieslists",
 		"sum",
 		input,
-		getTargetSeries("sumSeries(foo.*,movingAverage(bar, '1min'))", sumabc),
+		getSeriesNamed("sumSeries(foo.*,movingAverage(bar, '1min'))", sumabc),
 		t,
 		0,
 	)
@@ -130,7 +130,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"max-multiple-serieslists",
 		"max",
 		input,
-		getTargetSeries("maxSeries(foo.*,movingAverage(bar, '1min'))", maxabc),
+		getSeriesNamed("maxSeries(foo.*,movingAverage(bar, '1min'))", maxabc),
 		t,
 		0,
 	)
@@ -140,25 +140,25 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 func TestAggregateMultipleTimesSameInput(t *testing.T) {
 	input := [][]models.Series{
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
 		},
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
 		},
 		{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 	}
 	testAggregate(
 		"avg-multiple-times-same-input",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*,foo.*,a,a)", avg4a2b),
+		getSeriesNamed("averageSeries(foo.*,foo.*,a,a)", avg4a2b),
 		t,
 		0,
 	)
@@ -166,7 +166,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 		"sum-multiple-times-same-input",
 		"sum",
 		input,
-		getTargetSeries("sumSeries(foo.*,foo.*,a,a)", sum4a2b),
+		getSeriesNamed("sumSeries(foo.*,foo.*,a,a)", sum4a2b),
 		t,
 		0,
 	)
@@ -175,9 +175,9 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 func TestAggregateXFilesFactor(t *testing.T) {
 	input := [][]models.Series{
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
-			getQuerySeries("foo.*", c),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
+			getSeriesNamed("foo.*", c),
 		},
 	}
 
@@ -203,7 +203,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabc),
+		getSeriesNamed("averageSeries(foo.*)", avgabc),
 		t,
 		0,
 	)
@@ -211,7 +211,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.25",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabc),
+		getSeriesNamed("averageSeries(foo.*)", avgabc),
 		t,
 		0.25,
 	)
@@ -220,7 +220,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.5",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabcxff05),
+		getSeriesNamed("averageSeries(foo.*)", avgabcxff05),
 		t,
 		0.5,
 	)
@@ -229,7 +229,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.75",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabcxff075),
+		getSeriesNamed("averageSeries(foo.*)", avgabcxff075),
 		t,
 		0.75,
 	)
@@ -238,7 +238,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-1",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabcxff075),
+		getSeriesNamed("averageSeries(foo.*)", avgabcxff075),
 		t,
 		1,
 	)

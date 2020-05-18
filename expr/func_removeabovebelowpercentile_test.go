@@ -23,28 +23,28 @@ func TestRemoveAbovePercentileSingleAllNonNull(t *testing.T) {
 			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			getQuerySeries("removeAbovePercentile(a, 60)", []schema.Point{
+			getSeriesNamed("removeAbovePercentile(a, 60)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 0, Ts: 20},
 				{Val: 5.5, Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeAbovePercentile(b, 60)", []schema.Point{
+			getSeriesNamed("removeAbovePercentile(b, 60)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: math.MaxFloat64, Ts: 20},
 				{Val: math.MaxFloat64 - 20, Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: 1234567890, Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeAbovePercentile(c, 60)", []schema.Point{
+			getSeriesNamed("removeAbovePercentile(c, 60)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 0, Ts: 20},
 				{Val: 1, Ts: 30},
 				{Val: 2, Ts: 40},
 				{Val: 3, Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeAbovePercentile(d, 60)", []schema.Point{
+			getSeriesNamed("removeAbovePercentile(d, 60)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 33, Ts: 20},
 				{Val: 199, Ts: 30},
@@ -68,28 +68,28 @@ func TestRemoveBelowPercentileSingleAllNonNull(t *testing.T) {
 			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			getQuerySeries("removeBelowPercentile(a, 50)", []schema.Point{
+			getSeriesNamed("removeBelowPercentile(a, 50)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: 5.5, Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: 1234567890, Ts: 60}}),
-			getQuerySeries("removeBelowPercentile(b, 50)", []schema.Point{
+			getSeriesNamed("removeBelowPercentile(b, 50)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.MaxFloat64, Ts: 20},
 				{Val: math.MaxFloat64 - 20, Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeBelowPercentile(c, 50)", []schema.Point{
+			getSeriesNamed("removeBelowPercentile(c, 50)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: math.NaN(), Ts: 30},
 				{Val: 2, Ts: 40},
 				{Val: 3, Ts: 50},
 				{Val: 4, Ts: 60}}),
-			getQuerySeries("removeBelowPercentile(d, 50)", []schema.Point{
+			getSeriesNamed("removeBelowPercentile(d, 50)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: 199, Ts: 30},
@@ -112,7 +112,7 @@ func TestRemoveBelowPercentileWithNulls(t *testing.T) {
 			getSeries("b", "abcd", allNulls),
 		},
 		[]models.Series{
-			getQuerySeries("removeBelowPercentile(a, 50)", []schema.Point{
+			getSeriesNamed("removeBelowPercentile(a, 50)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: 5.5, Ts: 30},

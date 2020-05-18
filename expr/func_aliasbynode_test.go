@@ -14,10 +14,10 @@ func TestAliasByNodeSingle(t *testing.T) {
 	testAliasByNode(
 		"single",
 		[]models.Series{
-			getQuerySeries("foo.bar.baz", a),
+			getSeriesNamed("foo.bar.baz", a),
 		},
 		[]models.Series{
-			getTargetSeries("foo", a),
+			getSeriesNamed("foo", a),
 		},
 		t,
 	)
@@ -27,12 +27,12 @@ func TestAliasByNodeMultiple(t *testing.T) {
 	testAliasByNode(
 		"multiple",
 		[]models.Series{
-			getQuerySeries("1.foo", a),
-			getQuerySeries("2.foo", b),
+			getSeriesNamed("1.foo", a),
+			getSeriesNamed("2.foo", b),
 		},
 		[]models.Series{
-			getTargetSeries("1", a),
-			getTargetSeries("2", b),
+			getSeriesNamed("1", a),
+			getSeriesNamed("2", b),
 		},
 		t,
 	)

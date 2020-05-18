@@ -49,11 +49,11 @@ func TestPerSecondSingle(t *testing.T) {
 		"identity",
 		[][]models.Series{
 			{
-				getQuerySeries("a", a),
+				getSeriesNamed("a", a),
 			},
 		},
 		[]models.Series{
-			getQuerySeries("perSecond(a)", aPerSecond),
+			getSeriesNamed("perSecond(a)", aPerSecond),
 		},
 		0,
 		t,
@@ -65,11 +65,11 @@ func TestPerSecondSingleMaxValue(t *testing.T) {
 		"identity-counter8bit",
 		[][]models.Series{
 			{
-				getQuerySeries("counter8bit", d),
+				getSeriesNamed("counter8bit", d),
 			},
 		},
 		[]models.Series{
-			getQuerySeries("perSecond(counter8bit)", dPerSecondMax255),
+			getSeriesNamed("perSecond(counter8bit)", dPerSecondMax255),
 		},
 		255,
 		t,
@@ -81,13 +81,13 @@ func TestPerSecondMulti(t *testing.T) {
 		"multiple-series",
 		[][]models.Series{
 			{
-				getQuerySeries("a", a),
-				getQuerySeries("b.*", b),
+				getSeriesNamed("a", a),
+				getSeriesNamed("b.*", b),
 			},
 		},
 		[]models.Series{
-			getQuerySeries("perSecond(a)", aPerSecond),
-			getQuerySeries("perSecond(b.*)", bPerSecond),
+			getSeriesNamed("perSecond(a)", aPerSecond),
+			getSeriesNamed("perSecond(b.*)", bPerSecond),
 		},
 		0,
 		t,
@@ -98,17 +98,17 @@ func TestPerSecondMultiMulti(t *testing.T) {
 		"multiple-serieslists",
 		[][]models.Series{
 			{
-				getQuerySeries("a", a),
-				getQuerySeries("b.foo{bar,baz}", b),
+				getSeriesNamed("a", a),
+				getSeriesNamed("b.foo{bar,baz}", b),
 			},
 			{
-				getQuerySeries("movingAverage(bar, '1min')", c),
+				getSeriesNamed("movingAverage(bar, '1min')", c),
 			},
 		},
 		[]models.Series{
-			getQuerySeries("perSecond(a)", aPerSecond),
-			getQuerySeries("perSecond(b.foo{bar,baz})", bPerSecond),
-			getQuerySeries("perSecond(movingAverage(bar, '1min'))", cPerSecond),
+			getSeriesNamed("perSecond(a)", aPerSecond),
+			getSeriesNamed("perSecond(b.foo{bar,baz})", bPerSecond),
+			getSeriesNamed("perSecond(movingAverage(bar, '1min'))", cPerSecond),
 		},
 		0,
 		t,

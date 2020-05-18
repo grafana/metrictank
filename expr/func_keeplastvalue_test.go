@@ -24,10 +24,10 @@ func TestKeepLastValueAll(t *testing.T) {
 		"keepAll",
 		math.MaxInt64,
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("keepLastValue(a)", out),
+			getSeriesNamed("keepLastValue(a)", out),
 		},
 		t,
 	)
@@ -39,10 +39,10 @@ func TestKeepLastValueNone(t *testing.T) {
 		"keepNone",
 		0,
 		[]models.Series{
-			getQuerySeries("sum4a2b", sum4a2b),
+			getSeriesNamed("sum4a2b", sum4a2b),
 		},
 		[]models.Series{
-			getQuerySeries("keepLastValue(sum4a2b)", sum4a2b),
+			getSeriesNamed("keepLastValue(sum4a2b)", sum4a2b),
 		},
 		t,
 	)
@@ -62,12 +62,12 @@ func TestKeepLastValueOne(t *testing.T) {
 		"keepOne",
 		1,
 		[]models.Series{
-			getQuerySeries("b", b),
-			getQuerySeries("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("keepLastValue(b)", out),
-			getQuerySeries("keepLastValue(a)", a),
+			getSeriesNamed("keepLastValue(b)", out),
+			getSeriesNamed("keepLastValue(a)", a),
 		},
 		t,
 	)

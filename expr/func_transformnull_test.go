@@ -27,10 +27,10 @@ func TestTransformNullSingle(t *testing.T) {
 		"single",
 		0,
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("transformNull(a,0)", aWith0),
+			getSeriesNamed("transformNull(a,0)", aWith0),
 		},
 		t,
 	)
@@ -41,12 +41,12 @@ func TestTransformNullMultiple(t *testing.T) {
 		"single",
 		0,
 		[]models.Series{
-			getQuerySeries("a", a),
-			getQuerySeries("a2", a),
+			getSeriesNamed("a", a),
+			getSeriesNamed("a2", a),
 		},
 		[]models.Series{
-			getQuerySeries("transformNull(a,0)", aWith0),
-			getQuerySeries("transformNull(a2,0)", aWith0),
+			getSeriesNamed("transformNull(a,0)", aWith0),
+			getSeriesNamed("transformNull(a2,0)", aWith0),
 		},
 		t,
 	)

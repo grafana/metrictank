@@ -17,7 +17,7 @@ func TestScaleToSecondsSingle(t *testing.T) {
 			getSeries("a", "a", a),
 		},
 		[]models.Series{
-			getQuerySeries("scaleToSeconds(a,10)", a),
+			getSeriesNamed("scaleToSeconds(a,10)", a),
 		},
 		t,
 		10,
@@ -40,7 +40,7 @@ func TestScaleToSecondsSingleAllNonNull(t *testing.T) {
 			getSeries("d", "d", d),
 		},
 		[]models.Series{
-			getQuerySeries("scaleToSeconds(d,9223372036854774784)", out),
+			getSeriesNamed("scaleToSeconds(d,9223372036854774784)", out),
 		},
 		t,
 		9223372036854774784,
@@ -71,8 +71,8 @@ func TestScaleToSecondsMulti(t *testing.T) {
 			getSeries("c.foo{bar,baz}", "c.foo{bar,baz}", c),
 		},
 		[]models.Series{
-			getQuerySeries("scaleToSeconds(b.*,0)", out1),
-			getQuerySeries("scaleToSeconds(c.foo{bar,baz},0)", out2),
+			getSeriesNamed("scaleToSeconds(b.*,0)", out1),
+			getSeriesNamed("scaleToSeconds(c.foo{bar,baz},0)", out2),
 		},
 		t,
 		0.001,

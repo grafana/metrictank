@@ -26,17 +26,17 @@ func TestCountSeriesFive(t *testing.T) {
 		"five",
 		[][]models.Series{
 			{
-				getQuerySeries("abc", a),
-				getQuerySeries("abc", b),
-				getQuerySeries("abc", c),
+				getSeriesNamed("abc", a),
+				getSeriesNamed("abc", b),
+				getSeriesNamed("abc", c),
 			},
 			{
-				getQuerySeries("ad", d),
-				getQuerySeries("ad", a),
+				getSeriesNamed("ad", d),
+				getSeriesNamed("ad", a),
 			},
 		},
 		[]models.Series{
-			getQuerySeries("countSeries(abc,ad)", out),
+			getSeriesNamed("countSeries(abc,ad)", out),
 		},
 		t,
 	)

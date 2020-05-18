@@ -23,8 +23,8 @@ func TestAliasSub(t *testing.T) {
 func testAliasSub(search, replace string, inStr, outStr []string, t *testing.T) {
 	var in, out []models.Series
 	for i := range inStr {
-		in = append(in, getQuerySeries(inStr[i], a))
-		out = append(out, getQuerySeries(outStr[i], a))
+		in = append(in, getSeriesNamed(inStr[i], a))
+		out = append(out, getSeriesNamed(outStr[i], a))
 	}
 
 	f := NewAliasSub()

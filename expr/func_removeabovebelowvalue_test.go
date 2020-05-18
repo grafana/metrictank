@@ -23,28 +23,28 @@ func TestRemoveAboveValueSingleAllNonNull(t *testing.T) {
 			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			getQuerySeries("removeAboveValue(a, 199)", []schema.Point{
+			getSeriesNamed("removeAboveValue(a, 199)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 0, Ts: 20},
 				{Val: 5.5, Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeAboveValue(b, 199)", []schema.Point{
+			getSeriesNamed("removeAboveValue(b, 199)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: math.NaN(), Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeAboveValue(c, 199)", []schema.Point{
+			getSeriesNamed("removeAboveValue(c, 199)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 0, Ts: 20},
 				{Val: 1, Ts: 30},
 				{Val: 2, Ts: 40},
 				{Val: 3, Ts: 50},
 				{Val: 4, Ts: 60}}),
-			getQuerySeries("removeAboveValue(d, 199)", []schema.Point{
+			getSeriesNamed("removeAboveValue(d, 199)", []schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 33, Ts: 20},
 				{Val: 199, Ts: 30},
@@ -68,28 +68,28 @@ func TestRemoveBelowValueSingleAllNonNull(t *testing.T) {
 			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			getQuerySeries("removeBelowValue(a, 199)", []schema.Point{
+			getSeriesNamed("removeBelowValue(a, 199)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: math.NaN(), Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: 1234567890, Ts: 60}}),
-			getQuerySeries("removeBelowValue(b, 199)", []schema.Point{
+			getSeriesNamed("removeBelowValue(b, 199)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.MaxFloat64, Ts: 20},
 				{Val: math.MaxFloat64 - 20, Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: 1234567890, Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeBelowValue(c, 199)", []schema.Point{
+			getSeriesNamed("removeBelowValue(c, 199)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: math.NaN(), Ts: 30},
 				{Val: math.NaN(), Ts: 40},
 				{Val: math.NaN(), Ts: 50},
 				{Val: math.NaN(), Ts: 60}}),
-			getQuerySeries("removeBelowValue(d, 199)", []schema.Point{
+			getSeriesNamed("removeBelowValue(d, 199)", []schema.Point{
 				{Val: math.NaN(), Ts: 10},
 				{Val: math.NaN(), Ts: 20},
 				{Val: 199, Ts: 30},

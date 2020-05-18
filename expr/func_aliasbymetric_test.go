@@ -18,16 +18,16 @@ func TestAliasByMetricNameWithoutPeriods(t *testing.T) {
 	testAliasByMetric(
 		[]models.Series{
 			// No Function wrapper
-			getQuerySeries(veryShortMetric, a),
+			getSeriesNamed(veryShortMetric, a),
 			// Function wrapper - single
 			getSeries("functionBlah("+veryShortMetric+", funcValue1, funcValue2)", veryShortMetric, a),
 			// Function wrapper - multiple
 			getSeries("functionBlah(functionBlahBlah("+veryShortMetric+"),funcValue1, funcValue2)", veryShortMetric, a),
 		},
 		[]models.Series{
-			getQuerySeries(veryShortBase, a),
-			getQuerySeries(veryShortBase, a),
-			getQuerySeries(veryShortBase, a),
+			getSeriesNamed(veryShortBase, a),
+			getSeriesNamed(veryShortBase, a),
+			getSeriesNamed(veryShortBase, a),
 		},
 		t,
 	)
@@ -41,16 +41,16 @@ func TestAliasByMetricWithoutTags(t *testing.T) {
 	testAliasByMetric(
 		[]models.Series{
 			// No Function wrapper
-			getQuerySeries(shortMetric, a),
+			getSeriesNamed(shortMetric, a),
 			// Function wrapper - single
 			getSeries("functionBlah("+shortMetric+", funcValue1, funcValue2)", shortMetric, a),
 			// Function wrapper - multiple
 			getSeries("functionBlah(functionBlahBlah("+shortMetric+"),funcValue1, funcValue2)", shortMetric, a),
 		},
 		[]models.Series{
-			getQuerySeries(shortBase, a),
-			getQuerySeries(shortBase, a),
-			getQuerySeries(shortBase, a),
+			getSeriesNamed(shortBase, a),
+			getSeriesNamed(shortBase, a),
+			getSeriesNamed(shortBase, a),
 		},
 		t,
 	)
@@ -67,16 +67,16 @@ func TestAliasByMetricWithTags(t *testing.T) {
 	testAliasByMetric(
 		[]models.Series{
 			// No Function wrapper
-			getQuerySeries(longMetric, a),
+			getSeriesNamed(longMetric, a),
 			// Function wrapper - single
 			getSeries("functionBlah("+longMetric+", funcValue1, funcValue2)", longMetric, a),
 			// Function wrapper - multiple
 			getSeries("functionBlah(functionBlahBlah("+longMetric+"),funcValue1, funcValue2)", longMetric, a),
 		},
 		[]models.Series{
-			getQuerySeries(longBase, a),
-			getQuerySeries(longBase, a),
-			getQuerySeries(longBase, a),
+			getSeriesNamed(longBase, a),
+			getSeriesNamed(longBase, a),
+			getSeriesNamed(longBase, a),
 		},
 		t,
 	)

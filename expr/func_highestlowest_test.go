@@ -19,10 +19,10 @@ func TestHighestAverage(t *testing.T) {
 		1,
 		true,
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		t,
 	)
@@ -35,13 +35,13 @@ func TestLowestAverage(t *testing.T) {
 		2,
 		false,
 		[]models.Series{
-			getQuerySeries("b", b),
-			getQuerySeries("a", a),
-			getQuerySeries("c", c),
+			getSeriesNamed("b", b),
+			getSeriesNamed("a", a),
+			getSeriesNamed("c", c),
 		},
 		[]models.Series{
-			getQuerySeries("c", c),
-			getQuerySeries("a", a),
+			getSeriesNamed("c", c),
+			getSeriesNamed("a", a),
 		},
 		t,
 	)
@@ -54,18 +54,18 @@ func TestHighestCurrent(t *testing.T) {
 		3,
 		true,
 		[]models.Series{
-			getQuerySeries("avg4a2b", avg4a2b),
-			getQuerySeries("b", b),
-			getQuerySeries("b", b),
-			getQuerySeries("b", b),
-			getQuerySeries("sum4a2b", sum4a2b),
-			getQuerySeries("b", b),
-			getQuerySeries("b", b),
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{
-			getQuerySeries("sum4a2b", sum4a2b),
-			getQuerySeries("avg4a2b", avg4a2b),
-			getQuerySeries("b", b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("b", b),
 		},
 		t,
 	)
@@ -78,12 +78,12 @@ func TestLowestCurrent(t *testing.T) {
 		4,
 		true,
 		[]models.Series{
-			getQuerySeries("sumab", sumab),
-			getQuerySeries("b", b),
+			getSeriesNamed("sumab", sumab),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{
-			getQuerySeries("sumab", sumab),
-			getQuerySeries("b", b),
+			getSeriesNamed("sumab", sumab),
+			getSeriesNamed("b", b),
 		},
 		t,
 	)
@@ -96,12 +96,12 @@ func TestHighestMax(t *testing.T) {
 		1,
 		true,
 		[]models.Series{
-			getQuerySeries("avg4a2b", avg4a2b),
-			getQuerySeries("sum4a2b", sum4a2b),
-			getQuerySeries("b", b),
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{
-			getQuerySeries("avg4a2b", avg4a2b),
+			getSeriesNamed("avg4a2b", avg4a2b),
 		},
 		t,
 	)
@@ -114,18 +114,18 @@ func TestHighestLong(t *testing.T) {
 		5,
 		true,
 		[]models.Series{
-			getQuerySeries("c", c),
-			getQuerySeries("d", d),
-			getQuerySeries("sumabc", sumabc),
-			getQuerySeries("sum4a2b", sum4a2b),
-			getQuerySeries("a", a),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
+			getSeriesNamed("sumabc", sumabc),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			getQuerySeries("sum4a2b", sum4a2b),
-			getQuerySeries("sumabc", sumabc),
-			getQuerySeries("a", a),
-			getQuerySeries("d", d),
-			getQuerySeries("c", c),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("sumabc", sumabc),
+			getSeriesNamed("a", a),
+			getSeriesNamed("d", d),
+			getSeriesNamed("c", c),
 		},
 		t,
 	)
@@ -141,7 +141,7 @@ func TestHighestExtraLong(t *testing.T) {
 		{Val: math.MaxFloat64, Ts: 60},
 	}
 	series := []models.Series{
-		getQuerySeries("a",
+		getSeriesNamed("a",
 			[]schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 0, Ts: 20},
@@ -150,7 +150,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 0, Ts: 50},
 				{Val: 0, Ts: 60},
 			}),
-		getQuerySeries("b",
+		getSeriesNamed("b",
 			[]schema.Point{
 				{Val: 1, Ts: 10},
 				{Val: 1, Ts: 20},
@@ -159,7 +159,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 1, Ts: 50},
 				{Val: 1, Ts: 60},
 			}),
-		getQuerySeries("avg4a2b",
+		getSeriesNamed("avg4a2b",
 			[]schema.Point{
 				{Val: 2, Ts: 10},
 				{Val: 2, Ts: 20},
@@ -168,7 +168,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 2, Ts: 50},
 				{Val: 2, Ts: 60},
 			}),
-		getQuerySeries("sum4a2b",
+		getSeriesNamed("sum4a2b",
 			[]schema.Point{
 				{Val: 3, Ts: 10},
 				{Val: 3, Ts: 20},
@@ -177,7 +177,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 3, Ts: 50},
 				{Val: 3, Ts: 60},
 			}),
-		getQuerySeries("c",
+		getSeriesNamed("c",
 			[]schema.Point{
 				{Val: 4, Ts: 10},
 				{Val: 4, Ts: 20},
@@ -186,7 +186,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 4, Ts: 50},
 				{Val: 4, Ts: 60},
 			}),
-		getQuerySeries("d",
+		getSeriesNamed("d",
 			[]schema.Point{
 				{Val: 5, Ts: 10},
 				{Val: 5, Ts: 20},
@@ -195,7 +195,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 5, Ts: 50},
 				{Val: 5, Ts: 60},
 			}),
-		getQuerySeries("sumab",
+		getSeriesNamed("sumab",
 			[]schema.Point{
 				{Val: 6, Ts: 10},
 				{Val: 6, Ts: 20},
@@ -204,7 +204,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 6, Ts: 50},
 				{Val: 6, Ts: 60},
 			}),
-		getQuerySeries("sumabc",
+		getSeriesNamed("sumabc",
 			[]schema.Point{
 				{Val: 7, Ts: 10},
 				{Val: 7, Ts: 20},
@@ -213,7 +213,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 7, Ts: 50},
 				{Val: 7, Ts: 60},
 			}),
-		getQuerySeries("sumcd",
+		getSeriesNamed("sumcd",
 			[]schema.Point{
 				{Val: 8, Ts: 10},
 				{Val: 8, Ts: 20},
@@ -222,7 +222,7 @@ func TestHighestExtraLong(t *testing.T) {
 				{Val: 8, Ts: 50},
 				{Val: 8, Ts: 60},
 			}),
-		getQuerySeries("avgab",
+		getSeriesNamed("avgab",
 			[]schema.Point{
 				{Val: 9, Ts: 10},
 				{Val: 9, Ts: 20},
@@ -238,7 +238,7 @@ func TestHighestExtraLong(t *testing.T) {
 			series = append(series, serie)
 		}
 	}
-	series = append(series, getQuerySeries("highAvg", highAvg))
+	series = append(series, getSeriesNamed("highAvg", highAvg))
 	rand.Shuffle(len(series), func(i, j int) {
 		series[i], series[j] = series[j], series[i]
 	})
@@ -250,7 +250,7 @@ func TestHighestExtraLong(t *testing.T) {
 		true,
 		series,
 		[]models.Series{
-			getQuerySeries("highAvg", highAvg),
+			getSeriesNamed("highAvg", highAvg),
 		},
 		t,
 	)
@@ -263,9 +263,9 @@ func TestHighestNone(t *testing.T) {
 		0,
 		true,
 		[]models.Series{
-			getQuerySeries("avg4a2b", avg4a2b),
-			getQuerySeries("sum4a2b", sum4a2b),
-			getQuerySeries("b", b),
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{},
 		t,

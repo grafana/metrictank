@@ -271,7 +271,7 @@ func TestRoundTiny(t *testing.T) {
 func checkCases(t *testing.T, input []models.Series, cases []TestCase) {
 	for _, c := range cases {
 		f := getNewRound(input, c.precision)
-		out := []models.Series{getQuerySeries(c.expectedName, c.expectedOutput)}
+		out := []models.Series{getSeriesNamed(c.expectedName, c.expectedOutput)}
 
 		// Copy input to check that it is unchanged later
 		inputCopy := make([]models.Series, len(input))

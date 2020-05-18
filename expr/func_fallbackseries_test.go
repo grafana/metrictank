@@ -9,9 +9,9 @@ import (
 func TestFallbackSeriesNo(t *testing.T) {
 	testFallbackSeries(
 		"NoFallback",
-		[]models.Series{getQuerySeries("a", a)},
-		[]models.Series{getQuerySeries("b", b)},
-		[]models.Series{getQuerySeries("a", a)},
+		[]models.Series{getSeriesNamed("a", a)},
+		[]models.Series{getSeriesNamed("b", b)},
+		[]models.Series{getSeriesNamed("a", a)},
 		t,
 	)
 }
@@ -20,8 +20,8 @@ func TestFallbackSeriesYes(t *testing.T) {
 	testFallbackSeries(
 		"zeroIn",
 		[]models.Series{},
-		[]models.Series{getQuerySeries("b", b)},
-		[]models.Series{getQuerySeries("b", b)},
+		[]models.Series{getSeriesNamed("b", b)},
+		[]models.Series{getSeriesNamed("b", b)},
 		t,
 	)
 }
