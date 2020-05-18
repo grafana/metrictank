@@ -1,12 +1,14 @@
 package expr
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strings"
 
 	"github.com/grafana/metrictank/batch"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
@@ -49,6 +51,7 @@ func (s *FuncMovingWindow) Context(context Context) Context {
 	s.shiftOffset, err = s.getWindowSeconds()
 	if err != nil {
 		// shouldn't happen, validated above
+		log.Warnf("movingWindow: encountered error in getWindowSeconds, %s", err)
 		return context
 	}
 
@@ -75,10 +78,16 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 	outputs := make([]models.Series, 0, len(series))
 	for _, serie := range series {
 
+		from, points, err := aggregateOnWindow(serie, aggFunc, s.shiftOffset, s.xFilesFactor)
+		if err != nil {
+			return nil, err
+		}
+
 		serie.Target = newName(serie.Target)
 		serie.QueryPatt = newName(serie.QueryPatt)
 		serie.Tags = serie.CopyTagsWith(aggFuncName, s.windowSize)
-		serie.QueryFrom, serie.Datapoints = aggregateOnWindow(serie, aggFunc, s.shiftOffset, s.xFilesFactor)
+		serie.QueryFrom = from
+		serie.Datapoints = points
 
 		outputs = append(outputs, serie)
 	}
@@ -87,7 +96,7 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 	return outputs, nil
 }
 
-func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint32, xFilesFactor float64) (uint32, []schema.Point) {
+func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint32, xFilesFactor float64) (uint32, []schema.Point, error) {
 	out := pointSlicePool.Get().([]schema.Point)
 
 	numPoints := len(serie.Datapoints)
@@ -95,7 +104,7 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 	queryStart := uint32(serieStart + interval)
 
 	if queryStart < serieStart {
-		panic("Query start is before the first point in series")
+		return 0, nil, errors.New("query start time cannot be before the first point in series")
 	}
 
 	ptIdx := 0
@@ -117,7 +126,7 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 		out = append(out, aggPoint)
 	}
 
-	return queryStart, out
+	return queryStart, out, nil
 }
 
 func (s *FuncMovingWindow) getWindowSeconds() (uint32, error) {
