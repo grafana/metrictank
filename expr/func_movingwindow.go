@@ -1,12 +1,12 @@
 package expr
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
 
 	"github.com/grafana/metrictank/batch"
+	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 
@@ -104,7 +104,7 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 	queryStart := uint32(serieStart + interval)
 
 	if queryStart < serieStart {
-		return 0, nil, errors.New("query start time cannot be before the first point in series")
+		return 0, nil, errors.NewInternal("query start time cannot be before the first point in series")
 	}
 
 	ptIdx := 0
