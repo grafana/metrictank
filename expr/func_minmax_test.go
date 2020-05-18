@@ -10,15 +10,6 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-func getNewMinMax(in []models.Series) *FuncMinMax {
-	f := NewMinMax()
-	ps := f.(*FuncMinMax)
-	ps.in = NewMock(in)
-	return ps
-}
-
-const interval = 10
-
 var basic = []schema.Point{
 	{Val: 0, Ts: 10},
 	{Val: 10, Ts: 20},
@@ -69,194 +60,104 @@ var infinityR = []schema.Point{
 }
 
 func TestMinMaxBasic(t *testing.T) {
-	f := getNewMinMax(
+	testMinMax("NaN",
 		[]models.Series{
-			{
-				Interval:   interval,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: getCopy(basic),
-			},
+			getSeries("targetHere", "queryPattHere", basic),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "minMax(queryPattHere)",
-			Target:     "minMax(targetHere)",
-			Datapoints: getCopy(basicR),
+		[]models.Series{
+			getSeries("minMax(targetHere)", "minMax(queryPattHere)", basicR),
 		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+		t)
 }
 
 func TestMinMaxNaN(t *testing.T) {
-	f := getNewMinMax(
+	testMinMax("NaN",
 		[]models.Series{
-			{
-				Interval:   interval,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: getCopy(nan),
-			},
+			getSeries("targetHere", "queryPattHere", nan),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "minMax(queryPattHere)",
-			Target:     "minMax(targetHere)",
-			Datapoints: getCopy(nanR),
+		[]models.Series{
+			getSeries("minMax(targetHere)", "minMax(queryPattHere)", nanR),
 		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+		t)
 }
 
 func TestMinMaxSame(t *testing.T) {
-	f := getNewMinMax(
+	testMinMax("SameMinMax",
 		[]models.Series{
-			{
-				Interval:   interval,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: getCopy(minMaxSame),
-			},
+			getSeries("targetHere", "queryPattHere", minMaxSame),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "minMax(queryPattHere)",
-			Target:     "minMax(targetHere)",
-			Datapoints: getCopy(minMaxSameR),
+		[]models.Series{
+			getSeries("minMax(targetHere)", "minMax(queryPattHere)", minMaxSameR),
 		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestMinMaxInputUnchanged(t *testing.T) {
-	in := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "queryPattHere",
-			Target:     "targetHere",
-			Datapoints: []schema.Point{},
-		},
-	}
-
-	// store copy of the original input
-	inCopy := make([]models.Series, len(in))
-	copy(inCopy, in)
-
-	f := getNewMinMax(in)
-	_, err := f.Exec(make(map[Req][]models.Series))
-
-	// make sure input hasn't changed after call to minMax
-	if err := equalOutput(in, inCopy, nil, err); err != nil {
-		t.Fatal(err)
-	}
+		t)
 }
 
 func TestMinMaxInfinity(t *testing.T) {
-	f := getNewMinMax(
+	testMinMax("Infinity",
 		[]models.Series{
-			{
-				Interval:   interval,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: getCopy(infinity),
-			},
+			getSeries("targetHere", "queryPattHere", infinity),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "minMax(queryPattHere)",
-			Target:     "minMax(targetHere)",
-			Datapoints: getCopy(infinityR),
+		[]models.Series{
+			getSeries("minMax(targetHere)", "minMax(queryPattHere)", infinityR),
 		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+		t)
 }
 
 func TestMinMaxZero(t *testing.T) {
-	f := getNewMinMax(
+	testMinMax("Zero",
 		[]models.Series{
-			{
-				Interval:   interval,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: []schema.Point{},
-			},
+			getSeries("targetHere", "queryPattHere", []schema.Point{}),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "minMax(queryPattHere)",
-			Target:     "minMax(targetHere)",
-			Datapoints: []schema.Point{},
+		[]models.Series{
+			getSeries("minMax(targetHere)", "minMax(queryPattHere)", []schema.Point{}),
 		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+		t)
 }
 
 func TestMinMaxMultiple(t *testing.T) {
-	f := getNewMinMax(
+	testMinMax("MultipleSeries",
 		[]models.Series{
-			{
-				Interval:   interval,
-				QueryPatt:  "queryPattHere",
-				Target:     "targetHere",
-				Datapoints: getCopy(basic),
-			},
-			{
-				Interval:   20,
-				QueryPatt:  "queryPattHere2",
-				Target:     "targetHere2",
-				Datapoints: getCopy(basic),
-			},
+			getSeries("targetHere", "queryPattHere", basic),
+			getSeries("targetHere2", "queryPattHere2", basic),
+		}, []models.Series{
+			getSeries("minMax(targetHere)", "minMax(queryPattHere)", basicR),
+			getSeries("minMax(targetHere2)", "minMax(queryPattHere2)", basicR),
 		},
-	)
-	out := []models.Series{
-		{
-			Interval:   interval,
-			QueryPatt:  "minMax(queryPattHere)",
-			Target:     "minMax(targetHere)",
-			Datapoints: getCopy(basicR),
-		},
-		{
-			Interval:   20,
-			QueryPatt:  "minMax(queryPattHere2)",
-			Target:     "minMax(targetHere2)",
-			Datapoints: getCopy(basicR),
-		},
+		t)
+}
+
+func getNewMinMax(in []models.Series) *FuncMinMax {
+	f := NewMinMax()
+	ps := f.(*FuncMinMax)
+	ps.in = NewMock(in)
+	return ps
+}
+
+func testMinMax(name string, in []models.Series, out []models.Series, t *testing.T) {
+	f := getNewMinMax(in)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 func BenchmarkMinMax10k_1NoNulls(b *testing.B) {
