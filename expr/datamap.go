@@ -41,6 +41,9 @@ func (dm DataMap) CheckForOverlappingPoints() error {
 		flatseries = append(flatseries, series...)
 	}
 
+	// we leverage the fact here that for any given slice, if you reslice or subslice it - which may result in the
+	// first slot's address changing - the last slot of the backing array remains the same and can be used
+	// to find slices backed by the same array
 	slicesOverlap := func(x, y []schema.Point) bool {
 		return cap(x) > 0 && cap(y) > 0 && &x[0:cap(x)][cap(x)-1] ==
 			&y[0:cap(y)][cap(y)-1]
