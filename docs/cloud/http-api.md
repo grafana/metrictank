@@ -221,7 +221,7 @@ Returns metrics which match the `query` and have received an update since `from`
 ##### Parameters
 
 * query (required): [Graphite pattern](#graphite-patterns)
-* format: json, treejson, completer, pickle, or msgpack. (defaults to json)
+* format: json, treejson, completer, pickle, msgpack, or details. (defaults to json)
 * jsonp: true/false: enables jsonp
 * from: Graphite from time specification (defaults to now-24hours)
 
@@ -231,6 +231,7 @@ Returns metrics which match the `query` and have received an update since `from`
 * completer: used for graphite-web's completer UI
 * msgpack: optimized transfer format
 * pickle: deprecated
+* details: returns a json of any found series and their archives (including MKey and Interval)
 
 
 ##### Example

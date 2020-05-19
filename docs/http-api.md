@@ -53,7 +53,7 @@ POST /metrics/find
 
 * header `X-Org-Id` required
 * query (required): can be an id, and use all graphite glob patterns (`*`, `{}`, `[]`, `?`)
-* format: json, treejson, completer, pickle, or msgpack. (defaults to json)
+* format: json, treejson, completer, pickle, msgpack, or details. (defaults to json)
 * jsonp
 
 Returns metrics which match the query and are stored under the given org or are public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md))

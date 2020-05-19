@@ -369,6 +369,8 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
+	case "details":
+		response.Write(ctx, response.NewJson(200, findDetails(request.Query, nodes), request.Jsonp))
 	}
 }
 
@@ -562,6 +564,42 @@ func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
 		tree.Add(&t)
 	}
 	return tree
+}
+
+func findDetails(query string, nodes []idx.Node) models.SeriesDetails {
+	details := models.SeriesDetails{}
+	seen := make(map[string]struct{})
+
+	for _, g := range nodes {
+		name := string(g.Path)
+		i := strings.Index(name, ";")
+		if i == -1 {
+			i = len(name)
+		}
+		if i = strings.LastIndex(name[:i], "."); i != -1 {
+			name = name[i+1:]
+		}
+
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		allowChildren := 0
+		leaf := 0
+		expandable := 0
+		if g.HasChildren {
+			allowChildren = 1
+			expandable = 1
+		}
+		if g.Leaf {
+			leaf = 1
+		}
+
+		d := models.NewSeriesDetailItem(g.Path, name, allowChildren, expandable, leaf, g.Defs)
+
+		details.Add(d)
+	}
+	return details
 }
 
 func (s *Server) metricsDelete(ctx *middleware.Context, req models.MetricsDelete) {

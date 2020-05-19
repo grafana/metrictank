@@ -38,6 +38,9 @@ import (
 //msgp:ignore SeriesLastTs
 //msgp:ignore SeriesTree
 //msgp:ignore SeriesTreeItem
+//msgp:ignore SeriesDetails
+//msgp:ignore SeriesDetailItem
+//msgp:ignore SeriesDetailItemArchive
 
 type FromTo struct {
 	From  string `json:"from" form:"from"`
@@ -178,7 +181,7 @@ type GraphiteTagTermsResp struct {
 type GraphiteFind struct {
 	FromTo
 	Query  string `json:"query" form:"query" binding:"Required"`
-	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle)"`
+	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle,details)"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
 }
 
@@ -269,4 +272,70 @@ type SeriesTreeItem struct {
 	ID            string         `json:"id"`
 	Text          string         `json:"text"`
 	Context       map[string]int `json:"context"` // unused
+}
+
+type SeriesDetails []SeriesDetailItem
+
+func (s *SeriesDetails) Add(i *SeriesDetailItem) {
+	*s = append(*s, *i)
+}
+
+type SeriesDetailItem struct {
+	AllowChildren int                       `json:"allowChildren"`
+	Expandable    int                       `json:"expandable"`
+	Leaf          int                       `json:"leaf"`
+	ID            string                    `json:"id"`
+	Text          string                    `json:"text"`
+	Archives      []SeriesDetailItemArchive `json:"archives"`
+}
+
+func NewSeriesDetailItem(id, text string, allowChildren, expandable, leaf int, ar []idx.Archive) *SeriesDetailItem {
+	di := SeriesDetailItem{
+		ID:            id,
+		Text:          text,
+		AllowChildren: allowChildren,
+		Expandable:    expandable,
+		Leaf:          leaf,
+	}
+	arcs := make([]SeriesDetailItemArchive, 0, len(ar))
+	for _, a := range ar {
+		b := SeriesDetailItemArchive{
+			MKey:         a.MetricDefinition.Id.String(),
+			OrgId:        a.OrgId,
+			Name:         a.Name,
+			Interval:     a.Interval,
+			Unit:         a.Unit,
+			Mtype:        a.Mtype,
+			Tags:         a.Tags,
+			LastUpdate:   a.LastUpdate,
+			Partition:    a.Partition,
+			nameWithTags: a.NameWithTags(),
+
+			SchemaId: a.SchemaId,
+			AggId:    a.AggId,
+			IrId:     a.IrId,
+			LastSave: a.LastSave,
+		}
+		arcs = append(arcs, b)
+	}
+	di.Archives = arcs
+	return &di
+}
+
+type SeriesDetailItemArchive struct {
+	MKey         string   `json:"mkey"`
+	OrgId        uint32   `json:"org_id"`
+	Name         string   `json:"name"`
+	Interval     int      `json:"interval"`
+	Unit         string   `json:"unit"`
+	Mtype        string   `json:"mtype"`
+	Tags         []string `json:"tags"`
+	LastUpdate   int64    `json:"lastUpdate"`
+	Partition    int32    `json:"partition"`
+	nameWithTags string
+
+	SchemaId uint16 `json:"schema_id"`
+	AggId    uint16 `json:"agg_id"`
+	IrId     uint16 `json:"ir_id"`
+	LastSave uint32 `json:"lastSave"`
 }
