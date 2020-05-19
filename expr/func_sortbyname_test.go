@@ -118,14 +118,11 @@ func TestSortByName(t *testing.T) {
 				}
 			}
 
-			/*
-				TODO - Is sorting modification?
-				t.Run("DidNotModifyInput", func(t *testing.T) {
-					if err := equalOutput(inputCopy, in, nil, nil); err != nil {
-						t.Fatalf("Input was modified, err = %s", err)
-					}
-				})
-			*/
+			t.Run("DidNotModifyInput", func(t *testing.T) {
+				if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+					t.Fatalf("Input was modified, err = %s", err)
+				}
+			})
 
 			t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
 				if err := dataMap.CheckForOverlappingPoints(); err != nil {

@@ -37,7 +37,13 @@ func (s *FuncSortByName) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	sortFunc := seriesTargetSort{series, stringLess}
+	// Copy series to avoid conflicting with other functions
+	seriesCpy := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		seriesCpy = append(seriesCpy, serie)
+	}
+
+	sortFunc := seriesTargetSort{seriesCpy, stringLess}
 	if s.natural {
 		sortFunc.cmp = util.NaturalLess
 	}
@@ -48,7 +54,7 @@ func (s *FuncSortByName) Exec(dataMap DataMap) ([]models.Series, error) {
 		sort.Sort(sortFunc)
 	}
 
-	return series, nil
+	return seriesCpy, nil
 }
 
 // Provides a comparison function pointer

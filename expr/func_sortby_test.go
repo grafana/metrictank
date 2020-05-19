@@ -144,14 +144,11 @@ func testSortBy(name string, fn string, reverse bool, in []models.Series, out []
 		t.Fatalf("Case %s: %s", name, err)
 	}
 
-	/*
-		TODO - Is sorting modification?
-		t.Run("DidNotModifyInput", func(t *testing.T) {
-			if err := equalOutput(inputCopy, in, nil, nil); err != nil {
-				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
-			}
-		})
-	*/
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
 
 	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
 		if err := dataMap.CheckForOverlappingPoints(); err != nil {
