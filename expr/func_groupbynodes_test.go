@@ -231,7 +231,7 @@ func testGroupByNodes(name string, in []models.Series, expected []models.Series,
 	inputCopy := make([]models.Series, len(in))
 	copy(inputCopy, in)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMap(in)
 
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(expected, got, expErr, err); err != nil {

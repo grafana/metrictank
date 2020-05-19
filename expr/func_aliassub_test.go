@@ -37,7 +37,7 @@ func testAliasSub(search, replace string, inStr, outStr []string, t *testing.T) 
 	inputCopy := make([]models.Series, len(in))
 	copy(inputCopy, in)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMap(in)
 
 	name := search + "->" + replace
 	got, err := f.Exec(dataMap)

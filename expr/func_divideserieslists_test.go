@@ -114,7 +114,7 @@ func testDivideSeriesLists(name string, dividend, divisor []models.Series, out [
 	divisorCopy := make([]models.Series, len(divisor))
 	copy(divisorCopy, divisor)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMapMultiple([][]models.Series{dividend, divisor})
 
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {

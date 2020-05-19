@@ -277,7 +277,7 @@ func checkCases(t *testing.T, input []models.Series, cases []TestCase) {
 		inputCopy := make([]models.Series, len(input))
 		copy(inputCopy, input)
 
-		dataMap := DataMap(make(map[Req][]models.Series))
+		dataMap := initDataMap(input)
 
 		got, err := f.Exec(dataMap)
 		if err := equalOutput(out, got, nil, err); err != nil {

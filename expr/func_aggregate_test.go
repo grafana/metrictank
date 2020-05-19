@@ -264,7 +264,7 @@ func testAggregate(name, agg string, in [][]models.Series, out models.Series, t 
 
 	f := makeAggregate(agg, in, xFilesFactor)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMapMultiple(in)
 
 	got, err := f.Exec(dataMap)
 	if err := equalOutput([]models.Series{out}, got, nil, err); err != nil {

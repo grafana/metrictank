@@ -53,7 +53,7 @@ func testAliasByNode(name string, in []models.Series, out []models.Series, t *te
 	inputCopy := make([]models.Series, len(in))
 	copy(inputCopy, in)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMap(in)
 
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {

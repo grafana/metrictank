@@ -20,9 +20,6 @@ func (s FuncMock) Context(context Context) Context {
 }
 
 func (s FuncMock) Exec(dataMap DataMap) ([]models.Series, error) {
-	// func_get would retrieve this from the map (added at a higher layer)
-	// Mock should add `data` to properly mock the render path
-	dataMap.Add(Req{}, s.data...)
 	for i := range s.data {
 		s.data[i].SetTags()
 	}

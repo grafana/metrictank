@@ -64,7 +64,7 @@ func testIntegral(in []models.Series, out []models.Series, t *testing.T) {
 	inputCopy := make([]models.Series, len(in))
 	copy(inputCopy, in)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMap(in)
 
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {

@@ -130,7 +130,7 @@ func testPerSecond(name string, in [][]models.Series, out []models.Series, max i
 		copy(inputCopy[i], in[i])
 	}
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMapMultiple(in)
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatalf("Case %s: %s", name, err)

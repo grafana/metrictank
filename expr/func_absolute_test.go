@@ -72,7 +72,7 @@ func TestAbsoluteRandom(t *testing.T) {
 		},
 	}
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMap(input)
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)

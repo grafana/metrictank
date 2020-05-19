@@ -43,7 +43,7 @@ func testFallbackSeries(name string, in, fallback, out []models.Series, t *testi
 	fallbackCopy := make([]models.Series, len(fallback))
 	copy(fallbackCopy, fallback)
 
-	dataMap := DataMap(make(map[Req][]models.Series))
+	dataMap := initDataMap(in)
 
 	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {

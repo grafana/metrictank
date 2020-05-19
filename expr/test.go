@@ -86,3 +86,25 @@ func doubleFuzzyEqual(a, b float64) bool {
 	var epsilon = 1e-10
 	return a == b || math.Abs(a-b) < epsilon
 }
+
+func initDataMap(in []models.Series) DataMap {
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	// func_get would retrieve this from the map (added at a higher layer)
+	// Mock should add `data` to properly mock the render path
+	dataMap.Add(Req{}, in...)
+
+	return dataMap
+}
+
+func initDataMapMultiple(ins [][]models.Series) DataMap {
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	for _, in := range ins {
+		// func_get would retrieve this from the map (added at a higher layer)
+		// Mock should add `data` to properly mock the render path
+		dataMap.Add(Req{}, in...)
+	}
+
+	return dataMap
+}
