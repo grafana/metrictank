@@ -103,17 +103,28 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 	serieStart, serieEnd := serie.QueryFrom, serie.QueryTo
 	queryStart := uint32(serieStart + interval)
 
-	if queryStart < serieStart {
-		return 0, nil, errors.NewInternal("query start time cannot be before the first point in series")
+	if queryStart < serieStart || queryStart > serieEnd {
+		return 0, nil, errors.NewInternalf("query start %d doesn't lie within serie's intervals [%d,%d] ", queryStart, serieStart, serieEnd)
 	}
 
+	// if queryStart is in between points get the index of the point after
+	// else get the index of the point it lies on
 	ptIdx := 0
-	for ptIdx < numPoints-1 && serie.Datapoints[ptIdx+1].Ts <= queryStart {
+	for ptIdx < numPoints && serie.Datapoints[ptIdx].Ts < queryStart {
 		ptIdx++
 	}
 
-	for ptTs, stIdx := queryStart, 0; ptTs <= serieEnd && ptIdx < numPoints && stIdx <= ptIdx; stIdx++ {
+	stIdx := 0
+	stTs := serie.Datapoints[stIdx].Ts
+	for ptTs := queryStart; ptTs <= serieEnd && ptIdx < numPoints; ptIdx++ {
 		ptTs = serie.Datapoints[ptIdx].Ts
+
+		// increment start index only if the difference between current and start times
+		// becomes greater than the windowSize (interval)
+		for stIdx <= ptIdx && ptTs-stTs > interval {
+			stIdx++
+			stTs = serie.Datapoints[stIdx].Ts
+		}
 
 		points := serie.Datapoints[stIdx:ptIdx]
 		aggPoint := schema.Point{Val: math.NaN(), Ts: ptTs}
@@ -122,7 +133,6 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 			aggPoint.Val = aggFunc(points)
 		}
 
-		ptIdx++
 		out = append(out, aggPoint)
 	}
 
