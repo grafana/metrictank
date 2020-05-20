@@ -129,7 +129,7 @@ tags     // list of key=value pairs of tags (optional)
 timestamp_now_rounded=$(($(date +%s) / 10 * 10))
 timestamp_prev_rounded=$((timestamp_now_rounded - 10))
 
-curl -X POST -H "Authorization: Bearer $key" -H "Content-Type: application/json" "$out" -d '[{
+curl -X POST -H "Authorization: Bearer $key" -H "Content-Type: application/json" "$base_in" -d '[{
     "name": "test.metric",
     "interval": 10,
     "value": 12.345,
@@ -181,7 +181,7 @@ Should the metrics enter the system again with the same metadata, the data will 
 ##### Example
 
 ```sh
-curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/metrics/delete -d query=some.series.to.delete.*
+curl -u "api_key:<Your Grafana.com API Key>" https://$base_out/metrics/delete -d query=some.series.to.delete.*
 ```
 
 #### Tagged With `/tags/delSeries`
@@ -203,7 +203,7 @@ Should the metrics enter the system again with the same metadata, the data will 
 ##### Example
 
 ```sh
-curl -u "api_key:<Your Grafana.com API Key>" https://<tsdbgw>/tags/delSeries -d "path=some.series;key=value" -d "path=another.series;tag=value"
+curl -u "api_key:<Your Grafana.com API Key>" https://$base_out/tags/delSeries -d "path=some.series;key=value" -d "path=another.series;tag=value"
 ```
 
 ### Finding Metrics
@@ -273,7 +273,7 @@ The response for the updated query shows which data lives under the "metrictank"
 As we continue to dig deeper into the tree, by updating our query based on what we get back, we eventually end up at the leaf:
 
 ```sh
-curl -H "Authorization: Bearer $key" "$out/metrics/find?query=metrictank.aggstats.*.tank.metrics_active.gauge32"
+curl -H "Authorization: Bearer $key" "$base_out/metrics/find?query=metrictank.aggstats.*.tank.metrics_active.gauge32"
 [
     {
         "allowChildren": 0,
@@ -312,7 +312,7 @@ that duplicate entries will be returned.
 ##### Example
 
 ```sh
-curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&expr=server=web01"
+curl -H "Authorization: Bearer $key" "$base_out/tags/findSeries?expr=datacenter=dc1&expr=server=web01"
 
 [
   "disk.used;datacenter=dc1;rack=a1;server=web01"
@@ -320,7 +320,7 @@ curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&e
 ```
 
 ```sh
-curl -H "Authorization: Bearer $key" "$out/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastts-json"
+curl -H "Authorization: Bearer $key" "$base_out/tags/findSeries?expr=datacenter=dc1&expr=server=web01&format=lastts-json"
 
 {
     "series": [
@@ -353,7 +353,7 @@ Returns count of series for each tag value which matches tag queries for a given
 ##### Example
 
 ```sh
-curl -H "Authorization: Bearer $key" "$out/tags/terms?expr=datacenter=dc1&expr=server=web01&tags=rack"
+curl -H "Authorization: Bearer $key" "$base_out/tags/terms?expr=datacenter=dc1&expr=server=web01&tags=rack"
 
 {
   "totalSeries": 5892,

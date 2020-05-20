@@ -60,8 +60,13 @@ func TestMain(m *testing.M) {
 	log.Println(string(output))
 
 	log.Println("launching docker-chaos stack...")
-	cmd = exec.Command("docker-compose", "up", "--force-recreate", "-V")
+	// TODO: should probably use -V flag here.
+	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
+	// but circleCI machine image still stuck with 1.14.0
+	cmd = exec.Command("docker-compose", "up", "--force-recreate")
 	cmd.Dir = test.Path("docker/docker-chaos")
+	// note we rely on this technique to pass this setting on to all MT's
+	// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
 	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
@@ -73,6 +78,11 @@ func TestMain(m *testing.M) {
 		log.Fatal(err.Error())
 	}
 
+	// note: if docker-compose didn't start properly - e.g. it bails out due to unsupported config -
+	// what typically happens is the tests will fail and we will exit, and not see the docker-compose problem
+	// until further manual inspection or reproducing.
+	// in a future version, we should add more rigorous checks to make sure dockor-compose didn't exit >0 and that the containers started properly
+	// we may want to use 'docker-compose up -d' for that
 	retcode := m.Run()
 	fm.Close()
 
@@ -104,9 +114,11 @@ func TestClusterStartup(t *testing.T) {
 		{Str: "metrictank4_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "grafana.*HTTP Server Listen.*3000"},
+		{Str: "zookeeper entered RUNNING state"},
+		{Str: "kafka entered RUNNING state"},
 	}
 	select {
-	case <-tracker.Match(matchers):
+	case <-tracker.Match(matchers, true):
 		log.Println("stack now running.")
 		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
 	case <-time.After(time.Second * 80):
@@ -150,10 +162,10 @@ func TestQueryWorkload(t *testing.T) {
 	grafana.PostAnnotation("TestQueryWorkload:begin")
 	validators := []graphite.Validator{graphite.ValidateCorrect(12)}
 
-	got := graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 6000, validators...)
+	got := graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6064, 6065}, "sum(some.id.of.a.metric.*)", "-14s", time.Minute, 600, validators...)
 	exp := graphite.CheckResults{
 		Validators: validators,
-		Valid:      []int{6000},
+		Valid:      []int{600},
 		Empty:      0,
 		Timeout:    0,
 		Other:      0,
@@ -172,7 +184,7 @@ func TestQueryWorkload(t *testing.T) {
 // but also before it does, but fails to get data via clustered requests from peers)
 func TestIsolateOneInstance(t *testing.T) {
 	grafana.PostAnnotation("TestIsolateOneInstance:begin")
-	numReqMt4 := 1200
+	numReqMt4 := 120
 	validatorsOther := []graphite.Validator{graphite.ValidateCorrect(12)}
 	mt4ResultsChan := make(chan graphite.CheckResults, 1)
 	otherResultsChan := make(chan graphite.CheckResults, 1)
@@ -181,7 +193,7 @@ func TestIsolateOneInstance(t *testing.T) {
 		mt4ResultsChan <- graphite.CheckMT([]int{6064}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, numReqMt4, graphite.ValidateCorrect(12), graphite.ValidateCode(503))
 	}()
 	go func() {
-		otherResultsChan <- graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 6000, validatorsOther...)
+		otherResultsChan <- graphite.CheckMT([]int{6060, 6061, 6062, 6063, 6065}, "sum(some.id.of.a.metric.*)", "-15s", time.Minute, 600, validatorsOther...)
 	}()
 
 	// now go ahead and isolate for 30s
@@ -203,7 +215,7 @@ func TestIsolateOneInstance(t *testing.T) {
 	// validate results of other cluster nodes
 	exp := graphite.CheckResults{
 		Validators: validatorsOther,
-		Valid:      []int{6000},
+		Valid:      []int{600},
 		Empty:      0,
 		Timeout:    0,
 		Other:      0,

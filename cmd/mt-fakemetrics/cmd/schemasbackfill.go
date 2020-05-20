@@ -33,13 +33,14 @@ var schemasFile = "/etc/metrictank/storage-schemas.conf"
 func init() {
 	rootCmd.AddCommand(schemasbackfillCmd)
 	schemasbackfillCmd.Flags().IntVar(&mpr, "mpr", 10, "how many metrics so simulate per rule")
+	schemasbackfillCmd.Flags().StringVar(&metricBuilder, "metricbuilder", "simple", "the metric builder to use. (simple|tagged)")
 	schemasbackfillCmd.Flags().StringVar(&schemasFile, "schemas-file", "/etc/metrictank/storage-schemas.conf", "path to storage-schemas.conf file")
 	schemasbackfillCmd.Flags().StringVar(&ignore, "ignore", "default", "comma separated list of section names to exclude")
 	schemasbackfillCmd.Flags().DurationVar(&offset, "offset", 0, "offset duration expression. (how far back in time to start. e.g. 1month, 6h, etc). must be a multiple of 1s")
 	schemasbackfillCmd.Flags().IntVar(&speedup, "speedup", 1, "for each advancement of real time, how many advancements of fake data to simulate")
 	schemasbackfillCmd.Flags().DurationVar(&flushDur, "flush", time.Second, "how often to flush metrics")
 	schemasbackfillCmd.Flags().DurationVar(&periodDur, "period", time.Second, "period between metric points (must be a multiple of 1s)")
-	schemasbackfillCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\")")
+	schemasbackfillCmd.Flags().StringVar(&valuePolicy, "value-policy", "", "a value policy (i.e. \"single:1\" \"multiple:1,2,3,4,5\" \"timestamp\" \"daily-sine:<peak>,<offset>,<stdev>\")")
 }
 
 // schemasbackfillCmd represents the schemasbackfill command
@@ -80,7 +81,7 @@ var schemasbackfillCmd = &cobra.Command{
 				if err != nil {
 					panic(err)
 				}
-				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, SimpleBuilder{name}, vp)
+				dataFeed(out, 1, mpr, period, flush, int(offset.Seconds()), speedup, true, getBuilder(metricBuilder, name), vp)
 				wg.Done()
 			}(name, schema.Retentions.Rets[0].SecondsPerPoint)
 		}

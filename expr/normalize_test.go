@@ -147,3 +147,37 @@ func TestNormalizeMultiLCMSeriesAdjustWithPreCanonicalize(t *testing.T) {
 		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestNormalizeToWithMissingBeginning(t *testing.T) {
+	in := models.Series{
+		Interval:     15,
+		QueryFrom:    35,
+		QueryTo:      136,
+		Consolidator: consolidation.Sum,
+		Datapoints: []schema.Point{
+			{Ts: 45, Val: 45},
+			{Ts: 60, Val: 60},
+			{Ts: 75, Val: 75},
+			{Ts: 90, Val: 90},
+			{Ts: 105, Val: 105},
+			{Ts: 120, Val: 120},
+			{Ts: 135, Val: 135},
+		},
+	}
+	// 135 gets dropped
+	want := models.Series{
+		Interval:     60,
+		QueryFrom:    35,
+		QueryTo:      136,
+		Consolidator: consolidation.Sum,
+		Datapoints: []schema.Point{
+			{Ts: 60, Val: 45 + 60},
+			{Ts: 120, Val: 75 + 90 + 105 + 120},
+		},
+	}
+	dataMap := NewDataMap()
+	got := NormalizeTo(dataMap, in, 60)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
+	}
+}

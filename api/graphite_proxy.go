@@ -1,12 +1,16 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/stats"
 )
 
@@ -45,6 +49,21 @@ func NewGraphiteProxy(u *url.URL) *httputil.ReverseProxy {
 		// if kept, would errorously stick around and be invalid because we gzip responses
 		resp.Header.Del("content-length")
 		return nil
+	}
+
+	graphiteProxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		if graphiteProxy.ErrorLog != nil {
+			graphiteProxy.ErrorLog.Printf("http: proxy error: %v", err)
+		} else {
+			log.Printf("http: proxy error: %v", err)
+		}
+
+		if req.Context().Err() == context.Canceled {
+			// if the client disconnected before the query was fully processed
+			rw.WriteHeader(response.HttpClientClosedRequest)
+		} else {
+			rw.WriteHeader(http.StatusBadGateway)
+		}
 	}
 	return graphiteProxy
 }

@@ -5,56 +5,31 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/schema"
 )
+
+func getNamedSeries(target, patt string, data []schema.Point) models.Series {
+	return models.Series{
+		Target:     target,
+		QueryPatt:  patt,
+		Datapoints: getCopy(data),
+		Interval:   10,
+	}
+}
 
 func TestRemoveEmptySeriesIfAtLeastOneNonNull(t *testing.T) {
 	testRemoveEmptySeries(
 		0.0, // xFilesFactor
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "some nulls",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "all nulls",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "no nulls",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "allZeros",
-				Target:     "d",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "some nulls", a),
+			getNamedSeries("b", "all nulls", allNulls),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(a, 0)",
-				QueryPatt:  "removeEmptySeries(a, 0)",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(c, 0)",
-				QueryPatt:  "removeEmptySeries(c, 0)",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(d, 0)",
-				QueryPatt:  "removeEmptySeries(d, 0)",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "some nulls", a),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		t,
 	)
@@ -64,44 +39,14 @@ func TestRemoveEmptySeriesAllowNoNulls(t *testing.T) {
 	testRemoveEmptySeries(
 		1.0, // xFilesFactor
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "some nulls",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "all nulls",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "no nulls",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "allZeros",
-				Target:     "d",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "some nulls", a),
+			getNamedSeries("b", "all nulls", allNulls),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(c, 1)",
-				QueryPatt:  "removeEmptySeries(c, 1)",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(d, 1)",
-				QueryPatt:  "removeEmptySeries(d, 1)",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		t,
 	)
@@ -111,50 +56,15 @@ func TestRemoveEmptySeriesAllow30PercentNulls(t *testing.T) {
 	testRemoveEmptySeries(
 		0.3, // xFilesFactor
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "30 % nulls",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "all nulls",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "no nulls",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "allZeros",
-				Target:     "d",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "30% nulls", a),
+			getNamedSeries("b", "all nulls", allNulls),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(a, 0.3)",
-				QueryPatt:  "removeEmptySeries(a, 0.3)",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(c, 0.3)",
-				QueryPatt:  "removeEmptySeries(c, 0.3)",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(d, 0.3)",
-				QueryPatt:  "removeEmptySeries(d, 0.3)",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "30% nulls", a),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		t,
 	)
@@ -164,44 +74,14 @@ func TestRemoveEmptySeriesAllow70PercentNulls(t *testing.T) {
 	testRemoveEmptySeries(
 		0.7, // xFilesFactor
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "30 % nulls",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "all nulls",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "no nulls",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "allZeros",
-				Target:     "d",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "30% nulls", a),
+			getNamedSeries("b", "all nulls", allNulls),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(c, 0.7)",
-				QueryPatt:  "removeEmptySeries(c, 0.7)",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(d, 0.7)",
-				QueryPatt:  "removeEmptySeries(d, 0.7)",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		t,
 	)
@@ -211,50 +91,15 @@ func TestRemoveEmptySeriesMissingInputXFilesFactor(t *testing.T) {
 	testRemoveEmptySeries(
 		math.NaN(), // xFilesFactor
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "some nulls",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "all nulls",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "no nulls",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "allZeros",
-				Target:     "d",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "some nulls", a),
+			getNamedSeries("b", "all nulls", allNulls),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(a, 0)",
-				QueryPatt:  "removeEmptySeries(a, 0)",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(c, 0)",
-				QueryPatt:  "removeEmptySeries(c, 0)",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "removeEmptySeries(d, 0)",
-				QueryPatt:  "removeEmptySeries(d, 0)",
-				Datapoints: getCopy(allZeros),
-			},
+			getNamedSeries("a", "some nulls", a),
+			getNamedSeries("c", "no nulls", c),
+			getNamedSeries("d", "allZeros", allZeros),
 		},
 		t,
 	)

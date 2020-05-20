@@ -265,7 +265,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 
 	execCtx, execSpan := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
 	defer execSpan.Finish()
-	out, meta, err := s.executePlan(execCtx, ctx.OrgId, plan)
+	out, meta, err := s.executePlan(execCtx, ctx.OrgId, &plan)
 	if err != nil {
 		err := response.WrapError(err)
 		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
@@ -685,7 +685,7 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the individual series from the peer, and then sum here. that could be optimized
-func (s *Server) executePlan(ctx context.Context, orgId uint32, plan expr.Plan) ([]models.Series, models.RenderMeta, error) {
+func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan) ([]models.Series, models.RenderMeta, error) {
 	var meta models.RenderMeta
 
 	reqs := NewReqMap()

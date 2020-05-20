@@ -96,7 +96,7 @@ See also:
 | integral                                                       |              | Stable     |
 | integralByInterval                                             |              | No         |
 | interpolate                                                    |              | No         |
-| invert                                                         |              | No         |
+| invert                                                         |              | Stable     |
 | isNonNull(seriesList) seriesList                               |              | Stable     |
 | keepLastValue(seriesList, limit) seriesList                    |              | Stable     |
 | legendValue                                                    |              | No         |
@@ -113,7 +113,7 @@ See also:
 | maxSeries(seriesList) series                                   | max          | Stable     |
 | minimumAbove                                                   |              | Stable     |
 | minimumBelow                                                   |              | Stable     |
-| minMax                                                         |              | No         |
+| minMax                                                         |              | Stable     |
 | minSeries(seriesList) series                                   | min          | Stable     |
 | mostDeviant                                                    |              | No         |
 | movingAverage(seriesLists, windowSize) seriesList              |              | Unstable   |

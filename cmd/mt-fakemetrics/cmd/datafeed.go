@@ -2,124 +2,16 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
+	"math"
 	"time"
 
+	"github.com/grafana/metrictank/clock"
+	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
 	"github.com/grafana/metrictank/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
-
-type MetricPayloadBuilder interface {
-	Info() string
-	// Build builds a slice of slices of MetricData's( per orgid), with time and value not set yet.
-	Build(orgs, mpo, period int) [][]schema.MetricData
-}
-
-// uses no tags
-type SimpleBuilder struct {
-	metricName string
-}
-
-func (tb SimpleBuilder) Info() string {
-	return "metricName=" + tb.metricName
-}
-
-func (tb SimpleBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
-	out := make([][]schema.MetricData, orgs)
-	for o := 0; o < orgs; o++ {
-		metrics := make([]schema.MetricData, mpo)
-		for m := 0; m < mpo; m++ {
-			name := fmt.Sprintf("%s.%d", tb.metricName, m+1)
-			metrics[m] = schema.MetricData{
-				Name:     name,
-				OrgId:    o + 1,
-				Interval: period,
-				Unit:     "ms",
-				Mtype:    "gauge",
-			}
-			metrics[m].SetId()
-		}
-		out[o] = metrics
-	}
-	return out
-}
-
-// uses tags
-type TaggedBuilder struct {
-	metricName string
-}
-
-func (tb TaggedBuilder) Info() string {
-	return "metricName=" + tb.metricName
-}
-
-func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
-	out := make([][]schema.MetricData, orgs)
-	for o := 0; o < orgs; o++ {
-		metrics := make([]schema.MetricData, mpo)
-		for m := 0; m < mpo; m++ {
-			var tags []string
-			name := fmt.Sprintf("%s.%d", metricName, m+1)
-
-			localTags := []string{
-				"secondkey=anothervalue",
-				"thirdkey=onemorevalue",
-				"region=west",
-				"os=ubuntu",
-				"anothertag=somelongervalue",
-				"manymoreother=lotsoftagstointern",
-				"afewmoretags=forgoodmeasure",
-				"onetwothreefourfivesix=seveneightnineten",
-				"lotsandlotsoftags=morefunforeveryone",
-				"goodforpeoplewhojustusetags=forbasicallyeverything",
-			}
-
-			if len(customTags) > 0 {
-				if numUniqueCustomTags > 0 {
-					var j int
-					for j = 0; j < numUniqueCustomTags; j++ {
-						tags = append(tags, customTags[j]+strconv.Itoa(m+1))
-					}
-					for j < len(customTags) {
-						tags = append(tags, customTags[j])
-						j++
-					}
-
-				} else {
-					tags = customTags
-				}
-			}
-
-			if addTags {
-				if numUniqueTags > 0 {
-					var j int
-					for j = 0; j < numUniqueTags; j++ {
-						tags = append(tags, localTags[j]+strconv.Itoa(m+1))
-					}
-					for j < len(localTags) {
-						tags = append(tags, localTags[j])
-						j++
-					}
-				} else {
-					tags = localTags
-				}
-			}
-			metrics[m] = schema.MetricData{
-				Name:     name,
-				OrgId:    o + 1,
-				Interval: period,
-				Unit:     "ms",
-				Mtype:    "gauge",
-				Tags:     tags,
-			}
-			metrics[m].SetId()
-		}
-		out[o] = metrics
-	}
-	return out
-}
 
 // examples (everything perOrg)
 // num metrics - flush (s) - period (s) - speedup -> ratePerSPerOrg      -> ratePerFlushPerOrg
@@ -136,7 +28,7 @@ func (tb TaggedBuilder) Build(orgs, mpo, period int) [][]schema.MetricData {
 // period in seconds
 // flush  in ms
 // offset in seconds
-func dataFeed(out out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder MetricPayloadBuilder, vp policy.ValuePolicy) {
+func dataFeed(out out.Out, orgs, mpo, period, flush, offset, speedup int, stopAtNow bool, builder metricbuilder.Builder, vp policy.ValuePolicy) {
 	flushDur := time.Duration(flush) * time.Millisecond
 
 	if mpo*speedup%period != 0 {
@@ -172,52 +64,60 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		flushDur, ratePerFlush, ratePerS, orgs*mpo,
 		orgs, flushDur, ratePerFlush, ratePerS, orgs*mpo)
 
-	tick := time.NewTicker(flushDur)
-
 	metrics := builder.Build(orgs, mpo, period)
 
+	// set initial conditions
 	mp := int64(period)
-	ts := time.Now().Unix() - int64(offset) - mp
-	startFrom := 0
+	// set start to now-offset because we add mp back every time we start a cycle going through metrics[o]
+	now := time.Now().Unix()
+	t0 := now - int64(offset) - mp
 
-	// huh what if we increment ts beyond the now ts?
-	// this can only happen if we repeatedly loop, and bump ts each time
-	// let's say we loop 5 times, so:
-	// ratePerFlushPerOrg == 5 * mpo
-	// then last ts = ts+4*period
-	// (loops-1)*period < flush
-	// (ceil(ratePerFlushPerOrg/mpo)-1)*period < flush
-	// (ceil(mpo * speedup * flush /period /mpo)-1)*period < flush
-	// (ceil(speedup * flush /period)-1)*period < flush
-	// (ceil(speedup * flush - period ) < flush
+	stopAt := int64(math.MaxInt64)
 
-	for nowT := range tick.C {
-		now := nowT.Unix()
+	if stopAtNow {
+		stopAt = now
+	}
+
+	type OrgState struct {
+		startFrom int
+		ts        int64
+	}
+
+	state := make([]OrgState, orgs)
+	for i := range state {
+		state[i].ts = t0
+	}
+
+	for range clock.AlignedTickLossless(flushDur) {
 		var data []*schema.MetricData
 
 		for o := 0; o < len(metrics); o++ {
-			// as seen above, we need to flush ratePerFlushPerOrg
-			// respecting where a previous flush left off, we need to start from
-			// the point after it.
+			// for each org, we need to flush ratePerFlushPerOrg,
+			// starting at wherever a previous flush (if any) left off.
 			var m int
 			for num := 0; num < ratePerFlushPerOrg; num++ {
 				// note that ratePerFlushPerOrg may be any of >, =, < mpo
 				// it all depends on what the user requested
-				// the main thing we need to watch out for here is to bump the timestamp
-				// is properly bumped in both cases
-				m = (startFrom + num) % mpo
+				// we mainly need to ensure both cases properly bump the timestamp
+				m = (state[o].startFrom + num) % mpo
 				metricData := metrics[o][m]
-				// not the very first metric, but we "cycled back" to reusing metrics
-				// we already sent, so we must increase the timestamp
+				// every time we cycle through metrics[o], we bump timestamp
+				// note: not every time we tick, because a ts increase may be spread across multiple flushes
 				if m == 0 {
-					ts += mp
+					state[o].ts += mp
+					// note: all orgs will go into this condition for the same tick iteration
+					// after publishing the same set of metrics
+					if state[o].ts >= stopAt {
+						break
+					}
 				}
-				metricData.Time = ts
-				metricData.Value = vp.Value(ts)
+				metricData.Time = state[o].ts
+				metricData.Value = vp.Value(state[o].ts)
 
 				data = append(data, &metricData)
 			}
-			startFrom = (m + 1) % mpo
+			// next metrics iteration should start where we left off
+			state[o].startFrom = (m + 1) % mpo
 		}
 
 		preFlush := time.Now()
@@ -227,7 +127,8 @@ times %4d orgs: each %s, flushing %d metrics so rate of %d Hz. (%d total unique 
 		}
 		flushDuration.Value(time.Since(preFlush))
 
-		if ts >= now && stopAtNow {
+		// all orgs are treated equally for now. can check just one of them
+		if state[0].ts >= stopAt {
 			return
 		}
 	}

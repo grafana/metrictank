@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
@@ -13,14 +12,14 @@ type FuncRemoveEmptySeries struct {
 }
 
 func NewRemoveEmptySeries() GraphiteFunc {
-	return &FuncRemoveEmptySeries{}
+	return &FuncRemoveEmptySeries{xFilesFactor: 0}
 }
 
 func (s *FuncRemoveEmptySeries) Signature() ([]Arg, []Arg) {
 
 	return []Arg{
 			ArgSeriesList{val: &s.in},
-			ArgFloat{key: "xFilesFactor", val: &s.xFilesFactor, validator: []Validator{WithinZeroOneInclusiveInterval}},
+			ArgFloat{key: "xFilesFactor", val: &s.xFilesFactor, opt: true, validator: []Validator{WithinZeroOneInclusiveInterval}},
 		}, []Arg{
 			ArgSeriesList{},
 		}

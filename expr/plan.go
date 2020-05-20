@@ -302,7 +302,7 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 }
 
 // Run invokes all processing as specified in the plan (expressions, from/to) against the given datamap
-func (p Plan) Run(dataMap DataMap) ([]models.Series, error) {
+func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 	var out []models.Series
 	p.dataMap = dataMap
 	for _, fn := range p.funcs {

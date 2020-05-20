@@ -54,13 +54,13 @@ this also provides increased resiliency to connectivity issues.
 
 `carbon-relay-ng` is available for most Linux platforms, and is easy to install.
 
-* [EL6 (Red Hat 6.x, CentOS 6.x, and CloudLinux 6.x)](https://packagecloud.io/raintank/raintank/packages/el/6/carbon-relay-ng-0.11.0-1.x86_64.rpm)
-* [EL7 (Red Hat 7.x, CentOS 7.x, and CloudLinux 7.x.)](https://packagecloud.io/raintank/raintank/packages/el/7/carbon-relay-ng-0.11.0-1.x86_64.rpm)
-* [Debian Jessie](https://packagecloud.io/raintank/raintank/packages/debian/jessie/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Debian Stretch](https://packagecloud.io/raintank/raintank/packages/debian/stretch/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Debian Buster](https://packagecloud.io/raintank/raintank/packages/debian/buster/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Ubuntu Xenial](https://packagecloud.io/raintank/raintank/packages/ubuntu/xenial/carbon-relay-ng_0.11.0-1_amd64.deb)
-* [Ubuntu Trusty](https://packagecloud.io/raintank/raintank/packages/ubuntu/trusty/carbon-relay-ng_0.11.0-1_amd64.deb)
+* [EL6 (Red Hat 6.x, CentOS 6.x, and CloudLinux 6.x)](https://packagecloud.io/raintank/raintank/packages/el/6/carbon-relay-ng-0.12.0-1.x86_64.rpm)
+* [EL7 (Red Hat 7.x, CentOS 7.x, and CloudLinux 7.x.)](https://packagecloud.io/raintank/raintank/packages/el/7/carbon-relay-ng-0.12.0-1.x86_64.rpm)
+* [Debian Jessie](https://packagecloud.io/raintank/raintank/packages/debian/jessie/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Debian Stretch](https://packagecloud.io/raintank/raintank/packages/debian/stretch/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Debian Buster](https://packagecloud.io/raintank/raintank/packages/debian/buster/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Ubuntu Xenial](https://packagecloud.io/raintank/raintank/packages/ubuntu/xenial/carbon-relay-ng_0.12.0-1_amd64.deb)
+* [Ubuntu Trusty](https://packagecloud.io/raintank/raintank/packages/ubuntu/trusty/carbon-relay-ng_0.12.0-1_amd64.deb)
 
 We recommend installing the latest version.
 Once installed, you can configure the relay in two steps:
@@ -139,21 +139,24 @@ This file has the same format as the Graphite storage-schemas.conf file.
 
 You can paste the below into the file to get started:
 
+    [crng-service]
+      pattern = ^service_is_carbon-relay-ng
+      # interval should match graphite_interval in your relay configuration (default 10.000 ms)
+      retentions = 10s:1d
+    [crng-stats]
+      pattern = ^carbon-relay-ng\.stats
+      # interval should match graphite_interval in your relay configuration (default 10.000 ms)
+      retentions = 10s:1d
     [default]
       pattern = .*
       retentions = 10s:1d
 
-> This config assumes you are sending metrics at a 10s resolution, ie. 6 times per minute.
-> Change the 10s to your actual resolution if it is different.
-> This file is the same format as its Graphite counterpart,
-> and can define different metrics at different resolutions through pattern matching.
+> This default assumes you are sending metrics at a 10s resolution, ie. 6 times per minute, which you may need to change.
+> It is important that this file accurately describes your metrics and their raw resolutions (retentions mentioned in this file are ignored)
+> You may need to extend it to match your metrics, or alternatively, copy it from your Graphite server and add in the rules
+> for carbon-relay-ng metrics.
+> If you update the carbon-relay-ng 'graphite_interval' parameter to something other than the default of 10.000ms (10s),
+> you should set that update the rules for carbon-relay-ng here as well.
 
 Once configured, you can send metrics to the relay in carbon/Graphite format in port 2003,
 and they should show up in Grafana.
-
-
-## Deleting metrics
-
-If required, metrics can be removed from the index using the command below:
-
-    curl -u "api_key:<Your Grafana.com API Key>" https://<instance URL>.hosted-metrics.grafana.net/metrics/delete -d query=some.series.to.delete.*

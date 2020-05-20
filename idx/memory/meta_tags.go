@@ -2,6 +2,8 @@ package memory
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -46,12 +48,251 @@ var (
 	metaRecordSwapPruned = stats.NewCounter32("idx.memory.meta-tags.swap.ops.meta-records-pruned")
 )
 
+type metaTagIdx struct {
+	sync.RWMutex
+	byOrg    map[uint32]*orgMetaTagIdx
+	idLookup func(uint32, tagquery.Query, chan schema.MKey)
+}
+
+func newMetaTagIndex(idLookup func(uint32, tagquery.Query, chan schema.MKey)) *metaTagIdx {
+	return &metaTagIdx{
+		byOrg:    make(map[uint32]*orgMetaTagIdx),
+		idLookup: idLookup,
+	}
+}
+
+func (m *metaTagIdx) stop() {
+	m.Lock()
+	for _, idx := range m.byOrg {
+		idx.enricher.stop()
+	}
+	m.byOrg = make(map[uint32]*orgMetaTagIdx)
+	m.Unlock()
+}
+
+func (m *metaTagIdx) getOrgMetaTagIndex(orgId uint32) *orgMetaTagIdx {
+	m.RLock()
+	idx := m.byOrg[orgId]
+	m.RUnlock()
+	if idx != nil {
+		return idx
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	idx = m.byOrg[orgId]
+	if idx != nil {
+		return idx
+	}
+
+	idx = newOrgMetaTagIndex(func(query tagquery.Query, idCh chan schema.MKey) {
+		// bind orgId to function call
+		m.idLookup(orgId, query, idCh)
+	})
+
+	m.byOrg[orgId] = idx
+
+	return idx
+}
+
+type orgMetaTagIdx struct {
+	// swapMutex is only used to ensure that no two upsert/swap operations run concurrently
+	swapMutex sync.Mutex
+
+	hierarchy *metaTagHierarchy
+	records   *metaTagRecords
+	enricher  *metaTagEnricher
+}
+
+type idLookup func(tagquery.Query, chan schema.MKey)
+
+func newOrgMetaTagIndex(idLookup idLookup) *orgMetaTagIdx {
+	return &orgMetaTagIdx{
+		hierarchy: newMetaTagHierarchy(),
+		records:   newMetaTagRecords(),
+		enricher:  newEnricher(idLookup),
+	}
+}
+
+func (m *orgMetaTagIdx) getMetaTagsById(id schema.Key) tagquery.Tags {
+	return m.records.getMetaTagsByRecordIds(m.enricher.enrich(id))
+}
+
+// MetaTagRecordUpsert inserts or updates a meta record, depending on whether
+// it already exists or is new. The identity of a record is determined by its
+// queries, if the set of queries in the given record already exists in another
+// record, then the existing record will be updated, otherwise a new one gets
+// created.
+func (m *metaTagIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.MetaTagRecord) error {
+	if !TagSupport || !MetaTagSupport {
+		log.Warn("memory-idx: received tag/meta-tag query, but that feature is disabled")
+		return errors.NewBadRequest("Tag/Meta-Tag support is disabled")
+	}
+
+	// expressions need to be sorted because the unique ID of a meta record is
+	// its sorted set of expressions
+	upsertRecord.Expressions.Sort()
+
+	// initialize query in preparation to execute it once we have the swapMutex
+	// doing struct instantiations before acquiring lock to keep mutex time short
+	query, err := tagquery.NewQuery(upsertRecord.Expressions, 0)
+	if err != nil {
+		return fmt.Errorf("Invalid record with expressions/meta tags: %q/%q", upsertRecord.Expressions, upsertRecord.MetaTags)
+	}
+
+	idx := m.getOrgMetaTagIndex(orgId)
+
+	idx.swapMutex.Lock()
+	defer idx.swapMutex.Unlock()
+
+	id, oldId, oldRecord, err := idx.records.upsert(upsertRecord)
+	if err != nil {
+		return err
+	}
+
+	// check if the upsert has replaced a previously existing record
+	if oldId > 0 {
+		// if so we remove all references to it from the enricher
+		// and from the meta tag index
+		idx.enricher.delMetaRecord(oldId)
+		idx.hierarchy.deleteRecord(oldRecord.MetaTags, oldId)
+	}
+
+	// add the newly inserted meta record into the enricher and the
+	// meta tag index
+	idx.enricher.addMetaRecord(id, query)
+	idx.hierarchy.insertRecord(upsertRecord.MetaTags, id)
+
+	return nil
+}
+
+func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaTagRecord) error {
+	if !TagSupport || !MetaTagSupport {
+		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
+		return errors.NewBadRequest("Tag/Meta-Tag support is disabled")
+	}
+
+	metaRecordSwapExecuting.Inc()
+
+	log.Infof("memory-idx: Initiating Swap with %d records for org %d", len(newRecords), orgId)
+
+	// recordIdsToKeep contains the records that should not
+	// get pruned at the end of this swap
+	recordIdsToKeep := make(map[recordId]struct{}, len(newRecords))
+	var recordsToUpsert uint32
+
+	idx := m.getOrgMetaTagIndex(orgId)
+	idx.swapMutex.Lock()
+	defer idx.swapMutex.Unlock()
+
+	for i := range newRecords {
+		newRecords[i].Expressions.Sort()
+		newRecords[i].MetaTags.Sort()
+	}
+
+	recordComparison := idx.records.compareRecords(newRecords)
+	for _, status := range recordComparison {
+		if status.recordExists && status.isEqual {
+			recordIdsToKeep[status.currentId] = struct{}{}
+			continue
+		}
+		recordsToUpsert++
+	}
+
+	log.Infof("memory-idx: After diff against existing meta records for org %d, going to upsert %d, %d remain unchanged", orgId, recordsToUpsert, len(recordIdsToKeep))
+	recordsUnchanged := uint32(len(recordIdsToKeep))
+
+	var query tagquery.Query
+	var recordsModified, recordsAdded, recordsPruned uint32
+	for i, status := range recordComparison {
+		if status.recordExists && status.isEqual {
+			//  record does not need any modification
+			continue
+		}
+
+		if status.recordExists {
+			// record exists, but its meta tags need to be updated,
+			// we first delete it and then re-add it
+			recordsModified++
+			idx.enricher.delMetaRecord(status.currentId)
+			idx.hierarchy.deleteRecord(status.currentMetaTags, status.currentId)
+		} else {
+			// record does not exist, so it will be added
+			recordsAdded++
+		}
+
+		newRecordId, _, _, err := idx.records.upsert(newRecords[i])
+		if err != nil {
+			log.Errorf("Error when upserting meta record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err.Error())
+			continue
+		}
+
+		query, err = tagquery.NewQuery(newRecords[i].Expressions, 0)
+		if err != nil {
+			log.Errorf("Invalid record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err)
+			continue
+		}
+		idx.enricher.addMetaRecord(newRecordId, query)
+		idx.hierarchy.insertRecord(newRecords[i].MetaTags, newRecordId)
+
+		// adding the new record id to recordIdsToKeep to prevent that
+		// it gets pruned further down
+		recordIdsToKeep[newRecordId] = struct{}{}
+	}
+
+	// if the number of meta tag records is equal to the number of record
+	// ids to keep, and we've already ensured that the meta tag records are
+	// all up2date, then there's nothing to prune
+	if idx.records.length() != len(recordIdsToKeep) {
+		var pruned map[recordId]tagquery.MetaTagRecord
+		toPrune := idx.records.getPrunable(recordIdsToKeep)
+		if len(toPrune) > 0 {
+			log.Infof("memory-idx: Going to prune %d meta records for org %d", len(toPrune), orgId)
+			recordsPruned = uint32(len(toPrune))
+
+			// we can assume that the toPrune list is still correct because we're
+			// holding the metaRecordLock
+			pruned = make(map[recordId]tagquery.MetaTagRecord, len(toPrune))
+			idx.records.prune(toPrune, pruned)
+		}
+
+		// remove all references to the pruned meta records from the meta
+		// tag index and the enricher
+		for recordId, record := range pruned {
+			idx.enricher.delMetaRecord(recordId)
+			idx.hierarchy.deleteRecord(record.MetaTags, recordId)
+		}
+	}
+
+	metaRecordSwapUnchanged.AddUint32(recordsUnchanged)
+	metaRecordSwapAdded.AddUint32(recordsAdded)
+	metaRecordSwapModified.AddUint32(recordsModified)
+	metaRecordSwapPruned.AddUint32(recordsPruned)
+
+	return nil
+}
+
+func (m *metaTagIdx) MetaTagRecordList(orgId uint32) []tagquery.MetaTagRecord {
+	if !TagSupport || !MetaTagSupport {
+		log.Warn("memory-idx: received a tag/meta-tag query, but that feature is disabled")
+		return nil
+	}
+
+	metaTagIdx := m.getOrgMetaTagIndex(orgId)
+	if metaTagIdx == nil {
+		return nil
+	}
+
+	return metaTagIdx.records.listRecords()
+}
+
 type recordId uint32
 
 // list of meta records keyed by a unique identifier used as ID
 type metaTagRecords struct {
-	metaRecordLock sync.Mutex // used to ensure that we never run multiple swap operations concurrently
-	records        map[recordId]tagquery.MetaTagRecord
+	sync.RWMutex
+	records map[recordId]tagquery.MetaTagRecord
 }
 
 func newMetaTagRecords() *metaTagRecords {
@@ -61,10 +302,16 @@ func newMetaTagRecords() *metaTagRecords {
 }
 
 func (m *metaTagRecords) length() int {
+	m.RLock()
+	defer m.RUnlock()
+
 	return len(m.records)
 }
 
 func (m *metaTagRecords) prune(toPrune map[recordId]struct{}, pruned map[recordId]tagquery.MetaTagRecord) {
+	m.Lock()
+	defer m.Unlock()
+
 	for recordId := range toPrune {
 		pruned[recordId] = m.records[recordId]
 		delete(m.records, recordId)
@@ -72,6 +319,9 @@ func (m *metaTagRecords) prune(toPrune map[recordId]struct{}, pruned map[recordI
 }
 
 func (m *metaTagRecords) getPrunable(toKeep map[recordId]struct{}) map[recordId]struct{} {
+	m.RLock()
+	defer m.RUnlock()
+
 	toPrune := make(map[recordId]struct{}, len(m.records)-len(toKeep))
 	for recordId := range m.records {
 		if _, ok := toKeep[recordId]; !ok {
@@ -81,27 +331,31 @@ func (m *metaTagRecords) getPrunable(toKeep map[recordId]struct{}) map[recordId]
 	return toPrune
 }
 
-func (m *metaTagRecords) getMetaTagsByRecordId(recordId recordId) tagquery.Tags {
-	return m.records[recordId].MetaTags
+func (m *metaTagRecords) getMetaRecordById(recordId recordId) (tagquery.MetaTagRecord, bool) {
+	m.RLock()
+	defer m.RUnlock()
+	record, ok := m.records[recordId]
+	return record, ok
 }
 
 func (m *metaTagRecords) getMetaTagsByRecordIds(recordIds map[recordId]struct{}) tagquery.Tags {
+	m.RLock()
+	defer m.RUnlock()
 	res := make(tagquery.Tags, 0, len(recordIds))
 	for recordId := range recordIds {
-		record, ok := m.records[recordId]
-		if ok {
-			res = append(res, record.MetaTags...)
-		}
+		res = append(res, m.records[recordId].MetaTags...)
 	}
+
 	return res
 }
 
 // recordExists takes a meta record and checks if it exists
 // the identity of a record is determined by its set of query expressions, so if there is
 // any other record with the same query expressions this method returns the id, the record,
-// and true. if it doesn't exist the third return value is false. it is assumed that the
-// expressions of the given record are sorted.
-func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, bool) {
+// and true. if it doesn't exist the third return value is false.
+// it assumes that the expressions of the given record are sorted.
+// it assumes that a read lock has already been acquired.
+func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, tagquery.MetaTagRecord, bool) {
 	id := recordId(record.HashExpressions())
 
 	// loop over existing records, starting from id, trying to find one that has
@@ -110,12 +364,12 @@ func (m *metaTagRecords) recordExists(record tagquery.MetaTagRecord) (recordId, 
 		checkingId := id + recordId(i)
 		if existingRecord, ok := m.records[checkingId]; ok {
 			if record.Expressions.Equal(existingRecord.Expressions) {
-				return checkingId, &existingRecord, true
+				return checkingId, existingRecord, true
 			}
 		}
 	}
 
-	return 0, nil, false
+	return 0, tagquery.MetaTagRecord{}, false
 }
 
 // recordExistsAndIsEqual checks if the given record exists
@@ -133,6 +387,46 @@ func (m *metaTagRecords) recordExistsAndIsEqual(record tagquery.MetaTagRecord) (
 	return id, true, record.MetaTags.Equal(existingRecord.MetaTags)
 }
 
+func (m *metaTagRecords) compareRecords(records []tagquery.MetaTagRecord) []struct {
+	currentId       recordId
+	currentMetaTags tagquery.Tags
+	recordExists    bool
+	isEqual         bool
+} {
+	res := make([]struct {
+		currentId       recordId
+		currentMetaTags tagquery.Tags
+		recordExists    bool
+		isEqual         bool
+	}, len(records))
+
+	m.RLock()
+	defer m.RUnlock()
+
+	for i := range records {
+		id, exists, equal := m.recordExistsAndIsEqual(records[i])
+		res[i].currentId = id
+		res[i].currentMetaTags = m.records[id].MetaTags
+		res[i].recordExists = exists
+		res[i].isEqual = equal
+	}
+
+	return res
+}
+
+func (m *metaTagRecords) listRecords() []tagquery.MetaTagRecord {
+	m.RLock()
+	defer m.RUnlock()
+
+	res := make([]tagquery.MetaTagRecord, len(m.records))
+	var i uint32
+	for _, record := range m.records {
+		res[i] = record
+		i++
+	}
+	return res
+}
+
 // upsert inserts or updates a meta tag record according to the given specifications
 // it uses the set of tag query expressions as the identity of the record, if a record with the
 // same identity is already present then its meta tags get updated to the specified ones.
@@ -143,7 +437,10 @@ func (m *metaTagRecords) recordExistsAndIsEqual(record tagquery.MetaTagRecord) (
 // 3) The id of the record that has been replaced if an update was performed
 // 4) Pointer to the metaTagRecord that has been replaced if an update was performed, otherwise nil
 // 5) Error if an error occurred, otherwise it's nil
-func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagquery.MetaTagRecord, recordId, *tagquery.MetaTagRecord, error) {
+func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, recordId, tagquery.MetaTagRecord, error) {
+	m.Lock()
+	defer m.Unlock()
+
 	record.Expressions.Sort()
 
 	oldId, oldRecord, exists := m.recordExists(record)
@@ -152,7 +449,7 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 	}
 
 	if !record.HasMetaTags() {
-		return 0, &record, oldId, oldRecord, nil
+		return 0, oldId, oldRecord, nil
 	}
 
 	record.MetaTags.Sort()
@@ -164,13 +461,13 @@ func (m *metaTagRecords) upsert(record tagquery.MetaTagRecord) (recordId, *tagqu
 		if _, ok := m.records[id]; !ok {
 			m.records[id] = record
 
-			return id, &record, oldId, oldRecord, nil
+			return id, oldId, oldRecord, nil
 		}
 
 		id++
 	}
 
-	return 0, nil, 0, nil, errors.NewInternal("Could not find a free ID to insert record")
+	return 0, 0, tagquery.MetaTagRecord{}, errors.NewInternal("Could not find a free ID to insert record")
 }
 
 // metaTagEnricher is responsible for "enriching" metrics resulting from a query by
@@ -200,6 +497,8 @@ type metaTagEnricher struct {
 	addMetricBuffer []schema.MetricDefinition
 	// pool of idx.Archive structs that we use when processing add metric events
 	archivePool sync.Pool
+
+	idLookup idLookup
 }
 
 type enricherEventType uint8
@@ -218,13 +517,14 @@ type enricherEvent struct {
 	payload   interface{}
 }
 
-func newEnricher() *metaTagEnricher {
+func newEnricher(idLookup idLookup) *metaTagEnricher {
 	res := &metaTagEnricher{
 		queriesByRecord: make(map[recordId]tagquery.Query),
 		recordsByMetric: make(map[schema.Key]map[recordId]struct{}),
 		archivePool: sync.Pool{
 			New: func() interface{} { return &idx.Archive{} },
 		},
+		idLookup: idLookup,
 	}
 
 	res.start()
@@ -338,7 +638,10 @@ func (e *metaTagEnricher) _flushAddMetricBuffer() {
 				}{record: record}
 				queryCtx = NewTagQueryContext(e.queriesByRecord[record])
 				idCh := make(chan schema.MKey, 100)
-				queryCtx.RunNonBlocking(tags, defById, nil, nil, idCh)
+				go func() {
+					queryCtx.Run(tags, defById, nil, nil, idCh)
+					close(idCh)
+				}()
 				for id := range idCh {
 					result.keys = append(result.keys, id.Key)
 				}
@@ -416,79 +719,86 @@ func (e *metaTagEnricher) _delMetric(payload interface{}) {
 	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 }
 
-func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query, keys []schema.Key) {
+func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query) {
+	idCh := make(chan schema.MKey)
+
 	e.eventQueue <- enricherEvent{
 		eventType: addMetaRecord,
 		payload: struct {
-			id    recordId
-			query tagquery.Query
-			keys  []schema.Key
-		}{id: id, query: query, keys: keys},
+			recordId recordId
+			query    tagquery.Query
+			idCh     chan schema.MKey
+		}{recordId: id, query: query, idCh: idCh},
 	}
+
+	go e.idLookup(query, idCh)
+
 }
 
 func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		id    recordId
-		query tagquery.Query
-		keys  []schema.Key
+		recordId recordId
+		query    tagquery.Query
+		idCh     chan schema.MKey
 	})
 
-	e.Lock()
-	e.queriesByRecord[data.id] = data.query
-	e.Unlock()
-	enricherKnownMetaRecords.SetUint32(uint32(len(e.queriesByRecord)))
+	var added uint32
 
-	for _, key := range data.keys {
-		// we acquire one write lock per iteration, instead of one for the whole loop,
-		// because the performance of addMetaRecord operations is less important than
-		// the enrich() calls which are used by the query processing
-		e.Lock()
-		if _, ok := e.recordsByMetric[key]; ok {
-			e.recordsByMetric[key][data.id] = struct{}{}
-			e.Unlock()
-			continue
+	e.Lock()
+	for id := range data.idCh {
+		if _, ok := e.recordsByMetric[id.Key]; ok {
+			e.recordsByMetric[id.Key][data.recordId] = struct{}{}
+		} else {
+			e.recordsByMetric[id.Key] = map[recordId]struct{}{
+				data.recordId: {},
+			}
 		}
-		e.recordsByMetric[key] = map[recordId]struct{}{data.id: {}}
-		e.Unlock()
+		added++
 	}
+	e.queriesByRecord[data.recordId] = data.query
+	e.Unlock()
 
 	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
-	enricherMetricsAddedByQuery.Add(len(data.keys))
+	enricherMetricsAddedByQuery.AddUint32(added)
 }
 
-func (e *metaTagEnricher) delMetaRecord(id recordId, keys []schema.Key) {
+func (e *metaTagEnricher) delMetaRecord(id recordId) {
+	e.RLock()
+	query := e.queriesByRecord[id]
+	e.RUnlock()
+
+	idCh := make(chan schema.MKey)
+
 	e.eventQueue <- enricherEvent{
 		eventType: delMetaRecord,
 		payload: struct {
-			id   recordId
-			keys []schema.Key
-		}{id: id, keys: keys},
+			recordId recordId
+			idCh     chan schema.MKey
+		}{recordId: id, idCh: idCh},
 	}
+
+	go e.idLookup(query, idCh)
 }
 
 func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		id   recordId
-		keys []schema.Key
+		recordId recordId
+		idCh     chan schema.MKey
 	})
 
-	// before deleting the meta record from the e.queriesByRecord map we
-	// delete all references to it from the recordsByMetric map
-	for _, key := range data.keys {
-		e.Lock()
-		delete(e.recordsByMetric[key], data.id)
-		if len(e.recordsByMetric[key]) == 0 {
-			delete(e.recordsByMetric, key)
+	e.Lock()
+	for id := range data.idCh {
+		delete(e.recordsByMetric[id.Key], data.recordId)
+		if len(e.recordsByMetric[id.Key]) == 0 {
+			delete(e.recordsByMetric, id.Key)
 		}
-		e.Unlock()
 	}
-	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
+	e.Unlock()
 
 	e.Lock()
-	delete(e.queriesByRecord, data.id)
-	e.Unlock()
+	delete(e.queriesByRecord, data.recordId)
 	enricherKnownMetaRecords.SetUint32(uint32(len(e.queriesByRecord)))
+	e.Unlock()
 }
 
 // enrich resolves a metric key into the associated set of record ids,
@@ -510,37 +820,98 @@ func (e *metaTagEnricher) countMetricsWithMetaTags() int {
 
 // index structure keyed by tag -> value -> list of meta record IDs
 type metaTagValue map[string][]recordId
-type metaTagIndex map[string]metaTagValue
+type metaTagKeys map[string]metaTagValue
+type metaTagHierarchy struct {
+	sync.RWMutex
+	tags metaTagKeys
+}
 
-func (m metaTagIndex) deleteRecord(keyValue tagquery.Tag, id recordId) {
-	if ids, ok := m[keyValue.Key][keyValue.Value]; ok {
-		for i := 0; i < len(ids); i++ {
-			if ids[i] == id {
-				// no need to keep the order
-				ids[i] = ids[len(ids)-1]
-				m[keyValue.Key][keyValue.Value] = ids[:len(ids)-1]
-				break
+func newMetaTagHierarchy() *metaTagHierarchy {
+	return &metaTagHierarchy{tags: make(metaTagKeys)}
+}
+
+func (m *metaTagHierarchy) deleteRecord(tags tagquery.Tags, id recordId) {
+	m.Lock()
+	defer m.Unlock()
+
+	for _, tag := range tags {
+		if ids, ok := m.tags[tag.Key][tag.Value]; ok {
+			for i := 0; i < len(ids); i++ {
+				if ids[i] == id {
+					// no need to keep the order
+					ids[i] = ids[len(ids)-1]
+					m.tags[tag.Key][tag.Value] = ids[:len(ids)-1]
+					break
+				}
 			}
-		}
-		if len(m[keyValue.Key][keyValue.Value]) == 0 {
-			delete(m[keyValue.Key], keyValue.Value)
-			if len(m[keyValue.Key]) == 0 {
-				delete(m, keyValue.Key)
+			if len(m.tags[tag.Key][tag.Value]) == 0 {
+				delete(m.tags[tag.Key], tag.Value)
+				if len(m.tags[tag.Key]) == 0 {
+					delete(m.tags, tag.Key)
+				}
 			}
 		}
 	}
 }
 
-func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
+func (m *metaTagHierarchy) insertRecord(tags tagquery.Tags, id recordId) {
+	m.Lock()
+	defer m.Unlock()
+
 	var values metaTagValue
 	var ok bool
 
-	if values, ok = m[keyValue.Key]; !ok {
-		values = make(metaTagValue)
-		m[keyValue.Key] = values
+	for _, tag := range tags {
+		if values, ok = m.tags[tag.Key]; !ok {
+			values = make(metaTagValue)
+			m.tags[tag.Key] = values
+		}
+		values[tag.Value] = append(values[tag.Value], id)
+	}
+}
+
+func (m *metaTagHierarchy) updateExpressionCosts(costs []expressionCost, exprs tagquery.Expressions) {
+	if len(costs) != len(exprs) {
+		log.Warnf("metaTagHierarchy.UpdateExpressionCosts: Invalid pair of expression costs and expressions")
+		return
 	}
 
-	values[keyValue.Value] = append(values[keyValue.Value], id)
+	m.RLock()
+	defer m.RUnlock()
+
+	for i := range costs {
+		costs[i].metaTag = m.hasMatchesForExpression(exprs[i])
+	}
+}
+
+func (m *metaTagHierarchy) hasMatchesForExpression(expr tagquery.Expression) bool {
+	var res bool
+
+	if expr.OperatesOnTag() {
+		if expr.MatchesExactly() {
+			_, res = m.tags[expr.GetKey()]
+		} else {
+			for key := range m.tags {
+				if expr.ResultIsSmallerWhenInverted() == !expr.Matches(key) {
+					res = true
+					break
+				}
+			}
+		}
+	} else {
+		if expr.MatchesExactly() {
+			_, res = m.tags[expr.GetKey()][expr.GetValue()]
+		} else {
+			for value := range m.tags[expr.GetKey()] {
+				if expr.ResultIsSmallerWhenInverted() == !expr.Matches(value) {
+					res = true
+					break
+				}
+			}
+		}
+	}
+
+	return res
 }
 
 // getMetaRecordIdsByExpression takes an expression and a bool, it returns all meta record
@@ -550,43 +921,68 @@ func (m metaTagIndex) insertRecord(keyValue tagquery.Tag, id recordId) {
 // because less meta records will need to be checked against a given MetricDefinition.
 // The caller, after receiving the result set, needs to be aware of whether the result set
 // is inverted and interpret it accordingly.
-func (m metaTagIndex) getMetaRecordIdsByExpression(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+func (m *metaTagHierarchy) getMetaRecordIdsByExpression(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
 	if expr.OperatesOnTag() {
 		return m.getByTag(expr, invertSetOfMetaRecords)
 	}
 	return m.getByTagValue(expr, invertSetOfMetaRecords)
 }
 
-func (m metaTagIndex) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
-	var res []recordId
+func (m *metaTagHierarchy) getByTag(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+	recordSet := make(map[recordId]struct{})
 
-	for key := range m {
+	m.RLock()
+	defer m.RUnlock()
 
-		if invertSetOfMetaRecords {
-			if expr.Matches(key) {
-				continue
-			}
-		} else {
-			if !expr.Matches(key) {
-				continue
+	// optimization for simple "=" expressions
+	if !invertSetOfMetaRecords && expr.MatchesExactly() {
+		for _, records := range m.tags[expr.GetKey()] {
+			for _, record := range records {
+				recordSet[record] = struct{}{}
 			}
 		}
+	} else {
+		for key := range m.tags {
+			if invertSetOfMetaRecords {
+				if expr.Matches(key) {
+					continue
+				}
+			} else {
+				if !expr.Matches(key) {
+					continue
+				}
+			}
 
-		for _, ids := range m[key] {
-			res = append(res, ids...)
+			for _, records := range m.tags[key] {
+				for _, record := range records {
+					recordSet[record] = struct{}{}
+				}
+			}
 		}
+	}
+
+	res := make([]recordId, len(recordSet))
+	i := 0
+	for record := range recordSet {
+		res[i] = record
+		i++
 	}
 
 	return res
 }
 
-func (m metaTagIndex) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
-	if expr.MatchesExactly() {
-		return m[expr.GetKey()][expr.GetValue()]
+func (m *metaTagHierarchy) getByTagValue(expr tagquery.Expression, invertSetOfMetaRecords bool) []recordId {
+	recordSet := make(map[recordId]struct{})
+
+	m.RLock()
+	defer m.RUnlock()
+
+	// optimization for simple "=" expressions
+	if !invertSetOfMetaRecords && expr.MatchesExactly() {
+		return m.tags[expr.GetKey()][expr.GetValue()]
 	}
 
-	var res []recordId
-	for value, ids := range m[expr.GetKey()] {
+	for value, records := range m.tags[expr.GetKey()] {
 		passes := expr.Matches(value)
 
 		if invertSetOfMetaRecords {
@@ -597,7 +993,80 @@ func (m metaTagIndex) getByTagValue(expr tagquery.Expression, invertSetOfMetaRec
 			continue
 		}
 
-		res = append(res, ids...)
+		for _, record := range records {
+			recordSet[record] = struct{}{}
+		}
+	}
+
+	res := make([]recordId, len(recordSet))
+	i := 0
+	for record := range recordSet {
+		res[i] = record
+		i++
+	}
+
+	return res
+}
+
+func (m *metaTagHierarchy) getTagValuesByRegex(key string, filter *regexp.Regexp) map[string][]recordId {
+	res := make(map[string][]recordId)
+
+	m.RLock()
+	defer m.RUnlock()
+
+	for value, recordIds := range m.tags[key] {
+		if filter != nil && !filter.MatchString(value) {
+			continue
+		}
+
+		res[value] = recordIds
+	}
+
+	return res
+}
+
+func (m *metaTagHierarchy) getTagsByPrefix(prefix string) []string {
+	var res []string
+
+	m.RLock()
+	defer m.RUnlock()
+
+	for tag := range m.tags {
+		if len(prefix) > 0 && !strings.HasPrefix(tag, prefix) {
+			continue
+		}
+		res = append(res, tag)
+	}
+
+	return res
+}
+func (m *metaTagHierarchy) getTagsByFilter(filter *regexp.Regexp) []string {
+	var res []string
+
+	m.RLock()
+	defer m.RUnlock()
+
+	for tag := range m.tags {
+		if filter != nil && !filter.MatchString(tag) {
+			continue
+		}
+		res = append(res, tag)
+	}
+
+	return res
+}
+
+func (m *metaTagHierarchy) getTagValuesByTagAndPrefix(tag, prefix string) []string {
+	var res []string
+
+	m.RLock()
+	defer m.RUnlock()
+
+	for value := range m.tags[tag] {
+		if len(prefix) > 0 && !strings.HasPrefix(value, prefix) {
+			continue
+		}
+		res = append(res, value)
 	}
 
 	return res
