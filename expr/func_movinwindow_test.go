@@ -90,6 +90,34 @@ var allNullsB = []schema.Point{
 	{Val: math.NaN(), Ts: 80},
 }
 
+var seriesC30secs = []schema.Point{
+	{Val: 2, Ts: 30},
+	{Val: 3, Ts: 60},
+	{Val: 4, Ts: 90},
+	{Val: 5, Ts: 120},
+	{Val: 6, Ts: 150},
+	{Val: 7, Ts: 180},
+	{Val: 8, Ts: 210},
+}
+
+var sumC2Pts = []schema.Point{
+	{Val: 2, Ts: 60},
+	{Val: 5, Ts: 90},
+	{Val: 7, Ts: 120},
+	{Val: 9, Ts: 150},
+	{Val: 11, Ts: 180},
+	{Val: 13, Ts: 210},
+}
+
+var minC2Pts = []schema.Point{
+	{Val: 2, Ts: 60},
+	{Val: 2, Ts: 90},
+	{Val: 3, Ts: 120},
+	{Val: 4, Ts: 150},
+	{Val: 5, Ts: 180},
+	{Val: 6, Ts: 210},
+}
+
 func getNamedSeries(target, patt string, from, to uint32, data ...[]schema.Point) []models.Series {
 
 	if len(data) == 0 {
@@ -216,6 +244,32 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 		offset20s,
 		"20s",
 		"sum",
+		0,
+		t)
+}
+
+func TestMovingWindowWindowWhenTimeShiftGoesBeyondAvailableSeriesStartPoints(t *testing.T) {
+	offset1min := uint32(60)
+
+	testMovingWindow(
+		"movingSum of 1 min windowSize",
+		getNamedSeries("t", "p", 0, 210, seriesC30secs),
+		getNamedSeries("movingSum(t,\"1min\")", "movingSum(p,\"1min\")",
+			0+offset1min, 210, sumC2Pts),
+		offset1min,
+		"1min",
+		"sum",
+		0,
+		t)
+
+	testMovingWindow(
+		"movingMin of 1 min windowSize",
+		getNamedSeries("t", "p", 0, 210, seriesC30secs),
+		getNamedSeries("movingMin(t,\"1min\")", "movingMin(p,\"1min\")",
+			0+offset1min, 210, minC2Pts),
+		offset1min,
+		"1min",
+		"min",
 		0,
 		t)
 }
