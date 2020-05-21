@@ -9,12 +9,14 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 var ErrInvalidIntervalzero = errors.New("interval cannot be 0")
 var ErrInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var ErrInvalidEmptyName = errors.New("name cannot be empty")
 var ErrInvalidMtype = errors.New("invalid mtype")
+var ErrInvalidUtf8 = errors.New("invalid utf8 data")
 var ErrInvalidTagFormat = errors.New("invalid tag format")
 var ErrUnknownPartitionMethod = errors.New("unknown partition method")
 
@@ -53,6 +55,9 @@ func (m *MetricData) Validate() error {
 	}
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
+	}
+	if !utf8.ValidString(m.Name) {
+		return ErrInvalidUtf8
 	}
 	if !ValidateTags(m.Tags) {
 		return ErrInvalidTagFormat

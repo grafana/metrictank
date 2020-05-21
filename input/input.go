@@ -17,11 +17,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var rejectInvalidTags bool
+var (
+	rejectInvalidTags bool
+	rejectInvalidUtf8 bool
+)
 
 func ConfigSetup() {
 	input := flag.NewFlagSet("input", flag.ExitOnError)
 	input.BoolVar(&rejectInvalidTags, "reject-invalid-tags", true, "reject received metrics that have invalid tags")
+	input.BoolVar(&rejectInvalidUtf8, "reject-invalid-utf8", false, "reject received metrics with invalid utf8 data")
 	globalconf.Register("input", input, flag.ExitOnError)
 }
 
@@ -54,6 +58,7 @@ const (
 	invalidName      = "invalid-name"
 	invalidMtype     = "invalid-mtype"
 	invalidTagFormat = "invalid-tag-format"
+	invalidUtf8      = "invalid-utf8-data"
 	unknownPointId   = "unknown-point-id"
 )
 
@@ -128,6 +133,16 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 			}
 		}
 
+		// this is now the second to last check, just before the Invalid Tag check
+		if err == schema.ErrInvalidUtf8 {
+			if !rejectInvalidUtf8 {
+				if log.IsLevelEnabled(log.DebugLevel) {
+					log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid utf8 data is disabled: %s", md, err)
+				}
+				ignoreError = true
+			}
+		}
+
 		if !ignoreError {
 			log.Debugf("in: Invalid metric %v: %s", md, err)
 
@@ -141,6 +156,8 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 				reason = invalidName
 			case schema.ErrInvalidMtype:
 				reason = invalidMtype
+			case schema.ErrInvalidUtf8:
+				reason = invalidUtf8
 			case schema.ErrInvalidTagFormat:
 				reason = invalidTagFormat
 			default:
