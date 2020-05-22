@@ -10,7 +10,7 @@ These calls are recorded. If you do not wish to be recorded, you are free to dis
 
 Agenda: The agenda can be found in the [community calendar][calendar] entry for each month
 
-Zoom Call Link: [https://grafana.zoom.us/j/594084707][zoom]
+Zoom Call Link: [https://zoom.us/j/636994029][zoom]
 
 ## Why?
 
@@ -46,4 +46,4 @@ Discussions / Demos
 
 [coc]: https://github.com/grafana/grafana/blob/master/CODE_OF_CONDUCT.md
 [calendar]: https://calendar.google.com/calendar/embed?src=grafana.com_n57lluqpn4h4edroeje6199o00%40group.calendar.google.com
-[zoom]: https://grafana.zoom.us/j/594084707
+[zoom]: https://zoom.us/j/636994029
