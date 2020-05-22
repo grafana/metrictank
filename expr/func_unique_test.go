@@ -19,89 +19,60 @@ func getNewUnique(in [][]models.Series) *FuncUnique {
 }
 
 func TestUnique(t *testing.T) {
-	f := getNewUnique([][]models.Series{
-		{
+	testUnique(
+		"basic",
+		[][]models.Series{
 			{
-				Interval:   10,
-				QueryPatt:  "foo.a",
-				Target:     "foo.a",
-				Datapoints: getCopy(a),
+				getSeries("foo.a", "foo.a", a),
+				getSeries("foo.b", "foo.b", b),
 			},
 			{
-				Interval:   100,
-				QueryPatt:  "foo.b",
-				Target:     "foo.b",
-				Datapoints: getCopy(b),
+				getSeries("bar.b", "bar.b", b),
 			},
+			{
+				getSeries("foo.a", "foo.a", a),
+				getSeries("bar.b", "bar.*", b),
+				getSeries("bar.d", "bar.*", d),
+				getSeries("foo.a", "foo.a", a),
+			},
+		}, []models.Series{
+			getSeries("foo.a", "foo.a", a),
+			getSeries("foo.b", "foo.b", b),
+			getSeries("bar.b", "bar.b", b),
+			getSeries("bar.d", "bar.*", d),
 		},
-		{
-			{
-				Interval:   10,
-				QueryPatt:  "bar.b",
-				Target:     "bar.b",
-				Datapoints: getCopy(b),
-			},
-		},
-		{
-			{
-				Interval:   10,
-				QueryPatt:  "foo.a",
-				Target:     "foo.a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "bar.*",
-				Target:     "bar.b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   100,
-				QueryPatt:  "bar.*",
-				Target:     "bar.d",
-				Datapoints: getCopy(d),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "foo.a",
-				Target:     "foo.a",
-				Datapoints: getCopy(a),
-			},
-		},
-	},
-	)
+		t)
+}
 
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "foo.a",
-			Target:     "foo.a",
-			Datapoints: getCopy(a),
-		},
-		{
-			Interval:   100,
-			QueryPatt:  "foo.b",
-			Target:     "foo.b",
-			Datapoints: getCopy(b),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "bar.b",
-			Target:     "bar.b",
-			Datapoints: getCopy(b),
-		},
-		{
-			Interval:   100,
-			QueryPatt:  "bar.*",
-			Target:     "bar.d",
-			Datapoints: getCopy(d),
-		},
+func testUnique(name string, in [][]models.Series, out []models.Series, t *testing.T) {
+	f := getNewUnique(in)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([][]models.Series, len(in))
+	for i := range in {
+		inputCopy[i] = make([]models.Series, len(in[i]))
+		copy(inputCopy[i], in[i])
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+	dataMap := initDataMapMultiple(in)
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Case %s: %s", name, err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		for i := range inputCopy {
+			if err := equalOutput(inputCopy[i], in[i], nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+			}
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 func BenchmarkUnique10k_1NoNulls(b *testing.B) {

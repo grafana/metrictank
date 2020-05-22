@@ -15,7 +15,7 @@ Such functions require special options. see [the optimizations documentation](..
 
 See section 'Considerations around Series changes and reuse and why we chose copy-on-write' below.
 
-* must not modify existing data that the fields of any pre-existing `models.Series` point to. At the time of writing it's only the Datapoints, Tags and Meta fields, but this may change.
+* must not modify the fields of any pre-existing `models.Series`. Because these are stored in a slice, other functions may refer to the same slice and modifying them in place could potentially propagate changes to other execution branches.
   (exception: FuncGet)
 * should use the pool to get new slices in which to store their new/modified datapoints.
 * should add said new slices into the dataMap so that when the plan has run, and the caller calls plan.Clean(), we can return its datapoints slice to the pool.
@@ -24,20 +24,20 @@ See section 'Considerations around Series changes and reuse and why we chose cop
 
 example: an averageSeries() of 3 series:
 * will create an output series value.
-* it will use a new datapoints slice, retrieved from pool, because the points will be different. also it will allocate a new meta section and tags map because they are different from the input series also.
-* won't put the 3 inputs back in the pool or dataMap, because whoever allocated the input series was responsible for doing that. we should not add the same arrays to the pool multiple times.
+* it will use a new datapoints slice, retrieved from pool, because the points will be different. Also, it will allocate a new meta section and tags map because they are also different from the input series.
+* won't put the 3 inputs back in the pool or dataMap, because whoever allocated the input series was responsible for doing that. We must not add the same arrays to the pool multiple times.
 * It will however store the newly created series into the dataMap such that during plan cleanup time, the series' datapoints slice will be moved back to the pool.
 
 # Considerations around Series changes and reuse and why we chose copy-on-write.
 
-## introduction
+## Introduction
 
 The `models.Series` type, even when passed by value, has a few fields that need special attention:
 * `Datapoints []schema.Point`
 * `Tags       map[string]string`
 * `Meta       SeriesMeta`
 
-Many processing functions will want to return an output series that differs from the input, in terms of (some of the) datapoints may have changed value, tags or metadata.
+Many processing functions will want to return an output series that differs from the input in terms of datapoints, tags or metadata.
 They need a place to store their output but we cannot simply operate on the input series, or even a copy of it, as the underlying datastructures are shared.
 
 ## Goals
@@ -64,14 +64,14 @@ there's 2 main choices:
 - works well if you have many processing steps in a row that can just modify in place
 - copying up front, in a separate pass. also causes a stall
 - often copying may be unnessary, but we can't know that in advance (unless we expand the expr tree to mark whether it'll do a write)
-- means we cannot cache intermediate results, unless we also make deep copies anny time we want to cache and hand off for further processing.
+- means we cannot cache intermediate results, unless we also make deep copies any time we want to cache and hand off for further processing.
 
 
-for now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach, so we chose **the copy on write approach**
+For now we assume that multi-steps in a row is not that common, and COW seems more commonly the best approach, so we chose **the copy on write approach**
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
-Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this library to be easily embeddable in other programs. 
+Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this library to be easily embeddable in other programs.
 It's up to the client to instantiate the pool, and set up the default allocation to return point slices of desired point capacity.
 The client can then of course use this pool to store series, which it then feeds to expr.
 expr library does the rest.  It manages the series/pointslices and gets new ones as a basis for the COW.
@@ -109,7 +109,7 @@ consolidateBy(
     "max"
 )
 ```
-There's 2 important information flows to be aware of: parsing and after it, execution.
+There are 2 important information flows to be aware of: parsing and after it, execution.
 * Parsing starts at the root and continues until leaves are resolved, and we know which series need to be fetched.
 * Execution happens the other way around: first the data at the leaves is fetched, then functions are applied until we hit the root.
   At that point function processing is complete; we can do some final work (like merging of series that are the same metric but a different raw interval, and maxDatapoints consolidation) and return the data back to the user.
@@ -123,7 +123,7 @@ So:
    - consolidateBy setting defined closest to the leaf without a special* function in between the setting and the leaf, if available
    - determined via storage-aggregation.conf (defaults to average)
 3) at execution time, the consolidation settings encountered in consolidateBy calls travel up to the root because it is configured on the series, which is passed through the various layers of processing until it hits the root and the output step.  This becomes useful in two cases:
-   - when series need to be normalized at runtime, e.g. for sumSeries or divideSeries with series that have different steps; they need to be normalized (consolidated) so that the series get a compatible step, and the default of "avg" may not suffice.  (note that right now we have alignRequests which normalizes all series at fetch time, which can actually be a bit too eager, because some requests can use multiple targets with different processing - e.g. feed two different series into summarize(), so we actually don't need to normalize at runtime, but in the future we should make this better - TODO THIS IS OUT OF DATE) 
+   - when series need to be normalized at runtime, e.g. for sumSeries or divideSeries with series that have different steps; they need to be normalized (consolidated) so that the series get a compatible step, and the default of "avg" may not suffice.  (note that right now we have alignRequests which normalizes all series at fetch time, which can actually be a bit too eager, because some requests can use multiple targets with different processing - e.g. feed two different series into summarize(), so we actually don't need to normalize at runtime, but in the future we should make this better - TODO THIS IS OUT OF DATE)
    - when returning data back to the user via a json response and whatnot, we can consolidate down using the method requested by the user (or average, if not specified). Likewise here, when the setting encounters a special* function while traveling up to the root, the consolidation value is reset to the default (average)
    Note: some functions combine multiple series into a new one (e.g. sumSeries, avgSeries, ...). Your input series may use different consolidateBy settings, some may be explicitly specified while others are not.  In this scenario, the output series will be given the first explicitly defined consolidateBy found by iterating the inputs, or the first default otherwise.
 
@@ -136,15 +136,15 @@ see also https://github.com/grafana/metrictank/issues/463#issuecomment-275199880
 
 
 
-# naming
+# Naming
 
-when requesting series directly, we want to show the target (to uniquely identify each series), not the queryPattern
-thus the output returned by plan.Run must always use Target attribute to show the proper name
-it follows that any processing functions must set that attribute properly.
-but some functions (e.g. sumSeries) take queryPattern of their inputs, to show summary query pattern instead of each individual value.
-thus, to accommodate wrapping functions (which may use QueryPattern) as well as lack of wrapping functions (e.g. generating json output which will look at Target), processing functions must set both Target and QueryPatt, and they should set it to the same value.
+When requesting series directly, we want to show the target (to uniquely identify each series), not the queryPattern
+Thus, the output returned by plan.Run must always use Target attribute to show the proper name
+It follows that any processing functions must set that attribute properly.
+However, some functions (e.g. sumSeries) take queryPattern of their inputs, to show summary query pattern instead of each individual value.
+Thus, to accommodate wrapping functions (which may use QueryPattern) as well as lack of wrapping functions (e.g. generating json output which will look at Target), processing functions must set both Target and QueryPatt, and they should set it to the same value.
 
-in a future version we can probably refactor things to make this simpler: fetched data could result in a series with key attribute the graphite key (currently stored in target), and store the query pattern used in the target attribute.  functions only set target and only look at target, and at output phase, we just use target. there's only 1 special case of metrics returned without function processing. we could detect this case, or if we have multiple things with same target, print the metric name instead, or something
+In a future version we can probably refactor things to make this simpler: fetched data could result in a series with key attribute the graphite key (currently stored in target), and store the query pattern used in the target attribute.  functions only set target and only look at target, and at output phase, we just use target. there's only 1 special case of metrics returned without function processing. we could detect this case, or if we have multiple things with same target, print the metric name instead, or something
 
 examples: (series are in `series{target,querypatt}` form)
 

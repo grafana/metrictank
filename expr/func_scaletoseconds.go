@@ -35,12 +35,10 @@ func (s *FuncScaleToSeconds) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("scaleToSeconds(%s,%d)", serie.Target, int64(s.seconds))
-		series[i].QueryPatt = series[i].Target
-		series[i].Tags = serie.CopyTagsWith("scaleToSeconds", strconv.FormatFloat(s.seconds, 'g', -1, 64))
-		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
+	output := make([]models.Series, 0, len(series))
+	for _, serie := range series {
 
+		out := pointSlicePool.Get().([]schema.Point)
 		factor := float64(s.seconds) / float64(serie.Interval)
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {
@@ -48,9 +46,15 @@ func (s *FuncScaleToSeconds) Exec(dataMap DataMap) ([]models.Series, error) {
 				roundingFactor := math.Pow(10, 6)
 				p.Val = math.Round(p.Val*factor*roundingFactor) / roundingFactor
 			}
-			series[i].Datapoints = append(series[i].Datapoints, p)
+			out = append(out, p)
 		}
+		serie.Target = fmt.Sprintf("scaleToSeconds(%s,%d)", serie.Target, int64(s.seconds))
+		serie.QueryPatt = serie.Target
+		serie.Tags = serie.CopyTagsWith("scaleToSeconds", strconv.FormatFloat(s.seconds, 'g', -1, 64))
+		serie.Datapoints = out
+
+		output = append(output, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, output...)
+	return output, nil
 }

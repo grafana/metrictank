@@ -37,17 +37,32 @@ var randomAbsolute = []schema.Point{
 	{Val: math.MaxFloat64, Ts: 70},
 }
 
-func TestAbsoluteRandom(t *testing.T) {
+func TestAbsoluteZeroInput(t *testing.T) {
 	f := getNewAbsolute(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "random",
-				Target:     "rand",
-				Datapoints: getCopy(random),
-			},
-		},
+		[]models.Series{},
 	)
+	out := []models.Series{}
+
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAbsoluteRandom(t *testing.T) {
+
+	input := []models.Series{
+		{
+			Interval:   10,
+			QueryPatt:  "random",
+			Target:     "rand",
+			Datapoints: getCopy(random),
+		},
+	}
+	inputCopy := make([]models.Series, len(input))
+	copy(inputCopy, input)
+
+	f := getNewAbsolute(input)
 	out := []models.Series{
 		{
 			Interval:   10,
@@ -57,10 +72,23 @@ func TestAbsoluteRandom(t *testing.T) {
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+	dataMap := initDataMap(input)
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, input, nil, nil); err != nil {
+			t.Fatal("Input was modified: ", err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatal("Point slices in datamap overlap: ", err)
+		}
+	})
 }
 func BenchmarkAbsolute10k_1NoNulls(b *testing.B) {
 	benchmarkAbsolute(b, 1, test.RandFloats10k, test.RandFloats10k)

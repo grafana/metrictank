@@ -7,46 +7,47 @@ import (
 	"github.com/grafana/metrictank/api/models"
 )
 
-func TestAliasZero(t *testing.T) {
-	testAlias("zero", []models.Series{}, []models.Series{}, t)
+func TestAliasByNodeZero(t *testing.T) {
+	testAliasByNode("zero", []models.Series{}, []models.Series{}, t)
 }
-func TestAliasSingle(t *testing.T) {
-	testAlias(
+func TestAliasByNodeSingle(t *testing.T) {
+	testAliasByNode(
 		"single",
+		[]models.Series{
+			getSeriesNamed("foo.bar.baz", a),
+		},
 		[]models.Series{
 			getSeriesNamed("foo", a),
 		},
-		[]models.Series{
-			getSeriesNamed("bar", a),
-		},
 		t,
 	)
 }
-func TestAliasMultiple(t *testing.T) {
-	testAlias(
+
+func TestAliasByNodeMultiple(t *testing.T) {
+	testAliasByNode(
 		"multiple",
 		[]models.Series{
-			getSeriesNamed("foo-1", a),
-			getSeriesNamed("foo-2", b),
+			getSeriesNamed("1.foo", a),
+			getSeriesNamed("2.foo", b),
 		},
 		[]models.Series{
-			getSeriesNamed("bar", a),
-			getSeriesNamed("bar", b),
+			getSeriesNamed("1", a),
+			getSeriesNamed("2", b),
 		},
 		t,
 	)
 }
 
-func makeAlias(in []models.Series) GraphiteFunc {
-	f := NewAlias()
-	alias := f.(*FuncAlias)
-	alias.alias = "bar"
-	alias.in = NewMock(in)
+func makeAliasByNode(in []models.Series, nodes []expr) GraphiteFunc {
+	f := NewAliasByNode()
+	abn := f.(*FuncAliasByNode)
+	abn.nodes = nodes
+	abn.in = NewMock(in)
 	return f
 }
 
-func testAlias(name string, in []models.Series, out []models.Series, t *testing.T) {
-	f := makeAlias(in)
+func testAliasByNode(name string, in []models.Series, out []models.Series, t *testing.T) {
+	f := makeAliasByNode(in, []expr{{etype: etInt, int: 0}})
 
 	// Copy input to check that it is unchanged later
 	inputCopy := make([]models.Series, len(in))
@@ -73,20 +74,20 @@ func testAlias(name string, in []models.Series, out []models.Series, t *testing.
 	})
 }
 
-func BenchmarkAlias_1(b *testing.B) {
-	benchmarkAlias(b, 1)
+func BenchmarkAliasByNode_1(b *testing.B) {
+	benchmarkAliasByNode(b, 1)
 }
-func BenchmarkAlias_10(b *testing.B) {
-	benchmarkAlias(b, 10)
+func BenchmarkAliasByNode_10(b *testing.B) {
+	benchmarkAliasByNode(b, 10)
 }
-func BenchmarkAlias_100(b *testing.B) {
-	benchmarkAlias(b, 100)
+func BenchmarkAliasByNode_100(b *testing.B) {
+	benchmarkAliasByNode(b, 100)
 }
-func BenchmarkAlias_1000(b *testing.B) {
-	benchmarkAlias(b, 1000)
+func BenchmarkAliasByNode_1000(b *testing.B) {
+	benchmarkAliasByNode(b, 1000)
 }
 
-func benchmarkAlias(b *testing.B, numSeries int) {
+func benchmarkAliasByNode(b *testing.B, numSeries int) {
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
@@ -96,10 +97,10 @@ func benchmarkAlias(b *testing.B, numSeries int) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		f := NewAlias()
-		alias := f.(*FuncAlias)
-		alias.alias = "new-name"
-		alias.in = NewMock(input)
+		f := NewAliasByNode()
+		aliasbynode := f.(*FuncAliasByNode)
+		aliasbynode.nodes = []expr{{etype: etInt, int: 0}}
+		aliasbynode.in = NewMock(input)
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err != nil {
 			b.Fatalf("%s", err)

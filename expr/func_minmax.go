@@ -32,8 +32,6 @@ func (s *FuncMinMax) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	outputs := make([]models.Series, len(series))
-
 	valOrDefault := func(val float64, def float64) float64 {
 		if math.IsNaN(val) {
 			return def
@@ -51,7 +49,9 @@ func (s *FuncMinMax) Exec(dataMap DataMap) ([]models.Series, error) {
 		return (val - min) / (max - min)
 	}
 
-	for i, serie := range series {
+	outputs := make([]models.Series, 0, len(series))
+
+	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 
 		minVal := valOrDefault(batch.Min(serie.Datapoints), 0)
@@ -61,17 +61,12 @@ func (s *FuncMinMax) Exec(dataMap DataMap) ([]models.Series, error) {
 			out = append(out, schema.Point{Val: minMax(p.Val, minVal, maxVal), Ts: p.Ts})
 		}
 
-		s := models.Series{
-			Target:       fmt.Sprintf("minMax(%s)", serie.Target),
-			QueryPatt:    fmt.Sprintf("minMax(%s)", serie.QueryPatt),
-			Tags:         serie.CopyTagsWith("minMax", "1"),
-			Datapoints:   out,
-			Interval:     serie.Interval,
-			Meta:         serie.Meta,
-			QueryMDP:     serie.QueryMDP,
-			QueryPNGroup: serie.QueryPNGroup,
-		}
-		outputs[i] = s
+		serie.Target = fmt.Sprintf("minMax(%s)", serie.Target)
+		serie.QueryPatt = fmt.Sprintf("minMax(%s)", serie.QueryPatt)
+		serie.Tags = serie.CopyTagsWith("minMax", "1")
+		serie.Datapoints = out
+
+		outputs = append(outputs, serie)
 	}
 	dataMap.Add(Req{}, outputs...)
 	return outputs, nil

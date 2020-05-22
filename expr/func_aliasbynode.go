@@ -29,11 +29,14 @@ func (s *FuncAliasByNode) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i, serie := range series {
+
+	out := make([]models.Series, 0, len(series))
+	for _, serie := range series {
 		n := aggKey(serie, s.nodes)
-		series[i].Target = n
-		series[i].QueryPatt = n
-		series[i].Tags = series[i].CopyTagsWith("name", n)
+		serie.Target = n
+		serie.QueryPatt = n
+		serie.Tags = serie.CopyTagsWith("name", n)
+		out = append(out, serie)
 	}
-	return series, nil
+	return out, nil
 }

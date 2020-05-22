@@ -17,80 +17,40 @@ func TestRemoveAbovePercentileSingleAllNonNull(t *testing.T) {
 		true,
 		60,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", b),
+			getSeries("c", "abcd", c),
+			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "removeAbovePercentile(a, 60)",
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: 0, Ts: 20},
-					{Val: 5.5, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeAbovePercentile(b, 60)",
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: math.MaxFloat64, Ts: 20},
-					{Val: math.MaxFloat64 - 20, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: 1234567890, Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeAbovePercentile(c, 60)",
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: 0, Ts: 20},
-					{Val: 1, Ts: 30},
-					{Val: 2, Ts: 40},
-					{Val: 3, Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeAbovePercentile(d, 60)",
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: 33, Ts: 20},
-					{Val: 199, Ts: 30},
-					{Val: 29, Ts: 40},
-					{Val: 80, Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
+			getSeriesNamed("removeAbovePercentile(a, 60)", []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 0, Ts: 20},
+				{Val: 5.5, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
+			getSeriesNamed("removeAbovePercentile(b, 60)", []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: math.MaxFloat64, Ts: 20},
+				{Val: math.MaxFloat64 - 20, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: 1234567890, Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
+			getSeriesNamed("removeAbovePercentile(c, 60)", []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 0, Ts: 20},
+				{Val: 1, Ts: 30},
+				{Val: 2, Ts: 40},
+				{Val: 3, Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
+			getSeriesNamed("removeAbovePercentile(d, 60)", []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: 33, Ts: 20},
+				{Val: 199, Ts: 30},
+				{Val: 29, Ts: 40},
+				{Val: 80, Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
 		},
 		t,
 	)
@@ -102,80 +62,40 @@ func TestRemoveBelowPercentileSingleAllNonNull(t *testing.T) {
 		false,
 		50,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", b),
+			getSeries("c", "abcd", c),
+			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "removeBelowPercentile(a, 50)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: 5.5, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: 1234567890, Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeBelowPercentile(b, 50)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.MaxFloat64, Ts: 20},
-					{Val: math.MaxFloat64 - 20, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeBelowPercentile(c, 50)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: math.NaN(), Ts: 30},
-					{Val: 2, Ts: 40},
-					{Val: 3, Ts: 50},
-					{Val: 4, Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "removeBelowPercentile(d, 50)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: 199, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: 80, Ts: 50},
-					{Val: 250, Ts: 60},
-				},
-			},
+			getSeriesNamed("removeBelowPercentile(a, 50)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: 5.5, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: 1234567890, Ts: 60}}),
+			getSeriesNamed("removeBelowPercentile(b, 50)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: math.MaxFloat64, Ts: 20},
+				{Val: math.MaxFloat64 - 20, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: math.NaN(), Ts: 60}}),
+			getSeriesNamed("removeBelowPercentile(c, 50)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: math.NaN(), Ts: 30},
+				{Val: 2, Ts: 40},
+				{Val: 3, Ts: 50},
+				{Val: 4, Ts: 60}}),
+			getSeriesNamed("removeBelowPercentile(d, 50)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: 199, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: 80, Ts: 50},
+				{Val: 250, Ts: 60}}),
 		},
 		t,
 	)
@@ -188,32 +108,17 @@ func TestRemoveBelowPercentileWithNulls(t *testing.T) {
 		false,
 		50,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", allNulls),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "removeBelowPercentile(a, 50)",
-				Datapoints: []schema.Point{
-					{Val: math.NaN(), Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: 5.5, Ts: 30},
-					{Val: math.NaN(), Ts: 40},
-					{Val: math.NaN(), Ts: 50},
-					{Val: 1234567890, Ts: 60},
-				},
-			},
+			getSeriesNamed("removeBelowPercentile(a, 50)", []schema.Point{
+				{Val: math.NaN(), Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: 5.5, Ts: 30},
+				{Val: math.NaN(), Ts: 40},
+				{Val: math.NaN(), Ts: 50},
+				{Val: 1234567890, Ts: 60}}),
 		},
 		t,
 	)
@@ -222,12 +127,7 @@ func TestRemoveBelowPercentileWithNulls(t *testing.T) {
 		false,
 		50,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(allNulls),
-			},
+			getSeries("b", "abcd", allNulls),
 		},
 		[]models.Series{},
 		t,
@@ -238,29 +138,29 @@ func testRemoveAboveBelowPercentile(name string, above bool, n float64, in []mod
 	f := NewRemoveAboveBelowPercentileConstructor(above)()
 	f.(*FuncRemoveAboveBelowPercentile).in = NewMock(in)
 	f.(*FuncRemoveAboveBelowPercentile).n = n
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q (%f): err should be nil. got %q", name, n, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := initDataMap(in)
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q (%f): isNonNull len output expected %d, got %d", name, n, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q (%f): expected target %q, got %q", name, n, exp.QueryPatt, g.QueryPatt)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%f) len output expected %d, got %d", name, n, len(exp.Datapoints), len(g.Datapoints))
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q (%f): output point %d - expected %v got %v", name, n, j, exp.Datapoints[j], p)
-		}
-	}
+	})
 }
 func BenchmarkRemoveAboveBelowPercentile10k_1NoNulls(b *testing.B) {
 	benchmarkRemoveAboveBelowPercentile(b, 1, test.RandFloats10k, test.RandFloats10k)

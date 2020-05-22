@@ -6,6 +6,10 @@ import (
 	"github.com/grafana/metrictank/api/models"
 )
 
+func TestAliasByMetricZero(t *testing.T) {
+	testAlias("zero", []models.Series{}, []models.Series{}, t)
+}
+
 func TestAliasByMetricNameWithoutPeriods(t *testing.T) {
 	// Metric base same as the metric name
 	veryShortMetric := "veryShort"
@@ -13,44 +17,17 @@ func TestAliasByMetricNameWithoutPeriods(t *testing.T) {
 
 	testAliasByMetric(
 		[]models.Series{
-			{ // No Function wrapper
-				Interval:   10,
-				QueryPatt:  veryShortMetric,
-				Target:     veryShortMetric,
-				Datapoints: getCopy(a),
-			},
-			{ // Function wrapper - single
-				Interval:   10,
-				QueryPatt:  veryShortMetric,
-				Target:     "functionBlah(" + veryShortMetric + ", funcValue1, funcValue2)",
-				Datapoints: getCopy(a),
-			},
-			{ // Function wrapper - multiple
-				Interval:   10,
-				QueryPatt:  veryShortMetric,
-				Target:     "functionBlah(functionBlahBlah(" + veryShortMetric + "),funcValue1, funcValue2)",
-				Datapoints: getCopy(a),
-			},
+			// No Function wrapper
+			getSeriesNamed(veryShortMetric, a),
+			// Function wrapper - single
+			getSeries("functionBlah("+veryShortMetric+", funcValue1, funcValue2)", veryShortMetric, a),
+			// Function wrapper - multiple
+			getSeries("functionBlah(functionBlahBlah("+veryShortMetric+"),funcValue1, funcValue2)", veryShortMetric, a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  veryShortBase,
-				Target:     veryShortBase,
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  veryShortBase,
-				Target:     veryShortBase,
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  veryShortBase,
-				Target:     veryShortBase,
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed(veryShortBase, a),
+			getSeriesNamed(veryShortBase, a),
+			getSeriesNamed(veryShortBase, a),
 		},
 		t,
 	)
@@ -63,44 +40,17 @@ func TestAliasByMetricWithoutTags(t *testing.T) {
 
 	testAliasByMetric(
 		[]models.Series{
-			{ // No Function wrapper
-				Interval:   10,
-				QueryPatt:  shortMetric,
-				Target:     shortMetric,
-				Datapoints: getCopy(a),
-			},
-			{ // Function wrapper - single
-				Interval:   10,
-				QueryPatt:  shortMetric,
-				Target:     "functionBlah(" + shortMetric + ", funcValue1, funcValue2)",
-				Datapoints: getCopy(a),
-			},
-			{ // Function wrapper - multiple
-				Interval:   10,
-				QueryPatt:  shortMetric,
-				Target:     "functionBlah(functionBlahBlah(" + shortMetric + "),funcValue1, funcValue2)",
-				Datapoints: getCopy(a),
-			},
+			// No Function wrapper
+			getSeriesNamed(shortMetric, a),
+			// Function wrapper - single
+			getSeries("functionBlah("+shortMetric+", funcValue1, funcValue2)", shortMetric, a),
+			// Function wrapper - multiple
+			getSeries("functionBlah(functionBlahBlah("+shortMetric+"),funcValue1, funcValue2)", shortMetric, a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  shortBase,
-				Target:     shortBase,
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  shortBase,
-				Target:     shortBase,
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  shortBase,
-				Target:     shortBase,
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed(shortBase, a),
+			getSeriesNamed(shortBase, a),
+			getSeriesNamed(shortBase, a),
 		},
 		t,
 	)
@@ -116,44 +66,17 @@ func TestAliasByMetricWithTags(t *testing.T) {
 
 	testAliasByMetric(
 		[]models.Series{
-			{ // No Function wrapper
-				Interval:   10,
-				QueryPatt:  longMetric,
-				Target:     longMetric,
-				Datapoints: getCopy(a),
-			},
-			{ // Function wrapper - single
-				Interval:   10,
-				QueryPatt:  longMetric,
-				Target:     "functionBlah(" + longMetric + ", funcValue1, funcValue2)",
-				Datapoints: getCopy(a),
-			},
-			{ // Function wrapper - multiple
-				Interval:   10,
-				QueryPatt:  longMetric,
-				Target:     "functionBlah(functionBlahBlah(" + longMetric + "),funcValue1, funcValue2)",
-				Datapoints: getCopy(a),
-			},
+			// No Function wrapper
+			getSeriesNamed(longMetric, a),
+			// Function wrapper - single
+			getSeries("functionBlah("+longMetric+", funcValue1, funcValue2)", longMetric, a),
+			// Function wrapper - multiple
+			getSeries("functionBlah(functionBlahBlah("+longMetric+"),funcValue1, funcValue2)", longMetric, a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  longBase,
-				Target:     longBase,
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  longBase,
-				Target:     longBase,
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  longBase,
-				Target:     longBase,
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed(longBase, a),
+			getSeriesNamed(longBase, a),
+			getSeriesNamed(longBase, a),
 		},
 		t,
 	)
@@ -163,8 +86,27 @@ func testAliasByMetric(in []models.Series, out []models.Series, t *testing.T) {
 	f := NewAliasByMetric()
 	f.(*FuncAliasByMetric).in = NewMock(in)
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := initDataMap(in)
+
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Input was modified, err = %s", err)
+		}
+
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Point slices in datamap overlap, err = %s", err)
+		}
+	})
 }

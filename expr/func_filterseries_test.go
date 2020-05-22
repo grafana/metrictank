@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"math"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -19,33 +18,13 @@ func TestFilterSeriesEqual(t *testing.T) {
 		"=",
 		1234567890,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed("a", a),
 		},
 		t,
 	)
@@ -59,43 +38,15 @@ func TestFilterSeriesNotEqual(t *testing.T) {
 		"!=",
 		1234567890,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		t,
 	)
@@ -109,38 +60,14 @@ func TestFilterSeriesLessThan(t *testing.T) {
 		"<",
 		1234567890,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		t,
 	)
@@ -154,38 +81,14 @@ func TestFilterSeriesLessThanOrEqualTo(t *testing.T) {
 		"<=",
 		250,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		t,
 	)
@@ -199,38 +102,14 @@ func TestFilterSeriesMoreThan(t *testing.T) {
 		">",
 		250,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
 		},
 		t,
 	)
@@ -244,43 +123,15 @@ func TestFilterSeriesMoreThanOrEqual(t *testing.T) {
 		">=",
 		250,
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeriesNamed("a", a),
+			getSeriesNamed("b", b),
+			getSeriesNamed("d", d),
 		},
 		t,
 	)
@@ -292,29 +143,29 @@ func testFilterSeries(name string, fn string, operator string, threshold float64
 	f.(*FuncFilterSeries).fn = fn
 	f.(*FuncFilterSeries).operator = operator
 	f.(*FuncFilterSeries).threshold = threshold
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q (%s, %s, %f): err should be nil. got %q", name, fn, operator, threshold, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := initDataMap(in)
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q (%s, %s, %f): isNonNull len output expected %d, got %d", name, fn, operator, threshold, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.Target != exp.Target {
-			t.Fatalf("case %q (%s, %s, %f): expected target %q, got %q", name, fn, operator, threshold, exp.Target, g.Target)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%s, %s, %f) len output expected %d, got %d", name, fn, operator, threshold, len(exp.Datapoints), len(g.Datapoints))
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q (%s, %s, %f): output point %d - expected %v got %v", name, fn, operator, threshold, j, exp.Datapoints[j], p)
-		}
-	}
+	})
 }
 
 func BenchmarkFilterSeries10k_1NoNulls(b *testing.B) {

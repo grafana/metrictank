@@ -15,80 +15,52 @@ func TestNonNegativeDerivativeNoMax(t *testing.T) {
 		"no-max-value",
 		math.NaN(),
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", b),
+			getSeries("c", "abcd", c),
+			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+			getSeries(
+				"nonNegativeDerivative(a)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 5.5, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 60}}),
+			getSeries(
+				"nonNegativeDerivative(b)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: math.MaxFloat64, Ts: 20},
 					{Val: 0, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 60}}),
+			getSeries(
+				"nonNegativeDerivative(c)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 1, Ts: 30},
 					{Val: 1, Ts: 40},
 					{Val: 1, Ts: 50},
-					{Val: 1, Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: 1, Ts: 60}}),
+			getSeries(
+				"nonNegativeDerivative(d)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 33, Ts: 20},
 					{Val: 166, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: 51, Ts: 50},
-					{Val: 170, Ts: 60},
-				},
-			},
+					{Val: 170, Ts: 60}}),
 		},
 		t,
 	)
@@ -99,80 +71,52 @@ func TestNonNegativeDerivativeWithMax(t *testing.T) {
 		"with-max-value",
 		199,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "abcd",
-				Target:     "d",
-				Datapoints: getCopy(d),
-			},
+			getSeries("a", "abcd", a),
+			getSeries("b", "abcd", b),
+			getSeries("c", "abcd", c),
+			getSeries("d", "abcd", d),
 		},
 		[]models.Series{
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+			getSeries(
+				"nonNegativeDerivative(a)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 5.5, Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 60}}),
+			getSeries(
+				"nonNegativeDerivative(b)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: math.NaN(), Ts: 20},
 					{Val: math.NaN(), Ts: 30},
 					{Val: math.NaN(), Ts: 40},
 					{Val: math.NaN(), Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: math.NaN(), Ts: 60}}),
+			getSeries(
+				"nonNegativeDerivative(c)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 0, Ts: 20},
 					{Val: 1, Ts: 30},
 					{Val: 1, Ts: 40},
 					{Val: 1, Ts: 50},
-					{Val: 1, Ts: 60},
-				},
-			},
-			{
-				Interval:  10,
-				QueryPatt: "nonNegativeDerivative(abcd)",
-				Datapoints: []schema.Point{
+					{Val: 1, Ts: 60}}),
+			getSeries(
+				"nonNegativeDerivative(d)",
+				"nonNegativeDerivative(abcd)",
+				[]schema.Point{
 					{Val: math.NaN(), Ts: 10},
 					{Val: 33, Ts: 20},
 					{Val: 166, Ts: 30},
 					{Val: 30, Ts: 40},
 					{Val: 51, Ts: 50},
-					{Val: math.NaN(), Ts: 60},
-				},
-			},
+					{Val: math.NaN(), Ts: 60}}),
 		},
 		t,
 	)
@@ -182,29 +126,29 @@ func testNonNegativeDerivative(name string, maxValue float64, in []models.Series
 	f := NewNonNegativeDerivative()
 	f.(*FuncNonNegativeDerivative).in = NewMock(in)
 	f.(*FuncNonNegativeDerivative).maxValue = maxValue
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q (%f): err should be nil. got %q", name, maxValue, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := initDataMap(in)
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q (%f): isNonNull len output expected %d, got %d", name, maxValue, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q (%f): expected target %q, got %q", name, maxValue, exp.QueryPatt, g.QueryPatt)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q (%f) len output expected %d, got %d", name, maxValue, len(exp.Datapoints), len(g.Datapoints))
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q (%f): output point %d - expected %v got %v", name, maxValue, j, exp.Datapoints[j], p)
-		}
-	}
+	})
 }
 func BenchmarkNonNegativeDerivative10k_1NoNulls(b *testing.B) {
 	benchmarkNonNegativeDerivative(b, 1, test.RandFloats10k, test.RandFloats10k)

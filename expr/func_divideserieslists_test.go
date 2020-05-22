@@ -14,32 +14,26 @@ func TestDivideSeriesListsSingle(t *testing.T) {
 	testDivideSeriesLists(
 		"single",
 		[]models.Series{
-			{
-				Target:    "foo;a=a;b=b",
-				QueryPatt: `seriesByTag("name=foo")`,
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-					{Val: 0, Ts: 30},
-					{Val: 1, Ts: 40},
-				},
-			},
+			getSeries("foo;a=a;b=b", `seriesByTag("name=foo")`, []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+				{Val: 0, Ts: 30},
+				{Val: 1, Ts: 40},
+			}),
+		},
+		[]models.Series{
+			getSeries("bar;a=a1;b=b", `seriesByTag("name=bar")`, []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 1, Ts: 20},
+				{Val: 0, Ts: 30},
+				{Val: 0, Ts: 40},
+			}),
 		},
 		[]models.Series{
 			{
-				Target:    "bar;a=a1;b=b",
-				QueryPatt: `seriesByTag("name=bar")`,
-				Datapoints: []schema.Point{
-					{Val: 1, Ts: 10},
-					{Val: 1, Ts: 20},
-					{Val: 0, Ts: 30},
-					{Val: 0, Ts: 40},
-				},
-			},
-		},
-		[]models.Series{
-			{
-				Target: "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
+				Interval:  10,
+				Target:    "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
+				QueryPatt: "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
@@ -59,44 +53,30 @@ func TestDivideSeriesListsMultiple(t *testing.T) {
 	testDivideSeriesLists(
 		"multiple",
 		[]models.Series{
-			{
-				Target:    "foo-1;a=1;b=2;c=3",
-				QueryPatt: "foo-1",
-				Datapoints: []schema.Point{
-					{Val: 0, Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-				},
-			},
-			{
-				Target:    "foo-2;a=2;b=2;b=2",
-				QueryPatt: "foo-2",
-				Datapoints: []schema.Point{
-					{Val: 20, Ts: 10},
-					{Val: 100, Ts: 20},
-				},
-			},
+			getSeries("foo-1;a=1;b=2;c=3", "foo-1", []schema.Point{
+				{Val: 0, Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+			}),
+			getSeries("foo-2;a=2;b=2;b=2", "foo-2", []schema.Point{
+				{Val: 20, Ts: 10},
+				{Val: 100, Ts: 20},
+			}),
+		},
+		[]models.Series{
+			getSeries("overbar;a=3;b=2;c=1", "overbar", []schema.Point{
+				{Val: 2, Ts: 10},
+				{Val: math.NaN(), Ts: 20},
+			}),
+			getSeries("overbar-2;a=3;b=2;c=1", "overbar-2", []schema.Point{
+				{Val: 1, Ts: 10},
+				{Val: 2, Ts: 20},
+			}),
 		},
 		[]models.Series{
 			{
-				Target:    "overbar;a=3;b=2;c=1",
-				QueryPatt: "overbar",
-				Datapoints: []schema.Point{
-					{Val: 2, Ts: 10},
-					{Val: math.NaN(), Ts: 20},
-				},
-			},
-			{
-				Target:    "overbar-2;a=3;b=2;c=1",
-				QueryPatt: "overbar-2",
-				Datapoints: []schema.Point{
-					{Val: 1, Ts: 10},
-					{Val: 2, Ts: 20},
-				},
-			},
-		},
-		[]models.Series{
-			{
-				Target: "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
+				Interval:  10,
+				Target:    "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
+				QueryPatt: "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
 					{Val: 0, Ts: 10},
 					{Val: math.NaN(), Ts: 20},
@@ -106,7 +86,9 @@ func TestDivideSeriesListsMultiple(t *testing.T) {
 				},
 			},
 			{
-				Target: "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
+				Interval:  10,
+				Target:    "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
+				QueryPatt: "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
 					{Val: 20, Ts: 10},
 					{Val: 50, Ts: 20},
@@ -125,38 +107,37 @@ func testDivideSeriesLists(name string, dividend, divisor []models.Series, out [
 	DivideSeriesLists := f.(*FuncDivideSeriesLists)
 	DivideSeriesLists.dividends = NewMock(dividend)
 	DivideSeriesLists.divisors = NewMock(divisor)
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+
+	// Copy input to check that it is unchanged later
+	dividendCopy := make([]models.Series, len(dividend))
+	copy(dividendCopy, dividend)
+	divisorCopy := make([]models.Series, len(divisor))
+	copy(divisorCopy, divisor)
+
+	dataMap := initDataMapMultiple([][]models.Series{dividend, divisor})
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	if len(got) != len(dividend) {
-		t.Fatalf("case %q: DivideSeriesLists output should be same amount of series as dividend input: %d, not %d", name, len(dividend), len(got))
+	if err := equalTags(out, got); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	for i, o := range out {
-		g := got[i]
-		if o.Target != g.Target {
-			t.Fatalf("case %q: expected target %q, got %q", name, o.Target, g.Target)
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(dividendCopy, dividend, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		if len(o.Datapoints) != len(g.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(o.Datapoints), len(g.Datapoints))
+		if err := equalOutput(divisorCopy, divisor, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
 		}
-		for j, p := range o.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(g.Datapoints[j].Val)
-			if (bothNaN || p.Val == g.Datapoints[j].Val) && p.Ts == g.Datapoints[j].Ts {
-				continue
-			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, p, g.Datapoints[j])
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
-		if len(o.Tags) != len(g.Tags) {
-			t.Fatalf("case %q: len tags expected %d, got %d", name, len(o.Tags), len(g.Tags))
-		}
-		for k, v := range g.Tags {
-			if o.Tags[k] == v {
-				continue
-			}
-			t.Fatalf("case %q: output tag %q different, expected %q but got %q", name, k, o.Tags[k], v)
-		}
-	}
+	})
 }
 
 func BenchmarkDivideSeriesLists10k_1AllSeriesHalfNulls(b *testing.B) {

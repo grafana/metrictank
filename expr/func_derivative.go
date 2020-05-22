@@ -32,12 +32,13 @@ func (s *FuncDerivative) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("derivative(%s)", serie.Target)
-		series[i].Tags = serie.CopyTagsWith("derivative", "1")
-		series[i].QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
-		series[i].Consolidator = consolidation.None
-		series[i].QueryCons = consolidation.None
+	outSeries := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		serie.Target = fmt.Sprintf("derivative(%s)", serie.Target)
+		serie.Tags = serie.CopyTagsWith("derivative", "1")
+		serie.QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
+		serie.Consolidator = consolidation.None
+		serie.QueryCons = consolidation.None
 		out := pointSlicePool.Get().([]schema.Point)
 
 		prev := math.NaN()
@@ -51,8 +52,10 @@ func (s *FuncDerivative) Exec(dataMap DataMap) ([]models.Series, error) {
 			prev = val
 			out = append(out, p)
 		}
-		series[i].Datapoints = out
+		serie.Datapoints = out
+
+		outSeries = append(outSeries, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, outSeries...)
+	return outSeries, nil
 }

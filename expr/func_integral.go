@@ -32,23 +32,28 @@ func (s *FuncIntegral) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("integral(%s)", serie.Target)
-		series[i].Tags = serie.CopyTagsWith("integral", "1")
-		series[i].QueryPatt = fmt.Sprintf("integral(%s)", serie.QueryPatt)
-		series[i].Datapoints = pointSlicePool.Get().([]schema.Point)
-		series[i].Consolidator = consolidation.None
-		series[i].QueryCons = consolidation.None
+	outSeries := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		serie.Target = fmt.Sprintf("integral(%s)", serie.Target)
+		serie.Tags = serie.CopyTagsWith("integral", "1")
+		serie.QueryPatt = fmt.Sprintf("integral(%s)", serie.QueryPatt)
+		serie.Consolidator = consolidation.None
+		serie.QueryCons = consolidation.None
 
 		current := 0.0
+
+		out := pointSlicePool.Get().([]schema.Point)
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {
 				current += p.Val
 				p.Val = current
 			}
-			series[i].Datapoints = append(series[i].Datapoints, p)
+			out = append(out, p)
 		}
+		serie.Datapoints = out
+		outSeries = append(outSeries, serie)
+
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, outSeries...)
+	return outSeries, nil
 }

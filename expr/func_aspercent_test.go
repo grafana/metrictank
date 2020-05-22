@@ -102,63 +102,29 @@ var a1AsPercentOfFloat10 = []schema.Point{
 // let's try 3 different ways of inputting series
 
 func TestAsPercentSingleInputUsingSelf(t *testing.T) {
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: getCopy(a1),
-			},
+			getSeries("a", "a", a1),
 		})
 	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a,sumSeries(a))",
-			Target:     "asPercent(a,sumSeries(a))",
-			Datapoints: getCopy(a1AsPercentOfa1),
-		},
+		getSeries("asPercent(a,sumSeries(a))", "asPercent(a,sumSeries(a))", a1AsPercentOfa1),
 	}
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+
+	execAndCheck(in, out, f, t)
 }
 
 func TestAsPercentDoubleInputUsingSelf(t *testing.T) {
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.a",
-				Datapoints: getCopy(a1),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.b",
-				Datapoints: getCopy(b1),
-			},
+			getSeries("a.a", "a.*", a1),
+			getSeries("a.b", "a.*", b1),
 		})
 	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a.*,sumSeries(a.*))",
-			Target:     "asPercent(a.a,sumSeries(a.*))",
-			Datapoints: getCopy(a1AsPercentOfa1b1),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a.*,sumSeries(a.*))",
-			Target:     "asPercent(a.b,sumSeries(a.*))",
-			Datapoints: getCopy(b1AsPercentOfa1b1),
-		},
+		getSeries("asPercent(a.a,sumSeries(a.*))", "asPercent(a.*,sumSeries(a.*))", a1AsPercentOfa1b1),
+		getSeries("asPercent(a.b,sumSeries(a.*))", "asPercent(a.*,sumSeries(a.*))", b1AsPercentOfa1b1),
 	}
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+
+	execAndCheck(in, out, f, t)
 }
 
 // now let's try the case of specifying another seriesList.
@@ -166,132 +132,46 @@ func TestAsPercentDoubleInputUsingSelf(t *testing.T) {
 // for simplicity, each case uses 2 inputs.
 
 func TestAsPercentDoubleInputUsingOne(t *testing.T) {
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.a",
-				Datapoints: getCopy(a1),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.b",
-				Datapoints: getCopy(b1),
-			},
+			getSeries("a.a", "a.*", a1),
+			getSeries("a.b", "a.*", b1),
 		})
-	f.totalSeries = NewMock([]models.Series{{
-		Interval:   10,
-		QueryPatt:  "foo.*",
-		Target:     "foo.a",
-		Datapoints: getCopy(a1),
-	}})
+	f.totalSeries = NewMock([]models.Series{getSeries("foo.a", "foo.*", a1)})
 	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a.*,foo.*)",
-			Target:     "asPercent(a.a,foo.a)",
-			Datapoints: getCopy(a1AsPercentOfa1),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a.*,foo.*)",
-			Target:     "asPercent(a.b,foo.a)",
-			Datapoints: getCopy(b1AsPercentOfa1),
-		},
+		getSeries("asPercent(a.a,foo.a)", "asPercent(a.*,foo.*)", a1AsPercentOfa1),
+		getSeries("asPercent(a.b,foo.a)", "asPercent(a.*,foo.*)", b1AsPercentOfa1),
 	}
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	execAndCheck(in, out, f, t)
 }
 func TestAsPercentDoubleInputUsingTwo(t *testing.T) {
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.a",
-				Datapoints: getCopy(a1),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.b",
-				Datapoints: getCopy(b1),
-			},
+			getSeries("a.a", "a.*", a1),
+			getSeries("a.b", "a.*", b1),
 		})
 	f.totalSeries = NewMock([]models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "total.*",
-			Target:     "total.a",
-			Datapoints: getCopy(a2),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "total.*",
-			Target:     "total.b",
-			Datapoints: getCopy(b2),
-		},
+		getSeries("total.a", "total.*", a2),
+		getSeries("total.b", "total.*", b2),
 	})
 	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a.*,total.*)",
-			Target:     "asPercent(a.a,total.a)",
-			Datapoints: getCopy(a1AsPercentOfa2),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a.*,total.*)",
-			Target:     "asPercent(a.b,total.b)",
-			Datapoints: getCopy(b1AsPercentOfb2),
-		},
+		getSeries("asPercent(a.a,total.a)", "asPercent(a.*,total.*)", a1AsPercentOfa2),
+		getSeries("asPercent(a.b,total.b)", "asPercent(a.*,total.*)", b1AsPercentOfb2),
 	}
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	execAndCheck(in, out, f, t)
 }
 
 // 2 input series, 3 total series -> not allowed!
 func TestAsPercentDoubleInputUsingThree(t *testing.T) {
-	f := getNewAsPercent(
+	f, _ := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.a",
-				Datapoints: getCopy(a1),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a.*",
-				Target:     "a.b",
-				Datapoints: getCopy(b1),
-			},
+			getSeries("a.a", "a.*", a1),
+			getSeries("a.b", "a.*", b1),
 		})
 	f.totalSeries = NewMock([]models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "total.*",
-			Target:     "total.a",
-			Datapoints: getCopy(a2),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "total.*",
-			Target:     "total.b",
-			Datapoints: getCopy(b2),
-		},
-		{
-			Interval:   10,
-			QueryPatt:  "total.*",
-			Target:     "total.c",
-			Datapoints: getCopy(b2),
-		},
+		getSeries("total.a", "total.*", a2),
+		getSeries("total.b", "total.*", b2),
+		getSeries("total.c", "total.*", b2),
 	})
 	out := []models.Series{}
 	got, err := f.Exec(make(map[Req][]models.Series))
@@ -305,47 +185,54 @@ func TestAsPercentDoubleInputUsingThree(t *testing.T) {
 // for simplicity, we'll just use 1 input.
 
 func TestAsPercentSingleInputUsingFloat10(t *testing.T) {
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Target:     "a",
-				Datapoints: getCopy(a1),
-			},
+			getSeries("a", "a", a1),
 		})
 	f.totalFloat = 10
 	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "asPercent(a,10)",
-			Target:     "asPercent(a,10)",
-			Datapoints: getCopy(a1AsPercentOfFloat10),
-		},
+		getSeries("asPercent(a,10)", "asPercent(a,10)", a1AsPercentOfFloat10),
 	}
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	execAndCheck(in, out, f, t)
 }
 
-func getNewAsPercent(in []models.Series) *FuncAsPercent {
+func getNewAsPercent(in []models.Series) (*FuncAsPercent, []models.Series) {
 	f := NewAsPercent()
 	ps := f.(*FuncAsPercent)
 	ps.in = NewMock(in)
-	return ps
+	return ps, in
+}
+
+func execAndCheck(in, out []models.Series, f GraphiteFunc, t *testing.T) {
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := initDataMap(in)
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Input was modified, err = %s", err)
+		}
+
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Point slices in datamap overlap, err = %s", err)
+		}
+	})
 }
 
 func TestAsPercentSingleNoArg(t *testing.T) {
 
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "a;tag=something;tag2=anything",
-				Datapoints: getCopy(a),
-			},
+			getSeries("a;tag=something;tag2=anything", "func(tag=something;tag2=anything)", a),
 		},
 	)
 	out := []models.Series{
@@ -364,10 +251,7 @@ func TestAsPercentSingleNoArg(t *testing.T) {
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	execAndCheck(in, out, f, t)
 
 }
 
@@ -389,20 +273,10 @@ func TestAsPercentMultipleNoArg(t *testing.T) {
 		{Val: math.NaN(), Ts: 60},
 	}
 
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "a;tag=something;tag2=anything",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "b;tag=something;tag2=anything",
-				Datapoints: getCopy(b),
-			},
+			getSeries("a;tag=something;tag2=anything", "func(tag=something;tag2=anything)", a),
+			getSeries("b;tag=something;tag2=anything", "func(tag=something;tag2=anything)", b),
 		},
 	)
 	out := []models.Series{
@@ -420,22 +294,13 @@ func TestAsPercentMultipleNoArg(t *testing.T) {
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
-
+	execAndCheck(in, out, f, t)
 }
 
 func TestAsPercentTotalFloat(t *testing.T) {
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(a;tag=something;tag2=anything)",
-				Target:     "a;tag=something;tag2=anything",
-				Datapoints: getCopy(a),
-			},
+			getSeries("a;tag=something;tag2=anything", "func(a;tag=something;tag2=anything)", a),
 		},
 	)
 
@@ -455,12 +320,7 @@ func TestAsPercentTotalFloat(t *testing.T) {
 			},
 		},
 	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
-
+	execAndCheck(in, out, f, t)
 }
 
 func TestAsPercentTotalSerie(t *testing.T) {
@@ -480,30 +340,15 @@ func TestAsPercentTotalSerie(t *testing.T) {
 		{Val: math.NaN(), Ts: 50},
 		{Val: float64(250) / 1234567890 * 100, Ts: 60},
 	}
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "b;tag=something;tag2=anything",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "d;tag=something;tag2=anything",
-				Datapoints: getCopy(d),
-			},
+			getSeries("b;tag=something;tag2=anything", "func(tag=something;tag2=anything)", b),
+			getSeries("d;tag=something;tag2=anything", "func(tag=something;tag2=anything)", d),
 		},
 	)
 	f.totalSeries = NewMock(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=some;tag2=totalSerie)",
-				Target:     "a;tag=some;tag2=totalSerie",
-				Datapoints: getCopy(a),
-			},
+			getSeries("a;tag=some;tag2=totalSerie", "func(tag=some;tag2=totalSerie)", a),
 		},
 	)
 	out := []models.Series{
@@ -521,10 +366,7 @@ func TestAsPercentTotalSerie(t *testing.T) {
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	execAndCheck(in, out, f, t)
 }
 
 func TestAsPercentTotalSeries(t *testing.T) {
@@ -545,36 +387,16 @@ func TestAsPercentTotalSeries(t *testing.T) {
 		{Val: float64(250) / 4 * 100, Ts: 60},
 	}
 
-	f := getNewAsPercent(
+	f, in := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "b;tag=something;tag2=anything",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "d;tag=something;tag2=anything",
-				Datapoints: getCopy(d),
-			},
+			getSeries("b;tag=something;tag2=anything", "func(tag=something;tag2=anything)", b),
+			getSeries("d;tag=something;tag2=anything", "func(tag=something;tag2=anything)", d),
 		},
 	)
 	f.totalSeries = NewMock(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=some;tag2=totalSerie)",
-				Target:     "c;tag=some;tag2=totalSerie",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=some;tag2=totalSerie)",
-				Target:     "a;tag=some;tag2=totalSerie",
-				Datapoints: getCopy(a),
-			},
+			getSeries("c;tag=some;tag2=totalSerie", "func(tag=some;tag2=totalSerie)", c),
+			getSeries("a;tag=some;tag2=totalSerie", "func(tag=some;tag2=totalSerie)", a),
 		},
 	)
 	out := []models.Series{
@@ -592,10 +414,7 @@ func TestAsPercentTotalSeries(t *testing.T) {
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	execAndCheck(in, out, f, t)
 }
 
 func TestAsPercentNoArgNodes(t *testing.T) {
@@ -624,26 +443,11 @@ func TestAsPercentNoArgNodes(t *testing.T) {
 		{Val: 100, Ts: 60},
 	}
 
-	f := getNewAsPercent(
+	f, _ := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "this.that.a;tag=something;tag2=anything",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "this.that.b;tag=something;tag2=anything",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "this.this.c;tag=something;tag2=anything",
-				Datapoints: getCopy(c),
-			},
+			getSeries("this.that.a;tag=something;tag2=anything", "func(tag=something;tag2=anything)", a),
+			getSeries("this.that.b;tag=something;tag2=anything", "func(tag=something;tag2=anything)", b),
+			getSeries("this.this.c;tag=something;tag2=anything", "func(tag=something;tag2=anything)", c),
 		},
 	)
 	f.nodes = []expr{{etype: etFloat, float: 0}, {etype: etInt, int: 1}}
@@ -703,26 +507,11 @@ func TestAsPercentNoArgTagNodes(t *testing.T) {
 		{Val: 100, Ts: 60},
 	}
 
-	f := getNewAsPercent(
+	f, _ := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something1;tag2=anything)",
-				Target:     "this.that.a;tag=something1;tag2=anything",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something1;tag2=anything)",
-				Target:     "this.those.b;tag=something1;tag2=anything",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something2;tag2=anything)",
-				Target:     "this.this.c;tag=something2;tag2=anything",
-				Datapoints: getCopy(c),
-			},
+			getSeries("this.that.a;tag=something1;tag2=anything", "func(tag=something1;tag2=anything)", a),
+			getSeries("this.those.b;tag=something1;tag2=anything", "func(tag=something1;tag2=anything)", b),
+			getSeries("this.this.c;tag=something2;tag2=anything", "func(tag=something2;tag2=anything)", c),
 		},
 	)
 	f.nodes = []expr{{etype: etString, str: "tag"}}
@@ -781,48 +570,18 @@ func TestAsPercentSeriesByNodes(t *testing.T) {
 		{Val: math.NaN(), Ts: 50},
 		{Val: math.NaN(), Ts: 60},
 	}
-	f := getNewAsPercent(
+	f, _ := getNewAsPercent(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "this.that.a;tag=something;tag2=anything",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "this.that.b;tag=something;tag2=anything",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=anything)",
-				Target:     "this.this.c;tag=something;tag2=anything",
-				Datapoints: getCopy(c),
-			},
+			getSeries("this.that.a;tag=something;tag2=anything", "func(tag=something;tag2=anything)", a),
+			getSeries("this.that.b;tag=something;tag2=anything", "func(tag=something;tag2=anything)", b),
+			getSeries("this.this.c;tag=something;tag2=anything", "func(tag=something;tag2=anything)", c),
 		},
 	)
 	f.totalSeries = NewMock(
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=totalSerie)",
-				Target:     "this.those.ab;tag=something;tag2=totalSerie",
-				Datapoints: getCopy(sumab),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=totalSerie)",
-				Target:     "this.that.abc;tag=something;tag2=totalSerie",
-				Datapoints: getCopy(sumabc),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "func(tag=something;tag2=totalSerie)",
-				Target:     "this.that.cd;tag=something;tag2=totalSerie",
-				Datapoints: getCopy(sumcd),
-			},
+			getSeries("this.those.ab;tag=something;tag2=totalSerie", "func(tag=something;tag2=totalSerie)", sumab),
+			getSeries("this.that.abc;tag=something;tag2=totalSerie", "func(tag=something;tag2=totalSerie)", sumabc),
+			getSeries("this.that.cd;tag=something;tag2=totalSerie", "func(tag=something;tag2=totalSerie)", sumcd),
 		},
 	)
 	f.nodes = []expr{{etype: etFloat, float: 0}, {etype: etInt, int: 1}}

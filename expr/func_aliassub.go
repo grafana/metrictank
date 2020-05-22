@@ -37,18 +37,22 @@ func (s *FuncAliasSub) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i := range series {
+
+	out := make([]models.Series, 0, len(series))
+	for _, serie := range series {
 		// TODO - graphite doesn't attempt to extract the
 		// metric/expression from the series. MT probably shouldn't either.
 		// This will almost certainly break some dashboards
-		metric := extractMetric(series[i].Target)
+		metric := extractMetric(serie.Target)
 		if metric == "" {
-			metric = series[i].Target
+			metric = serie.Target
 		}
 		name := s.search.ReplaceAllString(metric, replace)
-		series[i].Target = name
-		series[i].QueryPatt = name
-		series[i].Tags = series[i].CopyTagsWith("name", name)
+		serie.Target = name
+		serie.QueryPatt = name
+		serie.Tags = serie.CopyTagsWith("name", name)
+
+		out = append(out, serie)
 	}
-	return series, err
+	return out, err
 }

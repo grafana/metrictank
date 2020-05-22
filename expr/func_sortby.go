@@ -44,9 +44,15 @@ func (s *FuncSortBy) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	SortSeriesWithConsolidator(series, consolidation.FromConsolidateBy(s.fn), s.reverse)
+	// Copy series to avoid conflicting with other functions
+	seriesCpy := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		seriesCpy = append(seriesCpy, serie)
+	}
 
-	return series, nil
+	SortSeriesWithConsolidator(seriesCpy, consolidation.FromConsolidateBy(s.fn), s.reverse)
+
+	return seriesCpy, nil
 }
 
 type ScoredSeries struct {

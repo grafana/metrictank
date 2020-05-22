@@ -34,15 +34,19 @@ func (s *FuncOffset) Exec(dataMap DataMap) ([]models.Series, error) {
 	if err != nil {
 		return nil, err
 	}
-	for i, serie := range series {
+
+	outSeries := make([]models.Series, 0, len(series))
+	for _, serie := range series {
 		out := pointSlicePool.Get().([]schema.Point)
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: v.Val + s.factor, Ts: v.Ts})
 		}
-		series[i].Target = fmt.Sprintf("offset(%s,%f)", serie.Target, s.factor)
-		series[i].QueryPatt = fmt.Sprintf("offset(%s,%f)", serie.QueryPatt, s.factor)
-		series[i].Datapoints = out
+		serie.Target = fmt.Sprintf("offset(%s,%g)", serie.Target, s.factor)
+		serie.QueryPatt = fmt.Sprintf("offset(%s,%g)", serie.QueryPatt, s.factor)
+		serie.Datapoints = out
+
+		outSeries = append(outSeries, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, outSeries...)
+	return outSeries, nil
 }

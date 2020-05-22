@@ -10,16 +10,24 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
+func TestAggregateZero(t *testing.T) {
+	f := makeAggregate("sum", [][]models.Series{}, 0)
+	got, err := f.Exec(make(map[Req][]models.Series))
+	if err := equalOutput([]models.Series{}, got, nil, err); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAggregateIdentity(t *testing.T) {
 	testAggregate(
 		"identity",
 		"average",
 		[][]models.Series{
 			{
-				getQuerySeries("single", a),
+				getSeriesNamed("single", a),
 			},
 		},
-		getTargetSeries("averageSeries(single)", a),
+		getSeriesNamed("averageSeries(single)", a),
 		t,
 		0,
 	)
@@ -28,10 +36,10 @@ func TestAggregateIdentity(t *testing.T) {
 		"sum",
 		[][]models.Series{
 			{
-				getQuerySeries("single", a),
+				getSeriesNamed("single", a),
 			},
 		},
-		getTargetSeries("sumSeries(single)", a),
+		getSeriesNamed("sumSeries(single)", a),
 		t,
 		0,
 	)
@@ -42,10 +50,10 @@ func TestAggregateQueryToSingle(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
+				getSeriesNamed("foo.*", a),
 			},
 		},
-		getTargetSeries("averageSeries(foo.*)", a),
+		getSeriesNamed("averageSeries(foo.*)", a),
 		t,
 		0,
 	)
@@ -56,11 +64,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"average",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
-				getQuerySeries("foo.*", b),
+				getSeriesNamed("foo.*", a),
+				getSeriesNamed("foo.*", b),
 			},
 		},
-		getTargetSeries("averageSeries(foo.*)", avgab),
+		getSeriesNamed("averageSeries(foo.*)", avgab),
 		t,
 		0,
 	)
@@ -69,11 +77,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"sum",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
-				getQuerySeries("foo.*", b),
+				getSeriesNamed("foo.*", a),
+				getSeriesNamed("foo.*", b),
 			},
 		},
-		getTargetSeries("sumSeries(foo.*)", sumab),
+		getSeriesNamed("sumSeries(foo.*)", sumab),
 		t,
 		0,
 	)
@@ -82,11 +90,11 @@ func TestAggregateMultiple(t *testing.T) {
 		"max",
 		[][]models.Series{
 			{
-				getQuerySeries("foo.*", a),
-				getQuerySeries("foo.*", b),
+				getSeriesNamed("foo.*", a),
+				getSeriesNamed("foo.*", b),
 			},
 		},
-		getTargetSeries("maxSeries(foo.*)", maxab),
+		getSeriesNamed("maxSeries(foo.*)", maxab),
 		t,
 		0,
 	)
@@ -94,11 +102,11 @@ func TestAggregateMultiple(t *testing.T) {
 func TestAggregateMultipleDiffQuery(t *testing.T) {
 	input := [][]models.Series{
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
 		},
 		{
-			getQuerySeries("movingAverage(bar, '1min')", c),
+			getSeriesNamed("movingAverage(bar, '1min')", c),
 		},
 	}
 
@@ -106,7 +114,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"avg-multiple-serieslists",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*,movingAverage(bar, '1min'))", avgabc),
+		getSeriesNamed("averageSeries(foo.*,movingAverage(bar, '1min'))", avgabc),
 		t,
 		0,
 	)
@@ -114,7 +122,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"sum-multiple-serieslists",
 		"sum",
 		input,
-		getTargetSeries("sumSeries(foo.*,movingAverage(bar, '1min'))", sumabc),
+		getSeriesNamed("sumSeries(foo.*,movingAverage(bar, '1min'))", sumabc),
 		t,
 		0,
 	)
@@ -122,7 +130,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 		"max-multiple-serieslists",
 		"max",
 		input,
-		getTargetSeries("maxSeries(foo.*,movingAverage(bar, '1min'))", maxabc),
+		getSeriesNamed("maxSeries(foo.*,movingAverage(bar, '1min'))", maxabc),
 		t,
 		0,
 	)
@@ -132,25 +140,25 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 func TestAggregateMultipleTimesSameInput(t *testing.T) {
 	input := [][]models.Series{
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
 		},
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
 		},
 		{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 		{
-			getQuerySeries("a", a),
+			getSeriesNamed("a", a),
 		},
 	}
 	testAggregate(
 		"avg-multiple-times-same-input",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*,foo.*,a,a)", avg4a2b),
+		getSeriesNamed("averageSeries(foo.*,foo.*,a,a)", avg4a2b),
 		t,
 		0,
 	)
@@ -158,7 +166,7 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 		"sum-multiple-times-same-input",
 		"sum",
 		input,
-		getTargetSeries("sumSeries(foo.*,foo.*,a,a)", sum4a2b),
+		getSeriesNamed("sumSeries(foo.*,foo.*,a,a)", sum4a2b),
 		t,
 		0,
 	)
@@ -167,9 +175,9 @@ func TestAggregateMultipleTimesSameInput(t *testing.T) {
 func TestAggregateXFilesFactor(t *testing.T) {
 	input := [][]models.Series{
 		{
-			getQuerySeries("foo.*", a),
-			getQuerySeries("foo.*", b),
-			getQuerySeries("foo.*", c),
+			getSeriesNamed("foo.*", a),
+			getSeriesNamed("foo.*", b),
+			getSeriesNamed("foo.*", c),
 		},
 	}
 
@@ -195,7 +203,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabc),
+		getSeriesNamed("averageSeries(foo.*)", avgabc),
 		t,
 		0,
 	)
@@ -203,7 +211,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.25",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabc),
+		getSeriesNamed("averageSeries(foo.*)", avgabc),
 		t,
 		0.25,
 	)
@@ -212,7 +220,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.5",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabcxff05),
+		getSeriesNamed("averageSeries(foo.*)", avgabcxff05),
 		t,
 		0.5,
 	)
@@ -221,7 +229,7 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-0.75",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabcxff075),
+		getSeriesNamed("averageSeries(foo.*)", avgabcxff075),
 		t,
 		0.75,
 	)
@@ -230,40 +238,52 @@ func TestAggregateXFilesFactor(t *testing.T) {
 		"xFilesFactor-1",
 		"average",
 		input,
-		getTargetSeries("averageSeries(foo.*)", avgabcxff075),
+		getSeriesNamed("averageSeries(foo.*)", avgabcxff075),
 		t,
 		1,
 	)
 }
 
-func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
+func makeAggregate(agg string, in [][]models.Series, xFilesFactor float64) GraphiteFunc {
 	f := NewAggregateConstructor(agg)()
 	avg := f.(*FuncAggregate)
 	for _, i := range in {
 		avg.in = append(avg.in, NewMock(i))
 	}
 	avg.xFilesFactor = xFilesFactor
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+	return f
+}
+
+func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
+	// Copy input to check that it is unchanged later
+	inputCopy := make([][]models.Series, len(in))
+	for i := range in {
+		inputCopy[i] = make([]models.Series, len(in[i]))
+		copy(inputCopy[i], in[i])
 	}
-	if len(got) != 1 {
-		t.Fatalf("case %q: Aggregate output should be only 1 thing (a series) not %d", name, len(got))
+
+	f := makeAggregate(agg, in, xFilesFactor)
+
+	dataMap := initDataMapMultiple(in)
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput([]models.Series{out}, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
 	}
-	g := got[0]
-	if g.Target != out.Target {
-		t.Fatalf("case %q: expected target %q, got %q", name, out.Target, g.Target)
-	}
-	if len(g.Datapoints) != len(out.Datapoints) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out.Datapoints), len(g.Datapoints))
-	}
-	for j, p := range g.Datapoints {
-		bothNaN := math.IsNaN(p.Val) && math.IsNaN(out.Datapoints[j].Val)
-		if (bothNaN || p.Val == out.Datapoints[j].Val) && p.Ts == out.Datapoints[j].Ts {
-			continue
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		for i := range inputCopy {
+			if err := equalOutput(inputCopy[i], in[i], nil, nil); err != nil {
+				t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+			}
 		}
-		t.Fatalf("case %q: output point %d - expected %v got %v", name, j, out.Datapoints[j], p)
-	}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
 }
 
 func BenchmarkAggregate10k_1NoNulls(b *testing.B) {

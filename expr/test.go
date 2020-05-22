@@ -4,10 +4,25 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/api/models"
 )
 
 var results []models.Series
+
+func equalTags(exp, got []models.Series) error {
+	if len(exp) != len(got) {
+		return fmt.Errorf("len output expected %d, got %d", len(exp), len(got))
+	}
+
+	for i, g := range got {
+		want := exp[i]
+		if diff := cmp.Diff(want.Tags, g.Tags); diff != "" {
+			return fmt.Errorf("Tag mismatch (-want +got):\n%s", diff)
+		}
+	}
+	return nil
+}
 
 func equalOutput(exp, got []models.Series, expErr, gotErr error) error {
 	if expErr == nil && gotErr != nil {
@@ -17,7 +32,7 @@ func equalOutput(exp, got []models.Series, expErr, gotErr error) error {
 		return fmt.Errorf("err should be error %v. got %q", expErr, gotErr)
 	}
 	if len(got) != len(exp) {
-		return fmt.Errorf("perSecond len output expected %d, got %d", len(exp), len(got))
+		return fmt.Errorf("len output expected %d, got %d", len(exp), len(got))
 	}
 	for i := range got {
 		if err := equalSeries(exp[i], got[i]); err != nil {
@@ -60,6 +75,7 @@ func equalSeries(exp, got models.Series) error {
 		}
 		return fmt.Errorf("point %d - expected %v got %v", j, exp.Datapoints[j], p)
 	}
+	// TODO - compare Tags?
 	return nil
 }
 
@@ -69,4 +85,26 @@ func doubleFuzzyEqual(a, b float64) bool {
 	}
 	var epsilon = 1e-10
 	return a == b || math.Abs(a-b) < epsilon
+}
+
+func initDataMap(in []models.Series) DataMap {
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	// func_get would retrieve this from the map (added at a higher layer)
+	// Mock should add `data` to properly mock the render path
+	dataMap.Add(Req{}, in...)
+
+	return dataMap
+}
+
+func initDataMapMultiple(ins [][]models.Series) DataMap {
+	dataMap := DataMap(make(map[Req][]models.Series))
+
+	for _, in := range ins {
+		// func_get would retrieve this from the map (added at a higher layer)
+		// Mock should add `data` to properly mock the render path
+		dataMap.Add(Req{}, in...)
+	}
+
+	return dataMap
 }

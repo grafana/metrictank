@@ -19,18 +19,10 @@ func TestHighestAverage(t *testing.T) {
 		1,
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed("a", a),
 		},
 		t,
 	)
@@ -43,33 +35,13 @@ func TestLowestAverage(t *testing.T) {
 		2,
 		false,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
+			getSeriesNamed("b", b),
+			getSeriesNamed("a", a),
+			getSeriesNamed("c", c),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed("c", c),
+			getSeriesNamed("a", a),
 		},
 		t,
 	)
@@ -82,58 +54,18 @@ func TestHighestCurrent(t *testing.T) {
 		3,
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("b", b),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("b", b),
 		},
 		t,
 	)
@@ -146,28 +78,12 @@ func TestLowestCurrent(t *testing.T) {
 		4,
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sumab",
-				Datapoints: getCopy(sumab),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("sumab", sumab),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sumab",
-				Datapoints: getCopy(sumab),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("sumab", sumab),
+			getSeriesNamed("b", b),
 		},
 		t,
 	)
@@ -180,28 +96,12 @@ func TestHighestMax(t *testing.T) {
 		1,
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
+			getSeriesNamed("avg4a2b", avg4a2b),
 		},
 		t,
 	)
@@ -214,58 +114,18 @@ func TestHighestLong(t *testing.T) {
 		5,
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "d",
-				Datapoints: getCopy(d),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sumabc",
-				Datapoints: getCopy(sumabc),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
+			getSeriesNamed("c", c),
+			getSeriesNamed("d", d),
+			getSeriesNamed("sumabc", sumabc),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("a", a),
 		},
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sumabc",
-				Datapoints: getCopy(sumabc),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "a",
-				Datapoints: getCopy(a),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "d",
-				Datapoints: getCopy(d),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "c",
-				Datapoints: getCopy(c),
-			},
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("sumabc", sumabc),
+			getSeriesNamed("a", a),
+			getSeriesNamed("d", d),
+			getSeriesNamed("c", c),
 		},
 		t,
 	)
@@ -281,126 +141,96 @@ func TestHighestExtraLong(t *testing.T) {
 		{Val: math.MaxFloat64, Ts: 60},
 	}
 	series := []models.Series{
-		{
-			Interval:  10,
-			QueryPatt: "a",
-			Datapoints: []schema.Point{
+		getSeriesNamed("a",
+			[]schema.Point{
 				{Val: 0, Ts: 10},
 				{Val: 0, Ts: 20},
 				{Val: 0, Ts: 30},
 				{Val: 0, Ts: 40},
 				{Val: 0, Ts: 50},
 				{Val: 0, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "b",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("b",
+			[]schema.Point{
 				{Val: 1, Ts: 10},
 				{Val: 1, Ts: 20},
 				{Val: 1, Ts: 30},
 				{Val: 1, Ts: 40},
 				{Val: 1, Ts: 50},
 				{Val: 1, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "avg4a2b",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("avg4a2b",
+			[]schema.Point{
 				{Val: 2, Ts: 10},
 				{Val: 2, Ts: 20},
 				{Val: 2, Ts: 30},
 				{Val: 2, Ts: 40},
 				{Val: 2, Ts: 50},
 				{Val: 2, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "sum4a2b",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("sum4a2b",
+			[]schema.Point{
 				{Val: 3, Ts: 10},
 				{Val: 3, Ts: 20},
 				{Val: 3, Ts: 30},
 				{Val: 3, Ts: 40},
 				{Val: 3, Ts: 50},
 				{Val: 3, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "c",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("c",
+			[]schema.Point{
 				{Val: 4, Ts: 10},
 				{Val: 4, Ts: 20},
 				{Val: 4, Ts: 30},
 				{Val: 4, Ts: 40},
 				{Val: 4, Ts: 50},
 				{Val: 4, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "d",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("d",
+			[]schema.Point{
 				{Val: 5, Ts: 10},
 				{Val: 5, Ts: 20},
 				{Val: 5, Ts: 30},
 				{Val: 5, Ts: 40},
 				{Val: 5, Ts: 50},
 				{Val: 5, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "sumab",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("sumab",
+			[]schema.Point{
 				{Val: 6, Ts: 10},
 				{Val: 6, Ts: 20},
 				{Val: 6, Ts: 30},
 				{Val: 6, Ts: 40},
 				{Val: 6, Ts: 50},
 				{Val: 6, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "sumabc",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("sumabc",
+			[]schema.Point{
 				{Val: 7, Ts: 10},
 				{Val: 7, Ts: 20},
 				{Val: 7, Ts: 30},
 				{Val: 7, Ts: 40},
 				{Val: 7, Ts: 50},
 				{Val: 7, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "sumcd",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("sumcd",
+			[]schema.Point{
 				{Val: 8, Ts: 10},
 				{Val: 8, Ts: 20},
 				{Val: 8, Ts: 30},
 				{Val: 8, Ts: 40},
 				{Val: 8, Ts: 50},
 				{Val: 8, Ts: 60},
-			},
-		},
-		{
-			Interval:  10,
-			QueryPatt: "avgab",
-			Datapoints: []schema.Point{
+			}),
+		getSeriesNamed("avgab",
+			[]schema.Point{
 				{Val: 9, Ts: 10},
 				{Val: 9, Ts: 20},
 				{Val: 9, Ts: 30},
 				{Val: 9, Ts: 40},
 				{Val: 9, Ts: 50},
 				{Val: 9, Ts: 60},
-			},
-		},
+			}),
 	}
 	for i := 0; i < 10; i++ {
 		for _, serie := range series {
@@ -408,11 +238,7 @@ func TestHighestExtraLong(t *testing.T) {
 			series = append(series, serie)
 		}
 	}
-	series = append(series, models.Series{
-		Interval:   10,
-		QueryPatt:  "highAvg",
-		Datapoints: getCopy(highAvg),
-	})
+	series = append(series, getSeriesNamed("highAvg", highAvg))
 	rand.Shuffle(len(series), func(i, j int) {
 		series[i], series[j] = series[j], series[i]
 	})
@@ -424,11 +250,7 @@ func TestHighestExtraLong(t *testing.T) {
 		true,
 		series,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "highAvg",
-				Datapoints: getCopy(highAvg),
-			},
+			getSeriesNamed("highAvg", highAvg),
 		},
 		t,
 	)
@@ -441,21 +263,9 @@ func TestHighestNone(t *testing.T) {
 		0,
 		true,
 		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "avg4a2b",
-				Datapoints: getCopy(avg4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "sum4a2b",
-				Datapoints: getCopy(sum4a2b),
-			},
-			{
-				Interval:   10,
-				QueryPatt:  "b",
-				Datapoints: getCopy(b),
-			},
+			getSeriesNamed("avg4a2b", avg4a2b),
+			getSeriesNamed("sum4a2b", sum4a2b),
+			getSeriesNamed("b", b),
 		},
 		[]models.Series{},
 		t,
@@ -466,29 +276,32 @@ func testHighestLowest(name string, fn string, n int64, highest bool, in []model
 	f := NewHighestLowestConstructor(fn, highest)()
 	f.(*FuncHighestLowest).in = NewMock(in)
 	f.(*FuncHighestLowest).n = n
-	gots, err := f.Exec(make(map[Req][]models.Series))
-	if err != nil {
-		t.Fatalf("case %q: err should be nil. got %q", name, err)
+
+	// Copy input to check that it is unchanged later
+	inputCopy := make([]models.Series, len(in))
+	copy(inputCopy, in)
+
+	dataMap := initDataMap(in)
+
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatal(err)
 	}
-	if len(gots) != len(out) {
-		t.Fatalf("case %q: len output expected %d, got %d", name, len(out), len(gots))
-	}
-	for i, g := range gots {
-		exp := out[i]
-		if g.QueryPatt != exp.QueryPatt {
-			t.Fatalf("case %q: expected target %q, got %q", name, exp.QueryPatt, g.QueryPatt)
-		}
-		if len(g.Datapoints) != len(exp.Datapoints) {
-			t.Fatalf("case %q: len output expected %d, got %d", name, len(exp.Datapoints), len(g.Datapoints))
-		}
-		for j, p := range g.Datapoints {
-			bothNaN := math.IsNaN(p.Val) && math.IsNaN(exp.Datapoints[j].Val)
-			if (bothNaN || p.Val == exp.Datapoints[j].Val) && p.Ts == exp.Datapoints[j].Ts {
-				continue
+
+	/*
+		TODO - does sorting count as modification?
+		t.Run("DidNotModifyInput", func(t *testing.T) {
+			if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+				t.Fatalf("Input was modified, err = %s", err)
 			}
-			t.Fatalf("case %q: output point %d - expected %v got %v", name, j, exp.Datapoints[j], p)
+		})
+	*/
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Point slices in datamap overlap, err = %s", err)
 		}
-	}
+	})
 }
 
 func BenchmarkHighestLowest10k_1NoNulls(b *testing.B) {

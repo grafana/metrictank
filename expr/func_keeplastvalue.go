@@ -45,9 +45,11 @@ func (s *FuncKeepLastValue) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 	limit := int(s.limit)
-	for i, serie := range series {
-		series[i].Target = fmt.Sprintf("keepLastValue(%s)", serie.Target)
-		series[i].QueryPatt = series[i].Target
+
+	outSeries := make([]models.Series, 0, len(series))
+	for _, serie := range series {
+		serie.Target = fmt.Sprintf("keepLastValue(%s)", serie.Target)
+		serie.QueryPatt = serie.Target
 		out := pointSlicePool.Get().([]schema.Point)
 
 		var consecutiveNaNs int
@@ -74,8 +76,9 @@ func (s *FuncKeepLastValue) Exec(dataMap DataMap) ([]models.Series, error) {
 			}
 		}
 
-		series[i].Datapoints = out
+		serie.Datapoints = out
+		outSeries = append(outSeries, serie)
 	}
-	dataMap.Add(Req{}, series...)
-	return series, nil
+	dataMap.Add(Req{}, outSeries...)
+	return outSeries, nil
 }
