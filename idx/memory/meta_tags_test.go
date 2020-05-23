@@ -434,8 +434,8 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(5)
 
-	enricher.delMetaRecord(recordId(2))
-	enricher.delMetaRecord(recordId(4))
+	enricher.delMetaRecord(recordId(2), acceptAll)
+	enricher.delMetaRecord(recordId(4), acceptEveryOdd)
 
 	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}},
@@ -457,8 +457,8 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(2)
 
-	enricher.delMetaRecord(recordId(1))
-	enricher.delMetaRecord(recordId(3))
+	enricher.delMetaRecord(recordId(1), acceptEveryEven)
+	enricher.delMetaRecord(recordId(3), acceptNone)
 
 	compareResultToExpected(t, []map[recordId]struct{}{
 		nil,

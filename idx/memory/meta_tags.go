@@ -155,7 +155,7 @@ func (m *metaTagIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.Met
 	if oldId > 0 {
 		// if so we remove all references to it from the enricher
 		// and from the meta tag index
-		idx.enricher.delMetaRecord(oldId)
+		idx.enricher.delMetaRecord(oldId, query)
 		idx.hierarchy.deleteRecord(oldRecord.MetaTags, oldId)
 	}
 
@@ -203,7 +203,6 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 	log.Infof("memory-idx: After diff against existing meta records for org %d, going to upsert %d, %d remain unchanged", orgId, recordsToUpsert, len(recordIdsToKeep))
 	recordsUnchanged := uint32(len(recordIdsToKeep))
 
-	var query tagquery.Query
 	var recordsModified, recordsAdded, recordsPruned uint32
 	for i, status := range recordComparison {
 		if status.recordExists && status.isEqual {
@@ -211,11 +210,17 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			continue
 		}
 
+		query, err := tagquery.NewQuery(newRecords[i].Expressions, 0)
+		if err != nil {
+			log.Errorf("Invalid record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err)
+			continue
+		}
+
 		if status.recordExists {
 			// record exists, but its meta tags need to be updated,
 			// we first delete it and then re-add it
 			recordsModified++
-			idx.enricher.delMetaRecord(status.currentId)
+			idx.enricher.delMetaRecord(status.currentId, query)
 			idx.hierarchy.deleteRecord(status.currentMetaTags, status.currentId)
 		} else {
 			// record does not exist, so it will be added
@@ -228,11 +233,6 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			continue
 		}
 
-		query, err = tagquery.NewQuery(newRecords[i].Expressions, 0)
-		if err != nil {
-			log.Errorf("Invalid record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err)
-			continue
-		}
 		idx.enricher.addMetaRecord(newRecordId, query)
 		idx.hierarchy.insertRecord(newRecords[i].MetaTags, newRecordId)
 
@@ -260,7 +260,12 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 		// remove all references to the pruned meta records from the meta
 		// tag index and the enricher
 		for recordId, record := range pruned {
-			idx.enricher.delMetaRecord(recordId)
+			query, err := tagquery.NewQuery(record.Expressions, 0)
+			if err != nil {
+				log.Errorf("Invalid record to prune, cannot instantiate query for (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err)
+				continue
+			}
+			idx.enricher.delMetaRecord(recordId, query)
 			idx.hierarchy.deleteRecord(record.MetaTags, recordId)
 		}
 	}
@@ -721,31 +726,33 @@ func (e *metaTagEnricher) _delMetric(payload interface{}) {
 
 func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query) {
 	idCh := make(chan schema.MKey)
+	go e.idLookup(query, idCh)
+	var metricIds []schema.MKey
+	for metricId := range idCh {
+		metricIds = append(metricIds, metricId)
+	}
 
 	e.eventQueue <- enricherEvent{
 		eventType: addMetaRecord,
 		payload: struct {
-			recordId recordId
-			query    tagquery.Query
-			idCh     chan schema.MKey
-		}{recordId: id, query: query, idCh: idCh},
+			recordId  recordId
+			query     tagquery.Query
+			metricIds []schema.MKey
+		}{recordId: id, query: query, metricIds: metricIds},
 	}
-
-	go e.idLookup(query, idCh)
-
 }
 
 func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		recordId recordId
-		query    tagquery.Query
-		idCh     chan schema.MKey
+		recordId  recordId
+		query     tagquery.Query
+		metricIds []schema.MKey
 	})
 
 	var added uint32
 
 	e.Lock()
-	for id := range data.idCh {
+	for _, id := range data.metricIds {
 		if _, ok := e.recordsByMetric[id.Key]; ok {
 			e.recordsByMetric[id.Key][data.recordId] = struct{}{}
 		} else {
@@ -762,32 +769,31 @@ func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	enricherMetricsAddedByQuery.AddUint32(added)
 }
 
-func (e *metaTagEnricher) delMetaRecord(id recordId) {
-	e.RLock()
-	query := e.queriesByRecord[id]
-	e.RUnlock()
-
+func (e *metaTagEnricher) delMetaRecord(id recordId, query tagquery.Query) {
 	idCh := make(chan schema.MKey)
+	go e.idLookup(query, idCh)
+	var metricIds []schema.MKey
+	for metricId := range idCh {
+		metricIds = append(metricIds, metricId)
+	}
 
 	e.eventQueue <- enricherEvent{
 		eventType: delMetaRecord,
 		payload: struct {
-			recordId recordId
-			idCh     chan schema.MKey
-		}{recordId: id, idCh: idCh},
+			recordId  recordId
+			metricIds []schema.MKey
+		}{recordId: id, metricIds: metricIds},
 	}
-
-	go e.idLookup(query, idCh)
 }
 
 func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		recordId recordId
-		idCh     chan schema.MKey
+		recordId  recordId
+		metricIds []schema.MKey
 	})
 
 	e.Lock()
-	for id := range data.idCh {
+	for _, id := range data.metricIds {
 		delete(e.recordsByMetric[id.Key], data.recordId)
 		if len(e.recordsByMetric[id.Key]) == 0 {
 			delete(e.recordsByMetric, id.Key)
