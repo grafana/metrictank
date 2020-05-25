@@ -154,7 +154,9 @@ func (m *metaTagIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.Met
 	// check if the upsert has replaced a previously existing record
 	if oldId > 0 {
 		// if so we remove all references to it from the enricher
-		// and from the meta tag index
+		// and from the meta tag index. we can reuse the already existing query
+		// because the identity of a meta record is its query expressions,
+		// so the new and the old record must have the same expressions
 		idx.enricher.delMetaRecord(oldId, query)
 		idx.hierarchy.deleteRecord(oldRecord.MetaTags, oldId)
 	}
@@ -220,6 +222,10 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			// record exists, but its meta tags need to be updated,
 			// we first delete it and then re-add it
 			recordsModified++
+			// we can use the query which has been instantiated from the new
+			// record because the identity of a meta record is defined by its
+			// expressions, so the old and the new record both must have the
+			// same expressions.
 			idx.enricher.delMetaRecord(status.currentId, query)
 			idx.hierarchy.deleteRecord(status.currentMetaTags, status.currentId)
 		} else {
