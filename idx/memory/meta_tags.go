@@ -795,9 +795,7 @@ func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 			delete(e.recordsByMetric, id.Key)
 		}
 	}
-	e.Unlock()
 
-	e.Lock()
 	delete(e.queriesByRecord, data.recordId)
 	enricherKnownMetaRecords.SetUint32(uint32(len(e.queriesByRecord)))
 	e.Unlock()
