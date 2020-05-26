@@ -795,13 +795,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 		return nil, meta, err
 	}
 	meta.RenderStats.PointsFetch = rp.PointsFetch()
-	meta.RenderStats.PointsReturn = rp.PointsReturn(plan.MaxDataPoints)
 	reqsList := rp.List()
 
 	span := opentracing.SpanFromContext(ctx)
 	span.SetTag("num_reqs", len(reqsList))
 	span.SetTag("points_fetch", meta.RenderStats.PointsFetch)
-	span.SetTag("points_return", meta.RenderStats.PointsReturn)
 
 	for _, req := range reqsList {
 		log.Debugf("HTTP Render %s - arch:%d archI:%d outI:%d aggN: %d from %s", req, req.Archive, req.ArchInterval, req.OutInterval, req.AggNum, req.Node.GetName())
@@ -849,6 +847,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 
 	preRun := time.Now()
 	out, err = plan.Run(dataMap)
+
+	for _, s := range out {
+		meta.RenderStats.PointsReturn += uint32(len(s.Datapoints))
+	}
+	span.SetTag("points_return", meta.RenderStats.PointsReturn)
 
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
