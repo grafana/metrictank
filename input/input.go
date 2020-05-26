@@ -43,6 +43,7 @@ type DefaultHandler struct {
 	receivedMPNO *stats.Counter32
 	invalidMD    *stats.CounterRate32
 	invalidTagMD *stats.CounterRate32
+	invalidUtfMD *stats.CounterRate32
 	invalidMP    *stats.CounterRate32
 	unknownMP    *stats.Counter32
 
@@ -75,6 +76,10 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		// metric input.%s.metricdata.discarded.invalid_tags is a count of times a metricdata was considered invalid due to
 		// invalid tags in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
 		invalidTagMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_tag", input)),
+		// metric input.%s.metricdata.discarded.invalid_utf is a count of times a metricdata was considered invalid due to
+		// invalid utf8 in either the name or tags in the metric definition. all rejected metrics counted here are also counted in
+		// above "invalid" counter
+		invalidUtfMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_utf", input)),
 		// metric input.%s.metricpoint.discarded.invalid is a count of times a metricpoint was invalid by input plugin
 		invalidMP: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.discarded.invalid", input)),
 		// metric input.%s.metricpoint.discarded.unknown is the count of times the ID of a received metricpoint was not in the index, by input plugin
@@ -128,13 +133,16 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		if err == schema.ErrInvalidTagFormat {
 			in.invalidTagMD.Inc()
 			if !rejectInvalidTags {
-				log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid tags is disabled: %s", md, err)
+				if log.IsLevelEnabled(log.DebugLevel) {
+					log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid tags is disabled: %s", md, err)
+				}
 				ignoreError = true
 			}
 		}
 
 		// this is now the second to last check, just before the Invalid Tag check
 		if err == schema.ErrInvalidUtf8 {
+			in.invalidUtfMD.Inc()
 			if !rejectInvalidUtf8 {
 				if log.IsLevelEnabled(log.DebugLevel) {
 					log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid utf8 data is disabled: %s", md, err)

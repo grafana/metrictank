@@ -270,10 +270,10 @@ func main() {
 			continue
 		}
 		if tags == "valid" || tags == "invalid" {
-			valid := schema.ValidateTags(d.Tags)
+			err := schema.ValidateTags(d.Tags)
 
 			// skip the metric if the validation result is not what we want
-			if valid != (tags == "valid") {
+			if (err == nil) != (tags == "valid") {
 				continue
 			}
 		}

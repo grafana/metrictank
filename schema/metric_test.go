@@ -26,29 +26,32 @@ func BenchmarkSetId(b *testing.B) {
 func TestTagValidation(t *testing.T) {
 	type testCase struct {
 		tag       []string
-		expecting bool
+		expecting error
 	}
 
 	testCases := []testCase{
-		{[]string{"abc=cba"}, true},
-		{[]string{"a="}, false},
-		{[]string{"a!="}, false},
-		{[]string{"=abc"}, false},
-		{[]string{"@#$%!=(*&"}, false},
-		{[]string{"!@#$%=(*&"}, false},
-		{[]string{"@#;$%=(*&"}, false},
-		{[]string{"@#$%=(;*&"}, false},
-		{[]string{"@#$%=(*&"}, true},
-		{[]string{"@#$%=(*&", "abc=!fd", "a===="}, true},
-		{[]string{"@#$%=(*&", "abc=!fd", "a===;="}, false},
-		{[]string{"a=~a"}, false},
-		{[]string{"a=a~"}, true},
-		{[]string{"aaa"}, false},
+		{[]string{"abc=cba"}, nil},
+		{[]string{"a="}, ErrInvalidTagFormat},
+		{[]string{"a!="}, ErrInvalidTagFormat},
+		{[]string{"=abc"}, ErrInvalidTagFormat},
+		{[]string{"@#$%!=(*&"}, ErrInvalidTagFormat},
+		{[]string{"!@#$%=(*&"}, ErrInvalidTagFormat},
+		{[]string{"@#;$%=(*&"}, ErrInvalidTagFormat},
+		{[]string{"@#$%=(;*&"}, ErrInvalidTagFormat},
+		{[]string{"@#$%=(*&"}, nil},
+		{[]string{"@#$%=(*&", "abc=!fd", "a===="}, nil},
+		{[]string{"@#$%=(*&", "abc=!fd", "a===;="}, ErrInvalidTagFormat},
+		{[]string{"a=~a"}, ErrInvalidTagFormat},
+		{[]string{"a=a~"}, nil},
+		{[]string{"aaa"}, ErrInvalidTagFormat},
+		{[]string{"aaa=b\xc3"}, ErrInvalidUtf8},
+		{[]string{"a\xc3=bb\x28\xc5"}, ErrInvalidUtf8},
 	}
 
 	for _, tc := range testCases {
-		if tc.expecting != ValidateTags(tc.tag) {
-			t.Fatalf("Expected %t, but testcase %s returned %t", tc.expecting, tc.tag, !tc.expecting)
+		err := ValidateTags(tc.tag)
+		if tc.expecting != err {
+			t.Fatalf("Expected %t, but testcase %s returned %v", tc.expecting, tc.tag, err)
 		}
 	}
 }

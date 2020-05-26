@@ -59,8 +59,9 @@ func (m *MetricData) Validate() error {
 	if !utf8.ValidString(m.Name) {
 		return ErrInvalidUtf8
 	}
-	if !ValidateTags(m.Tags) {
-		return ErrInvalidTagFormat
+	if err := ValidateTags(m.Tags); err != nil {
+		// this will return either ErrInvalidUtf8 or ErrInvalidTagFormat
+		return err
 	}
 	return nil
 }
@@ -205,8 +206,11 @@ func (m *MetricDefinition) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
 	}
-	if !ValidateTags(m.Tags) {
-		return ErrInvalidTagFormat
+	if err := ValidateTags(m.Tags); err != nil {
+		// we still return nil if the error returned is ErrInvalidUtf8, as that should never happen here
+		if err == ErrInvalidTagFormat {
+			return ErrInvalidTagFormat
+		}
 	}
 	return nil
 }
@@ -314,36 +318,50 @@ func EatDots(name string) string {
 // a valid format is anything that looks like key=value,
 // the length of key and value must be >0 and both cannot contain
 // the certain prohibited characters
-func ValidateTags(tags []string) bool {
+func ValidateTags(tags []string) error {
 	for _, t := range tags {
-		if !ValidateTag(t) {
-			return false
+		if err := ValidateTag(t); err != nil {
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
-func ValidateTag(tag string) bool {
+func ValidateTag(tag string) error {
 	// a valid tag must have:
 	// - a key that's at least 1 char long
 	// - a = sign
 	// - a value that's at least 1 char long
 	if len(tag) < 3 {
-		return false
+		return ErrInvalidTagFormat
 	}
 
 	equal := strings.Index(tag, "=")
 	if equal == -1 {
-		return false
+		return ErrInvalidTagFormat
 	}
 
 	// first equal sign must not be the first nor last character
 	if equal == 0 || equal == len(tag)-1 {
-		return false
+		return ErrInvalidTagFormat
 	}
 
-	return ValidateTagKey(tag[:equal]) && ValidateTagValue(tag[equal+1:])
+	// this now checks for both invalid utf8 and an invalid tag format. If the utf8 check fails, it still goes on to validate the tags.
+	// if both checks fail, the last one will set the error to invalid tag format. Now we know that if this function returns ErrInvalidUtf8 that
+	// all of the other checks passed and can handle further processing accordingly.
+	//
+	// if all checks pass, it still returns nil
+	var err error
+	if !utf8.ValidString(tag) {
+		err = ErrInvalidUtf8
+	}
+
+	if !ValidateTagKey(tag[:equal]) || !ValidateTagValue(tag[equal+1:]) {
+		err = ErrInvalidTagFormat
+	}
+
+	return err
 }
 
 // ValidateTagKey validates tag key requirements as defined in graphite docs
