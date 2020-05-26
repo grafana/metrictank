@@ -222,6 +222,10 @@ a count of times a metricdata was invalid by input plugin
 * `input.%s.metricdata.discarded.invalid_tags`:  
 a count of times a metricdata was considered invalid due to
 invalid tags in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
+* `input.%s.metricdata.discarded.invalid_utf`:  
+a count of times a metricdata was considered invalid due to
+invalid utf8 in either the name or tags in the metric definition. all rejected metrics counted here are also counted in
+above "invalid" counter
 * `input.%s.metricdata.received`:  
 the count of metricdata datapoints received by input plugin
 * `input.%s.metricpoint.discarded.invalid`:  
