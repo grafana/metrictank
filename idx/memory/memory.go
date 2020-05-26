@@ -493,10 +493,6 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	m.defByTagSet.add(def)
 
 	if MetaTagSupport {
-		// it is important to release the lock for a short time, otherwise
-		// it's possible that the enricher can't process its queue because
-		// it could be blocked on waiting for the read lock on the index
-		// which would lead to deadlock.
 		m.Unlock()
 		m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
 		m.Lock()
@@ -529,10 +525,6 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 	m.defByTagSet.del(def)
 
 	if MetaTagSupport {
-		// it is important to release the lock for a short time, otherwise
-		// it's possible that the enricher can't process its queue because
-		// it could be blocked on waiting for the read lock on the index
-		// which would lead to deadlock.
 		m.Unlock()
 		m.getOrgMetaTagIndex(def.OrgId).enricher.delMetric(def)
 		m.Lock()
