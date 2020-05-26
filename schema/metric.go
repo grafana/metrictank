@@ -56,14 +56,15 @@ func (m *MetricData) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
 	}
+	var err error
 	if !utf8.ValidString(m.Name) {
-		return ErrInvalidUtf8
+		err = ErrInvalidUtf8
 	}
-	if err := ValidateTags(m.Tags); err != nil {
+	if e := ValidateTags(m.Tags); e != nil {
 		// this will return either ErrInvalidUtf8 or ErrInvalidTagFormat
-		return err
+		err = e
 	}
-	return nil
+	return err
 }
 
 // returns a id (hash key) in the format OrgId.md5Sum
@@ -349,7 +350,8 @@ func ValidateTag(tag string) error {
 
 	// this now checks for both invalid utf8 and an invalid tag format. If the utf8 check fails, it still goes on to validate the tags.
 	// if both checks fail, the last one will set the error to invalid tag format. Now we know that if this function returns ErrInvalidUtf8 that
-	// all of the other checks passed and can handle further processing accordingly.
+	// all of the other checks passed and can handle further processing accordingly. This also means that if the tag contains invalid UTF8 and it
+	// also fails to validate as a tag, then it will still only return ErrInvalidTagFormat.
 	//
 	// if all checks pass, it still returns nil
 	var err error

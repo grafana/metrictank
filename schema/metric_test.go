@@ -23,6 +23,64 @@ func BenchmarkSetId(b *testing.B) {
 	}
 }
 
+func TestValidate(t *testing.T) {
+	type testCase struct {
+		md        MetricData
+		expecting error
+	}
+
+	md := MetricData{
+		Id:       "1.12345678901234567890123456789012",
+		OrgId:    1,
+		Name:     "abc",
+		Interval: 1,
+		Value:    2,
+		Time:     3,
+		Mtype:    "gauge",
+	}
+
+	mdZeroOrgId := md
+	mdZeroOrgId.OrgId = 0
+
+	mdZeroInterval := md
+	mdZeroInterval.Interval = 0
+
+	mdEmptyName := md
+	mdEmptyName.Name = ""
+
+	mdInvalidMType := md
+	mdInvalidMType.Mtype = "somejunk"
+
+	mdInvalidUtf8Name := md
+	mdInvalidUtf8Name.Name = string("a\xc5")
+
+	mdInvalidUtf8InTag := md
+	tags := []string{"abc=de\xc5"}
+	mdInvalidUtf8InTag.Tags = tags
+
+	mdInvalidUtf8InTagAndInvalidTag := md
+	tags = []string{"ab\xc5=@@!#@;;"}
+	mdInvalidUtf8InTagAndInvalidTag.Tags = tags
+
+	testCases := []testCase{
+		{md, nil},
+		{mdZeroOrgId, ErrInvalidOrgIdzero},
+		{mdZeroInterval, ErrInvalidIntervalzero},
+		{mdEmptyName, ErrInvalidEmptyName},
+		{mdInvalidMType, ErrInvalidMtype},
+		{mdInvalidUtf8Name, ErrInvalidUtf8},
+		{mdInvalidUtf8InTag, ErrInvalidUtf8},
+		{mdInvalidUtf8InTagAndInvalidTag, ErrInvalidTagFormat},
+	}
+
+	for _, tc := range testCases {
+		err := tc.md.Validate()
+		if tc.expecting != err {
+			t.Fatalf("Expected %t, but testcase %v returned %v", tc.expecting, tc.md, err)
+		}
+	}
+}
+
 func TestTagValidation(t *testing.T) {
 	type testCase struct {
 		tag       []string

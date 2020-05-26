@@ -140,6 +140,9 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 			}
 		}
 
+		// if a tag contains invalid UTF8 data and has other invalid tag problems, you will never see this error. We decided to optimize for the most
+		// common use case (no invalid UTF8 data) in order to keep this function fast. If you think you might have an issue with both invalid UTF8 data
+		// and invalid tags, then you should just turn on rejection for both.
 		// this is now the second to last check, just before the Invalid Tag check
 		if err == schema.ErrInvalidUtf8 {
 			in.invalidUtfMD.Inc()
