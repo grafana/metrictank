@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 type WriteQueue struct {
@@ -71,11 +72,21 @@ func (wq *WriteQueue) flush() {
 		}
 		return
 	}
+	preLock := time.Now()
 	wq.idx.Lock()
+	postLock := time.Now()
 	for _, archive := range wq.archives {
 		wq.idx.add(archive)
 	}
 	wq.idx.Unlock()
+
+	postOp := time.Now()
+	statDur := postOp.Sub(preLock)
+	statAddDuration.Value(statDur)
+	if statDur > time.Duration(250)*time.Millisecond {
+		log.Infof("Long index add: lockWaitTime = %v, lockHoldTime = %v, numAdds = %d", postLock.Sub(preLock), postOp.Sub(postLock), len(wq.archives))
+	}
+
 	wq.archives = make(map[schema.MKey]*idx.Archive)
 
 	select {
