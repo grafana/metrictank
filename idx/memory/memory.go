@@ -146,6 +146,34 @@ func New() MemoryIndex {
 	return NewUnpartitionedMemoryIdx()
 }
 
+type timedRLocker struct {
+       lock              *sync.RWMutex
+       preLock, postLock time.Time
+}
+
+func acquireTimedLock(lock *sync.RWMutex) timedRLocker {
+       trl := timedRLocker{
+               lock:    lock,
+               preLock: time.Now(),
+       }
+       trl.lock.RLock()
+       trl.postLock = time.Now()
+       return trl
+}
+
+func (trl timedRLocker) RUnlock(op string, logCb func() interface{}) {
+       trl.lock.RUnlock()
+       endTime := time.Now()
+
+       lockHoldTime := endTime.Sub(trl.postLock)
+       lockWaitTime := trl.postLock.Sub(trl.preLock)
+       if lockHoldTime > time.Second {
+               log.Infof("Long %s: lockWaitTime = %v, lockHoldTime = %v, details = '%v'", op, lockWaitTime, lockHoldTime, logCb())
+       } else if lockWaitTime > time.Second {
+               log.Infof("Long Blocked %s: lockWaitTime = %v, lockHoldTime = %v, details = '%v'", op, lockWaitTime, lockHoldTime, logCb())
+       }
+}
+
 type Tree struct {
 	Items map[string]*Node // key is the full path of the node.
 }
@@ -743,7 +771,8 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 
 	resCh := make(chan schema.MKey, 100)
 
-	m.RLock()
+	trl := acquireTimedLock(&m.RWMutex)
+
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	m.idsByTagQuery(orgId, query, resCh, true)
 
@@ -772,7 +801,9 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		}
 	}
 
-	m.RUnlock()
+	trl.RUnlock("findByTag", func() interface{} {
+		return query.Expressions.Strings()
+	})
 
 	results := make([]idx.Node, len(byPath))
 
@@ -802,7 +833,7 @@ func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query ta
 
 	resCh := make(chan schema.MKey, 100)
 
-	m.RLock()
+	trl := acquireTimedLock(&m.RWMutex)
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	m.idsByTagQuery(orgID, query, resCh, true)
 
@@ -834,7 +865,9 @@ func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query ta
 		}
 	}
 
-	m.RUnlock()
+	trl.RUnlock("tagTerms", func() interface{} {
+		return query.Expressions.Strings()
+	})
 
 	return totalResults, terms
 }
@@ -1004,7 +1037,7 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	resMap := make(map[string]struct{})
 	resCh := make(chan schema.MKey, 100)
 
-	m.RLock()
+	trl := acquireTimedLock(&m.RWMutex)
 	m.idsByTagQuery(orgId, query, resCh, true)
 	for id := range resCh {
 		def, ok := m.defById[id]
@@ -1037,7 +1070,10 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 			}
 		}
 	}
-	m.RUnlock()
+
+	trl.RUnlock("findTagsWithQuery", func() interface{} {
+		return query.Expressions.Strings()
+	})
 
 	// handle special case of the name tag
 	if len(prefix) == 0 || strings.HasPrefix("name", prefix) {
@@ -1113,7 +1149,7 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	resMap := make(map[string]struct{})
 	resCh := make(chan schema.MKey, 100)
 
-	m.RLock()
+	trl := acquireTimedLock(&m.RWMutex)
 	m.idsByTagQuery(orgId, query, resCh, true)
 	tagPrefix := tag + "=" + prefix
 	for id := range resCh {
@@ -1156,7 +1192,9 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 			}
 		}
 	}
-	m.RUnlock()
+	trl.RUnlock("findTagValuesWithQuery", func() interface{} {
+		return query.Expressions.Strings()
+	})
 
 	res := make([]string, len(resMap))
 	i := 0
