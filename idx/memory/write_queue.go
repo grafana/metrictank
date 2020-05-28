@@ -79,9 +79,9 @@ func (wq *WriteQueue) flush() {
 	wq.archives = make(map[schema.MKey]*idx.Archive)
 
 	select {
-       case wq.flushed <- struct{}{}:
-       default:
-    }
+	case wq.flushed <- struct{}{}:
+	default:
+	}
 }
 
 func (wq *WriteQueue) loop() {
