@@ -51,10 +51,10 @@ var (
 type metaTagIdx struct {
 	sync.RWMutex
 	byOrg    map[uint32]*orgMetaTagIdx
-	idLookup func(uint32, tagquery.Query, chan schema.MKey)
+	idLookup func(uint32, tagquery.Query, func([]schema.MKey))
 }
 
-func newMetaTagIndex(idLookup func(uint32, tagquery.Query, chan schema.MKey)) *metaTagIdx {
+func newMetaTagIndex(idLookup func(uint32, tagquery.Query, func([]schema.MKey))) *metaTagIdx {
 	return &metaTagIdx{
 		byOrg:    make(map[uint32]*orgMetaTagIdx),
 		idLookup: idLookup,
@@ -86,10 +86,7 @@ func (m *metaTagIdx) getOrgMetaTagIndex(orgId uint32) *orgMetaTagIdx {
 		return idx
 	}
 
-	idx = newOrgMetaTagIndex(func(query tagquery.Query, idCh chan schema.MKey) {
-		// bind orgId to function call
-		m.idLookup(orgId, query, idCh)
-	})
+	idx = newOrgMetaTagIndex()
 
 	m.byOrg[orgId] = idx
 
@@ -105,13 +102,11 @@ type orgMetaTagIdx struct {
 	enricher  *metaTagEnricher
 }
 
-type idLookup func(tagquery.Query, chan schema.MKey)
-
-func newOrgMetaTagIndex(idLookup idLookup) *orgMetaTagIdx {
+func newOrgMetaTagIndex() *orgMetaTagIdx {
 	return &orgMetaTagIdx{
 		hierarchy: newMetaTagHierarchy(),
 		records:   newMetaTagRecords(),
-		enricher:  newEnricher(idLookup),
+		enricher:  newEnricher(),
 	}
 }
 
@@ -146,23 +141,31 @@ func (m *metaTagIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.Met
 	idx.swapMutex.Lock()
 	defer idx.swapMutex.Unlock()
 
-	id, oldId, oldRecord, err := idx.records.upsert(upsertRecord)
+	newRecordId, oldRecordId, oldRecord, err := idx.records.upsert(upsertRecord)
 	if err != nil {
 		return err
 	}
 
 	// check if the upsert has replaced a previously existing record
-	if oldId > 0 {
+	if oldRecordId > 0 {
 		// if so we remove all references to it from the enricher
-		// and from the meta tag index
-		idx.enricher.delMetaRecord(oldId)
-		idx.hierarchy.deleteRecord(oldRecord.MetaTags, oldId)
+		// and from the meta tag index. we can reuse the already existing query
+		// because the identity of a meta record is its query expressions,
+		// so the new and the old record must have the same expressions
+		m.idLookup(orgId, query, func(metricIds []schema.MKey) {
+			idx.enricher.delMetaRecord(oldRecordId, query, metricIds)
+		})
+		idx.hierarchy.deleteRecord(oldRecord.MetaTags, oldRecordId)
 	}
 
-	// add the newly inserted meta record into the enricher and the
-	// meta tag index
-	idx.enricher.addMetaRecord(id, query)
-	idx.hierarchy.insertRecord(upsertRecord.MetaTags, id)
+	// lookup metrics from main index by the given query, then update the
+	// enricher with the new record id and the associated metrics
+	m.idLookup(orgId, query, func(metricIds []schema.MKey) {
+		idx.enricher.addMetaRecord(newRecordId, query, metricIds)
+	})
+
+	// add the newly inserted meta record to the meta tag index
+	idx.hierarchy.insertRecord(upsertRecord.MetaTags, newRecordId)
 
 	return nil
 }
@@ -203,7 +206,6 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 	log.Infof("memory-idx: After diff against existing meta records for org %d, going to upsert %d, %d remain unchanged", orgId, recordsToUpsert, len(recordIdsToKeep))
 	recordsUnchanged := uint32(len(recordIdsToKeep))
 
-	var query tagquery.Query
 	var recordsModified, recordsAdded, recordsPruned uint32
 	for i, status := range recordComparison {
 		if status.recordExists && status.isEqual {
@@ -211,11 +213,23 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			continue
 		}
 
+		query, err := tagquery.NewQuery(newRecords[i].Expressions, 0)
+		if err != nil {
+			log.Errorf("Invalid record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err)
+			continue
+		}
+
 		if status.recordExists {
 			// record exists, but its meta tags need to be updated,
 			// we first delete it and then re-add it
 			recordsModified++
-			idx.enricher.delMetaRecord(status.currentId)
+			// we can use the query which has been instantiated from the new
+			// record because the identity of a meta record is defined by its
+			// expressions, so the old and the new record both must have the
+			// same expressions.
+			m.idLookup(orgId, query, func(metricIds []schema.MKey) {
+				idx.enricher.delMetaRecord(status.currentId, query, metricIds)
+			})
 			idx.hierarchy.deleteRecord(status.currentMetaTags, status.currentId)
 		} else {
 			// record does not exist, so it will be added
@@ -228,12 +242,9 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			continue
 		}
 
-		query, err = tagquery.NewQuery(newRecords[i].Expressions, 0)
-		if err != nil {
-			log.Errorf("Invalid record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err)
-			continue
-		}
-		idx.enricher.addMetaRecord(newRecordId, query)
+		m.idLookup(orgId, query, func(metricIds []schema.MKey) {
+			idx.enricher.addMetaRecord(newRecordId, query, metricIds)
+		})
 		idx.hierarchy.insertRecord(newRecords[i].MetaTags, newRecordId)
 
 		// adding the new record id to recordIdsToKeep to prevent that
@@ -260,7 +271,14 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 		// remove all references to the pruned meta records from the meta
 		// tag index and the enricher
 		for recordId, record := range pruned {
-			idx.enricher.delMetaRecord(recordId)
+			query, err := tagquery.NewQuery(record.Expressions, 0)
+			if err != nil {
+				log.Errorf("Invalid record to prune, cannot instantiate query for (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err)
+				continue
+			}
+			m.idLookup(orgId, query, func(metricIds []schema.MKey) {
+				idx.enricher.delMetaRecord(recordId, query, metricIds)
+			})
 			idx.hierarchy.deleteRecord(record.MetaTags, recordId)
 		}
 	}
@@ -497,8 +515,6 @@ type metaTagEnricher struct {
 	addMetricBuffer []schema.MetricDefinition
 	// pool of idx.Archive structs that we use when processing add metric events
 	archivePool sync.Pool
-
-	idLookup idLookup
 }
 
 type enricherEventType uint8
@@ -517,14 +533,13 @@ type enricherEvent struct {
 	payload   interface{}
 }
 
-func newEnricher(idLookup idLookup) *metaTagEnricher {
+func newEnricher() *metaTagEnricher {
 	res := &metaTagEnricher{
 		queriesByRecord: make(map[recordId]tagquery.Query),
 		recordsByMetric: make(map[schema.Key]map[recordId]struct{}),
 		archivePool: sync.Pool{
 			New: func() interface{} { return &idx.Archive{} },
 		},
-		idLookup: idLookup,
 	}
 
 	res.start()
@@ -719,33 +734,28 @@ func (e *metaTagEnricher) _delMetric(payload interface{}) {
 	enricherMetricsWithMetaRecords.SetUint32(uint32(len(e.recordsByMetric)))
 }
 
-func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query) {
-	idCh := make(chan schema.MKey)
-
+func (e *metaTagEnricher) addMetaRecord(id recordId, query tagquery.Query, metricIds []schema.MKey) {
 	e.eventQueue <- enricherEvent{
 		eventType: addMetaRecord,
 		payload: struct {
-			recordId recordId
-			query    tagquery.Query
-			idCh     chan schema.MKey
-		}{recordId: id, query: query, idCh: idCh},
+			recordId  recordId
+			query     tagquery.Query
+			metricIds []schema.MKey
+		}{recordId: id, query: query, metricIds: metricIds},
 	}
-
-	go e.idLookup(query, idCh)
-
 }
 
 func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		recordId recordId
-		query    tagquery.Query
-		idCh     chan schema.MKey
+		recordId  recordId
+		query     tagquery.Query
+		metricIds []schema.MKey
 	})
 
 	var added uint32
 
 	e.Lock()
-	for id := range data.idCh {
+	for _, id := range data.metricIds {
 		if _, ok := e.recordsByMetric[id.Key]; ok {
 			e.recordsByMetric[id.Key][data.recordId] = struct{}{}
 		} else {
@@ -762,40 +772,30 @@ func (e *metaTagEnricher) _addMetaRecord(payload interface{}) {
 	enricherMetricsAddedByQuery.AddUint32(added)
 }
 
-func (e *metaTagEnricher) delMetaRecord(id recordId) {
-	e.RLock()
-	query := e.queriesByRecord[id]
-	e.RUnlock()
-
-	idCh := make(chan schema.MKey)
-
+func (e *metaTagEnricher) delMetaRecord(id recordId, query tagquery.Query, metricIds []schema.MKey) {
 	e.eventQueue <- enricherEvent{
 		eventType: delMetaRecord,
 		payload: struct {
-			recordId recordId
-			idCh     chan schema.MKey
-		}{recordId: id, idCh: idCh},
+			recordId  recordId
+			metricIds []schema.MKey
+		}{recordId: id, metricIds: metricIds},
 	}
-
-	go e.idLookup(query, idCh)
 }
 
 func (e *metaTagEnricher) _delMetaRecord(payload interface{}) {
 	data := payload.(struct {
-		recordId recordId
-		idCh     chan schema.MKey
+		recordId  recordId
+		metricIds []schema.MKey
 	})
 
 	e.Lock()
-	for id := range data.idCh {
+	for _, id := range data.metricIds {
 		delete(e.recordsByMetric[id.Key], data.recordId)
 		if len(e.recordsByMetric[id.Key]) == 0 {
 			delete(e.recordsByMetric, id.Key)
 		}
 	}
-	e.Unlock()
 
-	e.Lock()
 	delete(e.queriesByRecord, data.recordId)
 	enricherKnownMetaRecords.SetUint32(uint32(len(e.queriesByRecord)))
 	e.Unlock()

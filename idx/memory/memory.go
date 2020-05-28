@@ -294,22 +294,7 @@ func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 	}
 
 	if MetaTagSupport {
-		m.metaTagIdx = newMetaTagIndex(
-			// used by the meta tag enricher to lookup ids from query
-			// expressions on the main tag index
-			func(orgId uint32, query tagquery.Query, idCh chan schema.MKey) {
-				m.RLock()
-				defer m.RUnlock()
-				defer close(idCh)
-
-				tags, ok := m.tags[orgId]
-				if !ok {
-					return
-				}
-
-				queryCtx := NewTagQueryContext(query)
-				queryCtx.Run(tags, m.defById, nil, nil, idCh)
-			})
+		m.metaTagIdx = newMetaTagIndex(m.idsByTagQueryIntoCallback)
 	}
 
 	return m
@@ -508,10 +493,6 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	m.defByTagSet.add(def)
 
 	if MetaTagSupport {
-		// it is important to release the lock for a short time, otherwise
-		// it's possible that the enricher can't process its queue because
-		// it could be blocked on waiting for the read lock on the index
-		// which would lead to deadlock.
 		m.Unlock()
 		m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
 		m.Lock()
@@ -544,10 +525,6 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 	m.defByTagSet.del(def)
 
 	if MetaTagSupport {
-		// it is important to release the lock for a short time, otherwise
-		// it's possible that the enricher can't process its queue because
-		// it could be blocked on waiting for the read lock on the index
-		// which would lead to deadlock.
 		m.Unlock()
 		m.getOrgMetaTagIndex(def.OrgId).enricher.delMetric(def)
 		m.Lock()
@@ -1214,6 +1191,27 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query tagquery.Quer
 		}
 		close(idCh)
 	}()
+}
+
+// idsByTagQueryIntoCallback executes the given query on the tag index and collects
+// the resulting metric ids in a slice. Once the query completed it submits the slice
+// of metric ids to the given callback function before releasing the read lock.
+// It does not use the meta tag index.
+func (m *UnpartitionedMemoryIdx) idsByTagQueryIntoCallback(orgId uint32, query tagquery.Query, resultCb func([]schema.MKey)) {
+	idCh := make(chan schema.MKey, 100)
+
+	m.RLock()
+	defer m.RUnlock()
+
+	// we never use the meta tag index in this function
+	m.idsByTagQuery(orgId, query, idCh, false)
+
+	var metricIds []schema.MKey
+	for metricId := range idCh {
+		metricIds = append(metricIds, metricId)
+	}
+
+	resultCb(metricIds)
 }
 
 // finalizeResult prepares a result to return it to the caller

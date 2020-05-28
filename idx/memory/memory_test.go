@@ -1,7 +1,9 @@
 package memory
 
 import (
+	"crypto/md5"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"hash/fnv"
 	"regexp"
@@ -1471,4 +1473,103 @@ func testMatchSchemaWithTags(t *testing.T) {
 			t.Fatalf("Expected schema of archive %d to be %d, but it was %d", i, expectedSchemas[i], archives[i].SchemaId)
 		}
 	}
+}
+
+func BenchmarkAddingMetaRecordsToIdxWith100kMetrics(b *testing.B) {
+	reset := enableMetaTagSupport()
+	defer reset()
+
+	metricCnt := 100000
+	metaRecordCnt := b.N
+	ix := NewUnpartitionedMemoryIdx()
+
+	hasher := md5.New()
+	generateMetricName := func(id int) string {
+		hasher.Reset()
+		hasher.Write([]byte(fmt.Sprintf("%d", id)))
+		return string(hex.EncodeToString(hasher.Sum(nil)))
+	}
+
+	generateMetaRecordKeyTag := func(id int) string {
+		hasher.Reset()
+		hasher.Write([]byte(fmt.Sprintf("%d", id%metaRecordCnt)))
+		sum := hex.EncodeToString(hasher.Sum(nil))
+		return fmt.Sprintf("%s=%s", sum[:16], sum[16:32])
+	}
+
+	md := schema.MetricData{
+		Interval: 1,
+		Time:     123,
+	}
+	for i := 0; i < metricCnt; i++ {
+		md.OrgId = 1
+		md.Name = generateMetricName(i)
+
+		// add some tags, their content isn't relevant
+		md.Tags = []string{
+			fmt.Sprintf("%s=%s", md.Name[0:3], md.Name[3:6]),
+			fmt.Sprintf("%s=%s", md.Name[6:9], md.Name[9:12]),
+		}
+
+		// append the tag based on which we are going to assign meta records
+		md.Tags = append(md.Tags, generateMetaRecordKeyTag(i))
+
+		md.SetId()
+		mkey, err := schema.MKeyFromString(md.Id)
+		if err != nil {
+			b.Fatalf("Unexpected error when parsing id (%s): %s", md.Id, err)
+		}
+
+		ix.AddOrUpdate(mkey, &md, 0)
+	}
+
+	metaRecords := make([]tagquery.MetaTagRecord, metaRecordCnt)
+	for i := 0; i < metaRecordCnt; i++ {
+		// append the tag by which we are going to assign meta records
+		hasher.Reset()
+		hasher.Write([]byte(fmt.Sprintf("%d", i)))
+		sum := hex.EncodeToString(hasher.Sum(nil))
+		var err error
+		metaRecords[i].Expressions, err = tagquery.ParseExpressions([]string{generateMetaRecordKeyTag(i)})
+		if err != nil {
+			b.Fatalf("Unexpected error when parsing tag (%s): %s", fmt.Sprintf("%s=%s", sum[:8], sum[8:16]), err)
+		}
+		metaRecords[i].MetaTags = tagquery.Tags{
+			{
+				Key:   fmt.Sprintf("tag%d", i%10),
+				Value: fmt.Sprintf("value%d", i%10),
+			},
+		}
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	// add meta records to index
+	err := ix.MetaTagRecordSwap(1, metaRecords)
+	if err != nil {
+		b.Fatalf("Error when swapping meta records: %s", err)
+	}
+
+	// delete & readd meta records
+	for _, record := range metaRecords {
+		err = ix.MetaTagRecordUpsert(1, tagquery.MetaTagRecord{
+			Expressions: record.Expressions,
+		})
+		if err != nil {
+			b.Fatalf("Error when upserting meta record: %s", err)
+		}
+		err = ix.MetaTagRecordUpsert(1, record)
+		if err != nil {
+			b.Fatalf("Error when upserting meta record: %s", err)
+		}
+	}
+
+	// delete meta records from index
+	err = ix.MetaTagRecordSwap(1, nil)
+	if err != nil {
+		b.Fatalf("Error when swapping meta records: %s", err)
+	}
+
+	waitForMetaTagEnrichers(b, ix)
 }

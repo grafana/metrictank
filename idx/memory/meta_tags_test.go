@@ -300,8 +300,7 @@ func TestDeletingMetaRecord(t *testing.T) {
 }
 
 func TestAddingMetricsToEmptyEnricher(t *testing.T) {
-	var mockLookup func(tagquery.Query, chan schema.MKey)
-	enricher := newEnricher(mockLookup)
+	enricher := newEnricher()
 
 	mds := []schema.MetricDefinition{
 		{
@@ -346,34 +345,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 		allKeys[i] = testMetrics[i].Id.Key
 	}
 
-	// mocks a lookup function which would execute the given query on the tag index
-	// and then call the callback to pass it a channel of resulting metric ids
-	mockLookup := func(query tagquery.Query, resCh chan schema.MKey) {
-
-		switch query.Expressions[0].GetValue() {
-		case "everyEven":
-			for i := range testMetrics {
-				if i%2 == 0 {
-					resCh <- testMetrics[i].Id
-				}
-			}
-		case "everyOdd":
-			for i := range testMetrics {
-				if i%2 == 1 {
-					resCh <- testMetrics[i].Id
-				}
-			}
-		case "all":
-			for i := range testMetrics {
-				resCh <- testMetrics[i].Id
-			}
-		case "none":
-		}
-
-		close(resCh)
-	}
-
-	enricher := newEnricher(mockLookup)
+	enricher := newEnricher()
 	for i := range testMetrics {
 		enricher.addMetric(testMetrics[i])
 	}
@@ -382,9 +354,23 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	acceptAll := parseQueryMustCompile(t, []string{"accept=all"})
 	acceptNone := parseQueryMustCompile(t, []string{"accept=none"})
 	acceptEveryOdd := parseQueryMustCompile(t, []string{"accept=everyOdd"})
-	enricher.addMetaRecord(recordId(1), acceptEveryEven)
-	enricher.addMetaRecord(recordId(2), acceptAll)
-	enricher.addMetaRecord(recordId(3), acceptNone)
+	var evenMetricIds []schema.MKey
+	var oddMetricIds []schema.MKey
+	var allMetricIds []schema.MKey
+	var noMetricIds []schema.MKey
+	for i := range testMetrics {
+		if i%2 == 0 {
+			evenMetricIds = append(evenMetricIds, testMetrics[i].Id)
+		}
+		if i%2 == 1 {
+			oddMetricIds = append(oddMetricIds, testMetrics[i].Id)
+		}
+		allMetricIds = append(allMetricIds, testMetrics[i].Id)
+	}
+
+	enricher.addMetaRecord(recordId(1), acceptEveryEven, evenMetricIds)
+	enricher.addMetaRecord(recordId(2), acceptAll, allMetricIds)
+	enricher.addMetaRecord(recordId(3), acceptNone, noMetricIds)
 
 	flushEnricherQueue := func() {
 		// stop and start to process the event queue
@@ -423,7 +409,7 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(5)
 
-	enricher.addMetaRecord(recordId(4), acceptEveryOdd)
+	enricher.addMetaRecord(recordId(4), acceptEveryOdd, oddMetricIds)
 
 	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}, recordId(2): {}},
@@ -434,8 +420,8 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(5)
 
-	enricher.delMetaRecord(recordId(2))
-	enricher.delMetaRecord(recordId(4))
+	enricher.delMetaRecord(recordId(2), acceptAll, allMetricIds)
+	enricher.delMetaRecord(recordId(4), acceptEveryOdd, oddMetricIds)
 
 	compareResultToExpected(t, []map[recordId]struct{}{
 		{recordId(1): {}},
@@ -457,8 +443,8 @@ func TestAddingDeletingMetricsAndMetaRecordsToEnricher(t *testing.T) {
 	})
 	compareExpectedMetricCount(2)
 
-	enricher.delMetaRecord(recordId(1))
-	enricher.delMetaRecord(recordId(3))
+	enricher.delMetaRecord(recordId(1), acceptEveryEven, evenMetricIds)
+	enricher.delMetaRecord(recordId(3), acceptNone, noMetricIds)
 
 	compareResultToExpected(t, []map[recordId]struct{}{
 		nil,
