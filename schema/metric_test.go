@@ -68,9 +68,9 @@ func TestValidate(t *testing.T) {
 		{mdZeroInterval, ErrInvalidIntervalzero},
 		{mdEmptyName, ErrInvalidEmptyName},
 		{mdInvalidMType, ErrInvalidMtype},
-		{mdInvalidUtf8Name, ErrInvalidUtf8},
-		{mdInvalidUtf8InTag, ErrInvalidUtf8},
-		{mdInvalidUtf8InTagAndInvalidTag, ErrInvalidTagFormat},
+		{mdInvalidUtf8Name, ErrInvalidInput},
+		{mdInvalidUtf8InTag, ErrInvalidInput},
+		{mdInvalidUtf8InTagAndInvalidTag, ErrInvalidInput},
 	}
 
 	for _, tc := range testCases {
@@ -89,21 +89,21 @@ func TestTagValidation(t *testing.T) {
 
 	testCases := []testCase{
 		{[]string{"abc=cba"}, nil},
-		{[]string{"a="}, ErrInvalidTagFormat},
-		{[]string{"a!="}, ErrInvalidTagFormat},
-		{[]string{"=abc"}, ErrInvalidTagFormat},
-		{[]string{"@#$%!=(*&"}, ErrInvalidTagFormat},
-		{[]string{"!@#$%=(*&"}, ErrInvalidTagFormat},
-		{[]string{"@#;$%=(*&"}, ErrInvalidTagFormat},
-		{[]string{"@#$%=(;*&"}, ErrInvalidTagFormat},
+		{[]string{"a="}, ErrInvalidInput},
+		{[]string{"a!="}, ErrInvalidInput},
+		{[]string{"=abc"}, ErrInvalidInput},
+		{[]string{"@#$%!=(*&"}, ErrInvalidInput},
+		{[]string{"!@#$%=(*&"}, ErrInvalidInput},
+		{[]string{"@#;$%=(*&"}, ErrInvalidInput},
+		{[]string{"@#$%=(;*&"}, ErrInvalidInput},
 		{[]string{"@#$%=(*&"}, nil},
 		{[]string{"@#$%=(*&", "abc=!fd", "a===="}, nil},
-		{[]string{"@#$%=(*&", "abc=!fd", "a===;="}, ErrInvalidTagFormat},
-		{[]string{"a=~a"}, ErrInvalidTagFormat},
+		{[]string{"@#$%=(*&", "abc=!fd", "a===;="}, ErrInvalidInput},
+		{[]string{"a=~a"}, ErrInvalidInput},
 		{[]string{"a=a~"}, nil},
-		{[]string{"aaa"}, ErrInvalidTagFormat},
-		{[]string{"aaa=b\xc3"}, ErrInvalidUtf8},
-		{[]string{"a\xc3=bb\x28\xc5"}, ErrInvalidUtf8},
+		{[]string{"aaa"}, ErrInvalidInput},
+		{[]string{"aaa=b\xc3"}, ErrInvalidInput},
+		{[]string{"a\xc3=bb\x28\xc5"}, ErrInvalidInput},
 	}
 
 	for _, tc := range testCases {

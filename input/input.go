@@ -18,14 +18,12 @@ import (
 )
 
 var (
-	rejectInvalidTags bool
-	rejectInvalidUtf8 bool
+	rejectInvalidInput bool
 )
 
 func ConfigSetup() {
 	input := flag.NewFlagSet("input", flag.ExitOnError)
-	input.BoolVar(&rejectInvalidTags, "reject-invalid-tags", true, "reject received metrics that have invalid tags")
-	input.BoolVar(&rejectInvalidUtf8, "reject-invalid-utf8", false, "reject received metrics with invalid utf8 data")
+	input.BoolVar(&rejectInvalidInput, "reject-invalid-input", true, "reject received metrics that have invalid input data")
 	globalconf.Register("input", input, flag.ExitOnError)
 }
 
@@ -38,14 +36,13 @@ type Handler interface {
 
 // Default is a base handler for a metrics packet, aimed to be embedded by concrete implementations
 type DefaultHandler struct {
-	receivedMD   *stats.Counter32
-	receivedMP   *stats.Counter32
-	receivedMPNO *stats.Counter32
-	invalidMD    *stats.CounterRate32
-	invalidTagMD *stats.CounterRate32
-	invalidUtfMD *stats.CounterRate32
-	invalidMP    *stats.CounterRate32
-	unknownMP    *stats.Counter32
+	receivedMD     *stats.Counter32
+	receivedMP     *stats.Counter32
+	receivedMPNO   *stats.Counter32
+	invalidMD      *stats.CounterRate32
+	invalidInputMD *stats.CounterRate32
+	invalidMP      *stats.CounterRate32
+	unknownMP      *stats.Counter32
 
 	metrics     mdata.Metrics
 	metricIndex idx.MetricIndex
@@ -58,8 +55,7 @@ const (
 	invalidOrgId     = "invalid-orgID"
 	invalidName      = "invalid-name"
 	invalidMtype     = "invalid-mtype"
-	invalidTagFormat = "invalid-tag-format"
-	invalidUtf8      = "invalid-utf8-data"
+	invalidInput     = "invalid-input"
 	unknownPointId   = "unknown-point-id"
 )
 
@@ -73,13 +69,9 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		receivedMPNO: stats.NewCounter32(fmt.Sprintf("input.%s.metricpoint_no_org.received", input)),
 		// metric input.%s.metricdata.discarded.invalid is a count of times a metricdata was invalid by input plugin
 		invalidMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid", input)),
-		// metric input.%s.metricdata.discarded.invalid_tags is a count of times a metricdata was considered invalid due to
-		// invalid tags in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
-		invalidTagMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_tag", input)),
-		// metric input.%s.metricdata.discarded.invalid_utf is a count of times a metricdata was considered invalid due to
-		// invalid utf8 in either the name or tags in the metric definition. all rejected metrics counted here are also counted in
-		// above "invalid" counter
-		invalidUtfMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_utf", input)),
+		// metric input.%s.metricdata.discarded.invalid_input is a count of times a metricdata was considered invalid due to
+		// invalid input data in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
+		invalidInputMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_tag", input)),
 		// metric input.%s.metricpoint.discarded.invalid is a count of times a metricpoint was invalid by input plugin
 		invalidMP: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.discarded.invalid", input)),
 		// metric input.%s.metricpoint.discarded.unknown is the count of times the ID of a received metricpoint was not in the index, by input plugin
@@ -128,27 +120,13 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 		in.invalidMD.Inc()
 
 		ignoreError := false
-		// assuming that the tag format was the only issue found by Validate()
-		// better make sure that the tag format is the last check which Validate() checks, to not accidentally ignore a potential following error
-		if err == schema.ErrInvalidTagFormat {
-			in.invalidTagMD.Inc()
-			if !rejectInvalidTags {
+		// assuming that invalid input was the only issue found by Validate()
+		// better make sure that invalid input is the last check which Validate() checks, to not accidentally ignore a potential following error
+		if err == schema.ErrInvalidInput {
+			in.invalidInputMD.Inc()
+			if !rejectInvalidInput {
 				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid tags is disabled: %s", md, err)
-				}
-				ignoreError = true
-			}
-		}
-
-		// if a tag contains invalid UTF8 data and has other invalid tag problems, you will never see this error. We decided to optimize for the most
-		// common use case (no invalid UTF8 data) in order to keep this function fast. If you think you might have an issue with both invalid UTF8 data
-		// and invalid tags, then you should just turn on rejection for both.
-		// this is now the second to last check, just before the Invalid Tag check
-		if err == schema.ErrInvalidUtf8 {
-			in.invalidUtfMD.Inc()
-			if !rejectInvalidUtf8 {
-				if log.IsLevelEnabled(log.DebugLevel) {
-					log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid utf8 data is disabled: %s", md, err)
+					log.Debugf("in: Invalid metric %v, not rejecting it because rejection due to invalid input is disabled: %s", md, err)
 				}
 				ignoreError = true
 			}
@@ -167,10 +145,8 @@ func (in DefaultHandler) ProcessMetricData(md *schema.MetricData, partition int3
 				reason = invalidName
 			case schema.ErrInvalidMtype:
 				reason = invalidMtype
-			case schema.ErrInvalidUtf8:
-				reason = invalidUtf8
-			case schema.ErrInvalidTagFormat:
-				reason = invalidTagFormat
+			case schema.ErrInvalidInput:
+				reason = invalidInput
 			default:
 				reason = "unknown"
 			}

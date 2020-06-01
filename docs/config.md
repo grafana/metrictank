@@ -309,10 +309,8 @@ log-headers = false
 
 ```
 [input]
-# reject received metrics that have invalid tags
-reject-invalid-tags = true
-# reject received metrics that have invalid utf8 data
-reject-invalid-utf8 = false
+# reject received metrics that have invalid input data (invalid utf8 or invalid tags)
+reject-invalid-input = true
 ```
 
 ### carbon input (optional)

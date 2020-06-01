@@ -17,177 +17,135 @@ import (
 
 func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T) {
 	type testCase struct {
-		name                    string
-		mdName                  string
-		rejectInvalidTags       bool
-		rejectInvalidUtf8       bool
-		tags                    []string
-		expectedInvalidMdInc    uint32
-		expectedInvalidTagMdInc uint32
-		expectedInvalidUtf8Inc  uint32
-		expectedIndexSizeInc    uint32
+		name                      string
+		mdName                    string
+		rejectInvalidInput        bool
+		tags                      []string
+		expectedInvalidMdInc      uint32
+		expectedInvalidInputMdInc uint32
+		expectedIndexSizeInc      uint32
 	}
 
 	testCases := []testCase{
 		{
-			name:                    "valid_utf8_with_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       true,
-			tags:                    []string{"valid=tag"},
-			expectedInvalidMdInc:    0,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    1,
+			name:                      "valid_utf8_with_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      []string{"valid=tag"},
+			expectedInvalidMdInc:      0,
+			expectedInvalidInputMdInc: 0,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "valid_utf8_without_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       false,
-			tags:                    []string{"valid=tag"},
-			expectedInvalidMdInc:    0,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    1,
+			name:                      "valid_utf8_without_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        false,
+			tags:                      []string{"valid=tag"},
+			expectedInvalidMdInc:      0,
+			expectedInvalidInputMdInc: 0,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "invalid_utf8_name_with_rejection",
-			mdName:                  "abc\xc5",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       true,
-			tags:                    []string{"valid=tag"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  1,
-			expectedIndexSizeInc:    0,
+			name:                      "invalid_utf8_name_with_rejection",
+			mdName:                    "abc\xc5",
+			rejectInvalidInput:        true,
+			tags:                      []string{"valid=tag"},
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      0,
 		}, {
-			name:                    "invalid_utf8_name_without_rejection",
-			mdName:                  "abc\xc5",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       false,
-			tags:                    []string{"valid=tag"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  1,
-			expectedIndexSizeInc:    1,
+			name:                      "invalid_utf8_name_without_rejection",
+			mdName:                    "abc\xc5",
+			rejectInvalidInput:        false,
+			tags:                      []string{"valid=tag"},
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "invalid_utf8_tag_values_with_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       true,
-			tags:                    []string{"invalid=bb\xc5"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  1,
-			expectedIndexSizeInc:    0,
+			name:                      "invalid_utf8_tag_values_with_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      []string{"invalid=bb\xc5"},
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      0,
 		}, {
-			name:                    "invalid_utf8_tag_values_without_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       false,
-			tags:                    []string{"invalid=bb\xc5"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  1,
-			expectedIndexSizeInc:    1,
+			name:                      "invalid_utf8_tag_values_without_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        false,
+			tags:                      []string{"invalid=bb\xc5"},
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "invalid_utf8_tag_values_and_invalid_tags_with_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       true,
-			rejectInvalidUtf8:       false,
-			tags:                    []string{"invalid!!!;;;=bb\xc5@#;;;!@#"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    0,
+			name:                      "invalid_utf8_tag_values_and_invalid_tags_with_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      []string{"invalid!!!;;;=bb\xc5@#;;;!@#"},
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      0,
 		}, {
-			name:                    "invalid_utf8_tag_values_and_invalid_tags_with_utf8_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       true,
-			tags:                    []string{"invalid!!!;;;=bb\xc5@#;;;!@#"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0, // since the tag is invalid we won't ever see invalid UTF8 error
-			expectedIndexSizeInc:    1, // index still increases because we are not rejecting invalid tags
+			name:                      "invalid_utf8_tag_values_and_invalid_tags_with_utf8_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      []string{"invalid!!!;;;=bb\xc5@#;;;!@#"},
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      0,
 		},
 		{
-			name:                    "invalid_utf8_tag_values_and_invalid_tags_with_utf8_rejection_and_tag_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       true,
-			rejectInvalidUtf8:       true,
-			tags:                    []string{"invalid!!!;;;=bb\xc5@#;;;!@#"},
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0, // since the tag is invalid we won't ever see invalid UTF8 error
-			expectedIndexSizeInc:    0,
-		},
-		{
-			name:                    "valid_with_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       true,
-			rejectInvalidUtf8:       false,
-			tags:                    []string{"valid=tag"},
-			expectedInvalidMdInc:    0,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    1,
+			name:                      "valid_with_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      []string{"valid=tag"},
+			expectedInvalidMdInc:      0,
+			expectedInvalidInputMdInc: 0,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "valid_without_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       false,
-			tags:                    []string{"valid=tag"},
-			expectedInvalidMdInc:    0,
-			expectedInvalidTagMdInc: 0,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    1,
+			name:                      "valid_without_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        false,
+			tags:                      []string{"valid=tag"},
+			expectedInvalidMdInc:      0,
+			expectedInvalidInputMdInc: 0,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "invalid_tags_with_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       true,
-			rejectInvalidUtf8:       false,
-			tags:                    generateInvalidTags(t),
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    0,
+			name:                      "invalid_tags_with_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      generateInvalidTags(t),
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      0,
 		}, {
-			name:                    "invalid_tags_without_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       false,
-			tags:                    generateInvalidTags(t),
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    1,
+			name:                      "invalid_tags_without_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        false,
+			tags:                      generateInvalidTags(t),
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      1,
 		}, {
-			name:                    "invalid_tag_values_with_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       true,
-			rejectInvalidUtf8:       false,
-			tags:                    generateInvalidTagValues(t),
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    0,
+			name:                      "invalid_tag_values_with_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        true,
+			tags:                      generateInvalidTagValues(t),
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      0,
 		}, {
-			name:                    "invalid_tag_values_without_rejection",
-			mdName:                  "abc",
-			rejectInvalidTags:       false,
-			rejectInvalidUtf8:       false,
-			tags:                    generateInvalidTagValues(t),
-			expectedInvalidMdInc:    1,
-			expectedInvalidTagMdInc: 1,
-			expectedInvalidUtf8Inc:  0,
-			expectedIndexSizeInc:    1,
+			name:                      "invalid_tag_values_without_rejection",
+			mdName:                    "abc",
+			rejectInvalidInput:        false,
+			tags:                      generateInvalidTagValues(t),
+			expectedInvalidMdInc:      1,
+			expectedInvalidInputMdInc: 1,
+			expectedIndexSizeInc:      1,
 		},
 	}
 
 	for _, tc := range testCases {
 		handler, index, reset := getDefaultHandler(t)
-		rejectInvalidTags = tc.rejectInvalidTags
-		rejectInvalidUtf8 = tc.rejectInvalidUtf8
+		rejectInvalidInput = tc.rejectInvalidInput
 		for i, tag := range tc.tags {
 			data := getTestMetricData()
 			data.Tags = []string{tag}
@@ -199,8 +157,7 @@ func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T)
 				handler,
 				index,
 				tc.expectedInvalidMdInc,
-				tc.expectedInvalidTagMdInc,
-				tc.expectedInvalidUtf8Inc,
+				tc.expectedInvalidInputMdInc,
 				tc.expectedIndexSizeInc,
 			)
 		}
@@ -271,10 +228,9 @@ func getTestMetricData() schema.MetricData {
 	}
 }
 
-func testIngestMetricData(t *testing.T, tc string, data schema.MetricData, handler DefaultHandler, index idx.MetricIndex, expectedInvalidMdInc, expectedInvalidTagMdInc, expectedInvalidUtf8MdInc, expectedIndexSizeInc uint32) {
+func testIngestMetricData(t *testing.T, tc string, data schema.MetricData, handler DefaultHandler, index idx.MetricIndex, expectedInvalidMdInc, expectedInvalidInputMdInc, expectedIndexSizeInc uint32) {
 	originalInvalidCnt := handler.invalidMD.Peek()
-	originalInvalidTagCnt := handler.invalidTagMD.Peek()
-	originalInvalidUtf8Cnt := handler.invalidUtfMD.Peek()
+	originalInvalidInputCnt := handler.invalidInputMD.Peek()
 	originalIndexSize := uint32(len(index.List(1)))
 	data.SetId()
 	handler.ProcessMetricData(&data, 0)
@@ -283,16 +239,10 @@ func testIngestMetricData(t *testing.T, tc string, data schema.MetricData, handl
 	if invalidCnt != originalInvalidCnt+expectedInvalidMdInc {
 		t.Fatalf("TC %s: Invalid metric counter has not been updated correctly, expected %d, got %d", tc, originalInvalidCnt+expectedInvalidMdInc, invalidCnt)
 	}
-	invalidTagCnt := handler.invalidTagMD.Peek()
+	invalidInputCnt := handler.invalidInputMD.Peek()
 
-	if invalidTagCnt != originalInvalidTagCnt+expectedInvalidTagMdInc {
-		t.Fatalf("TC %s: Invalid tag counter has not been updated correctly, expected %d, got %d", tc, originalInvalidTagCnt+expectedInvalidTagMdInc, invalidTagCnt)
-	}
-
-	invalidUtf8Cnt := handler.invalidUtfMD.Peek()
-
-	if invalidUtf8Cnt != originalInvalidUtf8Cnt+expectedInvalidUtf8MdInc {
-		t.Fatalf("TC %s: Invalid utf8 counter has not been updated correctly, expected %d, got %d", tc, originalInvalidUtf8Cnt+expectedInvalidUtf8MdInc, invalidUtf8Cnt)
+	if invalidInputCnt != originalInvalidInputCnt+expectedInvalidInputMdInc {
+		t.Fatalf("TC %s: Invalid input counter has not been updated correctly, expected %d, got %d", tc, originalInvalidInputCnt+expectedInvalidInputMdInc, invalidInputCnt)
 	}
 
 	indexSize := uint32(len(index.List(1)))
@@ -304,14 +254,14 @@ func testIngestMetricData(t *testing.T, tc string, data schema.MetricData, handl
 func getDefaultHandler(t *testing.T) (DefaultHandler, idx.MetricIndex, func()) {
 	t.Helper()
 
-	oldRejectInvalidTags := rejectInvalidTags
+	oldrejectInvalidInput := rejectInvalidInput
 	oldSchemas := mdata.Schemas
 	oldTagSupport := memory.TagSupport
 	memory.TagSupport = true
 	index := memory.New()
 
 	reset := func() {
-		rejectInvalidTags = oldRejectInvalidTags
+		rejectInvalidInput = oldrejectInvalidInput
 		mdata.Schemas = oldSchemas
 		memory.TagSupport = oldTagSupport
 		index.Stop()

@@ -16,8 +16,7 @@ var ErrInvalidIntervalzero = errors.New("interval cannot be 0")
 var ErrInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var ErrInvalidEmptyName = errors.New("name cannot be empty")
 var ErrInvalidMtype = errors.New("invalid mtype")
-var ErrInvalidUtf8 = errors.New("invalid utf8 data")
-var ErrInvalidTagFormat = errors.New("invalid tag format")
+var ErrInvalidInput = errors.New("invalid input")
 var ErrUnknownPartitionMethod = errors.New("unknown partition method")
 
 type PartitionedMetric interface {
@@ -56,15 +55,10 @@ func (m *MetricData) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
 	}
-	var err error
 	if !utf8.ValidString(m.Name) {
-		err = ErrInvalidUtf8
+		return ErrInvalidInput
 	}
-	if e := ValidateTags(m.Tags); e != nil {
-		// this will return either ErrInvalidUtf8 or ErrInvalidTagFormat
-		err = e
-	}
-	return err
+	return ValidateTags(m.Tags)
 }
 
 // returns a id (hash key) in the format OrgId.md5Sum
@@ -207,13 +201,8 @@ func (m *MetricDefinition) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
 	}
-	if err := ValidateTags(m.Tags); err != nil {
-		// we still return nil if the error returned is ErrInvalidUtf8, as that should never happen here
-		if err == ErrInvalidTagFormat {
-			return ErrInvalidTagFormat
-		}
-	}
-	return nil
+	// this is the last check. It will either return nil or ErrInvalidInput
+	return ValidateTags(m.Tags)
 }
 
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
@@ -335,35 +324,28 @@ func ValidateTag(tag string) error {
 	// - a = sign
 	// - a value that's at least 1 char long
 	if len(tag) < 3 {
-		return ErrInvalidTagFormat
+		return ErrInvalidInput
 	}
 
 	equal := strings.Index(tag, "=")
 	if equal == -1 {
-		return ErrInvalidTagFormat
+		return ErrInvalidInput
 	}
 
 	// first equal sign must not be the first nor last character
 	if equal == 0 || equal == len(tag)-1 {
-		return ErrInvalidTagFormat
+		return ErrInvalidInput
 	}
 
-	// this now checks for both invalid utf8 and an invalid tag format. If the utf8 check fails, it still goes on to validate the tags.
-	// if both checks fail, the last one will set the error to invalid tag format. Now we know that if this function returns ErrInvalidUtf8 that
-	// all of the other checks passed and can handle further processing accordingly. This also means that if the tag contains invalid UTF8 and it
-	// also fails to validate as a tag, then it will still only return ErrInvalidTagFormat.
-	//
-	// if all checks pass, it still returns nil
-	var err error
 	if !utf8.ValidString(tag) {
-		err = ErrInvalidUtf8
+		return ErrInvalidInput
 	}
 
 	if !ValidateTagKey(tag[:equal]) || !ValidateTagValue(tag[equal+1:]) {
-		err = ErrInvalidTagFormat
+		return ErrInvalidInput
 	}
 
-	return err
+	return nil
 }
 
 // ValidateTagKey validates tag key requirements as defined in graphite docs
