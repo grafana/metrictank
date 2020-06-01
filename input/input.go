@@ -71,7 +71,7 @@ func NewDefaultHandler(metrics mdata.Metrics, metricIndex idx.MetricIndex, input
 		invalidMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid", input)),
 		// metric input.%s.metricdata.discarded.invalid_input is a count of times a metricdata was considered invalid due to
 		// invalid input data in the metric definition. all rejected metrics counted here are also counted in the above "invalid" counter
-		invalidInputMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_tag", input)),
+		invalidInputMD: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricdata.discarded.invalid_input", input)),
 		// metric input.%s.metricpoint.discarded.invalid is a count of times a metricpoint was invalid by input plugin
 		invalidMP: stats.NewCounterRate32(fmt.Sprintf("input.%s.metricpoint.discarded.invalid", input)),
 		// metric input.%s.metricpoint.discarded.unknown is the count of times the ID of a received metricpoint was not in the index, by input plugin
