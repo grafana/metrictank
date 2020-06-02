@@ -9,13 +9,14 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 var ErrInvalidIntervalzero = errors.New("interval cannot be 0")
 var ErrInvalidOrgIdzero = errors.New("org-id cannot be 0")
 var ErrInvalidEmptyName = errors.New("name cannot be empty")
 var ErrInvalidMtype = errors.New("invalid mtype")
-var ErrInvalidTagFormat = errors.New("invalid tag format")
+var ErrInvalidInput = errors.New("invalid input")
 var ErrUnknownPartitionMethod = errors.New("unknown partition method")
 
 type PartitionedMetric interface {
@@ -54,10 +55,10 @@ func (m *MetricData) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
 	}
-	if !ValidateTags(m.Tags) {
-		return ErrInvalidTagFormat
+	if !utf8.ValidString(m.Name) {
+		return ErrInvalidInput
 	}
-	return nil
+	return ValidateTags(m.Tags)
 }
 
 // returns a id (hash key) in the format OrgId.md5Sum
@@ -200,10 +201,8 @@ func (m *MetricDefinition) Validate() error {
 	if m.Mtype == "" || (m.Mtype != "gauge" && m.Mtype != "rate" && m.Mtype != "count" && m.Mtype != "counter" && m.Mtype != "timestamp") {
 		return ErrInvalidMtype
 	}
-	if !ValidateTags(m.Tags) {
-		return ErrInvalidTagFormat
-	}
-	return nil
+	// this is the last check. It will either return nil or ErrInvalidInput
+	return ValidateTags(m.Tags)
 }
 
 // MetricDefinitionFromMetricData yields a MetricDefinition that has no references
@@ -309,36 +308,44 @@ func EatDots(name string) string {
 // a valid format is anything that looks like key=value,
 // the length of key and value must be >0 and both cannot contain
 // the certain prohibited characters
-func ValidateTags(tags []string) bool {
+func ValidateTags(tags []string) error {
 	for _, t := range tags {
-		if !ValidateTag(t) {
-			return false
+		if err := ValidateTag(t); err != nil {
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
-func ValidateTag(tag string) bool {
+func ValidateTag(tag string) error {
 	// a valid tag must have:
 	// - a key that's at least 1 char long
 	// - a = sign
 	// - a value that's at least 1 char long
 	if len(tag) < 3 {
-		return false
+		return ErrInvalidInput
 	}
 
 	equal := strings.Index(tag, "=")
 	if equal == -1 {
-		return false
+		return ErrInvalidInput
 	}
 
 	// first equal sign must not be the first nor last character
 	if equal == 0 || equal == len(tag)-1 {
-		return false
+		return ErrInvalidInput
 	}
 
-	return ValidateTagKey(tag[:equal]) && ValidateTagValue(tag[equal+1:])
+	if !utf8.ValidString(tag) {
+		return ErrInvalidInput
+	}
+
+	if !ValidateTagKey(tag[:equal]) || !ValidateTagValue(tag[equal+1:]) {
+		return ErrInvalidInput
+	}
+
+	return nil
 }
 
 // ValidateTagKey validates tag key requirements as defined in graphite docs

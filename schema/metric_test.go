@@ -23,32 +23,93 @@ func BenchmarkSetId(b *testing.B) {
 	}
 }
 
-func TestTagValidation(t *testing.T) {
+func TestValidate(t *testing.T) {
 	type testCase struct {
-		tag       []string
-		expecting bool
+		md        MetricData
+		expecting error
 	}
 
+	md := MetricData{
+		Id:       "1.12345678901234567890123456789012",
+		OrgId:    1,
+		Name:     "abc",
+		Interval: 1,
+		Value:    2,
+		Time:     3,
+		Mtype:    "gauge",
+	}
+
+	mdZeroOrgId := md
+	mdZeroOrgId.OrgId = 0
+
+	mdZeroInterval := md
+	mdZeroInterval.Interval = 0
+
+	mdEmptyName := md
+	mdEmptyName.Name = ""
+
+	mdInvalidMType := md
+	mdInvalidMType.Mtype = "somejunk"
+
+	mdInvalidUtf8Name := md
+	mdInvalidUtf8Name.Name = string("a\xc5")
+
+	mdInvalidUtf8InTag := md
+	tags := []string{"abc=de\xc5"}
+	mdInvalidUtf8InTag.Tags = tags
+
+	mdInvalidUtf8InTagAndInvalidTag := md
+	tags = []string{"ab\xc5=@@!#@;;"}
+	mdInvalidUtf8InTagAndInvalidTag.Tags = tags
+
 	testCases := []testCase{
-		{[]string{"abc=cba"}, true},
-		{[]string{"a="}, false},
-		{[]string{"a!="}, false},
-		{[]string{"=abc"}, false},
-		{[]string{"@#$%!=(*&"}, false},
-		{[]string{"!@#$%=(*&"}, false},
-		{[]string{"@#;$%=(*&"}, false},
-		{[]string{"@#$%=(;*&"}, false},
-		{[]string{"@#$%=(*&"}, true},
-		{[]string{"@#$%=(*&", "abc=!fd", "a===="}, true},
-		{[]string{"@#$%=(*&", "abc=!fd", "a===;="}, false},
-		{[]string{"a=~a"}, false},
-		{[]string{"a=a~"}, true},
-		{[]string{"aaa"}, false},
+		{md, nil},
+		{mdZeroOrgId, ErrInvalidOrgIdzero},
+		{mdZeroInterval, ErrInvalidIntervalzero},
+		{mdEmptyName, ErrInvalidEmptyName},
+		{mdInvalidMType, ErrInvalidMtype},
+		{mdInvalidUtf8Name, ErrInvalidInput},
+		{mdInvalidUtf8InTag, ErrInvalidInput},
+		{mdInvalidUtf8InTagAndInvalidTag, ErrInvalidInput},
 	}
 
 	for _, tc := range testCases {
-		if tc.expecting != ValidateTags(tc.tag) {
-			t.Fatalf("Expected %t, but testcase %s returned %t", tc.expecting, tc.tag, !tc.expecting)
+		err := tc.md.Validate()
+		if tc.expecting != err {
+			t.Fatalf("Expected %t, but testcase %v returned %v", tc.expecting, tc.md, err)
+		}
+	}
+}
+
+func TestTagValidation(t *testing.T) {
+	type testCase struct {
+		tag       []string
+		expecting error
+	}
+
+	testCases := []testCase{
+		{[]string{"abc=cba"}, nil},
+		{[]string{"a="}, ErrInvalidInput},
+		{[]string{"a!="}, ErrInvalidInput},
+		{[]string{"=abc"}, ErrInvalidInput},
+		{[]string{"@#$%!=(*&"}, ErrInvalidInput},
+		{[]string{"!@#$%=(*&"}, ErrInvalidInput},
+		{[]string{"@#;$%=(*&"}, ErrInvalidInput},
+		{[]string{"@#$%=(;*&"}, ErrInvalidInput},
+		{[]string{"@#$%=(*&"}, nil},
+		{[]string{"@#$%=(*&", "abc=!fd", "a===="}, nil},
+		{[]string{"@#$%=(*&", "abc=!fd", "a===;="}, ErrInvalidInput},
+		{[]string{"a=~a"}, ErrInvalidInput},
+		{[]string{"a=a~"}, nil},
+		{[]string{"aaa"}, ErrInvalidInput},
+		{[]string{"aaa=b\xc3"}, ErrInvalidInput},
+		{[]string{"a\xc3=bb\x28\xc5"}, ErrInvalidInput},
+	}
+
+	for _, tc := range testCases {
+		err := ValidateTags(tc.tag)
+		if tc.expecting != err {
+			t.Fatalf("Expected %t, but testcase %s returned %v", tc.expecting, tc.tag, err)
 		}
 	}
 }
