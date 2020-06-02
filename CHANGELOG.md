@@ -1,7 +1,7 @@
 # master
 
 ## breaking changes
-
+* as of v0.13.1-788-g79e4709 (see: #1831) the option `reject-invalid-tags` was removed. Another option named `reject-invalid-input` was added to take its place, and the default value is set to `true`. This new option rejects invalid tags and invalid UTF8 data found in either the metric name or the tag key or tag value. The exported stat `input.xx.metricdata.discarded.invalid_tag` was also changed to `input.xx.metricdata.discarded.invalid_input`, so dashboards will need to be updated accordingly.
 * as of v0.13.1-384-g82dedf95 the meta record index configuration parameters have been moved out
   of the section `cassandra-idx`, they now have their own section `cassandra-meta-record-idx`.
 * as of v0.13.1-186-gc75005d the `/tags/delSeries` no longer accepts a `propagate` parameter.
