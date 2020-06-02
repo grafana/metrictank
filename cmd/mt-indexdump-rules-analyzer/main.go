@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"text/tabwriter"
 	"time"
 
 	"github.com/gosuri/uilive"
@@ -23,12 +24,6 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 }
 
-func perror(err error) {
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-}
-
 func showStats(indexRules conf.IndexRules, counts []uint64, wg *sync.WaitGroup, ctx context.Context) {
 
 	start := time.Now()
@@ -37,10 +32,14 @@ func showStats(indexRules conf.IndexRules, counts []uint64, wg *sync.WaitGroup, 
 	writer.Start()
 
 	printTable := func() {
-		fmt.Fprintln(writer, "Count        RuleID Pattern")
+
+		w := tabwriter.NewWriter(writer, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
+		fmt.Fprintln(w, "RuleID\tName\tPattern\tMaxStale\tCount")
 		for i := range counts {
-			fmt.Fprintf(writer, "%12d %6d %s\n", atomic.LoadUint64(&counts[i]), i, indexRules.Get(uint16(i)))
+			rule := indexRules.Get(uint16(i))
+			fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%d\n", i, rule.Name, rule.Pattern, rule.MaxStale, atomic.LoadUint64(&counts[i]))
 		}
+		w.Flush()
 	}
 
 	tick := time.NewTicker(time.Second)
@@ -63,6 +62,13 @@ func showStats(indexRules conf.IndexRules, counts []uint64, wg *sync.WaitGroup, 
 func main() {
 	var indexRulesFile string
 	flag.StringVar(&indexRulesFile, "index-rules-file", "/etc/metrictank/index-rules.conf", "name of file which defines the max-stale times")
+
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		fmt.Fprintln(flag.CommandLine.Output(), "reads metric names from stdin and reports the number of metrics that match each index-rules.conf rule")
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
 
 	indexRules, err := conf.ReadIndexRules(indexRulesFile)
