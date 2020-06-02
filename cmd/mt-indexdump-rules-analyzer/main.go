@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,6 +29,37 @@ func perror(err error) {
 	}
 }
 
+func showStats(indexRules conf.IndexRules, counts []uint64, wg *sync.WaitGroup, ctx context.Context) {
+
+	start := time.Now()
+
+	writer := uilive.New()
+	writer.Start()
+
+	printTable := func() {
+		fmt.Fprintln(writer, "Count        RuleID Pattern")
+		for i := range counts {
+			fmt.Fprintf(writer, "%12d %6d %s\n", atomic.LoadUint64(&counts[i]), i, indexRules.Get(uint16(i)))
+		}
+	}
+
+	tick := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-tick.C:
+			printTable()
+			writer.Flush()
+		case <-ctx.Done():
+			printTable()
+			fmt.Fprintf(writer, "Finished in %v\n", time.Since(start))
+			writer.Stop()
+			wg.Done()
+			return
+		}
+	}
+
+}
+
 func main() {
 	var indexRulesFile string
 	flag.StringVar(&indexRulesFile, "index-rules-file", "/etc/metrictank/index-rules.conf", "name of file which defines the max-stale times")
@@ -41,26 +74,19 @@ func main() {
 
 	counts := make([]uint64, len(indexRules.Rules)+1)
 
-	writer := uilive.New()
-	writer.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
 
-	go func() {
-		tick := time.NewTicker(100 * time.Millisecond)
-		for range tick.C {
-			for i := range counts {
-				fmt.Fprintf(writer, "Patt [%d]: %s    -- %d\n", i, indexRules.Get(uint16(i)), atomic.LoadUint64(&counts[i]))
-			}
-			writer.Flush()
-		}
-
-	}()
+	wg.Add(1)
+	go showStats(indexRules, counts, wg, ctx)
 
 	for scanner.Scan() {
 		word := scanner.Text()
 		ruleID, _ := indexRules.Match(word)
 		atomic.AddUint64(&counts[ruleID], 1)
 	}
-	writer.Stop()
+	cancel()
+	wg.Wait()
 
 	if err := scanner.Err(); err != nil {
 		log.Println(err)
