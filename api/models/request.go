@@ -28,9 +28,9 @@ type Req struct {
 	MaxPoints   uint32      `json:"maxPoints"`
 	PNGroup     PNGroup     `json:"pngroup"`
 	RawInterval uint32      `json:"rawInterval"` // the interval of the raw metric before any consolidation
-	// the consolidation method for rollup archive and normalization (pre-normalization and runtime normalization). (but not runtime consolidation)
-	// ConsReq 0 -> configured value
-	// Conseq != 0 -> closest value we can offer based on config
+	// the consolidation method for rollup archive and normalization (pre-normalization and runtime normalization). (but not runtime consolidation). Is never 0/None
+	// if ConsReq == 0 -> configured value
+	// if Conseq != 0 -> closest value we can offer based on config
 	Consolidator consolidation.Consolidator `json:"consolidator"`
 	// requested consolidation method via consolidateBy(), if any.
 	// could be 0 if it was not specified or reset by a "special" functions. in which case, we use the configured default.
