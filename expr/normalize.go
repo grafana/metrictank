@@ -90,6 +90,11 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	numDrop := int((datapoints[len(datapoints)-1].Ts - canonicalTs) / in.Interval)
 	datapoints = datapoints[0 : len(datapoints)-numDrop]
 
+	// series may have been created by a function that didn't know which consolidation function to default to.
+	// in the future maybe we can do more clever things here. e.g. perSecond maybe consolidate by max.
+	if in.Consolidator == 0 {
+		in.Consolidator = consolidation.Avg
+	}
 	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
 	in.Interval = interval
 	dataMap.Add(Req{}, in)

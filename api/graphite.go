@@ -743,6 +743,8 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 					for _, rawReq := range rawReqs {
 						var cons consolidation.Consolidator
 						consReq := rawReq.Cons
+
+						// while consReq may be 0, the actual cons to use may not be 0
 						if consReq == 0 {
 							// we will use the primary method dictated by the storage-aggregations rules
 							// note:

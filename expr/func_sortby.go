@@ -50,6 +50,7 @@ func (s *FuncSortBy) Exec(dataMap DataMap) ([]models.Series, error) {
 		seriesCpy = append(seriesCpy, serie)
 	}
 
+	// note that s.fn has already been validated at series construction time using consolidation.IsConsolFunc
 	SortSeriesWithConsolidator(seriesCpy, consolidation.FromConsolidateBy(s.fn), s.reverse)
 
 	return seriesCpy, nil

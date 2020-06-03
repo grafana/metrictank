@@ -45,6 +45,7 @@ func (s *FuncSummarize) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	interval, _ := dur.ParseDuration(s.intervalString)
+	// note that s.fn has already been validated at series construction time using consolidation.IsConsolFunc
 	aggFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
 
 	var alignToFromTarget string

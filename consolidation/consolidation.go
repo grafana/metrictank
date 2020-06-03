@@ -101,6 +101,10 @@ func FromArchive(archive schema.Method) Consolidator {
 	return None
 }
 
+// FromConsolidateBy returns a consolidator based on a "consolidateBy" string
+// for any string allowed by Validate(), or None otherwise.
+// note that we also recognize "lst" here whereas Validate() doesn't, which does
+// not violate the above statement.
 func FromConsolidateBy(c string) Consolidator {
 	switch c {
 	case "avg", "average":
@@ -129,7 +133,8 @@ func FromConsolidateBy(c string) Consolidator {
 	return None
 }
 
-// map the consolidation to the respective aggregation function, if applicable.
+// GetAggFunc returns a batch aggregation function or any valid consolidator,
+// or nil otherwise
 func GetAggFunc(consolidator Consolidator) batch.AggFunc {
 	var consFunc batch.AggFunc
 	switch consolidator {
