@@ -33,6 +33,9 @@ func ConsolidateNudged(points []schema.Point, interval, maxDataPoints uint32, co
 // it will always aggregate aggNum-sized groups of points together, with the timestamp of the last of them, and it always starts at the beginning,
 // possibly having a point at the end that didn't incorporate as much data
 func Consolidate(in []schema.Point, aggNum uint32, consolidator Consolidator) []schema.Point {
+	if consolidator == None {
+		panic("Consolidate called with consolidation.None. this should never happen")
+	}
 	num := int(aggNum)
 	aggFunc := GetAggFunc(consolidator)
 
