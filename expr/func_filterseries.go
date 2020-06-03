@@ -84,6 +84,7 @@ func (s *FuncFilterSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
+	// note that s.fn has already been validated at series construction time using consolidation.IsConsolFunc
 	consolidationFunc := consolidation.GetAggFunc(consolidation.FromConsolidateBy(s.fn))
 	operatorFunc, err := getOperatorFunc(s.operator)
 	if err != nil {
