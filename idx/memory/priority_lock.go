@@ -126,33 +126,3 @@ func getDetails(logCb func() interface{}) string {
 	}
 	return fmt.Sprintf(", details = '%v'", logCb())
 }
-
-/*
-type timedRLocker struct {
-	lock              *sync.RWMutex
-	preLock, postLock time.Time
-}
-
-func acquireTimedLock(lock *sync.RWMutex) timedRLocker {
-	trl := timedRLocker{
-		lock:    lock,
-		preLock: time.Now(),
-	}
-	trl.lock.RLock()
-	trl.postLock = time.Now()
-	return trl
-}
-
-func (trl timedRLocker) RUnlock(op string, logCb func() interface{}) {
-	endTime := time.Now()
-	trl.lock.RUnlock()
-
-	lockHoldTime := endTime.Sub(trl.postLock)
-	lockWaitTime := trl.postLock.Sub(trl.preLock)
-	if lockHoldTime > time.Second {
-		log.Infof("Long %s: lockWaitTime = %f, lockHoldTime = %f (%v - %v), details = '%v' ", op, lockWaitTime.Seconds(), lockHoldTime.Seconds(), trl.postLock, endTime, logCb())
-	} else if lockWaitTime > time.Second {
-		log.Infof("Long Blocked %s: lockWaitTime = %f, lockHoldTime = %f, details = '%v'", op, lockWaitTime.Seconds(), lockHoldTime.Seconds(), logCb())
-	}
-}
-*/
