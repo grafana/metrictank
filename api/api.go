@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/mdata/cache"
@@ -32,7 +35,18 @@ var (
 	reqSpanMem = stats.NewMeter32("api.requests_span.mem", false)
 )
 
+type seriesFinder interface {
+	clusterFindByTag(context.Context, uint32, tagquery.Expressions, int64, int, bool) ([]Series, error)
+	findSeries(context.Context, uint32, []string, int64) ([]Series, error)
+}
+
+type targetGetter interface {
+	getTargets(context.Context, *models.StorageStats, []models.Req) ([]models.Series, error)
+}
+
 type Server struct {
+	seriesFinder
+	targetGetter
 	Addr            string
 	SSL             bool
 	certFile        string

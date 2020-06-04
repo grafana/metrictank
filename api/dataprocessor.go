@@ -154,7 +154,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	return pointsA
 }
 
-func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
+/*func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
 	remoteReqs := make(map[string][]models.Req)
@@ -212,7 +212,7 @@ func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs [
 	}
 	log.Debugf("DP getTargets: %d series found on cluster", len(out))
 	return out, nil
-}
+}*/
 
 // getTargetsRemote issues the requests - keyed by node name - on other nodes
 func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[string][]models.Req) ([]models.Series, error) {

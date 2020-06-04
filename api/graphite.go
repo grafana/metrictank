@@ -13,7 +13,6 @@ import (
 
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
-	"github.com/tinylib/msgp/msgp"
 	macaron "gopkg.in/macaron.v1"
 
 	"github.com/grafana/metrictank/api/middleware"
@@ -100,7 +99,7 @@ type Series struct {
 	Node    cluster.Node
 }
 
-func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
+/*func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
 	data := models.IndexFind{
 		Patterns: patterns,
 		OrgId:    orgId,
@@ -137,7 +136,7 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 	}
 
 	return series, nil
-}
+}*/
 
 func (s *Server) proxyToGraphite(ctx *middleware.Context) {
 	proxyCtx, span := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "graphiteproxy")
@@ -1052,7 +1051,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 
 // clusterFindByTag returns the Series matching the given expressions.
 // If maxSeries is > 0, it specifies a limit which will truncate the resultset (if softLimit is true) or return an error otherwise.
-func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagquery.Expressions, from int64, maxSeries int, softLimit bool) ([]Series, error) {
+/*func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions tagquery.Expressions, from int64, maxSeries int, softLimit bool) ([]Series, error) {
 	data := models.IndexFindByTag{OrgId: orgId, Expr: expressions.Strings(), From: from}
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -1105,7 +1104,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 
 	err := <-errorChan
 	return allSeries, err
-}
+}*/
 
 func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTags) {
 	reqCtx := ctx.Req.Context()
