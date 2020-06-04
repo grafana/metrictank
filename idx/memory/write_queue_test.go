@@ -55,6 +55,9 @@ func TestWriteQueue(t *testing.T) {
 	mkey, _ := schema.MKeyFromString(data.Id)
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 
+	// TODO - make this less flaky (add flush counter? Flush wait func?)
+	time.Sleep(100 * time.Millisecond)
+
 	nodes, err = ix.Find(1, "some.metric.*", 0)
 	if err != nil {
 		t.Fatal(err)
