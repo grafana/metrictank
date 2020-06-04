@@ -632,6 +632,7 @@ func mergeSeries(in []models.Series, dataMap expr.DataMap) []models.Series {
 		from    uint32
 		to      uint32
 		con     consolidation.Consolidator
+		consReq consolidation.Consolidator
 		mdp     uint32
 		pngroup models.PNGroup
 	}
@@ -643,6 +644,7 @@ func mergeSeries(in []models.Series, dataMap expr.DataMap) []models.Series {
 			series.QueryFrom,
 			series.QueryTo,
 			series.Consolidator,
+			series.QueryCons,
 			series.QueryMDP,
 			series.QueryPNGroup,
 		}
