@@ -12,8 +12,7 @@ import (
 // blocking low priority operations if a write lock is waiting.
 type PriorityRWMutex struct {
 	lock        sync.RWMutex
-	writeWaiter sync.WaitGroup
-	readWaiter  sync.WaitGroup
+	lowPrioLock sync.RWMutex
 }
 
 type BlockContext struct {
@@ -50,27 +49,24 @@ func (pm *PriorityRWMutex) RUnlock(bc *BlockContext) {
 func (pm *PriorityRWMutex) RLockLow() BlockContext {
 	// Wait for any pending writes
 	bc := BlockContext{lock: pm, preLockTime: time.Now()}
-	pm.writeWaiter.Wait()
+	pm.lowPrioLock.RLock()
 	pm.lock.RLock()
 	bc.postLockTime = time.Now()
-	pm.readWaiter.Add(1)
 	return bc
 }
 
 // RUnlockLow unlocks read lock called via RLockLow
 func (pm *PriorityRWMutex) RUnlockLow(bc *BlockContext) {
-	pm.readWaiter.Done()
 	bc.postOpTime = time.Now()
 	pm.lock.RUnlock()
+	pm.lowPrioLock.RUnlock()
 }
 
 // Lock will block new low prio read locks until can acquire the lock. High prio read locks will
 // not be blocked or accounted for.
 func (pm *PriorityRWMutex) Lock() BlockContext {
 	bc := BlockContext{lock: pm, preLockTime: time.Now()}
-	pm.writeWaiter.Add(1)
-	// Wait for any active reads
-	pm.readWaiter.Wait()
+	pm.lowPrioLock.Lock()
 	pm.lock.Lock()
 	bc.postLockTime = time.Now()
 	return bc
@@ -78,8 +74,8 @@ func (pm *PriorityRWMutex) Lock() BlockContext {
 
 // Unlock unlocks mutex acquired via Lock
 func (pm *PriorityRWMutex) Unlock(bc *BlockContext) {
-	pm.writeWaiter.Done()
 	bc.postOpTime = time.Now()
+	pm.lowPrioLock.Unlock()
 	pm.lock.Unlock()
 }
 
