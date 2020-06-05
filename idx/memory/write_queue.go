@@ -15,6 +15,7 @@ type WriteQueue struct {
 	maxBuffered  int
 	maxDelay     time.Duration
 	flushTrigger chan struct{}
+	flushPending bool
 
 	archives map[schema.MKey]*idx.Archive
 	sync.RWMutex
@@ -32,6 +33,7 @@ func NewWriteQueue(index *UnpartitionedMemoryIdx, maxDelay time.Duration, maxBuf
 		maxBuffered:  maxBuffered,
 		maxDelay:     maxDelay,
 		flushTrigger: make(chan struct{}, 1),
+		flushPending: false,
 		idx:          index,
 	}
 	go wq.loop()
@@ -46,8 +48,12 @@ func (wq *WriteQueue) Stop() {
 func (wq *WriteQueue) Queue(archive *idx.Archive) {
 	wq.Lock()
 	wq.archives[archive.Id] = archive
-	if len(wq.archives) >= wq.maxBuffered {
-		wq.flushTrigger <- struct{}{}
+	if !wq.flushPending && len(wq.archives) >= wq.maxBuffered {
+		wq.flushPending = true
+		select {
+		case wq.flushTrigger <- struct{}{}:
+		default:
+		}
 	}
 	wq.Unlock()
 }
@@ -64,6 +70,7 @@ func (wq *WriteQueue) flush() {
 	// Quick check to see if we have any archives we need to flush
 	wq.Lock()
 	archiveSize := len(wq.archives)
+	wq.flushPending = archiveSize > 0
 	wq.Unlock()
 
 	if archiveSize == 0 {
@@ -73,6 +80,7 @@ func (wq *WriteQueue) flush() {
 	// wq.idx.Lock() can be very slow to acquire (if there are long read ops). wq.Lock has much
 	// smaller bounds on lock hold time. So, to avoid blocking writes while waiting on the idx,
 	// we make sure to acquire the index lock first and only then acquire wq.Lock
+	pre := time.Now()
 
 	bc := wq.idx.Lock()
 	defer bc.Unlock("WriteQueueFlush", func() interface{} {
@@ -87,14 +95,9 @@ func (wq *WriteQueue) flush() {
 		wq.idx.add(archive)
 	}
 	wq.archives = make(map[schema.MKey]*idx.Archive)
-<<<<<<< HEAD
+	wq.flushPending = false
 
-	select {
-	case wq.flushed <- struct{}{}:
-	default:
-	}
-=======
->>>>>>> Use Priority lock, write queue flush is only called from flush loop
+	statAddDuration.Value(time.Since(pre))
 }
 
 func (wq *WriteQueue) loop() {
@@ -119,4 +122,11 @@ func (wq *WriteQueue) loop() {
 			return
 		}
 	}
+}
+
+func (wq *WriteQueue) isFlushPending() bool {
+	wq.Lock()
+	defer wq.Unlock()
+
+	return wq.flushPending
 }
