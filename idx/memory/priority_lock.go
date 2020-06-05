@@ -75,8 +75,8 @@ func (pm *PriorityRWMutex) Lock() BlockContext {
 // Unlock unlocks mutex acquired via Lock
 func (pm *PriorityRWMutex) Unlock(bc *BlockContext) {
 	bc.postOpTime = time.Now()
-	pm.lowPrioLock.Unlock()
 	pm.lock.Unlock()
+	pm.lowPrioLock.Unlock()
 }
 
 func (bc *BlockContext) RUnlockLow(op string, logCb func() interface{}) {
