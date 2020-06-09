@@ -750,8 +750,10 @@ func newRequestContext(ctx context.Context, req *models.Req, consolidator consol
 		rc.AMKey = schema.GetAMKey(req.MKey, consolidator.Archive(), req.ArchInterval)
 	}
 
+	// if the request has after-fetch runtime normalization, plan to make the series pre-canonical.
+	// (note: unfortunately we cannot make inputs for on-demand runtime normalization because by definition those are not predictable!)
 	if req.AggNum > 1 {
-		// the series needs to be pre-canonical. There's 2 aspects to this
+		// There's 2 aspects to this
 
 		// 1) `from` adjustment.
 		// we may need to rewind the from so that we make sure to include all the necessary input raw data
