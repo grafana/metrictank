@@ -24,7 +24,7 @@ canonical form comes into play when we need to normalize (through consolidation 
 It essentially means a series looks like a "native" fixed series of that higher interval,
 with respect to how many points it contains and which timestamps they have.
 
-It is important here to keep in mind that consolidated points get the timestamp of the last of its input points.
+It is important here to keep in mind that consolidated points get the timestamp of the last of its input points (postmarking).
 
 Continuing the above example, if we need to normalize the above series with aggNum 3 (OutInterval is 30s)
 we would normally get a series of (60,70,80), (90 -null -, 100, 110 - null), so the 30-second timestamps become 80 and 110.
@@ -55,14 +55,17 @@ Continuing the example again, it could be another series that had a raw interval
 
 ## pre-canonical
 
-a pre-canonical series is simply a series that after normalizing, will be canonical.
+a series that is pre-canonical (wrt a given interval) is simply a series that after normalizing (to that interval), will be canonical.
 I.O.W. is a series that is fetched in such a way that when it is fed to Consolidate(), will produce a canonical series.
 See above for more details.
 Note: this can only be done to the extent we know what the normalization looks like.
 (by setting up req.AggNum and req.OutInterval for normalization). For series that get (further) normalized at runtime,
-we can't predict this at fetch time and have to remove points to make the output canonical, or do what Graphite also does,
-which is to add null points at the beginning or end as needed, which may lead to inaccurate leading or trailing points that
+we can't predict this at fetch time and have to either:
+A) remove points to make the output canonical, which removes some information
+B) add null points at the beginning or end as needed, which may lead to inaccurate leading or trailing points that
 go potentially out of the bounds of the query.
+
+Graphite does B, so we do the same.
 
 
 ## nudging
