@@ -38,6 +38,19 @@ func TestAliasByNodeMultiple(t *testing.T) {
 	)
 }
 
+func TestAliasByNodeWithSpaceInTag(t *testing.T) {
+	testAliasByNode(
+		"space in tag",
+		[]models.Series{
+			getSeriesNamed("some.id.of.a.metric.1;my tag=the value", a),
+		},
+		[]models.Series{
+			getSeriesNamed("some", a),
+		},
+		t,
+	)
+}
+
 func makeAliasByNode(in []models.Series, nodes []expr) GraphiteFunc {
 	f := NewAliasByNode()
 	abn := f.(*FuncAliasByNode)
