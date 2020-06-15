@@ -32,6 +32,8 @@ func TestDivideSeriesListsSingle(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:  10,
+				QueryFrom: 10,
+				QueryTo:   41,
 				Target:    "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				QueryPatt: "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				Datapoints: []schema.Point{
@@ -75,6 +77,8 @@ func TestDivideSeriesListsMultiple(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:  10,
+				QueryFrom: 10,
+				QueryTo:   21,
 				Target:    "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				QueryPatt: "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
@@ -87,6 +91,8 @@ func TestDivideSeriesListsMultiple(t *testing.T) {
 			},
 			{
 				Interval:  10,
+				QueryFrom: 10,
+				QueryTo:   21,
 				Target:    "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
 				QueryPatt: "divideSeries(foo-2;a=2;b=2;b=2,overbar-2;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
@@ -136,6 +142,13 @@ func testDivideSeriesLists(name string, dividend, divisor []models.Series, out [
 	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
 		if err := dataMap.CheckForOverlappingPoints(); err != nil {
 			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			}
 		}
 	})
 }

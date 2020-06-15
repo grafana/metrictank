@@ -109,4 +109,11 @@ func testAliasByMetric(in []models.Series, out []models.Series, t *testing.T) {
 			t.Fatalf("Point slices in datamap overlap, err = %s", err)
 		}
 	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", "main", i, s)
+			}
+		}
+	})
 }

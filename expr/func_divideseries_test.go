@@ -28,6 +28,8 @@ func TestDivideSeriesSingle(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:  10,
+				QueryFrom: 10,
+				QueryTo:   21,
 				Target:    "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				QueryPatt: "divideSeries(foo;a=a;b=b,bar;a=a1;b=b)",
 				Datapoints: []schema.Point{
@@ -65,6 +67,8 @@ func TestDivideSeriesMultiple(t *testing.T) {
 		[]models.Series{
 			{
 				Interval:  10,
+				QueryFrom: 10,
+				QueryTo:   21,
 				Target:    "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				QueryPatt: "divideSeries(foo-1;a=1;b=2;c=3,overbar;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{
@@ -77,6 +81,8 @@ func TestDivideSeriesMultiple(t *testing.T) {
 			},
 			{
 				Interval:  10,
+				QueryFrom: 10,
+				QueryTo:   21,
 				Target:    "divideSeries(foo-2;a=2;b=2;b=2,overbar;a=3;b=2;c=1)",
 				QueryPatt: "divideSeries(foo-2;a=2;b=2;b=2,overbar;a=3;b=2;c=1)",
 				Datapoints: []schema.Point{

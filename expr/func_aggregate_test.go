@@ -284,6 +284,14 @@ func testAggregate(name, agg string, in [][]models.Series, out models.Series, t 
 			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
 	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			}
+		}
+	})
+
 }
 
 func BenchmarkAggregate10k_1NoNulls(b *testing.B) {

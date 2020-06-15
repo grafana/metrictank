@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/util/align"
 	pickle "github.com/kisielk/og-rek"
 )
 
@@ -236,6 +237,22 @@ func (s *Series) CopyTagsWith(key, val string) map[string]string {
 	}
 	out[key] = val
 	return out
+}
+
+// IsCanonical checks whether the series is canonical wrt to its interval and from/to
+func (s Series) IsCanonical() bool {
+	firstTs := align.ForwardIfNotAligned(s.QueryFrom, s.Interval)
+	lastTs := align.Backward(s.QueryTo, s.Interval)
+	num := int((lastTs-firstTs)/s.Interval) + 1
+	if len(s.Datapoints) != num {
+		return false
+	}
+	for i := 0; i < num; i++ {
+		if s.Datapoints[i].Ts != firstTs+uint32(i)*s.Interval {
+			return false
+		}
+	}
+	return true
 }
 
 type SeriesByTarget []Series
