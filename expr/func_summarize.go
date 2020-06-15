@@ -95,6 +95,8 @@ func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start
 
 	numPoints := len(serie.Datapoints)
 
+	// graphite-compatible bit
+
 	for ts, i := start, 0; i < numPoints && ts < end; ts += interval {
 		s := i
 		for ; i < numPoints && serie.Datapoints[i].Ts < ts+interval; i++ {
@@ -109,6 +111,12 @@ func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start
 		}
 
 		out = append(out, aggPoint)
+	}
+
+	// MT specific bit: if !s.alignToFrom we want the output to be canonical
+	// only thing needed is strip out the first point if its TS < from
+	if len(out) != 0 && out[0].Ts < serie.QueryFrom {
+		out = out[1:]
 	}
 
 	return out
