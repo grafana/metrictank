@@ -45,8 +45,8 @@ type Req struct {
 	Archive      uint8  `json:"archive"`      // 0 means original data, 1 means first agg level, 2 means 2nd, etc.
 	ArchInterval uint32 `json:"archInterval"` // the interval corresponding to the archive we'll fetch
 	TTL          uint32 `json:"ttl"`          // the ttl of the archive we'll fetch
-	OutInterval  uint32 `json:"outInterval"`  // the interval of the output data, after any runtime consolidation
-	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together at runtime, after fetching from the archive (normalization)
+	OutInterval  uint32 `json:"outInterval"`  // the interval of the series after fetching (possibly with pre-normalization) and after-fetch runtime normalization. not aware of further normalization or runtime consolidation
+	AggNum       uint32 `json:"aggNum"`       // how many points to consolidate together for after-fetch runtime normalization (see docs/consolidation.md)
 }
 
 // PNGroup is an identifier for a pre-normalization group: data that can be pre-normalized together
@@ -92,7 +92,7 @@ func (r *Req) Plan(i int, a archives.Archive) {
 	r.AggNum = 1
 }
 
-// PlanNormalization updates the planning parameters to accommodate normalization to the specified interval
+// PlanNormalization updates the planning parameters to accommodate after-fetch runtime normalization to the specified interval
 func (r *Req) PlanNormalization(interval uint32) {
 	r.OutInterval = interval
 	r.AggNum = interval / r.ArchInterval
@@ -132,11 +132,12 @@ func (r Req) PointsFetch() uint32 {
 }
 
 // PointsReturn estimates the amount of points that will be returned for this request
-// best effort: not aware of summarize(), runtime normalization. but does account for runtime consolidation
+// It is not aware of summarize() or on-demand runtime normalization.
+// but does account for after-fetch runtime normalization and runtime consolidation
 func (r Req) PointsReturn(planMDP uint32) uint32 {
 	points := (r.To - r.From) / r.OutInterval
 	if planMDP > 0 && points > planMDP {
-		// note that we don't assign to req.AggNum here, because that's only for normalization.
+		// note that we don't assign to req.AggNum here, because that's only for after-fetch runtime normalization.
 		// MDP runtime consolidation doesn't look at req.AggNum
 		aggNum := consolidation.AggEvery(points, planMDP)
 		points /= aggNum

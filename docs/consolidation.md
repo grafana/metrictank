@@ -124,3 +124,20 @@ LONGER CHUNK (vs SHORTER CHUNK):
 * more decoding overhead
 * to accommodate newest chunk, cost of keeping 1 extra old chunk in RAM increases (or hitting cassandra more)
 * for aggbands, generally means storing more data in RAM that we don't really need in ram
+
+
+
+
+## Consolidation throughout the response path
+
+
+* Fetching of chunk data (raw or rollup), mainly based on time range queried and max-points-per-req restrictions
+* Normalization: consolidates when series need to be combined together (e.g., in sumSeries(), divideSeries(), asPercent(), groupByTags() etc.). There's 2 different cases here:
+  - Pre-normalization: a specific optimization that, when enabled, can detect when series will definitely get combined together and not used elsewhere (e.g. when feeding into sumSeries), and if the output of the normalization would use an interval, that a series also has available as a rollup, will set up the request to use the rollup instead.
+  - Runtime normalization: if PN disabled or could not guarantee series will be solely normalized together (e.g. groupByTags(), asPercent) or we didn't have the right archives availables.
+  This takes two forms:
+    - on-demand runtime normalization: during function processing, when functions need to combine inputs of different intervals
+    - after-fetch runtime normalization (by using req.AggNum): when we could predict that normalization will always be needed on a series, but could not use pre-normalization.
+
+* Series run through the function-processing API. Many functions don't invoke consolidation but e.g. summarize() does.
+* Runtime consolidation: To honor the MaxDataPoints value

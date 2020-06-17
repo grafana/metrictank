@@ -313,27 +313,51 @@ func getCopy(in []schema.Point) []schema.Point {
 }
 
 func getSeries(target, patt string, data []schema.Point) models.Series {
+	from := uint32(10)
+	to := uint32(61)
+	if len(data) > 0 {
+		from = data[0].Ts
+		to = data[len(data)-1].Ts + 1
+	}
 	return models.Series{
 		Target:     target,
 		QueryPatt:  patt,
+		QueryFrom:  from,
+		QueryTo:    to,
 		Datapoints: getCopy(data),
 		Interval:   10,
 	}
 }
 
 func getSeriesNamed(name string, data []schema.Point) models.Series {
+	from := uint32(10)
+	to := uint32(61)
+	if len(data) > 0 {
+		from = data[0].Ts
+		to = data[len(data)-1].Ts + 1
+	}
 	return models.Series{
 		Target:     name,
 		QueryPatt:  name,
+		QueryFrom:  from,
+		QueryTo:    to,
 		Datapoints: getCopy(data),
 		Interval:   10,
 	}
 }
 
 func getModel(name string, data []schema.Point) models.Series {
+	from := uint32(10)
+	to := uint32(61)
+	if len(data) > 0 {
+		from = data[0].Ts
+		to = data[len(data)-1].Ts + 1
+	}
 	series := models.Series{
 		Target:     name,
 		QueryPatt:  name,
+		QueryFrom:  from,
+		QueryTo:    to,
 		Datapoints: getCopy(data),
 		Interval:   10,
 	}

@@ -52,24 +52,14 @@ func TestAbsoluteZeroInput(t *testing.T) {
 func TestAbsoluteRandom(t *testing.T) {
 
 	input := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "random",
-			Target:     "rand",
-			Datapoints: getCopy(random),
-		},
+		getSeries("rand", "random", random),
 	}
 	inputCopy := make([]models.Series, len(input))
 	copy(inputCopy, input)
 
 	f := getNewAbsolute(input)
 	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "absolute(random)",
-			Target:     "absolute(rand)",
-			Datapoints: getCopy(randomAbsolute),
-		},
+		getSeries("absolute(rand)", "absolute(random)", randomAbsolute),
 	}
 
 	dataMap := initDataMap(input)
@@ -89,6 +79,14 @@ func TestAbsoluteRandom(t *testing.T) {
 			t.Fatal("Point slices in datamap overlap: ", err)
 		}
 	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", "main", i, s)
+			}
+		}
+	})
+
 }
 func BenchmarkAbsolute10k_1NoNulls(b *testing.B) {
 	benchmarkAbsolute(b, 1, test.RandFloats10k, test.RandFloats10k)

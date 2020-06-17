@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/util/align"
 )
 
 var abSummarize = []schema.Point{
@@ -63,7 +64,7 @@ func TestSummarizeDefaultInterval(t *testing.T) {
 			Target:     "a",
 			QueryPatt:  "a",
 			QueryFrom:  10,
-			QueryTo:    60,
+			QueryTo:    61,
 			Interval:   10,
 			Datapoints: getCopy(a),
 		},
@@ -74,7 +75,7 @@ func TestSummarizeDefaultInterval(t *testing.T) {
 				Target:     "summarize(a, \"10\", \"sum\")",
 				QueryPatt:  "summarize(a, \"10\", \"sum\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -84,7 +85,7 @@ func TestSummarizeDefaultInterval(t *testing.T) {
 				Target:     "summarize(a, \"10\", \"sum\", true)",
 				QueryPatt:  "summarize(a, \"10\", \"sum\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -96,7 +97,7 @@ func TestSummarizeDefaultInterval(t *testing.T) {
 				Target:     "summarize(a, \"10\", \"max\")",
 				QueryPatt:  "summarize(a, \"10\", \"max\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -106,7 +107,7 @@ func TestSummarizeDefaultInterval(t *testing.T) {
 				Target:     "summarize(a, \"10\", \"max\", true)",
 				QueryPatt:  "summarize(a, \"10\", \"max\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -140,7 +141,7 @@ func TestSummarizeOversampled(t *testing.T) {
 			Target:     "a",
 			QueryPatt:  "a",
 			QueryFrom:  10,
-			QueryTo:    60,
+			QueryTo:    61,
 			Interval:   10,
 			Datapoints: getCopy(a),
 		},
@@ -151,7 +152,7 @@ func TestSummarizeOversampled(t *testing.T) {
 				Target:     "summarize(a, \"5\", \"sum\")",
 				QueryPatt:  "summarize(a, \"5\", \"sum\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   5,
 				Datapoints: getCopy(aOversampled),
 			},
@@ -161,7 +162,7 @@ func TestSummarizeOversampled(t *testing.T) {
 				Target:     "summarize(a, \"5\", \"sum\", true)",
 				QueryPatt:  "summarize(a, \"5\", \"sum\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   5,
 				Datapoints: getCopy(aOversampled),
 			},
@@ -173,7 +174,7 @@ func TestSummarizeOversampled(t *testing.T) {
 				Target:     "summarize(a, \"5\", \"max\")",
 				QueryPatt:  "summarize(a, \"5\", \"max\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   5,
 				Datapoints: getCopy(aOversampled),
 			},
@@ -183,7 +184,7 @@ func TestSummarizeOversampled(t *testing.T) {
 				Target:     "summarize(a, \"5\", \"max\", true)",
 				QueryPatt:  "summarize(a, \"5\", \"max\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   5,
 				Datapoints: getCopy(aOversampled),
 			},
@@ -202,7 +203,7 @@ func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 			Target:     "a",
 			QueryPatt:  "a",
 			QueryFrom:  10,
-			QueryTo:    60,
+			QueryTo:    61,
 			Interval:   10,
 			Datapoints: getCopy(a),
 		},
@@ -213,7 +214,7 @@ func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"sum\")",
 				QueryPatt:  "summarize(a, \"10s\", \"sum\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -223,7 +224,7 @@ func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"sum\", true)",
 				QueryPatt:  "summarize(a, \"10s\", \"sum\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -235,7 +236,7 @@ func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"max\")",
 				QueryPatt:  "summarize(a, \"10s\", \"max\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -245,7 +246,7 @@ func TestSummarizeNyquistSingleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"max\", true)",
 				QueryPatt:  "summarize(a, \"10s\", \"max\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -263,7 +264,7 @@ func TestSummarizeAllFuncs(t *testing.T) {
 			Target:    "a",
 			QueryPatt: "a",
 			QueryFrom: 10,
-			QueryTo:   60,
+			QueryTo:   61,
 			Interval:  10,
 			Datapoints: []schema.Point{
 				{Val: 0, Ts: 10},
@@ -364,7 +365,7 @@ func TestSummarizeAllFuncs(t *testing.T) {
 			Target:     target,
 			QueryPatt:  target,
 			QueryFrom:  10,
-			QueryTo:    60,
+			QueryTo:    61,
 			Interval:   30,
 			Datapoints: c.points,
 		}}
@@ -378,7 +379,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 			Target:     "a",
 			QueryPatt:  "a",
 			QueryFrom:  10,
-			QueryTo:    60,
+			QueryTo:    61,
 			Interval:   10,
 			Datapoints: getCopy(a),
 		},
@@ -386,7 +387,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 			Target:     "b",
 			QueryPatt:  "b",
 			QueryFrom:  10,
-			QueryTo:    60,
+			QueryTo:    61,
 			Interval:   10,
 			Datapoints: getCopy(b),
 		},
@@ -397,7 +398,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"sum\")",
 				QueryPatt:  "summarize(a, \"10s\", \"sum\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -405,7 +406,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(b, \"10s\", \"sum\")",
 				QueryPatt:  "summarize(b, \"10s\", \"sum\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(b),
 			},
@@ -415,7 +416,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"sum\", true)",
 				QueryPatt:  "summarize(a, \"10s\", \"sum\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -423,7 +424,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(b, \"10s\", \"sum\", true)",
 				QueryPatt:  "summarize(b, \"10s\", \"sum\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(b),
 			},
@@ -435,7 +436,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"max\")",
 				QueryPatt:  "summarize(a, \"10s\", \"max\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -443,7 +444,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(b, \"10s\", \"max\")",
 				QueryPatt:  "summarize(b, \"10s\", \"max\")",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(b),
 			},
@@ -453,7 +454,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(a, \"10s\", \"max\", true)",
 				QueryPatt:  "summarize(a, \"10s\", \"max\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(a),
 			},
@@ -461,7 +462,7 @@ func TestSummarizeMultipleIdentity(t *testing.T) {
 				Target:     "summarize(b, \"10s\", \"max\", true)",
 				QueryPatt:  "summarize(b, \"10s\", \"max\", true)",
 				QueryFrom:  10,
-				QueryTo:    60,
+				QueryTo:    61,
 				Interval:   10,
 				Datapoints: getCopy(b),
 			},
@@ -690,7 +691,6 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 		{Val: 8, Ts: 240},
 	}
 	var unaligned45sum, unaligned45max = []schema.Point{
-		{Val: 1, Ts: 0},
 		{Val: 2, Ts: 45},
 		{Val: 7, Ts: 90},
 		{Val: 5, Ts: 135},
@@ -698,7 +698,6 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 		{Val: 8, Ts: 225},
 	},
 		[]schema.Point{
-			{Val: 1, Ts: 0},
 			{Val: 2, Ts: 45},
 			{Val: 4, Ts: 90},
 			{Val: 5, Ts: 135},
@@ -725,7 +724,7 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 			Target:     "align",
 			QueryPatt:  "align",
 			QueryFrom:  30,
-			QueryTo:    240,
+			QueryTo:    241,
 			Interval:   30,
 			Datapoints: getCopy(aligned30),
 		},
@@ -736,7 +735,7 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 				Target:     "summarize(align, \"45s\", \"sum\")",
 				QueryPatt:  "summarize(align, \"45s\", \"sum\")",
 				QueryFrom:  30,
-				QueryTo:    240,
+				QueryTo:    241,
 				Interval:   45,
 				Datapoints: getCopy(unaligned45sum),
 			},
@@ -746,7 +745,7 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 				Target:     "summarize(align, \"45s\", \"sum\", true)",
 				QueryPatt:  "summarize(align, \"45s\", \"sum\", true)",
 				QueryFrom:  30,
-				QueryTo:    240,
+				QueryTo:    241,
 				Interval:   45,
 				Datapoints: getCopy(aligned45sum),
 			},
@@ -758,7 +757,7 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 				Target:     "summarize(align, \"45s\", \"max\")",
 				QueryPatt:  "summarize(align, \"45s\", \"max\")",
 				QueryFrom:  30,
-				QueryTo:    240,
+				QueryTo:    241,
 				Interval:   45,
 				Datapoints: getCopy(unaligned45max),
 			},
@@ -768,7 +767,7 @@ func TestSummarizeAlignToFrom(t *testing.T) {
 				Target:     "summarize(align, \"45s\", \"max\", true)",
 				QueryPatt:  "summarize(align, \"45s\", \"max\", true)",
 				QueryFrom:  30,
-				QueryTo:    240,
+				QueryTo:    241,
 				Interval:   45,
 				Datapoints: getCopy(aligned45max),
 			},
@@ -799,12 +798,11 @@ func TestSummarizeLargeIntervalTimestamps(t *testing.T) {
 	outputInterval := uint32(30 * 24 * 60 * 60)
 
 	// alignToFrom = false - starting timestamp is a multiple of `outputInterval`
-	unalignedStart := startTime - (startTime % outputInterval)
+	unalignedStart := align.ForwardIfNotAligned(startTime, outputInterval)
 	var unalignedExpected = []schema.Point{
 		{Val: 0, Ts: unalignedStart},
 		{Val: 0, Ts: unalignedStart + outputInterval},
 		{Val: 0, Ts: unalignedStart + 2*outputInterval},
-		{Val: 0, Ts: unalignedStart + 3*outputInterval},
 	}
 
 	// alignToFrom = true - starting timestamp is unchanged from input
@@ -882,6 +880,15 @@ func testSummarize(name string, in []models.Series, out []models.Series, interva
 			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
 	})
+	if !alignToFrom {
+		t.Run("OutputIsCanonical", func(t *testing.T) {
+			for i, s := range got {
+				if !s.IsCanonical() {
+					t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+				}
+			}
+		})
+	}
 }
 
 func BenchmarkSummarize10k_1NoNulls(b *testing.B) {

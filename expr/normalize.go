@@ -50,6 +50,7 @@ func NormalizeTwo(dataMap DataMap, a, b models.Series) (models.Series, models.Se
 }
 
 // NormalizeTo normalizes the given series to the desired interval
+// will pad front and strip from back as needed, to assure the output is canonical for the given interval
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
@@ -60,35 +61,12 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	}
 
 	// we need to copy the datapoints first because the consolidater will reuse the input slice
-	// also, the input may not be pre-canonical. so add nulls in front and at the back to make it pre-canonical.
+	// also, for the consolidator's output to be canonical, the input must be pre-canonical.
+	// so add nulls in front and at the back to make it pre-canonical.
 	// this may make points in front and at the back less accurate when consolidated (e.g. summing when some of the points are null results in a lower value)
 	// but this is what graphite does....
 	datapoints := pointSlicePool.Get().([]schema.Point)
-
-	// example of how this works:
-	// if in.Interval is 5, and interval is 15, then for example, to generate point 15, you want inputs 5, 10 and 15.
-	// or more generally (you can follow any example vertically):
-	//  5 10 15 20 25 30 35 40 45 50 <-- if any of these timestamps are your first point in `in`
-	//  5  5  5 20 20 20 35 35 35 50 <-- then these are the corresponding timestamps of the first values we want as input for the consolidator
-	// 15 15 15 30 30 30 45 45 45 60 <-- which, when fed through alignForwardIfNotAligned(), result in these numbers
-	//  5  5  5 20 20 20 35 35 35 50 <-- subtract (aggnum-1)* in.interval or equivalent -interval + in.Interval = -15 + 5 = -10. these are our desired numbers!
-
-	// now, for the final value, it's important to be aware of cases like this:
-	// until=47, interval=10, in.Interval = 5
-	// a canonical 10s series would have as last point 40. whereas our input series will have 45, which will consolidate into a point with timestamp 50, which is incorrect
-	// (it breaches `to`, and may have more points than other series it needs to be combined with)
-	// thus, we also need to potentially trim points from the back until the last point has the same Ts as a canonical series would
-
-	canonicalStart := align.ForwardIfNotAligned(in.Datapoints[0].Ts, interval) - interval + in.Interval
-	for ts := canonicalStart; ts < in.Datapoints[0].Ts; ts += in.Interval {
-		datapoints = append(datapoints, schema.Point{Val: math.NaN(), Ts: ts})
-	}
-
-	datapoints = append(datapoints, in.Datapoints...)
-
-	canonicalTs := (datapoints[len(datapoints)-1].Ts / interval) * interval
-	numDrop := int((datapoints[len(datapoints)-1].Ts - canonicalTs) / in.Interval)
-	datapoints = datapoints[0 : len(datapoints)-numDrop]
+	datapoints = makePreCanonicalCopy(in, interval, datapoints)
 
 	// series may have been created by a function that didn't know which consolidation function to default to.
 	// in the future maybe we can do more clever things here. e.g. perSecond maybe consolidate by max.
@@ -99,4 +77,37 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	in.Interval = interval
 	dataMap.Add(Req{}, in)
 	return in
+}
+
+// makePreCanonicalCopy returns a copy of in's datapoints slice, but adjusted to be pre-canonical with respect to interval.
+// for this, it reuses the 'datapoints' slice.
+func makePreCanonicalCopy(in models.Series, interval uint32, datapoints []schema.Point) []schema.Point {
+	// to achieve this we need to assure our input starts and ends with the right timestamp.
+
+	// we need to figure out what is the ts of the first point to feed into the consolidator
+	// example of how this works:
+	// if in.Interval is 5, and interval is 15, then for example, to generate point 15, because we postmark and we want a full input going into this point,
+	// you want inputs 5, 10 and 15.
+	// or more generally (you can follow any example vertically):
+	//  5 10 15 20 25 30 35 40 45 50 <-- if any of these timestamps are your first point in `in`
+	//  5  5  5 20 20 20 35 35 35 50 <-- then these are the corresponding timestamps of the first values we want as input for the consolidator
+	// 15 15 15 30 30 30 45 45 45 60 <-- which, when fed through alignForwardIfNotAligned(), result in these numbers
+	//  5  5  5 20 20 20 35 35 35 50 <-- subtract (aggnum-1)* in.interval or equivalent -interval + in.Interval = -15 + 5 = -10. this is our initial timestamp.
+
+	canonicalStart := align.ForwardIfNotAligned(in.Datapoints[0].Ts, interval) - interval + in.Interval
+	for ts := canonicalStart; ts < in.Datapoints[0].Ts; ts += in.Interval {
+		datapoints = append(datapoints, schema.Point{Val: math.NaN(), Ts: ts})
+	}
+
+	datapoints = append(datapoints, in.Datapoints...)
+
+	// for the desired last input ts, it's important to be aware of cases like this:
+	// until=47, interval=10, in.Interval = 5
+	// a canonical 10s series would have as last point 40. whereas our input series will have 45, which will consolidate into a point with timestamp 50, which is incorrect
+	// (it breaches `to`, and may have more points than other series it needs to be combined with)
+	// thus, we also need to potentially trim points from the back until the last point has the same Ts as a canonical series would
+
+	canonicalTs := (datapoints[len(datapoints)-1].Ts / interval) * interval
+	numDrop := int((datapoints[len(datapoints)-1].Ts - canonicalTs) / in.Interval)
+	return datapoints[0 : len(datapoints)-numDrop]
 }

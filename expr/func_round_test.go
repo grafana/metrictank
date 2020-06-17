@@ -97,12 +97,7 @@ type TestCase struct {
 }
 
 func TestRoundLowPrecInput(t *testing.T) {
-	input := models.Series{
-		Interval:   10,
-		QueryPatt:  "lowPrec",
-		Target:     "lowPrec",
-		Datapoints: getCopy(lowPrec),
-	}
+	input := getSeriesNamed("lowPrec", lowPrec)
 
 	testData := []TestCase{
 		{
@@ -128,12 +123,7 @@ func TestRoundLowPrecInput(t *testing.T) {
 }
 
 func TestRoundHighPrecInput(t *testing.T) {
-	input := models.Series{
-		Interval:   10,
-		QueryPatt:  "highPrec",
-		Target:     "highPrec",
-		Datapoints: getCopy(highPrec),
-	}
+	input := getSeriesNamed("highPrec", highPrec)
 
 	testData := []TestCase{
 		{
@@ -168,12 +158,7 @@ func TestRoundOverflow(t *testing.T) {
 		{Val: 1.0e+306, Ts: 10},
 		{Val: -1.0e+306, Ts: 20},
 	}
-	input := models.Series{
-		Interval:   10,
-		QueryPatt:  "overflow",
-		Target:     "overflow",
-		Datapoints: getCopy(massiveDatapoints),
-	}
+	input := getSeriesNamed("overflow", massiveDatapoints)
 
 	testData := []TestCase{
 		{
@@ -197,12 +182,9 @@ func TestRoundOverflow(t *testing.T) {
 
 	for _, data := range testData {
 		f := getNewRound([]models.Series{input}, data.precision)
-		out := []models.Series{{
-			Interval:   10,
-			QueryPatt:  data.expectedName,
-			Target:     data.expectedName,
-			Datapoints: data.expectedOutput,
-		}}
+		out := []models.Series{
+			getSeriesNamed(data.expectedName, data.expectedOutput),
+		}
 		got, err := f.Exec(make(map[Req][]models.Series))
 		if err := equalOutput(out, got, nil, err); err != nil {
 			t.Fatal("Failed test:", data.expectedName, err)
@@ -211,7 +193,7 @@ func TestRoundOverflow(t *testing.T) {
 }
 
 func TestRoundUnderflow(t *testing.T) {
-	minisculeDatapoint := []schema.Point{
+	minisculeDatapoints := []schema.Point{
 		{Val: 1.0e-306, Ts: 10},
 		{Val: -1.0e-306, Ts: 20},
 	}
@@ -219,12 +201,7 @@ func TestRoundUnderflow(t *testing.T) {
 		{Val: 0, Ts: 10},
 		{Val: 0, Ts: 20},
 	}
-	input := models.Series{
-		Interval:   10,
-		QueryPatt:  "underflow",
-		Target:     "underflow",
-		Datapoints: getCopy(minisculeDatapoint),
-	}
+	input := getSeriesNamed("underflow", minisculeDatapoints)
 
 	testData := []TestCase{
 		{
@@ -242,7 +219,7 @@ func TestRoundUnderflow(t *testing.T) {
 }
 
 func TestRoundTiny(t *testing.T) {
-	minisculeDatapoint := []schema.Point{
+	minisculeDatapoints := []schema.Point{
 		{Val: 1.123e-36, Ts: 10},
 		{Val: -1.123e-36, Ts: 20},
 	}
@@ -250,12 +227,7 @@ func TestRoundTiny(t *testing.T) {
 		{Val: 1.12e-36, Ts: 10},
 		{Val: -1.12e-36, Ts: 20},
 	}
-	input := models.Series{
-		Interval:   10,
-		QueryPatt:  "underflow",
-		Target:     "underflow",
-		Datapoints: getCopy(minisculeDatapoint),
-	}
+	input := getSeriesNamed("underflow", minisculeDatapoints)
 
 	testData := []TestCase{
 		{
