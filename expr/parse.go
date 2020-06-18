@@ -403,7 +403,7 @@ func parseString(s string) (string, string, error) {
 // metric name / path expression is defined by the following criteria:
 // 1. Not a function name
 // 2. Consists only of name characters
-// 	2.1 '=' / ' ' are conditionally allowed if ';' is found (denoting tag format)
+// 	2.1 '=' and ' ' are conditionally allowed if ';' is found (denoting tag format)
 // 	2.2 ',' is conditionally allowed within matching '{}'
 // 3. Is not a string literal (i.e. contained within single/double quote pairs)
 func extractMetric(m string) string {
