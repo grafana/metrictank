@@ -82,6 +82,28 @@ func TestAliasByMetricWithTags(t *testing.T) {
 	)
 }
 
+func TestAliasByMetricWithTagsWithSpaces(t *testing.T) {
+	originalMetric := "my.test;my tag=my value"
+	expectedMetric := "test;my tag=my value"
+
+	testAliasByMetric(
+		[]models.Series{
+			// No Function wrapper
+			getSeriesNamed(originalMetric, a),
+			// Function wrapper - single
+			getSeries("functionBlah("+originalMetric+", funcValue1, funcValue2)", originalMetric, a),
+			// Function wrapper - multiple
+			getSeries("functionBlah(functionBlahBlah("+originalMetric+"),funcValue1, funcValue2)", originalMetric, a),
+		},
+		[]models.Series{
+			getSeriesNamed(expectedMetric, a),
+			getSeriesNamed(expectedMetric, a),
+			getSeriesNamed(expectedMetric, a),
+		},
+		t,
+	)
+}
+
 func testAliasByMetric(in []models.Series, out []models.Series, t *testing.T) {
 	f := NewAliasByMetric()
 	f.(*FuncAliasByMetric).in = NewMock(in)
