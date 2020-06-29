@@ -15,7 +15,8 @@ func TestParse(t *testing.T) {
 		e   *expr
 		err error
 	}{
-		{"metric",
+		{
+			"metric",
 			&expr{str: "metric"},
 			nil,
 		},
@@ -24,7 +25,8 @@ func TestParse(t *testing.T) {
 			&expr{str: "metric.foo"},
 			nil,
 		},
-		{"metric.*.foo",
+		{
+			"metric.*.foo",
 			&expr{str: "metric.*.foo"},
 			nil,
 		},
@@ -70,6 +72,35 @@ func TestParse(t *testing.T) {
 			nil,
 		},
 		{
+			"func1(metric1,func2(func3(func4(metricA,'foo'))))",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "func3",
+								etype: etFunc,
+								args: []*expr{
+									{str: "func4",
+										etype:   etFunc,
+										args:    []*expr{{str: "metricA"}, {etype: etString, str: "foo"}},
+										argsStr: "metricA,'foo'",
+									},
+								},
+								argsStr: "func4(metricA,'foo')",
+							},
+						},
+						argsStr: "func3(func4(metricA,'foo'))",
+					},
+				},
+				argsStr: "metric1,func2(func3(func4(metricA,'foo')))",
+			},
+			nil,
+		},
+		{
 			"func1(metric1,func2(metricA, metricB),metric3)",
 			&expr{
 				str:   "func1",
@@ -86,7 +117,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"3",
 			&expr{int: 3, str: "3", etype: etInt},
@@ -151,7 +181,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"func1(metric1, -3 , 'foo' )",
 			&expr{
@@ -166,7 +195,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"func(metric, key='value')",
 			&expr{
@@ -240,7 +268,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"func(metric, 1, key='value')",
 			&expr{
@@ -341,7 +368,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			`foo.{bar,baz}.qux`,
 			&expr{
@@ -384,9 +410,9 @@ func TestParse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		e, _, err := Parse(tt.s)
+		e, leftover, err := Parse(tt.s)
 		if err != tt.err {
-			t.Errorf("case %+v expected err %v, got %v", tt.s, tt.err, err)
+			t.Errorf("case %+v expected err %v, got %v (leftover: %q", tt.s, tt.err, err, leftover)
 			continue
 		}
 		if !reflect.DeepEqual(e, tt.e) {
@@ -403,12 +429,15 @@ func TestParse(t *testing.T) {
 ### got ###
 %s
 
-###diff ###
-%s`
-			t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs))
-		}
+### diff ###
+%s
 
+### leftover ###
+%q`
+			t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs), leftover)
+		}
 	}
+
 }
 
 func TestExtractMetric(t *testing.T) {
