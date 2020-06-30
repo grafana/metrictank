@@ -28,9 +28,9 @@ type expr struct {
 	int       int64            // for etInt
 	str       string           // for etName, etFunc (func name), etString, etBool, etInt and etFloat (unparsed input value)
 	bool      bool             // for etBool
-	args      []*expr          // for etFunc: positional args which itself are expressions
+	args      []*expr          // for etFunc: positional args which itself are expressions (including piped in args)
 	namedArgs map[string]*expr // for etFunc: named args which itself are expressions
-	argsStr   string           // for etFunc: literal string of how all the args were specified
+	argsStr   string           // for etFunc: literal string of how all the args were specified (excluding piped in args)
 }
 
 func (e expr) Print(indent int) string {

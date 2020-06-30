@@ -23,6 +23,7 @@ var (
 	ErrMissingQuote        = errors.NewBadRequest("missing quote")
 	ErrUnexpectedCharacter = errors.NewBadRequest("unexpected character")
 	ErrIllegalCharacter    = errors.NewBadRequest("illegal character for function name")
+	ErrExpectingPipeFunc   = errors.NewBadRequest("pipe symbol must be followed by function call")
 )
 
 type ErrBadArgument struct {
@@ -118,7 +119,7 @@ type MetricRequest struct {
 func ParseMany(targets []string) ([]*expr, error) {
 	var out []*expr
 	for _, target := range targets {
-		e, leftover, err := Parse(target)
+		e, leftover, err := Parse(target, false)
 		if err != nil {
 			return nil, err
 		}
@@ -130,13 +131,19 @@ func ParseMany(targets []string) ([]*expr, error) {
 	return out, nil
 }
 
+func skipWhitespace(s string) string {
+	for len(s) > 1 && s[0] == ' ' {
+		s = s[1:]
+	}
+	return s
+}
+
 // Parses an expression string and turns it into an expression
 // also returns any leftover data that could not be parsed
-func Parse(e string) (*expr, string, error) {
-	// skip whitespace
-	for len(e) > 1 && e[0] == ' ' {
-		e = e[1:]
-	}
+// piped means: the expression to be parsed is known to receive a piped input
+// (should only be set by internal calls)
+func Parse(e string, piped bool) (*expr, string, error) {
+	e = skipWhitespace(e)
 
 	if len(e) == 0 {
 		return nil, "", ErrMissingExpr
@@ -166,24 +173,64 @@ func Parse(e string) (*expr, string, error) {
 		return nil, e, ErrMissingArg
 	}
 
+	var exp *expr
+	var err error
+
 	if e != "" && e[0] == '(' {
+		// in this case, our parsed name is a function
 		for i := range name {
 			if !isFnChar(name[i]) {
 				return nil, "", ErrIllegalCharacter
 			}
 		}
 
-		exp := &expr{str: name, etype: etFunc}
+		exp = &expr{str: name, etype: etFunc}
 
-		ArgString, posArgs, namedArgs, e, err := parseArgList(e)
-		exp.argsStr = ArgString
-		exp.args = posArgs
-		exp.namedArgs = namedArgs
+		exp.argsStr, exp.args, exp.namedArgs, e, err = parseArgList(e, piped)
 
-		return exp, e, err
+		if err != nil {
+			return exp, e, err
+		}
+	} else {
+		// otherwise it's a metric name/pattern
+		exp = &expr{str: name, etype: etName}
 	}
 
-	return &expr{str: name, etype: etName}, e, nil
+	// both a metricname/pattern or a function may be followed by one or more pipe symbol + other function call
+	// let's say the input is "A | B | C | D"
+	// we process like so:
+	// 1) we parsed A already when we're here
+	// 2) see a pipe, parse B, and put A as the first arg into B (let's call this B+ here)
+	// 3) see another pipe, parse C, and put B+ as first arg into it, which gives C+
+	// 4) see another pipe and parse D, and we put C+ into it as first arg.
+	// note that every time we read beyond a pipe, we call this same Parse function again
+	// for this to work correctly, we should only do this discovery/parsing of the pipe chain in the top level call
+	// if we are in a sub-call to Parse (such as the Parse() called in step 2/3/4) we should not try to read upcoming
+	// pipes, but rather have the top-level consume them all.
+
+	for !piped && e != "" {
+		e = skipWhitespace(e)
+		if e == "" || e[0] != '|' {
+			break
+		}
+		e = e[1:]
+		var nextExp *expr
+		nextExp, e, err = Parse(e, true)
+		if err != nil {
+			return exp, e, err
+		}
+		if nextExp.etype != etFunc {
+			return exp, e, ErrExpectingPipeFunc
+		}
+		realArgs := nextExp.args
+		nextExp.args = []*expr{
+			exp,
+		}
+		nextExp.args = append(nextExp.args, realArgs...)
+		exp = nextExp
+	}
+
+	return exp, e, nil
 }
 
 func strToBool(val string) (bool, bool) {
@@ -214,8 +261,16 @@ func strToFloat(val string) (float64, bool) {
 	return f, true
 }
 
-// caller must assure s starts with opening paren
-func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
+// parseArgList parses a comma separated list of arguments
+// (recursively, so any args that are themselves function calls get parsed also)
+// caller must assure s starts with opening paren "("
+// parsing ends when the respective closing ")" is encountered (or an error).
+// Note: not the first closing ")". e.g. f1(f2(a),b) will parse as:
+// f1 func with args:
+//  * f2 func with args:
+//    * a
+//  * b
+func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, string, error) {
 
 	var (
 		posArgs   []*expr
@@ -225,15 +280,25 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 	if e[0] != '(' {
 		panic("arg list should start with paren. calling code should have asserted this")
 	}
-
 	ArgString := e[1:]
+	e = e[1:] // leftover
 
-	e = e[1:]
+	// arglist may be empty only if the function was piped into, but still requires a closing parenthesis
+	e = skipWhitespace(e)
+	if piped {
+		if e == "" {
+			fmt.Println("HUH DOES THIS HAPPEN. ALWAYS EXPECT AT LEAST ) (or more)")
+			return "", nil, nil, "", nil
+		}
+		if e[0] == ')' {
+			return "", nil, nil, e[1:], nil
+		}
+	}
 
 	for {
 		var arg *expr
 		var err error
-		arg, e, err = Parse(e)
+		arg, e, err = Parse(e, false)
 		if err != nil {
 			return "", nil, nil, e, err
 		}
@@ -247,7 +312,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
-			argCont, eCont, errCont := Parse(e)
+			argCont, eCont, errCont := Parse(e, false)
 			if errCont != nil {
 				return "", nil, nil, eCont, errCont
 			}
@@ -271,10 +336,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 			posArgs = append(posArgs, arg)
 		}
 
-		// after the argument, trim any trailing spaces
-		for len(e) > 0 && e[0] == ' ' {
-			e = e[1:]
-		}
+		e = skipWhitespace(e)
 
 		if e[0] == ')' {
 			return ArgString[:len(ArgString)-len(e)], posArgs, namedArgs, e[1:], nil
@@ -288,7 +350,7 @@ func parseArgList(e string) (string, []*expr, map[string]*expr, string, error) {
 	}
 }
 
-var nameChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%&*+-/:;<>?@[]^_|~."
+var nameChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#$%&*+-/:;<>?@[]^_~."
 
 func isNameChar(r byte) bool {
 	return strings.IndexByte(nameChar, r) >= 0
