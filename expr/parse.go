@@ -24,6 +24,7 @@ var (
 	ErrUnexpectedCharacter = errors.NewBadRequest("unexpected character")
 	ErrIllegalCharacter    = errors.NewBadRequest("illegal character for function name")
 	ErrExpectingPipeFunc   = errors.NewBadRequest("pipe symbol must be followed by function call")
+	ErrIncompleteCall      = errors.NewBadRequest("incomplete function call")
 )
 
 type ErrBadArgument struct {
@@ -287,8 +288,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 	e = skipWhitespace(e)
 	if piped {
 		if e == "" {
-			fmt.Println("HUH DOES THIS HAPPEN. ALWAYS EXPECT AT LEAST ) (or more)")
-			return "", nil, nil, "", nil
+			return "", nil, nil, "", ErrIncompleteCall
 		}
 		if e[0] == ')' {
 			return "", nil, nil, e[1:], nil
@@ -296,6 +296,15 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 	}
 
 	for {
+		if e == "" {
+			if len(posArgs) > 0 || len(namedArgs) > 0 {
+				// after any arg we should always have a ')' or ','
+				return "", nil, nil, "", ErrIncompleteCall
+			}
+			// if it's our first time here then we are missing an argument
+			return "", nil, nil, "", ErrMissingArg
+		}
+
 		var arg *expr
 		var err error
 		arg, e, err = Parse(e, false)
@@ -304,7 +313,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 		}
 
 		if e == "" {
-			return "", nil, nil, "", ErrMissingComma
+			return "", nil, nil, "", ErrIncompleteCall
 		}
 
 		// we now know we're parsing a key-value pair

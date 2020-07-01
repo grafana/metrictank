@@ -59,6 +59,22 @@ func TestParse(t *testing.T) {
 			nil,
 		},
 		{
+			"func(metric",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+			},
+			ErrIncompleteCall,
+		},
+		{
+			"func(metric,)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+			},
+			ErrMissingArg,
+		},
+		{
 			"func(metric1,metric2,metric3)",
 			&expr{
 				str:   "func",
@@ -432,6 +448,28 @@ func TestParse(t *testing.T) {
 			"metric | 3",
 			&expr{str: "metric"},
 			ErrExpectingPipeFunc,
+		},
+		{
+			"metric | func(metric",
+			&expr{
+				str:   "metric",
+				etype: etName,
+			},
+			ErrIncompleteCall,
+		},
+		{
+			"metric | func(metric,)",
+			&expr{
+				str: "metric",
+			},
+			ErrMissingArg,
+		},
+		{
+			"metric | func(",
+			&expr{
+				str: "metric",
+			},
+			ErrIncompleteCall,
 		},
 		{
 			"metric;tag1=value1 | func(key='value')",
