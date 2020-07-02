@@ -176,12 +176,30 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, optimizations Opt
 
 // newplan adds requests as needed for the given expr, resolving function calls as needed
 func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, []Req, error) {
+
+	// surpress duplicate queries such as target=foo&target=foo
+	// note that unless `pre-normalization = false`,
+	// this cannot surpress duplicate reqs in these cases:
+	// target=foo&target=sum(foo)      // reqs are different, one has a PNGroup set
+	// target=sum(foo)&target=sum(foo) // reqs get different PNGroups
+	// perhaps in the future we can improve on this and
+	// deduplicate the largest common (sub)expressions
+
+	addReqIfNew := func(req Req) {
+		for _, r := range reqs {
+			if r == req {
+				return
+			}
+		}
+		reqs = append(reqs, req)
+	}
+
 	if e.etype != etFunc && e.etype != etName {
 		return nil, nil, errors.NewBadRequest("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
 		req := NewReqFromContext(e.str, context)
-		reqs = append(reqs, req)
+		addReqIfNew(req)
 		return NewGet(req), reqs, nil
 	} else if e.etype == etFunc && e.str == "seriesByTag" {
 		// `seriesByTag` function requires resolving expressions to series
@@ -191,7 +209,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		// TODO - find a way to prevent this parse/encode/parse/encode loop
 		expressionStr := "seriesByTag(" + e.argsStr + ")"
 		req := NewReqFromContext(expressionStr, context)
-		reqs = append(reqs, req)
+		addReqIfNew(req)
 		return NewGet(req), reqs, nil
 	}
 	// here e.type is guaranteed to be etFunc
