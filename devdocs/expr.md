@@ -60,7 +60,7 @@ Note: even if the same series is present elsewhere in the datamap, each copy is 
 
 # function processing
 
-loading data and feeding into the function processing chain happens through FuncGet, which lookups data based on the expr.Req coming from the user, which maps 1:1 to the datamap above.
+Loading data and feeding into the function processing chain happens through FuncGet, which looks up data based on the expr.Req coming from the user, which maps 1:1 to the datamap above.
 In particular: it takes into account pngroups (even if they lead to equivalent fetches and thus identical series). But each copy of a series is a distinct, deep copy.
 It is important to note that any series may be processed or returned more than once. E.g. a query like `target=a&target=a`. For this reason, any function or operation such as runtime consolidation, needs to make sure not to effect the contents of the datamap.
 How we solve this is described in the section "Considerations around Series changes and reuse and why we chose copy-on-write" below.
