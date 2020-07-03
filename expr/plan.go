@@ -330,6 +330,9 @@ func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 		}
 		out = append(out, series...)
 	}
+
+	// while 'out' contains copies of the series, the datapoints, meta and tags properties need COW
+	// see devdocs/expr.md
 	for i, o := range out {
 		if p.MaxDataPoints != 0 && len(o.Datapoints) > int(p.MaxDataPoints) {
 			// series may have been created by a function that didn't know which consolidation function to default to.
@@ -337,12 +340,16 @@ func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 			if o.Consolidator == 0 {
 				o.Consolidator = consolidation.Avg
 			}
-			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
+			pointsCopy := pointSlicePoolGet(len(o.Datapoints))
+			pointsCopy = pointsCopy[:len(o.Datapoints)]
+			copy(pointsCopy, o.Datapoints)
+			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(pointsCopy, o.Interval, p.MaxDataPoints, o.Consolidator)
 			out[i].Meta = out[i].Meta.CopyWithChange(func(in models.SeriesMetaProperties) models.SeriesMetaProperties {
 				in.AggNumRC = consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
 				in.ConsolidatorRC = o.Consolidator
 				return in
 			})
+			dataMap.Add(Req{}, out[i])
 		}
 	}
 	return out, nil
