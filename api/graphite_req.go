@@ -37,7 +37,7 @@ func (r ReqMap) Dump() string {
 	out := fmt.Sprintf("ReqsMap (%d entries):\n", r.cnt)
 	out += "  Groups:\n"
 	for i, reqs := range r.pngroups {
-		out += fmt.Sprintf("    * group %d:", i)
+		out += fmt.Sprintf("    * group %d:\n", i)
 		for _, r := range reqs {
 			out += "      " + r.DebugString() + "\n"
 		}
