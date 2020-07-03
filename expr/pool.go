@@ -20,13 +20,10 @@ func Pool(p *sync.Pool) {
 // pointSlicePoolGet returns a pointslice of at least minCap capacity.
 // similar code lives also in api.Fix(). at some point we should really clean up our pool code.
 func pointSlicePoolGet(minCap int) []schema.Point {
-	// 3 attempts to get a sufficiently sized slice from the pool. if it fails, allocate a new one
-	for attempt := 1; attempt < 4; attempt++ {
-		candidate := pointSlicePool.Get().([]schema.Point)
-		if cap(candidate) >= minCap {
-			return candidate
-		}
-		pointSlicePool.Put(candidate)
+	candidate := pointSlicePool.Get().([]schema.Point)
+	if cap(candidate) >= minCap {
+		return candidate
 	}
+	pointSlicePool.Put(candidate)
 	return make([]schema.Point, 0, minCap)
 }
