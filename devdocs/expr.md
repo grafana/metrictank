@@ -99,19 +99,30 @@ example: an averageSeries() of 3 series:
 
 ## Introduction
 
-The `models.Series` type, even when passed by value, has a few fields that need special attention:
-* `Datapoints []schema.Point`
-* `Tags       map[string]string`
-* `Meta       SeriesMeta`
+`plan.Run()` runs all function processing as well as any needed follup, such as runtime consolidation.
+To do this, it has a dataMap as its source of data. For more information on how this structure is generated,
+see above. But the TLDR is that it is the source of truth of series data, keyed by the expr.Req,
+and that each entry in the datamap may be read more than once (if the same expression is used multiple times in a query)
 
-Many processing functions, as well as other code running after function processing (e.g. runtime normalization)
-will want to return an output series that differs from the input in terms of datapoints, tags or metadata.
-They need a place to store their output but we cannot simply operate on the input series, or even a copy of it, as the underlying datastructures are shared.
-(in particular, shared with the canonical copies inside of the datamap. The same series may be pulled out of the datamap multiple times if the same target is used more than once in a query).
+Many processing functions (or runtime consolidation) will want to return an output series that differs from the input,
+e.g. a different target or interval, tags, datapoints, etc.
+
+This requires 2 special considerations:
+
+1. Since in most of the processing chain, series are passed as series lists (`in []models.Series`),
+any change such as `in[0].Interval = <newvalue>` will impact the entry in the datamap.
+2. The `models.Series` type, even when copied or passed by value, still has a few fields that need special attention, because
+  the underlying datastructures are shared. These are:
+  - `Datapoints []schema.Point`
+  - `Tags       map[string]string`
+  - `Meta       SeriesMeta`
+
+Thus, when making changes, we need a place to store the new output. For 1. it suffices to take a copy of the series struct itself,
+for 2, we need to copy the underlying datastructures.
 
 ## Goals
 
-* processing should not modify data if that data needs to remain original (e.g. because of re-use of the same input data elsewhere)
+* processing functions should not modify data if that data needs to remain original (e.g. because of re-use of the same input data elsewhere)
 * minimize allocations of new structures foremost
 * minimize data copying as a smaller concern
 * simple code
