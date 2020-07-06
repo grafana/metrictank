@@ -176,12 +176,30 @@ func NewPlan(exprs []*expr, from, to, mdp uint32, stable bool, optimizations Opt
 
 // newplan adds requests as needed for the given expr, resolving function calls as needed
 func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, []Req, error) {
+
+	// suppress duplicate queries such as target=foo&target=foo
+	// note that unless `pre-normalization = false`,
+	// this cannot suppress duplicate reqs in these cases:
+	// target=foo&target=sum(foo)      // reqs are different, one has a PNGroup set
+	// target=sum(foo)&target=sum(foo) // reqs get different PNGroups
+	// perhaps in the future we can improve on this and
+	// deduplicate the largest common (sub)expressions
+
+	addReqIfNew := func(req Req) {
+		for _, r := range reqs {
+			if r == req {
+				return
+			}
+		}
+		reqs = append(reqs, req)
+	}
+
 	if e.etype != etFunc && e.etype != etName {
 		return nil, nil, errors.NewBadRequest("request must be a function call or metric pattern")
 	}
 	if e.etype == etName {
 		req := NewReqFromContext(e.str, context)
-		reqs = append(reqs, req)
+		addReqIfNew(req)
 		return NewGet(req), reqs, nil
 	} else if e.etype == etFunc && e.str == "seriesByTag" {
 		// `seriesByTag` function requires resolving expressions to series
@@ -191,7 +209,7 @@ func newplan(e *expr, context Context, stable bool, reqs []Req) (GraphiteFunc, [
 		// TODO - find a way to prevent this parse/encode/parse/encode loop
 		expressionStr := "seriesByTag(" + e.argsStr + ")"
 		req := NewReqFromContext(expressionStr, context)
-		reqs = append(reqs, req)
+		addReqIfNew(req)
 		return NewGet(req), reqs, nil
 	}
 	// here e.type is guaranteed to be etFunc
@@ -312,6 +330,9 @@ func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 		}
 		out = append(out, series...)
 	}
+
+	// while 'out' contains copies of the series, the datapoints, meta and tags properties need COW
+	// see devdocs/expr.md
 	for i, o := range out {
 		if p.MaxDataPoints != 0 && len(o.Datapoints) > int(p.MaxDataPoints) {
 			// series may have been created by a function that didn't know which consolidation function to default to.
@@ -319,12 +340,16 @@ func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 			if o.Consolidator == 0 {
 				o.Consolidator = consolidation.Avg
 			}
-			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(o.Datapoints, o.Interval, p.MaxDataPoints, o.Consolidator)
+			pointsCopy := pointSlicePoolGet(len(o.Datapoints))
+			pointsCopy = pointsCopy[:len(o.Datapoints)]
+			copy(pointsCopy, o.Datapoints)
+			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(pointsCopy, o.Interval, p.MaxDataPoints, o.Consolidator)
 			out[i].Meta = out[i].Meta.CopyWithChange(func(in models.SeriesMetaProperties) models.SeriesMetaProperties {
 				in.AggNumRC = consolidation.AggEvery(uint32(len(o.Datapoints)), p.MaxDataPoints)
 				in.ConsolidatorRC = o.Consolidator
 				return in
 			})
+			dataMap.Add(Req{}, out[i])
 		}
 	}
 	return out, nil

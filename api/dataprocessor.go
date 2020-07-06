@@ -71,18 +71,14 @@ func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 		// the requested range is too narrow for the requested interval
 		return []schema.Point{}
 	}
-	// 3 attempts to get a sufficiently sized slice from the pool. if it fails, allocate a new one.
+	// try to get a sufficiently sized slice from the pool. if it fails, allocate a new one.
 	var out []schema.Point
 	neededCap := int((last-first)/interval + 1)
-	for attempt := 1; attempt < 4; attempt++ {
-		candidate := pointSlicePool.Get().([]schema.Point)
-		if cap(candidate) >= neededCap {
-			out = candidate[:neededCap]
-			break
-		}
+	candidate := pointSlicePool.Get().([]schema.Point)
+	if cap(candidate) >= neededCap {
+		out = candidate[:neededCap]
+	} else {
 		pointSlicePool.Put(candidate)
-	}
-	if out == nil {
 		out = make([]schema.Point, neededCap)
 	}
 
