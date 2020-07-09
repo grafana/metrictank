@@ -41,7 +41,7 @@ func (s *FuncInvert) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	for i, serie := range series {
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 
 		for _, p := range serie.Datapoints {
 			out = append(out, schema.Point{Val: newVal(p.Val), Ts: p.Ts})

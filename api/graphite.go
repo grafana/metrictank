@@ -897,7 +897,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 		New: func(in models.Series) {
 		},
 		Done: func(in models.Series) {
-			pointSlicePool.Put(in.Datapoints[:0])
+			pointSlicePool.Put(in.Datapoints)
 		},
 	})
 

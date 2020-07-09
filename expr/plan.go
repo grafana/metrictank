@@ -340,7 +340,7 @@ func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 			if o.Consolidator == 0 {
 				o.Consolidator = consolidation.Avg
 			}
-			pointsCopy := pointSlicePoolGet(len(o.Datapoints))
+			pointsCopy := pointSlicePool.GetMin(len(o.Datapoints))
 			pointsCopy = pointsCopy[:len(o.Datapoints)]
 			copy(pointsCopy, o.Datapoints)
 			out[i].Datapoints, out[i].Interval = consolidation.ConsolidateNudged(pointsCopy, o.Interval, p.MaxDataPoints, o.Consolidator)

@@ -36,7 +36,7 @@ func (s *FuncConstantLine) Context(context Context) Context {
 }
 
 func (s *FuncConstantLine) Exec(dataMap DataMap) ([]models.Series, error) {
-	out := pointSlicePool.Get().([]schema.Point)
+	out := pointSlicePool.Get()
 
 	out = append(out, schema.Point{Val: s.value, Ts: s.first})
 	diff := s.last - s.first

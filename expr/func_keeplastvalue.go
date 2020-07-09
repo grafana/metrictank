@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncKeepLastValue struct {
@@ -50,7 +49,7 @@ func (s *FuncKeepLastValue) Exec(dataMap DataMap) ([]models.Series, error) {
 	for _, serie := range series {
 		serie.Target = fmt.Sprintf("keepLastValue(%s)", serie.Target)
 		serie.QueryPatt = serie.Target
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 
 		var consecutiveNaNs int
 		lastVal := math.NaN()

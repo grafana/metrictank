@@ -6,7 +6,6 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncNonNegativeDerivative struct {
@@ -40,7 +39,7 @@ func (s *FuncNonNegativeDerivative) Exec(dataMap DataMap) ([]models.Series, erro
 	outSeries := make([]models.Series, 0, len(series))
 
 	for _, serie := range series {
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {

@@ -6,7 +6,6 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncIntegral struct {
@@ -42,7 +41,7 @@ func (s *FuncIntegral) Exec(dataMap DataMap) ([]models.Series, error) {
 
 		current := 0.0
 
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {
 				current += p.Val

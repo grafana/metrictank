@@ -361,7 +361,7 @@ func benchmarkGroupByTags(b *testing.B, numInputSeries, numOutputSeries int) {
 
 		if true {
 			for _, serie := range results {
-				pointSlicePool.Put(serie.Datapoints[:0])
+				pointSlicePool.Put(serie.Datapoints)
 			}
 		}
 	}

@@ -2,7 +2,6 @@ package expr
 
 import (
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncGroupByNodes struct {
@@ -96,7 +95,7 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		group.s = Normalize(group.s, NewCOWCycler(dataMap))
 		outSeries.Interval = group.s[0].Interval
 		outSeries.SetTags()
-		outSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
+		outSeries.Datapoints = pointSlicePool.Get()
 		aggFunc(group.s, &outSeries.Datapoints)
 		output = append(output, outSeries)
 	}

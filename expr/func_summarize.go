@@ -91,7 +91,7 @@ func (s *FuncSummarize) Exec(dataMap DataMap) ([]models.Series, error) {
 }
 
 func summarizeValues(serie models.Series, aggFunc batch.AggFunc, interval, start, end uint32) []schema.Point {
-	out := pointSlicePool.Get().([]schema.Point)
+	out := pointSlicePool.Get()
 
 	numPoints := len(serie.Datapoints)
 

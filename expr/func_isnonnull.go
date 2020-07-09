@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncIsNonNull struct {
@@ -37,7 +36,7 @@ func (s *FuncIsNonNull) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.QueryPatt = fmt.Sprintf("isNonNull(%s)", serie.QueryPatt)
 		serie.Tags = serie.CopyTagsWith("isNonNull", "1")
 
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = 0

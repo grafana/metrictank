@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/grafana/metrictank/schema"
-
 	"github.com/grafana/metrictank/api/models"
 )
 
@@ -48,7 +46,7 @@ func (s *FuncRemoveAboveBelowValue) Exec(dataMap DataMap) ([]models.Series, erro
 		}
 		serie.QueryPatt = serie.Target
 
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 		for _, p := range serie.Datapoints {
 			if s.above {
 				if p.Val > s.n {
