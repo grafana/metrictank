@@ -268,6 +268,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	execCtx, execSpan := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
 	defer execSpan.Finish()
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, &plan)
+	defer plan.Clean()
 	if err != nil {
 		err := response.WrapError(err)
 		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
@@ -317,7 +318,6 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 			response.Write(ctx, response.NewFastJson(200, models.SeriesByTarget(out)))
 		}
 	}
-	plan.Clean()
 }
 
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
