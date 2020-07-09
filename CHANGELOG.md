@@ -1,6 +1,7 @@
 # master
 
 ## breaking changes
+
 * as of v0.13.1-788-g79e4709 (see: #1831) the option `reject-invalid-tags` was removed. Another option named `reject-invalid-input` was added to take its place, and the default value is set to `true`. This new option rejects invalid tags and invalid UTF8 data found in either the metric name or the tag key or tag value. The exported stat `input.xx.metricdata.discarded.invalid_tag` was also changed to `input.xx.metricdata.discarded.invalid_input`, so dashboards will need to be updated accordingly.
 * as of v0.13.1-384-g82dedf95 the meta record index configuration parameters have been moved out
   of the section `cassandra-idx`, they now have their own section `cassandra-meta-record-idx`.
@@ -25,9 +26,9 @@
   now gets enabled due to this change then the tags would be treated as tags and they wouldn't
   be part of the metric name anymore. As a result there is a very unlikely scenario in which some
   queries don't return the same results as before, if they query for tags as part of the metric
-  name.
+  name. (note: meta tags still disabled by default)
   #1619
-* as of v0.13.1-250-g21d1dcd1 metrictank no longer excessively aligns all data to the same
+* as of v0.13.1-250-g21d1dcd1 (#951) metrictank no longer excessively aligns all data to the same
   lowest comon multiple resolution, but rather keeps data at their native resolution when possible.
   1. When queries request mixed resolution data, this will now typically result in larger response datasets,
   with more points, and thus slower responses.
@@ -55,24 +56,68 @@
   B) do a colored deployment: create a new gossip cluster that has the optimization enabled from the get-go,
      then delete the older deployment.
 * as of v0.13.1-433-g4c801819, metrictank proxies bad requests to graphite.
-  though as of <TODO> this is configurable via the `http.proxy-bad-requests` flag.
+  though as of v0.13.1-577-g07eed80f this is configurable via the `http.proxy-bad-requests` flag.
   Leave enabled if your queries are in the grey zone (rejected by MT, tolerated by graphite),
   disable if you don't like the additional latency.
   The aspiration is to remove this entire feature once we work out any more kinks in metrictank's request validation.
 
+## index
+
+* performance improvement meta tags #1541, #1542
+* Meta tag support bigtable. #1646
+* bugfix: return correct counts when deleting multiple tagged series. #1641
+* fix: auto complete should not ignore meta tags if they are also metric tags. #1649
+* fix: update cass/bt index when deleting tagged metrics. #1657
+* fix various index bugs. #1664, #1667, #1748, #1766, #1833
+* bigtable index fix: only load current metricdefs. #1564
+* Fix deadlock when write queue full. #1569
+
+## fakemetrics
+
+* filters. first filter is an "offset filter". #1762
+* import 'schemasbackfill' mode. #1666
+* carbon tag support. #1691
+* add values policy. #1773
+* configurable builders + "daily-sine" value policy. #1815
+
+## other tools
+
+* mt-gateway: new tool to receive data over http and save into kafka, for MT to consume.  #1608, #1627, #1645
+* mt-parrot: continuous validation by sending dummy stats and querying them back. #1680
+* mt-whisper-importer-reader: print message when everything done with the final stats. #1617
+
+## new native processing functions
+
+* aggregate() #1751
+* aliasByMetric() #1755
+* constantLine() #1734 (note: due to a yet undiagnosed bug, was disabled in #1783 )
+* groupByNode, groupByNodes. #1753, #1774
+* invert(). #1791
+* minMax(). #1792
+* offset() #1621
+* removeEmptySeries() #1754
+* round() #1719
+* unique() #1745
+
 ## other
 
 * dashboard tweaks. #1557, #1618
-* performance improvement meta tags #1541, #1542
-* docs improvements #1559 , #1620
-* bigtable index fix: only load current metricdefs. #1564
-* Fix deadlock when write queue full. #1569
+* docs improvements #1559 , #1620, #1594, #1796
 * tags/findSeries - add lastts-json format. #1580
 * add catastrophe recovery for cassandra (re-resolve when all IP's have changed). #1579
-* mt-whisper-importer-reader: print message when everything done with the final stats. #1617
 * Add `/tags/terms` query to get counts of tag values #1582 
-* add function offset() #1621
 * expr: be more lenient: allow quoted ints and floats #1622
+* Replaced Macaron logger with custom logger enabling query statistics. #1634
+* Logger middleware: support gzipped responses from graphite-web. #1693
+* Fix error status codes. #1684
+* Kafka ssl support. #1701
+* Aggmetrics: track how long a GC() run takes and how many series deleted #1746
+* only connect to peers that have non-null ip address. #1758
+* Added a panic recovery middleware after the logger so that we know what the query was that triggered a panic. #1784
+* asPercent: don't panic on empty input. #1788
+* Return 499 http code instead of 502 when client disconnect during a render query with graphite proxying. #1821
+* Deduplicate resolve series requests. #1794
+* Deduplicate duplicate fetches #1855
   
 # v0.13.1: Meta tag and http api improvements, lineage metadata, per partition metrics and more. Nov 28, 2019.
 
