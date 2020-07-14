@@ -71,6 +71,7 @@ Available Commands:
   agginput         A particular workload good to test performance of carbon-relay-ng aggregators
   backfill         backfills old data and stops when 'now' is reached
   bad              Sends out invalid/out-of-order/duplicate metric data
+  containers       Mimic a set of containers - with churn - whose stats get reported at the same time
   feed             Publishes a realtime feed of data
   help             Help about any command
   resolutionchange Sends out metric with changing intervals, time range 24hours
