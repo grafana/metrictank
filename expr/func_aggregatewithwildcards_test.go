@@ -24,7 +24,7 @@ func TestAggregateWithWildcardsIdentity(t *testing.T) {
 		getSeriesNamed("averageSeries(single)", a),
 		t,
 		0,
-		[]expr{{etype: etInt, int: 1}},
+		[]expr{},
 	)
 	testAggregateWithWildcards(
 		"identity",
@@ -35,7 +35,7 @@ func TestAggregateWithWildcardsIdentity(t *testing.T) {
 		getSeriesNamed("sumSeries(single)", a),
 		t,
 		0,
-		[]expr{{etype: etInt, int: 1}},
+		[]expr{},
 	)
 }
 func TestAggregateWithWildcardsAvg(t *testing.T) {
