@@ -476,3 +476,38 @@ func aggKey(serie models.Series, nodes []expr) string {
 	}
 	return strings.Join(name, ".")
 }
+
+// filterNodesByPositions removes the node at the given position(s)
+func filterNodesByPositions(serie models.Series, nodes []expr) (string, error) {
+	metric := extractMetric(serie.Target)
+	if len(metric) == 0 {
+		return "", fmt.Errorf("invalid metric name")
+	}
+	// Trim off tags (if they are there) and split on '.'
+	parts := strings.Split(strings.SplitN(metric, ";", 2)[0], ".")
+	name := parts[:0]
+
+	n := 0
+	for i, p := range parts {
+		// if we have already reached the end of the nodes to filter, just add all remaining parts to name
+		if n >= len(nodes) {
+			name = append(name, p)
+			continue
+		}
+
+		// we don't perform a check of ettype here. This should be done before calling this function
+		idx := int(nodes[n].int)
+		if idx >= len(parts) || idx < 0 {
+			return "", fmt.Errorf("invalid node: %d", idx)
+		}
+
+		// if our idx matches the current position, incremenmt and continue
+		if idx == i {
+			n++
+			continue
+		}
+
+		name = append(name, p)
+	}
+	return strings.Join(name, "."), nil
+}
