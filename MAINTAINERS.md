@@ -1,8 +1,8 @@
-# Current Members
+@Dieterbe is the main/default maintainer, some parts of the codebase have other maintainers:
 
-* Anthony Woods ([Grafana Labs](https://grafana.com)) (awoods@grafana.com)
-* Dieter Plaetinck ([Grafana Labs](https://grafana.com)) (dieter@grafana.com)
-* Florian Boucault ([Grafana Labs](https://grafana.com)) (florian.boucault@grafana.com)
-* Mauro Stettler ([Grafana Labs](https://grafana.com)) (mauro.stettler@grafana.com)
-* Robert Milan ([Grafana Labs](https://grafana.com)) (robert@grafana.com)
-* Sean Hanson ([Bloomberg LP](https://bloomberg.com)) (shanson7@bloomberg.net)
+* idx:
+  * @replay , @robert-milan, @woodsaj, @shanson7
+* expr:
+  * @Dieterbe, @robert-milan, @shanson7
+* api:
+  * @Dieterbe, @replay, @robert-milan, @shanson7
