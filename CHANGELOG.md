@@ -1,12 +1,7 @@
-# master
+# 1.0
 
 ## breaking changes
 
-* as of v0.13.1-788-g79e4709 (see: #1831) the option `reject-invalid-tags` was removed. Another option named `reject-invalid-input` was added to take its place, and the default value is set to `true`. This new option rejects invalid tags and invalid UTF8 data found in either the metric name or the tag key or tag value. The exported stat `input.xx.metricdata.discarded.invalid_tag` was also changed to `input.xx.metricdata.discarded.invalid_input`, so dashboards will need to be updated accordingly.
-* as of v0.13.1-384-g82dedf95 the meta record index configuration parameters have been moved out
-  of the section `cassandra-idx`, they now have their own section `cassandra-meta-record-idx`.
-* as of v0.13.1-186-gc75005d the `/tags/delSeries` no longer accepts a `propagate` parameter.
-  It is no longer possible to send the request to only a single node, it now always propagates to all nodes, bringing this method in line with `/metrics/delete`.
 * as of v0.13.1-38-gb88c3b84 by default we reject data points with a timestamp far in the future.
   By default the cutoff is at 10% of the raw retention's TTL, so for example with the default
   storage schema `1s:35d:10min:7` the cutoff is at `35d*0.1=3.5d`. 
@@ -28,6 +23,8 @@
   queries don't return the same results as before, if they query for tags as part of the metric
   name. (note: meta tags still disabled by default)
   #1619
+* as of v0.13.1-186-gc75005d the `/tags/delSeries` no longer accepts a `propagate` parameter.
+  It is no longer possible to send the request to only a single node, it now always propagates to all nodes, bringing this method in line with `/metrics/delete`.
 * as of v0.13.1-250-g21d1dcd1 (#951) metrictank no longer excessively aligns all data to the same
   lowest comon multiple resolution, but rather keeps data at their native resolution when possible.
   1. When queries request mixed resolution data, this will now typically result in larger response datasets,
@@ -55,11 +52,14 @@
      upgrade query or shard nodes.
   B) do a colored deployment: create a new gossip cluster that has the optimization enabled from the get-go,
      then delete the older deployment.
+* as of v0.13.1-384-g82dedf95 the meta record index configuration parameters have been moved out
+  of the section `cassandra-idx`, they now have their own section `cassandra-meta-record-idx`.
 * as of v0.13.1-433-g4c801819, metrictank proxies bad requests to graphite.
   though as of v0.13.1-577-g07eed80f this is configurable via the `http.proxy-bad-requests` flag.
   Leave enabled if your queries are in the grey zone (rejected by MT, tolerated by graphite),
   disable if you don't like the additional latency.
   The aspiration is to remove this entire feature once we work out any more kinks in metrictank's request validation.
+* as of v0.13.1-788-g79e4709 (see: #1831) the option `reject-invalid-tags` was removed. Another option named `reject-invalid-input` was added to take its place, and the default value is set to `true`. This new option rejects invalid tags and invalid UTF8 data found in either the metric name or the tag key or tag value. The exported stat `input.xx.metricdata.discarded.invalid_tag` was also changed to `input.xx.metricdata.discarded.invalid_input`, so dashboards will need to be updated accordingly.
 
 ## index
 
@@ -79,6 +79,7 @@
 * carbon tag support. #1691
 * add values policy. #1773
 * configurable builders + "daily-sine" value policy. #1815
+* add a "Containers" mode to fakemetrics with configurable churn #1859
 
 ## other tools
 
@@ -118,6 +119,7 @@
 * Return 499 http code instead of 502 when client disconnect during a render query with graphite proxying. #1821
 * Deduplicate resolve series requests. #1794
 * Deduplicate duplicate fetches #1855
+* set points-return more accurately. #1835
   
 # v0.13.1: Meta tag and http api improvements, lineage metadata, per partition metrics and more. Nov 28, 2019.
 
