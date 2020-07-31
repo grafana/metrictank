@@ -15,7 +15,8 @@ func TestParse(t *testing.T) {
 		e   *expr
 		err error
 	}{
-		{"metric",
+		{
+			"metric",
 			&expr{str: "metric"},
 			nil,
 		},
@@ -24,7 +25,8 @@ func TestParse(t *testing.T) {
 			&expr{str: "metric.foo"},
 			nil,
 		},
-		{"metric.*.foo",
+		{
+			"metric.*.foo",
 			&expr{str: "metric.*.foo"},
 			nil,
 		},
@@ -57,6 +59,22 @@ func TestParse(t *testing.T) {
 			nil,
 		},
 		{
+			"func(metric",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+			},
+			ErrIncompleteCall,
+		},
+		{
+			"func(metric,)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+			},
+			ErrMissingArg,
+		},
+		{
 			"func(metric1,metric2,metric3)",
 			&expr{
 				str:   "func",
@@ -66,6 +84,35 @@ func TestParse(t *testing.T) {
 					{str: "metric2"},
 					{str: "metric3"}},
 				argsStr: "metric1,metric2,metric3",
+			},
+			nil,
+		},
+		{
+			"func1(metric1,func2(func3(func4(metricA,'foo'))))",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "func3",
+								etype: etFunc,
+								args: []*expr{
+									{str: "func4",
+										etype:   etFunc,
+										args:    []*expr{{str: "metricA"}, {etype: etString, str: "foo"}},
+										argsStr: "metricA,'foo'",
+									},
+								},
+								argsStr: "func4(metricA,'foo')",
+							},
+						},
+						argsStr: "func3(func4(metricA,'foo'))",
+					},
+				},
+				argsStr: "metric1,func2(func3(func4(metricA,'foo')))",
 			},
 			nil,
 		},
@@ -86,7 +133,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"3",
 			&expr{int: 3, str: "3", etype: etInt},
@@ -151,7 +197,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"func1(metric1, -3 , 'foo' )",
 			&expr{
@@ -166,7 +211,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"func(metric, key='value')",
 			&expr{
@@ -240,7 +284,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			"func(metric, 1, key='value')",
 			&expr{
@@ -341,7 +384,6 @@ func TestParse(t *testing.T) {
 			},
 			nil,
 		},
-
 		{
 			`foo.{bar,baz}.qux`,
 			&expr{
@@ -381,12 +423,344 @@ func TestParse(t *testing.T) {
 			nil,
 			ErrIllegalCharacter,
 		},
+		// PIPE SYNTAX TESTS
+		{
+			"metric | func()",
+			&expr{
+				str:     "func",
+				etype:   etFunc,
+				args:    []*expr{{str: "metric"}},
+				argsStr: "",
+			},
+			nil,
+		},
+		{
+			"metric | abc",
+			&expr{str: "metric"},
+			ErrExpectingPipeFunc,
+		},
+		{
+			"metric | true",
+			&expr{str: "metric"},
+			ErrExpectingPipeFunc,
+		},
+		{
+			"metric | 3",
+			&expr{str: "metric"},
+			ErrExpectingPipeFunc,
+		},
+		{
+			"metric | func(metric",
+			&expr{
+				str:   "metric",
+				etype: etName,
+			},
+			ErrIncompleteCall,
+		},
+		{
+			"metric | func(metric,)",
+			&expr{
+				str: "metric",
+			},
+			ErrMissingArg,
+		},
+		{
+			"metric | func(",
+			&expr{
+				str: "metric",
+			},
+			ErrIncompleteCall,
+		},
+		{
+			"metric;tag1=value1 | func(key='value')",
+			&expr{
+				str:     "func",
+				etype:   etFunc,
+				args:    []*expr{{str: "metric;tag1=value1"}},
+				argsStr: "key='value'",
+				namedArgs: map[string]*expr{
+					"key": {etype: etString, str: "value"},
+				},
+			},
+			nil,
+		},
+		{
+			"metric1|func(metric2,metric3)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "metric2"},
+					{str: "metric3"}},
+				argsStr: "metric2,metric3",
+			},
+			nil,
+		},
+		{
+			"metric1 |  func(metric2,'stringconst',metric3)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "metric2"},
+					{str: "stringconst", etype: etString},
+					{str: "metric3"}},
+				argsStr: "metric2,'stringconst',metric3",
+			},
+			nil,
+		},
+		{
+			"metric1|func1('stringconst')",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "stringconst", etype: etString},
+				},
+				argsStr: "'stringconst'",
+			},
+			nil,
+		},
+		{
+			"metric1|func1(-3)",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{int: -3, str: "-3", etype: etInt},
+				},
+				argsStr: "-3",
+			},
+			nil,
+		},
+		{
+			" metric|func(key2='true', key1='false')",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric"},
+				},
+				namedArgs: map[string]*expr{
+					"key2": {etype: etString, str: "true"},
+					"key1": {etype: etString, str: "false"},
+				},
+				argsStr: "key2='true', key1='false'",
+			},
+			nil,
+		},
+		{
+			"metric|func(key1='value1', key2='value two is here')",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric"},
+				},
+				namedArgs: map[string]*expr{
+					"key1": {etype: etString, str: "value1"},
+					"key2": {etype: etString, str: "value two is here"},
+				},
+				argsStr: "key1='value1', key2='value two is here'",
+			},
+			nil,
+		},
+		{
+			"metric1;tag1=val1 | func(key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4)",
+			&expr{
+				str:   "func",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1;tag1=val1"},
+					{str: "metric2;tag2=val2"},
+					{str: "metric3;tag3=val3"},
+					{str: "metric4;tag4=val4"},
+				},
+				namedArgs: map[string]*expr{
+					"key1": {etype: etString, str: "value1"},
+					"key2": {etype: etBool, str: "true", bool: true},
+					"key3": {etype: etName, str: "None"},
+				},
+				argsStr: "key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4",
+			},
+			nil,
+		},
+		{
+			"metric1 | func1() | func2() | func3(3)",
+			&expr{
+				str:   "func3",
+				etype: etFunc,
+				args: []*expr{
+					{
+						str:   "func2",
+						etype: etFunc,
+						args: []*expr{
+							{
+								str:   "func1",
+								etype: etFunc,
+								args: []*expr{
+									{str: "metric1"},
+								},
+								argsStr: "",
+							},
+						},
+						argsStr: "",
+					},
+					{etype: etInt, str: "3", int: 3},
+				},
+				argsStr: "3",
+			},
+			nil,
+		},
+		{
+			"func1(metric1 | func2(), 3)",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{
+						str:   "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "metric1"},
+						},
+						argsStr: "",
+					},
+					{etype: etInt, str: "3", int: 3},
+				},
+				argsStr: "metric1 | func2(), 3",
+			},
+			nil,
+		},
+		{
+			"metric1 | func1(func2(func3(func4(metricA,'foo'))))",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "func3",
+								etype: etFunc,
+								args: []*expr{
+									{str: "func4",
+										etype:   etFunc,
+										args:    []*expr{{str: "metricA"}, {etype: etString, str: "foo"}},
+										argsStr: "metricA,'foo'",
+									},
+								},
+								argsStr: "func4(metricA,'foo')",
+							},
+						},
+						argsStr: "func3(func4(metricA,'foo'))",
+					},
+				},
+				argsStr: "func2(func3(func4(metricA,'foo')))",
+			},
+			nil,
+		},
+		{
+			"metric1 | func1(func3(func4(metricA,'foo')) | func2())",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{
+						str:   "func2",
+						etype: etFunc,
+						args: []*expr{
+							{
+								str:   "func3",
+								etype: etFunc,
+								args: []*expr{
+									{
+										str:     "func4",
+										etype:   etFunc,
+										args:    []*expr{{str: "metricA"}, {etype: etString, str: "foo"}},
+										argsStr: "metricA,'foo'",
+									},
+								},
+								argsStr: "func4(metricA,'foo')",
+							},
+						},
+						argsStr: "",
+					},
+				},
+				argsStr: "func3(func4(metricA,'foo')) | func2()",
+			},
+			nil,
+		},
+		{
+			"metric1 | func1(func4(metricA,'foo') | func3() | func2())",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "func3",
+								etype: etFunc,
+								args: []*expr{
+									{str: "func4",
+										etype:   etFunc,
+										args:    []*expr{{str: "metricA"}, {etype: etString, str: "foo"}},
+										argsStr: "metricA,'foo'",
+									},
+								},
+								argsStr: "",
+							},
+						},
+						argsStr: "",
+					},
+				},
+				argsStr: "func4(metricA,'foo') | func3() | func2()",
+			},
+			nil,
+		},
+		{
+			"metric1 | func1(metricA | func4('foo') | func3() | func2())",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{str: "metric1"},
+					{str: "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "func3",
+								etype: etFunc,
+								args: []*expr{
+									{str: "func4",
+										etype:   etFunc,
+										args:    []*expr{{str: "metricA"}, {etype: etString, str: "foo"}},
+										argsStr: "'foo'",
+									},
+								},
+								argsStr: "",
+							},
+						},
+						argsStr: "",
+					},
+				},
+				argsStr: "metricA | func4('foo') | func3() | func2()",
+			},
+			nil,
+		},
 	}
 
 	for _, tt := range tests {
-		e, _, err := Parse(tt.s)
+		e, leftover, err := Parse(tt.s, false)
 		if err != tt.err {
-			t.Errorf("case %+v expected err %v, got %v", tt.s, tt.err, err)
+			t.Errorf("case %+v expected err %v, got %v (leftover: %q)", tt.s, tt.err, err, leftover)
 			continue
 		}
 		if !reflect.DeepEqual(e, tt.e) {
@@ -403,12 +777,15 @@ func TestParse(t *testing.T) {
 ### got ###
 %s
 
-###diff ###
-%s`
-			t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs))
-		}
+### diff ###
+%s
 
+### leftover ###
+%q`
+			t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs), leftover)
+		}
 	}
+
 }
 
 func TestExtractMetric(t *testing.T) {
