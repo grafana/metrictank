@@ -1160,189 +1160,303 @@
         "y": 18
       },
       "id": 52,
-      "panels": [
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$datasource",
-          "editable": true,
-          "error": false,
-          "fill": 1,
-          "grid": {},
-          "gridPos": {
-            "h": 5,
-            "w": 8,
-            "x": 0,
-            "y": 25
-          },
-          "id": 13,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": false,
-          "linewidth": 2,
-          "links": [],
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 1,
-          "points": true,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "duration",
-              "lines": false,
-              "pointradius": 1,
-              "points": true,
-              "yaxis": 2
-            }
-          ],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
-            },
-            {
-              "refId": "B",
-              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Golang GC",
-          "tooltip": {
-            "msResolution": false,
-            "shared": true,
-            "sort": 0,
-            "value_type": "cumulative"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "hertz",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "ns",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        },
-        {
-          "aliasColors": {
-            "gogc": "#ba43a9"
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "fill": 0,
-          "gridPos": {
-            "h": 5,
-            "w": 8,
-            "x": 8,
-            "y": 25
-          },
-          "id": 54,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 3,
-          "links": [],
-          "nullPointMode": "null",
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": true,
-          "targets": [
-            {
-              "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 'gogc')"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "GOGC",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        }
-      ],
+      "panels": [],
       "title": "runtime",
       "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 13,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": false,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pluginVersion": "7.1.1",
+      "pointradius": 1,
+      "points": true,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "duration",
+          "lines": false,
+          "pointradius": 1,
+          "points": true,
+          "yaxis": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
+        },
+        {
+          "refId": "B",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Golang GC",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "hertz",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "ns",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "gogc": "#ba43a9"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 54,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 3,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pluginVersion": "7.1.1",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": true,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "alias(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 'gogc')"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "GOGC",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "gogc": "#ba43a9",
+        "goroutines": "semi-dark-blue",
+        "total goroutines": "semi-dark-blue"
+      },
+      "bars": true,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 60,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": false,
+      "linewidth": 3,
+      "links": [],
+      "nullPointMode": "null",
+      "percentage": false,
+      "pluginVersion": "7.1.1",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": true,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "alias(metrictank.stats.$environment.$instance.runtime.goroutines.total.gauge64, 'total goroutines')",
+          "textEditor": false
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Goroutines",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     },
     {
       "collapsed": false,
@@ -1351,7 +1465,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 24
       },
       "id": 40,
       "panels": [],
@@ -1377,7 +1491,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 20
+        "y": 25
       },
       "hiddenSeries": false,
       "id": 35,
@@ -1476,7 +1590,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 20
+        "y": 25
       },
       "hiddenSeries": false,
       "id": 33,
@@ -1587,7 +1701,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 20
+        "y": 25
       },
       "hiddenSeries": false,
       "id": 34,
@@ -1671,7 +1785,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 32
       },
       "id": 41,
       "panels": [],
@@ -1709,7 +1823,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 28
+        "y": 33
       },
       "hiddenSeries": false,
       "id": 4,
@@ -1847,7 +1961,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 28
+        "y": 33
       },
       "hiddenSeries": false,
       "id": 10,
@@ -1952,7 +2066,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 28
+        "y": 33
       },
       "hiddenSeries": false,
       "id": 16,
@@ -2061,7 +2175,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 39
       },
       "id": 42,
       "panels": [],
@@ -2087,13 +2201,15 @@
         "overrides": []
       },
       "fill": 0,
+      "fillGradient": 0,
       "grid": {},
       "gridPos": {
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 35
+        "y": 40
       },
+      "hiddenSeries": false,
       "id": 14,
       "legend": {
         "avg": false,
@@ -2213,13 +2329,15 @@
         "overrides": []
       },
       "fill": 0,
+      "fillGradient": 0,
       "grid": {},
       "gridPos": {
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 35
+        "y": 40
       },
+      "hiddenSeries": false,
       "id": 18,
       "legend": {
         "avg": false,
@@ -2350,13 +2468,15 @@
         "overrides": []
       },
       "fill": 0,
+      "fillGradient": 0,
       "grid": {},
       "gridPos": {
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 35
+        "y": 40
       },
+      "hiddenSeries": false,
       "id": 21,
       "legend": {
         "avg": false,
@@ -2453,7 +2573,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 47
       },
       "id": 43,
       "panels": [],
@@ -2488,7 +2608,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 43
+        "y": 48
       },
       "id": 6,
       "legend": {
@@ -2607,7 +2727,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 43
+        "y": 48
       },
       "id": 3,
       "legend": {
@@ -2712,7 +2832,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 43
+        "y": 48
       },
       "id": 11,
       "legend": {
@@ -2802,7 +2922,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 55
       },
       "id": 44,
       "panels": [],
@@ -2837,7 +2957,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 51
+        "y": 56
       },
       "id": 7,
       "legend": {
@@ -2966,7 +3086,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 51
+        "y": 56
       },
       "id": 23,
       "legend": {
@@ -3067,7 +3187,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 51
+        "y": 56
       },
       "id": 8,
       "legend": {
@@ -3145,7 +3265,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 63
       },
       "id": 45,
       "panels": [],
@@ -3170,7 +3290,7 @@
         "h": 7,
         "w": 2,
         "x": 0,
-        "y": 59
+        "y": 64
       },
       "id": 30,
       "legend": {
@@ -3269,7 +3389,7 @@
         "h": 7,
         "w": 10,
         "x": 2,
-        "y": 59
+        "y": 64
       },
       "id": 12,
       "legend": {
@@ -3402,7 +3522,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 59
+        "y": 64
       },
       "id": 20,
       "legend": {
@@ -3523,7 +3643,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 59
+        "y": 64
       },
       "id": 22,
       "legend": {
@@ -3623,7 +3743,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 66
+        "y": 71
       },
       "id": 56,
       "legend": {
@@ -3735,7 +3855,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 66
+        "y": 71
       },
       "id": 57,
       "legend": {
@@ -3851,7 +3971,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 66
+        "y": 71
       },
       "id": 58,
       "legend": {
@@ -3932,7 +4052,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 75
       },
       "id": 46,
       "panels": [],
@@ -3960,7 +4080,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 71
+        "y": 76
       },
       "id": 24,
       "legend": {
@@ -4056,7 +4176,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 71
+        "y": 76
       },
       "id": 25,
       "legend": {
@@ -4167,7 +4287,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 71
+        "y": 76
       },
       "id": 26,
       "legend": {
@@ -4251,7 +4371,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 83
       },
       "id": 47,
       "panels": [],
@@ -4282,7 +4402,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 79
+        "y": 84
       },
       "id": 27,
       "legend": {
@@ -4420,7 +4540,7 @@
         "h": 6,
         "w": 7,
         "x": 8,
-        "y": 79
+        "y": 84
       },
       "id": 50,
       "legend": {
@@ -4563,7 +4683,7 @@
         "h": 6,
         "w": 9,
         "x": 15,
-        "y": 79
+        "y": 84
       },
       "id": 28,
       "legend": {
@@ -4676,7 +4796,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 90
       },
       "id": 48,
       "panels": [],
@@ -4709,7 +4829,7 @@
         "h": 6,
         "w": 18,
         "x": 0,
-        "y": 86
+        "y": 91
       },
       "id": 32,
       "legend": {
@@ -4798,7 +4918,7 @@
         "h": 11,
         "w": 6,
         "x": 18,
-        "y": 86
+        "y": 91
       },
       "id": 15,
       "legend": {
@@ -4901,7 +5021,7 @@
         "h": 5,
         "w": 18,
         "x": 0,
-        "y": 92
+        "y": 97
       },
       "id": 59,
       "legend": {
