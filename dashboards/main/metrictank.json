@@ -1243,7 +1243,7 @@
           "targets": [
             {
               "refId": "A",
-              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.gogc.sgauge32, 'gogc')"
+              "target": "alias(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 'gogc')"
             }
           ],
           "thresholds": [],
