@@ -77,5 +77,8 @@ func (m *MemoryReporter) WriteGraphiteLine(buf, prefix []byte, now time.Time) []
 	// metric memory.gc.gogc is the current GOGC value (derived from the GOGC environment variable)
 	buf = WriteInt32(buf, prefix, []byte("memory.gc.gogc.gauge32"), nil, nil, int32(gcPercent), now)
 
+	// metric runtime.goroutines.total is how many goroutines there are
+	buf = WriteUint64(buf, prefix, []byte("runtime.goroutines.total.gauge64"), nil, nil, uint64(runtime.NumGoroutine()), now)
+
 	return buf
 }
