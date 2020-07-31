@@ -1,4 +1,8 @@
-# 1.0
+# master (unreleased)
+
+* Graphite pipe query syntax. #1854
+
+# 1.0 July 30, 2020.
 
 ## breaking changes
 
