@@ -516,14 +516,53 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFu
 	return queryPeers(ctx, peerGroups, name, fetchFunc)
 }
 
+type fetchFunc func(context.Context, cluster.Node) (interface{}, error)
+
+type shardResponse struct {
+	shardGroup int32
+	data       GenericPeerResponse
+	err        error
+}
+
+// shardState represents the state of a shard wrt speculative execution of a query
+type shardState struct {
+	shard          int32          // shard ID
+	remainingPeers []cluster.Node // peers that we have not sent a query to yet
+}
+
+// AskPeer issues the query on the next peer, if available, and returns it
+func (state *shardState) AskPeer(ctx context.Context, fn fetchFunc, responses chan shardResponse) (cluster.Node, bool) {
+	if len(state.remainingPeers) == 0 {
+		return nil, false
+	}
+	peer := state.remainingPeers[0]
+	state.remainingPeers = state.remainingPeers[1:]
+	go state.askPeer(ctx, peer, fn, responses)
+	return peer, true
+}
+
+func (state *shardState) askPeer(ctx context.Context, peer cluster.Node, fetchFn fetchFunc, responses chan shardResponse) {
+	//log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
+	resp, err := fetchFn(ctx, peer)
+	select {
+	case <-ctx.Done():
+		return
+	case responses <- shardResponse{state.shard, GenericPeerResponse{peer, resp}, err}:
+	}
+	// Only print if the context isn't done
+	if err != nil {
+		log.Errorf("Peer %s responded with error = %q", peer.GetName(), err.Error())
+	}
+}
+
 // queryPeers takes a function and peers grouped by shard. The function
 // is called it for one peer of each shard. If any peer fails, we try another replica.
 // If enough peers have been heard from (based on speculation-threshold configuration),
 // and we are missing the others, try to speculatively query other members of the shard group.
 // ctx:          request context
 // peerGroups:   peers grouped by shard
-// fetchFunc:    function to call to fetch the data from a peer
-func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name string, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
+// fetchFn:        function to call to fetch the data from a peer
+func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name string, fetchFn fetchFunc) (<-chan GenericPeerResponse, <-chan error) {
 	resultChan := make(chan GenericPeerResponse)
 	errorChan := make(chan error, 1)
 
@@ -537,30 +576,10 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 		defer cancel()
 		defer opSpan.Finish()
 
-		type response struct {
-			shardGroup int32
-			data       GenericPeerResponse
-			err        error
-		}
-
-		responses := make(chan response)
+		responses := make(chan shardResponse)
 		originalPeers := make(map[string]struct{}, len(peerGroups))    // track the first peers we query for each shard
 		receivedResponses := make(map[int32]struct{}, len(peerGroups)) // non-error responses per shard
-
-		askPeer := func(shardGroup int32, peer cluster.Node, specCtx context.Context) {
-			//log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
-			resp, err := fetchFunc(specCtx, peer)
-			select {
-			case <-specCtx.Done():
-				return
-			case responses <- response{shardGroup, GenericPeerResponse{peer, resp}, err}:
-			}
-			// Only print if the context isn't done
-			if err != nil {
-				log.Errorf("Peer %s responded with error = %q", peer.GetName(), err.Error())
-			}
-
-		}
+		states := make(map[int32]*shardState, len(peerGroups))         // query state per shard
 
 		for shard, peers := range peerGroups {
 			if len(peers) == 0 {
@@ -568,13 +587,13 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 				delete(peerGroups, shard)
 				continue
 			}
-
-			nextPeer := peers[0]
-			// shift nextPeer from the group
-			peerGroups[group] = peers[1:]
-
-			originalPeers[nextPeer.GetName()] = struct{}{}
-			go askPeer(group, nextPeer, reqCtx)
+			state := &shardState{
+				shard:          shard,
+				remainingPeers: peers,
+			}
+			peer, _ := state.AskPeer(reqCtx, fetchFn, responses) // thanks to the above check we always know there was a peer available
+			originalPeers[peer.GetName()] = struct{}{}
+			states[shard] = state
 		}
 
 		var specSpan opentracing.Span
@@ -598,14 +617,10 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 				}
 
 				if resp.err != nil {
-					// check if there is another peer for this shardGroup. If so try it.
-					if len(peerGroups[resp.shardGroup]) > 0 {
+					// if we can try another peer for this shardGroup, do it
+					_, ok := states[resp.shardGroup].AskPeer(reqCtx, fetchFn, responses)
+					if ok {
 						speculativeRequests.Inc()
-						nextPeer := peerGroups[resp.shardGroup][0]
-						// shift nextPeer from the group
-						peerGroups[resp.shardGroup] = peerGroups[resp.shardGroup][1:]
-
-						go askPeer(resp.shardGroup, nextPeer, reqCtx)
 						continue
 					}
 					// No more peers to try. Cancel the reqCtx, which will cancel all in-flight
@@ -629,23 +644,14 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 					var specCtx context.Context
 					specCtx, specSpan = tracing.NewSpan(OpCtx, span.Tracer(), "speculative-queries")
 					defer specSpan.Finish()
-					for shardGroup, peers := range peerGroups {
+					for shardGroup := range peerGroups {
 						if _, ok := receivedResponses[shardGroup]; ok {
 							continue
 						}
 
-						if len(peers) == 0 {
-							// no more peers to try
-							continue
+						if _, ok := states[shardGroup].AskPeer(specCtx, fetchFn, responses); ok {
+							speculativeRequests.Inc()
 						}
-
-						nextPeer := peers[0]
-						// shift nextPeer from the group
-						peerGroups[shardGroup] = peers[1:]
-
-						// send the request to the next peer for the group.
-						speculativeRequests.Inc()
-						go askPeer(shardGroup, nextPeer, specCtx)
 					}
 				}
 			}
