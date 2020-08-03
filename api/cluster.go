@@ -544,8 +544,8 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 		}
 
 		responses := make(chan response)
-		originalPeers := make(map[string]struct{}, len(peerGroups))
-		receivedResponses := make(map[int32]struct{}, len(peerGroups))
+		originalPeers := make(map[string]struct{}, len(peerGroups))    // track the first peers we query for each shard
+		receivedResponses := make(map[int32]struct{}, len(peerGroups)) // non-error responses per shard
 
 		askPeer := func(shardGroup int32, peer cluster.Node, specCtx context.Context) {
 			//log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
@@ -562,10 +562,10 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 
 		}
 
-		for group, peers := range peerGroups {
+		for shard, peers := range peerGroups {
 			if len(peers) == 0 {
-				log.Warningf("HTTP Peer group %d has no peers", group)
-				delete(peerGroups, group)
+				log.Warningf("HTTP Peer group for shard %d has no peers", shard)
+				delete(peerGroups, shard)
 				continue
 			}
 
