@@ -293,6 +293,8 @@ func TestPlanRequestsMultiIntervalsUseRaw(t *testing.T) {
 // 2 identical singles, one requesting older data (> raw TTL).
 // They should be independently planned
 func TestPlanRequests_Singles_DifferentTimeRanges(t *testing.T) {
+	// req0 400-800
+	// req1 0-400 // with a now at 1200, archive 0 doesn't have long enough retention
 	in, out := generate(400, 800, []reqProp{
 		NewReqProp(10, 0, 0),
 		NewReqProp(10, 0, 0),
@@ -307,6 +309,7 @@ func TestPlanRequests_Singles_DifferentTimeRanges(t *testing.T) {
 	testPlan(in, rets, out, nil, 1200, 0, 0, t)
 
 	// If soft is slightly breached, only the high res data should be reduced
+	// (800-400)/10 + (400-0)/60 = 46 points
 	t.Run("WithMaxPointsPerReqSoftJustBreached", func(t *testing.T) {
 		adjust(&out[0], 1, 60, 60, 1200)
 		testPlan(in, rets, out, nil, 1200, 45, 0, t)
