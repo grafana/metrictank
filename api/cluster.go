@@ -528,6 +528,7 @@ type shardResponse struct {
 type shardState struct {
 	shard          int32          // shard ID
 	remainingPeers []cluster.Node // peers that we have not sent a query to yet
+	inflight       int            // number of requests in flight
 }
 
 // AskPeer issues the query on the next peer, if available, and returns it
@@ -537,6 +538,7 @@ func (state *shardState) AskPeer(ctx context.Context, fn fetchFunc, responses ch
 	}
 	peer := state.remainingPeers[0]
 	state.remainingPeers = state.remainingPeers[1:]
+	state.inflight++
 	go state.askPeer(ctx, peer, fn, responses)
 	return peer, true
 }
@@ -611,6 +613,8 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 				//request canceled
 				return
 			case resp := <-responses:
+				states[resp.shardGroup].inflight--
+
 				if _, ok := receivedResponses[resp.shardGroup]; ok {
 					// already received this response (possibly speculatively)
 					continue
@@ -623,8 +627,11 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 						speculativeRequests.Inc()
 						continue
 					}
-					// No more peers to try. Cancel the reqCtx, which will cancel all in-flight
-					// requests.
+					// if there is another request in-flight for this shardGroup, then we can wait for that
+					if states[resp.shardGroup].inflight > 0 {
+						continue
+					}
+					// we're out of options. Cancel the reqCtx, which will cancel all in-flight requests.
 					cancel()
 					errorChan <- resp.err
 					return
