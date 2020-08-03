@@ -621,8 +621,8 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 
 			case <-tickChan:
 				// Check if it's time to speculate!
-				percentReceived := float64(len(receivedResponses)) / float64(len(peerGroups))
-				if percentReceived >= speculationThreshold {
+				ratioReceived := float64(len(receivedResponses)) / float64(len(peerGroups))
+				if ratioReceived >= speculationThreshold {
 					// kick off speculative queries to other members now
 					ticker.Stop()
 					speculativeAttempts.Inc()
