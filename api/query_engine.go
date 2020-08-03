@@ -67,7 +67,7 @@ var (
 func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard int) (*ReqsPlan, error) {
 	ok, rp := false, NewReqsPlan(*reqs)
 
-	// 1) Initial parameters
+	// getTimeWindowSuperSet returns the min `from` and max `to` seen across all given requests
 	getTimeWindowSuperSet := func(rba ReqsByArchives) (uint32, uint32) {
 		minFrom := uint32(math.MaxUint32)
 		maxTo := uint32(0)
@@ -82,8 +82,10 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 		}
 		return minFrom, maxTo
 	}
+
+	// 1) Initial parameters
+
 	for group, split := range rp.pngroups {
-		// Find the minFrom and maxTo of reqs in the same split
 		if split.mdpyes.HasData() {
 			groupFrom, groupTo := getTimeWindowSuperSet(split.mdpyes)
 			ok = planLowestResForMDPMulti(now, groupFrom, groupTo, planMDP, split.mdpyes, rp.archives)
@@ -106,7 +108,7 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 		}
 		// Singles should be planned independently
 		for i := range reqs {
-			ok = planLowestResForMDPSingles(now, planMDP, archivesID, &reqs[i], rp.archives)
+			ok = planLowestResForMDPSingle(now, planMDP, archivesID, &reqs[i], rp.archives)
 			if !ok {
 				return nil, errUnSatisfiable
 			}
@@ -118,7 +120,7 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 		}
 		// Singles should be planned independently
 		for i := range reqs {
-			ok = planHighestResSingles(now, archivesID, &reqs[i], rp.archives)
+			ok = planHighestResSingle(now, archivesID, &reqs[i], rp.archives)
 			if !ok {
 				return nil, errUnSatisfiable
 			}
@@ -224,8 +226,8 @@ HonoredSoft:
 	return &rp, nil
 }
 
-// planHighestResSingles plans all requests of the given retention to their most precise resolution (which may be different for different retentions).
-func planHighestResSingles(now uint32, archivesID int, req *models.Req, index archives.Index) bool {
+// planHighestResSingle plans the request of the given retention to its most precise resolution (which may be different for different retentions).
+func planHighestResSingle(now uint32, archivesID int, req *models.Req, index archives.Index) bool {
 	as := index.Get(archivesID)
 	minTTL := now - req.From
 	archive, a, ok := findHighestResRet(as, req.From, minTTL)
@@ -235,8 +237,8 @@ func planHighestResSingles(now uint32, archivesID int, req *models.Req, index ar
 	return ok
 }
 
-// planLowestResForMDPSingles plans all requests of the given retention to an interval such that requests still return >=mdp/2 points (interval may be different for different retentions)
-func planLowestResForMDPSingles(now, mdp uint32, archivesID int, req *models.Req, index archives.Index) bool {
+// planLowestResForMDPSingle plans the request of the given retention to an interval such that requests still return >=mdp/2 points (interval may be different for different retentions)
+func planLowestResForMDPSingle(now, mdp uint32, archivesID int, req *models.Req, index archives.Index) bool {
 	as := index.Get(archivesID)
 	for i := len(as) - 1; i >= 0; i-- {
 		// skip non-ready option.
@@ -320,7 +322,7 @@ func planLowestResForMDPMulti(now, from, to, mdp uint32, rba ReqsByArchives, ind
 	return true
 }
 
-// reduceResSingle reduces the resolution of a given request to the next more coarse, common,
+// reduceResSingle reduces the resolution of the request to the next more coarse, common,
 // interval (which may be different for different retentions)
 // we already assume that the request is setup to request as little as data as possible to yield
 // the desired output interval. Thus the only way to fetch fewer points is to increase the output
