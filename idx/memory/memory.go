@@ -494,7 +494,10 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 
 	if MetaTagSupport {
 		if ok := m.getOrgMetaTagIndex(def.OrgId).enricher.tryAddMetric(*def); !ok {
-			log.Warnf("Failed to add ")
+			log.Warnf("Failed to add metric def need to relinquish lock")
+			m.Unlock()
+			m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
+			m.Lock()
 		}
 	}
 }
