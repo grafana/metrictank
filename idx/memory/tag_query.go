@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/grafana/metrictank/schema"
 
@@ -189,6 +190,9 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 	q.metaTagRecords = mtr
 	q.prepareExpressions()
 
+	timeoutChan := make(chan struct{})
+	finishedChan := make(chan struct{})
+
 	// no initial expression has been chosen, returning empty result
 	if q.startWith < 0 || q.startWith >= len(q.query.Expressions) {
 		return
@@ -202,7 +206,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		q.wg.Add(1)
 		go func() {
 			defer q.wg.Done()
-			q.selector.getIds(idCh, nil)
+			q.selector.getIds(idCh, timeoutChan)
 			close(idCh)
 		}()
 
@@ -218,9 +222,23 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		q.wg.Add(1)
 		go func() {
 			defer q.wg.Done()
-			q.selector.getIds(resCh, nil)
+			q.selector.getIds(resCh, timeoutChan)
 		}()
 	}
 
-	q.wg.Wait()
+	go func() {
+		q.wg.Wait()
+		finishedChan <- struct{}{}
+	}()
+
+	timeout := time.NewTimer(60 * time.Second)
+	select {
+	case <-timeout.C:
+		// Took too long
+		log.Errorf("Canceling request due to timeout: %v", q.query.Expressions.Strings())
+		timeoutChan <- struct{}{}
+		<-finishedChan
+	case <-finishedChan:
+		// Success
+	}
 }
