@@ -1230,7 +1230,7 @@ func (m *UnpartitionedMemoryIdx) idsByTagQueryIntoCallback(orgId uint32, query t
 
 	bc := m.RLockLow()
 	defer bc.RUnlockLow("idsByTagQueryIntoCallback", func() interface{} {
-		return pattern
+		return query.Expressions.Strings()
 	})
 
 	// we never use the meta tag index in this function
