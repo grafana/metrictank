@@ -95,9 +95,7 @@ func makeAggregateWithWildcards(agg string, in []models.Series, xFilesFactor flo
 }
 
 func testAggregateWithWildcards(name, agg string, in []models.Series, out models.Series, t *testing.T, xFilesFactor float64, nodes []expr) {
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	f := makeAggregateWithWildcards(agg, in, xFilesFactor, nodes)
 
