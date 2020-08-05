@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -28,7 +27,6 @@ import (
 	"github.com/grafana/metrictank/mdata"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
-	"github.com/grafana/metrictank/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	traceLog "github.com/opentracing/opentracing-go/log"
@@ -690,8 +688,6 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan) ([]models.Series, models.RenderMeta, error) {
 	var meta models.RenderMeta
 
-	minFrom := uint32(math.MaxUint32)
-	var maxTo uint32
 	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
@@ -733,9 +729,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 		if err != nil {
 			return nil, meta, err
 		}
-
-		minFrom = util.Min(minFrom, r.From)
-		maxTo = util.Max(maxTo, r.To)
 
 		for _, s := range series {
 			for _, metric := range s.Series {
@@ -792,7 +785,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	// note: if 1 series has a movingAvg that requires a long time range extension, it may push other reqs into another archive. can be optimized later
 	var err error
 	var rp *ReqsPlan
-	rp, err = planRequests(uint32(time.Now().Unix()), minFrom, maxTo, reqs, plan.MaxDataPoints, maxPointsPerReqSoft, maxPointsPerReqHard)
+	rp, err = planRequests(uint32(time.Now().Unix()), reqs, plan.MaxDataPoints, maxPointsPerReqSoft, maxPointsPerReqHard)
 	if err != nil {
 		return nil, meta, err
 	}

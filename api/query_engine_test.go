@@ -49,7 +49,7 @@ func testPlan(reqs []models.Req, retentions []conf.Retentions, outReqs []models.
 	// thus SchemasID must accommodate for this!
 	mdata.Schemas = conf.NewSchemas(schemas)
 	//spew.Dump(mdata.Schemas)
-	out, err := planRequests(now, reqs[0].From, reqs[0].To, getReqMap(reqs), 0, maxPointsPerReqSoft, maxPointsPerReqHard)
+	out, err := planRequests(now, getReqMap(reqs), 0, maxPointsPerReqSoft, maxPointsPerReqHard)
 	if err != outErr {
 		t.Errorf("different err value expected: %v, got: %v", outErr, err)
 	}
@@ -290,9 +290,35 @@ func TestPlanRequestsMultiIntervalsUseRaw(t *testing.T) {
 	})
 }
 
+// 2 identical singles, one requesting older data (> raw TTL).
+// They should be independently planned
+func TestPlanRequests_Singles_DifferentTimeRanges(t *testing.T) {
+	// req0 400-800
+	// req1 0-400 // with a now at 1200, archive 0 doesn't have long enough retention
+	in, out := generate(400, 800, []reqProp{
+		NewReqProp(10, 0, 0),
+		NewReqProp(10, 0, 0),
+	})
+	rets := []conf.Retentions{
+		conf.MustParseRetentions("10s:800s:60s:2:true,60s:1200s:5min:2:true"),
+	}
+	adjust(&out[0], 0, 10, 10, 800)
+	adjust(&out[1], 1, 60, 60, 1200)
+	in[1].From, out[1].From = 0, 0
+	in[1].To, out[1].To = 400, 400
+	testPlan(in, rets, out, nil, 1200, 0, 0, t)
+
+	// If soft is slightly breached, only the high res data should be reduced
+	// (800-400)/10 + (400-0)/60 = 46 points
+	t.Run("WithMaxPointsPerReqSoftJustBreached", func(t *testing.T) {
+		adjust(&out[0], 1, 60, 60, 1200)
+		testPlan(in, rets, out, nil, 1200, 45, 0, t)
+	})
+}
+
 // TestPlanRequestsMaxPointsPerReqSoft tests how maxPointsPerReqSoft gets applied.
 // we validate that:
-// * requests are coarsened, PNGroup by PNGroup (we can predict PNGroup map iteration order, so we only test with 1 PNGroup),
+// * requests are coarsened, PNGroup by PNGroup (we cannot predict PNGroup map iteration order, so we only test with 1 PNGroup),
 //   and singles in groups by retention (in schemaID order)
 // * PNGroups obviously will need a common interval, which gets interesting when using multiple schemas
 // * coarsening continues until all data is fetched at its coarsest. At that point we may breach soft, but never hard
@@ -640,7 +666,7 @@ func BenchmarkPlanRequestsSamePNGroupNoLimits(b *testing.B) {
 	})
 
 	for n := 0; n < b.N; n++ {
-		res, _ = planRequests(14*24*3600, 0, 3600*24*7, reqs, 0, 0, 0)
+		res, _ = planRequests(14*24*3600, reqs, 0, 0, 0)
 	}
 	result = res
 }
