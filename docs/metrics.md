@@ -288,6 +288,8 @@ each time this happens, an error is logged with more details.
 how many times
 an invalid tag for a metric is encountered.
 each time this happens, an error is logged with more details.
+* `runtime.goroutines.total`:  
+how many goroutines there are
 * `stats.generate_message`:  
 how long it takes to generate the stats
 * `store.bigtable.chunk_operations.save_fail`:  
