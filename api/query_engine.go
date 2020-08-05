@@ -176,23 +176,23 @@ HonoredSoft:
 	// 4) send out some metrics and we're done!
 	for _, reqs := range rp.single.mdpyes {
 		if len(reqs) != 0 {
-			reqRenderChosenArchive.ValueUint32(uint32(reqs[0].Archive) * uint32(len(reqs)))
+			reqRenderChosenArchive.Values(int(reqs[0].Archive), len(reqs))
 		}
 	}
 	for _, reqs := range rp.single.mdpno {
 		if len(reqs) != 0 {
-			reqRenderChosenArchive.ValueUint32(uint32(reqs[0].Archive) * uint32(len(reqs)))
+			reqRenderChosenArchive.Values(int(reqs[0].Archive), len(reqs))
 		}
 	}
 	for _, data := range rp.pngroups {
 		for _, reqs := range data.mdpyes {
 			if len(reqs) != 0 {
-				reqRenderChosenArchive.ValueUint32(uint32(reqs[0].Archive) * uint32(len(reqs)))
+				reqRenderChosenArchive.Values(int(reqs[0].Archive), len(reqs))
 			}
 		}
 		for _, reqs := range data.mdpno {
 			if len(reqs) != 0 {
-				reqRenderChosenArchive.ValueUint32(uint32(reqs[0].Archive) * uint32(len(reqs)))
+				reqRenderChosenArchive.Values(int(reqs[0].Archive), len(reqs))
 			}
 		}
 	}
