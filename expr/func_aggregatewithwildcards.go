@@ -27,12 +27,11 @@ func (s *FuncAggregateWithWildcards) Signature() ([]Arg, []Arg) {
 			ArgString{key: "func", val: &s.fn, validator: []Validator{IsAggFunc}},
 			ArgStringsOrInts{key: "positions", val: &s.nodes, validator: []Validator{IntZeroOrPositive}},
 		}, []Arg{ArgSeriesList{}}
-	} else {
-		return []Arg{
-			ArgSeriesList{val: &s.in},
-			ArgStringsOrInts{key: "positions", val: &s.nodes, validator: []Validator{IntZeroOrPositive}},
-		}, []Arg{ArgSeriesList{}}
 	}
+	return []Arg{
+		ArgSeriesList{val: &s.in},
+		ArgStringsOrInts{key: "positions", val: &s.nodes, validator: []Validator{IntZeroOrPositive}},
+	}, []Arg{ArgSeriesList{}}
 }
 
 func (s *FuncAggregateWithWildcards) Context(context Context) Context {
