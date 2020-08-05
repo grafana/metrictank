@@ -48,40 +48,28 @@ func (s *FuncAggregateWithWildcards) Exec(dataMap DataMap) ([]models.Series, err
 		return series, nil
 	}
 
-	type serieWithPatt struct {
-		Ser  []models.Series
-		Patt []string
-	}
-
 	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.fn), name: s.fn}
 
-	filtered := make(map[string]serieWithPatt)
-	var keyList []string
+	groups := make(map[string][]models.Series)
+	var keys []string
 
 	for _, serie := range series {
-		key, err := filterNodesByPositions(serie, s.nodes)
-		if err != nil {
-			return nil, err
+		key := filterNodesByPositions(serie.Target, s.nodes)
+		_, ok := groups[key]
+		if !ok {
+			keys = append(keys, key)
 		}
-		if swp, ok := filtered[key]; ok {
-			swp.Ser = append(swp.Ser, serie)
-			filtered[key] = swp
-		} else {
-			swp := serieWithPatt{
-				[]models.Series{serie},
-				[]string{key},
-			}
-			filtered[key] = swp
-			keyList = append(keyList, key)
-		}
+		groups[key] = append(groups[key], serie)
 	}
-	out := make([]models.Series, 0, len(filtered))
+	out := make([]models.Series, 0, len(groups))
 
-	for _, key := range keyList {
-		res, err := aggregate(dataMap, filtered[key].Ser, filtered[key].Patt, agg, 0)
+	for _, key := range keys {
+		res, err := aggregate(dataMap, groups[key], []string{key}, agg, 0)
 		if err != nil {
 			return nil, err
 		}
+		res[0].Target = key
+		res[0].QueryPatt = key
 		out = append(out, res...)
 	}
 
