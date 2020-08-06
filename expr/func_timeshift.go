@@ -65,7 +65,7 @@ func (s *FuncTimeShift) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	outputs := make([]models.Series, 0, len(series))
 	for _, serie := range series {
-		out := GetPooledSliceAtLeastSize(len(serie.Datapoints))
+		out := pointSlicePoolGet(len(serie.Datapoints))
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: v.Val, Ts: addOffset(v.Ts, negativeOffset)})
 		}
