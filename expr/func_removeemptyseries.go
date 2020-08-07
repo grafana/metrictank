@@ -1,7 +1,6 @@
 package expr
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
@@ -42,8 +41,12 @@ func (s *FuncRemoveEmptySeries) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	var output []models.Series
 	for _, serie := range series {
-		serie.Target = fmt.Sprintf("removeEmptySeries(%s, %g)", serie.Target, s.xFilesFactor)
-		serie.QueryPatt = serie.Target
+		notNull := 0
+		for _, p := range serie.Datapoints {
+			if !math.IsNaN(p.Val) {
+				notNull++
+			}
+		}
 
 		if pointsXffCheck(serie.Datapoints, s.xFilesFactor) {
 			output = append(output, serie)
