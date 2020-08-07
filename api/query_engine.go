@@ -84,6 +84,7 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 	}
 
 	// 1) Initial parameters
+
 	for group, split := range rp.pngroups {
 		if split.mdpyes.HasData() {
 			groupFrom, groupTo := getTimeWindowSuperSet(split.mdpyes)
@@ -171,6 +172,7 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 						progress = true
 						if rp.PointsFetch() <= uint32(mpprSoft) {
 							goto HonoredSoft
+
 						}
 					}
 				}
