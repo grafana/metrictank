@@ -118,32 +118,12 @@ var minC2Pts = []schema.Point{
 	{Val: 6, Ts: 210},
 }
 
-func getNamedSeries(target, patt string, from, to uint32, data ...[]schema.Point) []models.Series {
-
-	if len(data) == 0 {
-		panic("Needs at least one array of schema.Points")
-	}
-
-	outputs := make([]models.Series, 0, len(data))
-	for _, datum := range data {
-		serie := models.Series{
-			Target:     target,
-			QueryPatt:  patt,
-			QueryFrom:  from,
-			QueryTo:    to,
-			Datapoints: getCopy(datum),
-		}
-		outputs = append(outputs, serie)
-	}
-	return outputs
-}
-
 func TestMovingWindowWithDefaultValues(t *testing.T) {
 	offset10s := uint32(10)
 	testMovingWindow(
 		"defaults",
-		getNamedSeries("t", "p", 10, 80, seriesA, seriesB),
-		getNamedSeries("movingAverage(t,\"10s\")", "movingAverage(p,\"10s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesB),
+		getTimeRangeSeriesListNamed("movingAverage(t,\"10s\")", "movingAverage(p,\"10s\")",
 			10+offset10s, 80, resSinglePtInA, resSinglePtInB),
 		offset10s,
 		"10s",
@@ -154,8 +134,8 @@ func TestMovingWindowWithDefaultValues(t *testing.T) {
 	offset20s := uint32(20)
 	testMovingWindow(
 		"defaults",
-		getNamedSeries("t", "p", 10, 80, seriesA, seriesB),
-		getNamedSeries("movingAverage(t,\"20s\")", "movingAverage(p,\"20s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesB),
+		getTimeRangeSeriesListNamed("movingAverage(t,\"20s\")", "movingAverage(p,\"20s\")",
 			10+offset20s, 80, avg2PtsA, res2PtsB),
 		offset20s,
 		"20s",
@@ -168,8 +148,8 @@ func TestMovingWindowByWindowSizes(t *testing.T) {
 	offset10s := uint32(10)
 	testMovingWindow(
 		"signed window(negative)",
-		getNamedSeries("t", "p", 10, 80, seriesA, seriesA),
-		getNamedSeries("movingAverage(t,\"-10s\")", "movingAverage(p,\"-10s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesA),
+		getTimeRangeSeriesListNamed("movingAverage(t,\"-10s\")", "movingAverage(p,\"-10s\")",
 			10+offset10s, 80, resSinglePtInA, resSinglePtInA),
 		offset10s,
 		"-10s",
@@ -179,8 +159,8 @@ func TestMovingWindowByWindowSizes(t *testing.T) {
 
 	testMovingWindow(
 		"signed window (positive)",
-		getNamedSeries("t", "p", 10, 80, seriesA, seriesA),
-		getNamedSeries("movingSum(t,\"+10s\")", "movingSum(p,\"+10s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesA),
+		getTimeRangeSeriesListNamed("movingSum(t,\"+10s\")", "movingSum(p,\"+10s\")",
 			10+offset10s, 80, resSinglePtInA, resSinglePtInA),
 		offset10s,
 		"+10s",
@@ -191,8 +171,8 @@ func TestMovingWindowByWindowSizes(t *testing.T) {
 	offsetZero := uint32(0)
 	testMovingWindow(
 		"empty window",
-		getNamedSeries("t", "p", 10, 80, seriesA, seriesB),
-		getNamedSeries("movingAverage(t,\"0m\")", "movingAverage(p,\"0m\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesB),
+		getTimeRangeSeriesListNamed("movingAverage(t,\"0m\")", "movingAverage(p,\"0m\")",
 			10+offsetZero, 80, allNullPts, allNullPts),
 		offsetZero,
 		"0m",
@@ -205,8 +185,8 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 	offset20s := uint32(20)
 	testMovingWindow(
 		"xFilesFactor > 0.5",
-		getNamedSeries("t", "p", 10, 80, seriesB),
-		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
 			10+offset20s, 80, allNullsB),
 		offset20s,
 		"20s",
@@ -216,8 +196,8 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 
 	testMovingWindow(
 		"xFilesFactor < 0.5",
-		getNamedSeries("t", "p", 10, 80, seriesB),
-		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
 			10+offset20s, 80, res2PtsB),
 		offset20s,
 		"20s",
@@ -227,8 +207,8 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 
 	testMovingWindow(
 		"xFilesFactor 1",
-		getNamedSeries("t", "p", 10, 80, seriesB),
-		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
 			10+offset20s, 80, allNullsB),
 		offset20s,
 		"20s",
@@ -238,8 +218,8 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 
 	testMovingWindow(
 		"xFilesFactor 0",
-		getNamedSeries("t", "p", 10, 80, seriesB),
-		getNamedSeries("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
+		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
 			10+offset20s, 80, res2PtsB),
 		offset20s,
 		"20s",
@@ -253,8 +233,8 @@ func TestMovingWindowWindowWhenTimeShiftGoesBeyondAvailableSeriesStartPoints(t *
 
 	testMovingWindow(
 		"movingSum of 1 min windowSize",
-		getNamedSeries("t", "p", 0, 210, seriesC30secs),
-		getNamedSeries("movingSum(t,\"1min\")", "movingSum(p,\"1min\")",
+		getTimeRangeSeriesListNamed("t", "p", 0, 210, seriesC30secs),
+		getTimeRangeSeriesListNamed("movingSum(t,\"1min\")", "movingSum(p,\"1min\")",
 			0+offset1min, 210, sumC2Pts),
 		offset1min,
 		"1min",
@@ -264,8 +244,8 @@ func TestMovingWindowWindowWhenTimeShiftGoesBeyondAvailableSeriesStartPoints(t *
 
 	testMovingWindow(
 		"movingMin of 1 min windowSize",
-		getNamedSeries("t", "p", 0, 210, seriesC30secs),
-		getNamedSeries("movingMin(t,\"1min\")", "movingMin(p,\"1min\")",
+		getTimeRangeSeriesListNamed("t", "p", 0, 210, seriesC30secs),
+		getTimeRangeSeriesListNamed("movingMin(t,\"1min\")", "movingMin(p,\"1min\")",
 			0+offset1min, 210, minC2Pts),
 		offset1min,
 		"1min",
