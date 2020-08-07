@@ -201,6 +201,15 @@ func (s *Series) buildTargetFromTags() {
 	s.Target = buf.String()
 }
 
+// SeriesCopy returns a deep copy of the series slice
+func SeriesCopy(series []Series) []Series {
+	out := make([]Series, len(series))
+	for i, s := range series {
+		out[i] = s.Copy(nil)
+	}
+	return out
+}
+
 // Copy returns a deep copy.
 // The returned value does not link to the same memory space for any of the properties
 func (s Series) Copy(emptyDatapoints []schema.Point) Series {

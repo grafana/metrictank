@@ -41,7 +41,7 @@ See also:
 | absolute                                                       |              | Stable     |
 | aggregate                                                      |              | Stable     |
 | aggregateLine                                                  |              | No         |
-| aggregateWithWildcards                                         |              | No         |
+| aggregateWithWildcards                                         |              | Stable     |
 | alias(seriesList, alias) seriesList                            |              | Stable     |
 | aliasByMetric                                                  |              | Stable     |
 | aliasByNode(seriesList, nodeList) seriesList                   | aliasByTags  | Stable     |
@@ -56,7 +56,7 @@ See also:
 | averageBelow                                                   |              | Stable     |
 | averageOutsidePercentile                                       |              | No         |
 | averageSeries(seriesLists) series                              | avg          | Stable     |
-| averageSeriesWithWildcards                                     |              | No         |
+| averageSeriesWithWildcards                                     |              | Stable     |
 | cactiStyle                                                     |              | No         |
 | changed                                                        |              | No         |
 | color                                                          |              | No         |
@@ -123,7 +123,7 @@ See also:
 | movingSum                                                      |              | No         |
 | movingWindow                                                   |              | No         |
 | multiplySeries(seriesList) series                              |              | Stable     |
-| multiplySeriesWithWildcards                                    |              | No         |
+| multiplySeriesWithWildcards                                    |              | Stable     |
 | nonNegatievDerivative(seriesList, maxValue) seriesList         |              | Stable     |
 | nPercentile                                                    |              | No         |
 | offset                                                         |              | No         |
@@ -164,7 +164,7 @@ See also:
 | substr                                                         |              | No         |
 | summarize(seriesList) seriesList                               |              | Stable     |
 | sumSeries(seriesLists) series                                  | sum          | Stable     |
-| sumSeriesWithWildcards                                         |              | No         |
+| sumSeriesWithWildcards                                         |              | Stable     |
 | threshold                                                      |              | No         |
 | timeFunction                                                   | time         | No         |
 | timeShift                                                      |              | No         |

@@ -7,6 +7,7 @@ import (
 )
 
 var ErrIntPositive = errors.NewBadRequest("integer must be positive")
+var ErrIntZeroOrPositive = errors.NewBadRequest("integer must be zero or positive")
 var ErrInvalidAggFunc = errors.NewBadRequest("Invalid aggregation func")
 var ErrNonNegativePercent = errors.NewBadRequest("The requested percent is required to be greater than 0")
 var ErrWithinZeroOneInclusiveInterval = errors.NewBadRequest("value must lie within interval [0,1]")
@@ -18,6 +19,15 @@ type Validator func(e *expr) error
 func IntPositive(e *expr) error {
 	if e.int < 1 {
 		return ErrIntPositive
+	}
+	return nil
+}
+
+// IntZeroOrPositive validates whether an int is at least 0. This is mostly
+// used for functions which take a (series) node argument
+func IntZeroOrPositive(e *expr) error {
+	if e.int < 0 {
+		return ErrIntZeroOrPositive
 	}
 	return nil
 }
