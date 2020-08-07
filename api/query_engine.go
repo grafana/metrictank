@@ -84,17 +84,6 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 	}
 
 	// 1) Initial parameters
-	getTimeWindowSuperSet := func(reqs ReqsByRet) (uint32, uint32) {
-		minFrom := uint32(math.MaxUint32)
-		maxTo := uint32(0)
-		for _, rs := range reqs {
-			for _, r := range rs {
-				minFrom = util.Min(minFrom, r.From)
-				maxTo = util.Max(maxTo, r.To)
-			}
-		}
-		return minFrom, maxTo
-	}
 	for group, split := range rp.pngroups {
 		// Find the minFrom and maxTo of reqs in the same split
 		if split.mdpyes.HasData() {
