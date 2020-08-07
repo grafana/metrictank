@@ -172,7 +172,6 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 						progress = true
 						if rp.PointsFetch() <= uint32(mpprSoft) {
 							goto HonoredSoft
-
 						}
 					}
 				}
@@ -185,6 +184,7 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 				}
 				if progress && rp.PointsFetch() <= uint32(mpprSoft) {
 					goto HonoredSoft
+
 				}
 			}
 		}
