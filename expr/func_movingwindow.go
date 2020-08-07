@@ -151,7 +151,7 @@ func (s *FuncMovingWindow) getWindowSeconds() (uint32, error) {
 	// Note: s.windowSize is not overwritten and will be appended as is to the
 	// new Target, QueryPatt and Tags (keeping it consistent with graphite)
 	// This implies a window size of '-2min' or '+2min' will be captured as is.
-	// However the time operation is always a lookback over preceeding points.
+	// However the time operation is always a look back over preceding points.
 	// If this needs to be corrected in the native implementation
 	// uncomment the line below.
 	// s.windowSize = durStr
