@@ -1,5 +1,6 @@
+<img src="docs/assets/metrictank-logo.png" height="150px" alt="Metrictank logo">
+
 # Metrictank
-![Metrictank logo](https://raw.githubusercontent.com/grafana/metrictank/master/docs/assets/metrictank-logo.png)
 
 [![Circle CI](https://circleci.com/gh/grafana/metrictank.svg?style=shield)](https://circleci.com/gh/grafana/metrictank)
 [![Go Report Card](https://goreportcard.com/badge/github.com/grafana/metrictank)](https://goreportcard.com/report/github.com/grafana/metrictank)
