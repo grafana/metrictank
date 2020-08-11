@@ -54,6 +54,7 @@ func NormalizeTwo(dataMap DataMap, a, b models.Series) (models.Series, models.Se
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
+// the adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
 func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Series {
 
 	if len(in.Datapoints) == 0 {

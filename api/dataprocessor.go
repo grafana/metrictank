@@ -62,6 +62,8 @@ type getTargetsResp struct {
 // note: values are quantized to the right because we can't lie about the future:
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
+// Note: `in` series is returned to the pool and should not be reused.
+// output series comes out of the pool if possible.
 func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
 	first := align.ForwardIfNotAligned(from, interval)
@@ -150,6 +152,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	return pointsA
 }
 
+// getTargets retrieves the series for the given requests by querying remote and/or remote nodes as needed
 func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)

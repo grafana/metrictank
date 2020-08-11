@@ -801,6 +801,13 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	}
 
 	a := time.Now()
+
+	// any series fetched by getTargets or its children is (mostly) stored in point slices fetched from pointSlicePool
+	// ('mostly', see https://github.com/grafana/metrictank/issues/962)
+	// * any series dropped anywhere inside of this call (not part of the return value) should go into pool, so it can be reclaimed
+	// * any series that are part of the return value
+	//   - if they are part of the response to the user, go into the datamap such that they'll go into the pool after we generate the response
+	//   - if they are not, should be added straight into the pool
 	out, err := s.getTargets(ctx, &meta.StorageStats, reqsList)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
@@ -812,6 +819,21 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 
 	dataMap := expr.NewDataMap()
 
+	// mergeSeries proper: discarded models.Series slices get returned to pool
+	// BUT it also calls Normalize on all series which behaves differently:
+	// any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
+	// this behavior is good for when called from expr, e.g. complies with plan.Run behavior
+	// but NOT GOOD when this is the caller, because we will add these entries to the datamap also, and they'll be reclaimed twice.
+
+	// when caller is expr:
+	// any unused series should be left alone (may be referenced or read from later)
+	// any newly created series requires an entry in datamap
+
+	// when caller is Server.executePlan(), behavior should be like mergeSeries:
+	// any unused series should go into pointSlicePool
+	// any newly created series should:
+	// - if it gets returned, do nothing special
+	// - it it doesn't get returned, return to pool
 	out = mergeSeries(out, dataMap)
 
 	if len(metaTagEnrichmentData) > 0 {
@@ -841,6 +863,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	span.LogFields(traceLog.Float64("PrepareSeriesMillis", durToMillis(meta.RenderStats.PrepareSeriesDuration)))
 
 	preRun := time.Now()
+
+	// all input data is in the datamap
+	// any newly created series is sourced out of the pool, and stored in the datamap
+	// this way, after we return the response to the client, we return all series (whether used in final response or not) back to the pool
+	// Nothing in the expr package returns straight to the pool directly, not even expr.Normalize*
 	out, err = plan.Run(dataMap)
 
 	for _, s := range out {
