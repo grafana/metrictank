@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/api/seriescycle"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
@@ -819,22 +820,16 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 
 	dataMap := expr.NewDataMap()
 
-	// mergeSeries proper: discarded models.Series slices get returned to pool
-	// BUT it also calls Normalize on all series which behaves differently:
-	// any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
-	// this behavior is good for when called from expr, e.g. complies with plan.Run behavior
-	// but NOT GOOD when this is the caller, because we will add these entries to the datamap also, and they'll be reclaimed twice.
+	// continuing the logic from above, mergeSeries() and children should return any non-used series to the pool
+	// whereas data that will be used in the response should be added to the datamap
 
-	// when caller is expr:
-	// any unused series should be left alone (may be referenced or read from later)
-	// any newly created series requires an entry in datamap
-
-	// when caller is Server.executePlan(), behavior should be like mergeSeries:
-	// any unused series should go into pointSlicePool
-	// any newly created series should:
-	// - if it gets returned, do nothing special
-	// - it it doesn't get returned, return to pool
-	out = mergeSeries(out, dataMap)
+	out = mergeSeries(out, seriescycle.SeriesCycler{
+		New: func(in models.Series) {
+		},
+		Done: func(in models.Series) {
+			pointSlicePool.Put(in.Datapoints[:0])
+		},
+	})
 
 	if len(metaTagEnrichmentData) > 0 {
 		for i := range out {

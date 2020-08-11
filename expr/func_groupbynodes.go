@@ -93,7 +93,7 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 			QueryPNGroup: group.s[0].QueryPNGroup,
 			Meta:         group.m,
 		}
-		group.s = Normalize(dataMap, group.s)
+		group.s = Normalize(group.s, NewCOWCycler(dataMap))
 		outSeries.Interval = group.s[0].Interval
 		outSeries.SetTags()
 		outSeries.Datapoints = pointSlicePool.Get().([]schema.Point)

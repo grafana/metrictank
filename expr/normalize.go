@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/seriescycle"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
@@ -12,8 +13,8 @@ import (
 )
 
 // Normalize normalizes series to the same common LCM interval - if they don't already have the same interval
-// any adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
-func Normalize(dataMap DataMap, in []models.Series) []models.Series {
+// any adjusted series gets created in a series drawn out of the pool
+func Normalize(in []models.Series, sc seriescycle.SeriesCycler) []models.Series {
 	if len(in) < 2 {
 		return in
 	}
@@ -27,13 +28,13 @@ func Normalize(dataMap DataMap, in []models.Series) []models.Series {
 	lcm := util.Lcm(intervals)
 	for i, s := range in {
 		if s.Interval != lcm {
-			in[i] = NormalizeTo(dataMap, s, lcm)
+			in[i] = NormalizeTo(s, lcm, sc)
 		}
 	}
 	return in
 }
 
-func NormalizeTwo(dataMap DataMap, a, b models.Series) (models.Series, models.Series) {
+func NormalizeTwo(a, b models.Series, sc seriescycle.SeriesCycler) (models.Series, models.Series) {
 	if a.Interval == b.Interval {
 		return a, b
 	}
@@ -41,10 +42,10 @@ func NormalizeTwo(dataMap DataMap, a, b models.Series) (models.Series, models.Se
 	lcm := util.Lcm(intervals)
 
 	if a.Interval != lcm {
-		a = NormalizeTo(dataMap, a, lcm)
+		a = NormalizeTo(a, lcm, sc)
 	}
 	if b.Interval != lcm {
-		b = NormalizeTo(dataMap, b, lcm)
+		b = NormalizeTo(b, lcm, sc)
 	}
 	return a, b
 }
@@ -54,8 +55,8 @@ func NormalizeTwo(dataMap DataMap, a, b models.Series) (models.Series, models.Se
 // the following MUST be true when calling this:
 // * interval > in.Interval
 // * interval % in.Interval == 0
-// the adjusted series gets created in a series drawn out of the pool and is added to the dataMap so it can be reclaimed
-func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Series {
+// the adjusted series gets created in a series drawn out of the pool
+func NormalizeTo(in models.Series, interval uint32, sc seriescycle.SeriesCycler) models.Series {
 
 	if len(in.Datapoints) == 0 {
 		panic(fmt.Sprintf("series %q cannot be normalized from interval %d to %d because it is empty", in.Target, in.Interval, interval))
@@ -74,9 +75,12 @@ func NormalizeTo(dataMap DataMap, in models.Series, interval uint32) models.Seri
 	if in.Consolidator == 0 {
 		in.Consolidator = consolidation.Avg
 	}
+
+	sc.Done(in)
 	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
 	in.Interval = interval
-	dataMap.Add(Req{}, in)
+	sc.New(in)
+
 	return in
 }
 

@@ -73,9 +73,9 @@ func (s *FuncDivideSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 			if ok {
 				divisor = newDiv
 				// we now have the right divisor but may still need to normalize the dividend
-				dividend, divisor = NormalizeTwo(dataMap, dividend, divisor)
+				dividend, divisor = NormalizeTwo(dividend, divisor, NewCOWCycler(dataMap))
 			} else {
-				dividend, divisor = NormalizeTwo(dataMap, dividend, divisor)
+				dividend, divisor = NormalizeTwo(dividend, divisor, NewCOWCycler(dataMap))
 				divisorsByRes[lcm] = divisor
 			}
 		}
