@@ -7,6 +7,224 @@ import (
 )
 
 // DecodeMsg implements msgp.Decodable
+func (z *GraphiteExpand) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Query":
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
+			if err != nil {
+				err = msgp.WrapError(err, "Query")
+				return
+			}
+			if cap(z.Query) >= int(zb0002) {
+				z.Query = (z.Query)[:zb0002]
+			} else {
+				z.Query = make([]string, zb0002)
+			}
+			for za0001 := range z.Query {
+				z.Query[za0001], err = dc.ReadString()
+				if err != nil {
+					err = msgp.WrapError(err, "Query", za0001)
+					return
+				}
+			}
+		case "GroupByExpr":
+			z.GroupByExpr, err = dc.ReadBool()
+			if err != nil {
+				err = msgp.WrapError(err, "GroupByExpr")
+				return
+			}
+		case "LeavesOnly":
+			z.LeavesOnly, err = dc.ReadBool()
+			if err != nil {
+				err = msgp.WrapError(err, "LeavesOnly")
+				return
+			}
+		case "Jsonp":
+			z.Jsonp, err = dc.ReadString()
+			if err != nil {
+				err = msgp.WrapError(err, "Jsonp")
+				return
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z *GraphiteExpand) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 4
+	// write "Query"
+	err = en.Append(0x84, 0xa5, 0x51, 0x75, 0x65, 0x72, 0x79)
+	if err != nil {
+		return
+	}
+	err = en.WriteArrayHeader(uint32(len(z.Query)))
+	if err != nil {
+		err = msgp.WrapError(err, "Query")
+		return
+	}
+	for za0001 := range z.Query {
+		err = en.WriteString(z.Query[za0001])
+		if err != nil {
+			err = msgp.WrapError(err, "Query", za0001)
+			return
+		}
+	}
+	// write "GroupByExpr"
+	err = en.Append(0xab, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x42, 0x79, 0x45, 0x78, 0x70, 0x72)
+	if err != nil {
+		return
+	}
+	err = en.WriteBool(z.GroupByExpr)
+	if err != nil {
+		err = msgp.WrapError(err, "GroupByExpr")
+		return
+	}
+	// write "LeavesOnly"
+	err = en.Append(0xaa, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x73, 0x4f, 0x6e, 0x6c, 0x79)
+	if err != nil {
+		return
+	}
+	err = en.WriteBool(z.LeavesOnly)
+	if err != nil {
+		err = msgp.WrapError(err, "LeavesOnly")
+		return
+	}
+	// write "Jsonp"
+	err = en.Append(0xa5, 0x4a, 0x73, 0x6f, 0x6e, 0x70)
+	if err != nil {
+		return
+	}
+	err = en.WriteString(z.Jsonp)
+	if err != nil {
+		err = msgp.WrapError(err, "Jsonp")
+		return
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *GraphiteExpand) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 4
+	// string "Query"
+	o = append(o, 0x84, 0xa5, 0x51, 0x75, 0x65, 0x72, 0x79)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Query)))
+	for za0001 := range z.Query {
+		o = msgp.AppendString(o, z.Query[za0001])
+	}
+	// string "GroupByExpr"
+	o = append(o, 0xab, 0x47, 0x72, 0x6f, 0x75, 0x70, 0x42, 0x79, 0x45, 0x78, 0x70, 0x72)
+	o = msgp.AppendBool(o, z.GroupByExpr)
+	// string "LeavesOnly"
+	o = append(o, 0xaa, 0x4c, 0x65, 0x61, 0x76, 0x65, 0x73, 0x4f, 0x6e, 0x6c, 0x79)
+	o = msgp.AppendBool(o, z.LeavesOnly)
+	// string "Jsonp"
+	o = append(o, 0xa5, 0x4a, 0x73, 0x6f, 0x6e, 0x70)
+	o = msgp.AppendString(o, z.Jsonp)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *GraphiteExpand) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Query":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Query")
+				return
+			}
+			if cap(z.Query) >= int(zb0002) {
+				z.Query = (z.Query)[:zb0002]
+			} else {
+				z.Query = make([]string, zb0002)
+			}
+			for za0001 := range z.Query {
+				z.Query[za0001], bts, err = msgp.ReadStringBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "Query", za0001)
+					return
+				}
+			}
+		case "GroupByExpr":
+			z.GroupByExpr, bts, err = msgp.ReadBoolBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "GroupByExpr")
+				return
+			}
+		case "LeavesOnly":
+			z.LeavesOnly, bts, err = msgp.ReadBoolBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "LeavesOnly")
+				return
+			}
+		case "Jsonp":
+			z.Jsonp, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Jsonp")
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *GraphiteExpand) Msgsize() (s int) {
+	s = 1 + 6 + msgp.ArrayHeaderSize
+	for za0001 := range z.Query {
+		s += msgp.StringPrefixSize + len(z.Query[za0001])
+	}
+	s += 12 + msgp.BoolSize + 11 + msgp.BoolSize + 6 + msgp.StringPrefixSize + len(z.Jsonp)
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
 func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
