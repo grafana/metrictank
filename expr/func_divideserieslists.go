@@ -52,7 +52,7 @@ func (s *FuncDivideSeriesLists) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	var series []models.Series
 	for i := range dividends {
-		dividend, divisor := NormalizeTwo(dataMap, dividends[i], divisors[i])
+		dividend, divisor := NormalizeTwo(dividends[i], divisors[i], NewCOWCycler(dataMap))
 
 		out := pointSlicePool.Get().([]schema.Point)
 		for i := 0; i < len(dividend.Datapoints); i++ {

@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/metrictank/api/middleware"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
+	"github.com/grafana/metrictank/api/seriescycle"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
@@ -801,6 +802,13 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	}
 
 	a := time.Now()
+
+	// any series fetched by getTargets or its children is (mostly) stored in point slices fetched from pointSlicePool
+	// ('mostly', see https://github.com/grafana/metrictank/issues/962)
+	// * any series dropped anywhere inside of this call (not part of the return value) should go into pool, so it can be reclaimed
+	// * any series that are part of the return value
+	//   - if they are part of the response to the user, go into the datamap such that they'll go into the pool after we generate the response
+	//   - if they are not, should be added straight into the pool
 	out, err := s.getTargets(ctx, &meta.StorageStats, reqsList)
 	if err != nil {
 		log.Errorf("HTTP Render %s", err.Error())
@@ -812,7 +820,16 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 
 	dataMap := expr.NewDataMap()
 
-	out = mergeSeries(out, dataMap)
+	// continuing the logic from above, mergeSeries() and children should return any non-used series to the pool
+	// whereas data that will be used in the response should be added to the datamap
+
+	out = mergeSeries(out, seriescycle.SeriesCycler{
+		New: func(in models.Series) {
+		},
+		Done: func(in models.Series) {
+			pointSlicePool.Put(in.Datapoints[:0])
+		},
+	})
 
 	if len(metaTagEnrichmentData) > 0 {
 		for i := range out {
@@ -841,6 +858,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	span.LogFields(traceLog.Float64("PrepareSeriesMillis", durToMillis(meta.RenderStats.PrepareSeriesDuration)))
 
 	preRun := time.Now()
+
+	// all input data is in the datamap
+	// any newly created series is sourced out of the pool, and stored in the datamap
+	// this way, after we return the response to the client, we return all series (whether used in final response or not) back to the pool
+	// Nothing in the expr package returns straight to the pool directly, not even expr.Normalize*
 	out, err = plan.Run(dataMap)
 
 	for _, s := range out {

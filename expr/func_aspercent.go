@@ -156,7 +156,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMa
 				outSeries = append(outSeries, nonesSerie)
 			} else {
 				// key found in both inByKey and totalSerieByKey
-				serie1, serie2 := NormalizeTwo(dataMap, serie1, totalSerieByKey[key])
+				serie1, serie2 := NormalizeTwo(serie1, totalSerieByKey[key], NewCOWCycler(dataMap))
 				serie1 = serie1.Copy(pointSlicePool.Get().([]schema.Point))
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
@@ -186,7 +186,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 	var outSeries []models.Series
 	var totalsSerie models.Series
 	if math.IsNaN(s.totalFloat) && totals == nil {
-		totalsSerie = sumSeries(Normalize(dataMap, in), dataMap)
+		totalsSerie = sumSeries(Normalize(in, NewCOWCycler(dataMap)), dataMap)
 		if len(in) == 1 {
 			totalsSerie.Target = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
 			totalsSerie.QueryPatt = fmt.Sprintf("sumSeries(%s)", totalsSerie.QueryPatt)
@@ -215,7 +215,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 			totalsSerie = totals[i]
 		}
 		if len(totalsSerie.Datapoints) > 0 {
-			serie, totalsSerie = NormalizeTwo(dataMap, serie, totalsSerie)
+			serie, totalsSerie = NormalizeTwo(serie, totalsSerie, NewCOWCycler(dataMap))
 			serie = serie.Copy(pointSlicePool.Get().([]schema.Point))
 			for i := range serie.Datapoints {
 				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
@@ -271,7 +271,7 @@ func getTotalSeries(totalSeriesByKey, inByKey map[string][]models.Series, dataMa
 	totalSerieByKey := make(map[string]models.Series, len(totalSeriesByKey))
 	for key := range totalSeriesByKey {
 		if _, ok := inByKey[key]; ok {
-			totalSerieByKey[key] = sumSeries(Normalize(dataMap, totalSeriesByKey[key]), dataMap)
+			totalSerieByKey[key] = sumSeries(Normalize(totalSeriesByKey[key], NewCOWCycler(dataMap)), dataMap)
 		} else {
 			totalSerieByKey[key] = totalSeriesByKey[key][0]
 		}
