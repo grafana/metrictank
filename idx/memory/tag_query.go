@@ -232,6 +232,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 	}()
 
 	timeout := time.NewTimer(TagQueryTimeout)
+	defer timeout.Stop()
 	select {
 	case <-timeout.C:
 		// Took too long
