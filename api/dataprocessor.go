@@ -153,7 +153,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	return pointsA
 }
 
-// getTargets retrieves the series for the given requests by querying remote and/or remote nodes as needed
+// getTargets retrieves the series for the given requests by querying local and/or remote nodes as needed
 func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
