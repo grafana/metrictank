@@ -231,7 +231,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		finishedChan <- struct{}{}
 	}()
 
-	timeout := time.NewTimer(60 * time.Second)
+	timeout := time.NewTimer(TagQueryTimeout)
 	select {
 	case <-timeout.C:
 		// Took too long
