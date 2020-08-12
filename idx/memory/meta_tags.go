@@ -731,6 +731,18 @@ func (e *metaTagEnricher) tryAddMetric(md schema.MetricDefinition) bool {
 	}
 }
 
+func (e *metaTagEnricher) tryDelMetric(md schema.MetricDefinition) bool {
+	select {
+	case e.eventQueue <- enricherEvent{
+		eventType: delMetric,
+		payload:   md,
+	}:
+		return true
+	default:
+		return false
+	}
+}
+
 func (e *metaTagEnricher) delMetric(md *schema.MetricDefinition) {
 	e.eventQueue <- enricherEvent{
 		eventType: delMetric,
