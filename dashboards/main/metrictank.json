@@ -1,4 +1,34 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_METRICTANK",
+      "label": "metrictank",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "graphite",
+      "pluginName": "Graphite"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "7.1.3"
+    },
+    {
+      "type": "panel",
+      "id": "graph",
+      "name": "Graph",
+      "version": ""
+    },
+    {
+      "type": "datasource",
+      "id": "graphite",
+      "name": "Graphite",
+      "version": "1.0.0"
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -20,13 +50,13 @@
   "editable": true,
   "gnetId": 279,
   "graphTooltip": 1,
-  "id": 21,
-  "iteration": 1596201582175,
+  "id": null,
+  "iteration": 1597308768906,
   "links": [],
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -78,7 +108,7 @@
       "links": [],
       "nullPointMode": "null as zero",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -245,7 +275,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -376,7 +406,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -497,7 +527,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -554,7 +584,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -733,7 +763,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -791,7 +821,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -949,7 +979,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1065,7 +1095,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1152,7 +1182,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1203,7 +1233,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1276,7 +1306,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -1307,7 +1337,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1371,7 +1401,7 @@
       "bars": true,
       "dashLength": 10,
       "dashes": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -1402,7 +1432,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1460,7 +1490,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1509,7 +1539,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1608,7 +1638,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1723,7 +1753,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1780,7 +1810,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1841,7 +1871,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1979,7 +2009,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2084,7 +2114,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2170,7 +2200,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2225,7 +2255,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2353,7 +2383,7 @@
       "links": [],
       "nullPointMode": "null as zero",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": false,
       "renderer": "flot",
@@ -2492,7 +2522,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2568,7 +2598,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2625,7 +2655,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2744,7 +2774,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2849,7 +2879,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2917,7 +2947,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2975,7 +3005,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3103,7 +3133,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3204,7 +3234,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3260,7 +3290,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3307,7 +3337,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -3408,7 +3438,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3541,7 +3571,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 2,
       "points": true,
       "renderer": "flot",
@@ -3660,7 +3690,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3760,7 +3790,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -3872,7 +3902,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -3988,7 +4018,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4047,7 +4077,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4097,7 +4127,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4193,7 +4223,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4304,7 +4334,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -4366,7 +4396,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4419,7 +4449,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4557,7 +4587,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4700,7 +4730,7 @@
       "links": [],
       "nullPointMode": "connected",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4791,7 +4821,7 @@
     },
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4846,7 +4876,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -4935,7 +4965,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -5038,7 +5068,7 @@
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
-      "pluginVersion": "7.1.1",
+      "pluginVersion": "7.1.3",
       "pointradius": 1,
       "points": false,
       "renderer": "flot",
@@ -5147,13 +5177,7 @@
       {
         "allFormat": "glob",
         "allValue": null,
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
