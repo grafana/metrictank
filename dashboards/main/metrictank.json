@@ -1328,7 +1328,7 @@
         "current": false,
         "max": false,
         "min": false,
-        "show": true,
+        "show": false,
         "total": false,
         "values": false
       },
@@ -1348,7 +1348,7 @@
       "targets": [
         {
           "refId": "A",
-          "target": "alias(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 'gogc')"
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 3)"
         }
       ],
       "thresholds": [],
@@ -1398,7 +1398,7 @@
         "goroutines": "semi-dark-blue",
         "total goroutines": "semi-dark-blue"
       },
-      "bars": true,
+      "bars": false,
       "dashLength": 10,
       "dashes": false,
       "datasource": "$datasource",
@@ -1423,12 +1423,12 @@
         "current": false,
         "max": false,
         "min": false,
-        "show": true,
+        "show": false,
         "total": false,
         "values": false
       },
-      "lines": false,
-      "linewidth": 3,
+      "lines": true,
+      "linewidth": 1,
       "links": [],
       "nullPointMode": "null",
       "percentage": false,
@@ -1439,11 +1439,11 @@
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": true,
+      "steppedLine": false,
       "targets": [
         {
           "refId": "A",
-          "target": "alias(metrictank.stats.$environment.$instance.runtime.goroutines.total.gauge64, 'total goroutines')",
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.runtime.goroutines.total.gauge64, 3)",
           "textEditor": false
         }
       ],
@@ -2633,6 +2633,7 @@
         "overrides": []
       },
       "fill": 1,
+      "fillGradient": 0,
       "grid": {},
       "gridPos": {
         "h": 7,
@@ -2640,6 +2641,7 @@
         "x": 0,
         "y": 48
       },
+      "hiddenSeries": false,
       "id": 6,
       "legend": {
         "avg": false,
@@ -2752,6 +2754,7 @@
         "overrides": []
       },
       "fill": 0,
+      "fillGradient": 0,
       "grid": {},
       "gridPos": {
         "h": 7,
@@ -2759,6 +2762,7 @@
         "x": 8,
         "y": 48
       },
+      "hiddenSeries": false,
       "id": 3,
       "legend": {
         "avg": false,
@@ -2857,6 +2861,7 @@
         "overrides": []
       },
       "fill": 0,
+      "fillGradient": 0,
       "grid": {},
       "gridPos": {
         "h": 7,
@@ -2864,6 +2869,7 @@
         "x": 16,
         "y": 48
       },
+      "hiddenSeries": false,
       "id": 11,
       "legend": {
         "avg": false,
