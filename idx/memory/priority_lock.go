@@ -15,6 +15,8 @@ type PriorityRWMutex struct {
 	lowPrioLock sync.RWMutex
 }
 
+// BlockContext is used to track the stages of lock acquisition and release so that timing
+// may be reported (and include salient details of the operation the lock was needed for)
 type BlockContext struct {
 	lock         *PriorityRWMutex
 	preLockTime  time.Time
@@ -25,8 +27,8 @@ type BlockContext struct {
 // RLockHigh allows *guaranteed fast* (or very high priority) ops to acquire the read lock as
 // quickly as possible. Note: This can block write lock acquisition
 func (pm *PriorityRWMutex) RLockHigh() {
-	// Don't increment activeReads just grab the lock. If an active write is holding the lock it
-	// will block, otherwise it *may* block a write acquisition, but that is opted into.
+	// If an active write is holding the lock this call will block
+	// otherwise, this call *may* block a write acquisition, but that is ok for "high" priority.
 	pm.lock.RLock()
 }
 
@@ -35,12 +37,12 @@ func (pm *PriorityRWMutex) RUnlockHigh() {
 	pm.lock.RUnlock()
 }
 
-// Synonym for RLockLow
+// RLock is an alias for RLockLow
 func (pm *PriorityRWMutex) RLock() BlockContext {
 	return pm.RLockLow()
 }
 
-// Synonym for RUnlockLow
+// RUnlock is an alias for RUnlockLow
 func (pm *PriorityRWMutex) RUnlock(bc *BlockContext) {
 	pm.RUnlockLow(bc)
 }
@@ -62,8 +64,8 @@ func (pm *PriorityRWMutex) RUnlockLow(bc *BlockContext) {
 	pm.lowPrioLock.RUnlock()
 }
 
-// Lock will block new low prio read locks until can acquire the lock. High prio read locks will
-// not be blocked or accounted for.
+// Lock will block new low priority read locks until it can acquire the lock.
+// High priority reads will not be blocked until all active low priority operations are complete.
 func (pm *PriorityRWMutex) Lock() BlockContext {
 	bc := BlockContext{lock: pm, preLockTime: time.Now()}
 	pm.lowPrioLock.Lock()
@@ -79,6 +81,8 @@ func (pm *PriorityRWMutex) Unlock(bc *BlockContext) {
 	pm.lowPrioLock.Unlock()
 }
 
+// RUnlockLow will unlock the associated lock and log if the lock was held for a long time
+// or acquisition was blocked for a significant length of time.
 func (bc *BlockContext) RUnlockLow(op string, logCb func() interface{}) {
 	bc.lock.RUnlockLow(bc)
 
@@ -92,6 +96,8 @@ func (bc *BlockContext) RUnlockLow(op string, logCb func() interface{}) {
 	}
 }
 
+// Unlock will unlock the associated lock and log if the lock was held for a long time
+// or acquisition was blocked for a significant length of time.
 func (bc *BlockContext) Unlock(op string, logCb func() interface{}) {
 	bc.lock.Unlock(bc)
 
