@@ -1306,7 +1306,7 @@
       "bars": false,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_METRICTANK}",
+      "datasource": "$datasource",
       "fieldConfig": {
         "defaults": {
           "custom": {}
@@ -1401,7 +1401,7 @@
       "bars": true,
       "dashLength": 10,
       "dashes": false,
-      "datasource": "${DS_METRICTANK}",
+      "datasource": "$datasource",
       "fieldConfig": {
         "defaults": {
           "custom": {}
