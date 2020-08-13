@@ -123,10 +123,3 @@ func (wq *WriteQueue) loop() {
 		}
 	}
 }
-
-func (wq *WriteQueue) isFlushPending() bool {
-	wq.Lock()
-	defer wq.Unlock()
-
-	return wq.flushPending
-}
