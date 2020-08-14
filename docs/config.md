@@ -720,7 +720,7 @@ max-stale = 0
 # * xFilesFactor is not honored yet.  What it is in graphite is a floating point number between 0 and 1 specifying what fraction of the previous retention level's slots must have non-null values in order to aggregate to a non-null value. The default is 0.5.
 # * aggregationMethod specifies the functions used to aggregate values for the next retention level. Legal methods are avg/average, sum, min, max, and last. The default is average.
 # Unlike Graphite, you can specify multiple, as it is often handy to have different summaries available depending on what analysis you need to do.
-# When using multiple, the first one is used for reading.  In the future, we will add capabilities to select the different archives for reading.
+# When using multiple, the first one listed is the "primary" one, used for reading data unless another one is requested via consolidateBy().
 # * the settings configured when metrictank starts are what is applied. So you can enable or disable archives by restarting metrictank.
 #
 # see https://github.com/grafana/metrictank/blob/master/docs/consolidation.md for related info.
