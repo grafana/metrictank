@@ -9,6 +9,7 @@ exemptLabels:
   - pinned
   - security
   - Epic
+  - customer-impacting
   - help wanted
 
   # Set to true to ignore issues in a milestone (defaults to false)
