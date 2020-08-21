@@ -13,7 +13,10 @@ There are some small behavioral and functional differences with Graphite:
 * Graphite supports the following render formats: csv, json, dygraph, msgpack, pickle, png, pdf, raw, rickshaw, and svg.
   Metrictank only implements json, msgp, msgpack, and pickle. Grafana only uses json. In particular, Metrictank does not render images, because Grafana renders great.
 * Some less commonly used functions are not implemented yet in Metrictank itself, but Metrictank can seamlessly proxy those to graphite-web (see below for details)
-  At Grafana Labs, 90 to 95 % of requests get handled by Metrictank without involving Graphite.
+  At Grafana Labs, 90 to 99 % of requests get handled by Metrictank without involving Graphite.
+* perl-style regex (pcre) are not supported in functions such as aliasSub, and if used, will return an error like so
+  "error parsing regexp: invalid or unsupported Perl syntax: '(?!'...". See https://github.com/grafana/metrictank/issues/1776
+* Metrictank supports rolling up any given metric by multiple functions and using consolidateBy() to select a rollup
 
 
 ## Processing functions
@@ -41,7 +44,7 @@ See also:
 | absolute                                                       |              | Stable     |
 | aggregate                                                      |              | Stable     |
 | aggregateLine                                                  |              | No         |
-| aggregateWithWildcards                                         |              | No         |
+| aggregateWithWildcards                                         |              | Stable     |
 | alias(seriesList, alias) seriesList                            |              | Stable     |
 | aliasByMetric                                                  |              | Stable     |
 | aliasByNode(seriesList, nodeList) seriesList                   | aliasByTags  | Stable     |
@@ -56,7 +59,7 @@ See also:
 | averageBelow                                                   |              | Stable     |
 | averageOutsidePercentile                                       |              | No         |
 | averageSeries(seriesLists) series                              | avg          | Stable     |
-| averageSeriesWithWildcards                                     |              | No         |
+| averageSeriesWithWildcards                                     |              | Stable     |
 | cactiStyle                                                     |              | No         |
 | changed                                                        |              | No         |
 | color                                                          |              | No         |
@@ -123,7 +126,7 @@ See also:
 | movingSum                                                      |              | No         |
 | movingWindow                                                   |              | No         |
 | multiplySeries(seriesList) series                              |              | Stable     |
-| multiplySeriesWithWildcards                                    |              | No         |
+| multiplySeriesWithWildcards                                    |              | Stable     |
 | nonNegatievDerivative(seriesList, maxValue) seriesList         |              | Stable     |
 | nPercentile                                                    |              | No         |
 | offset                                                         |              | No         |
@@ -164,7 +167,7 @@ See also:
 | substr                                                         |              | No         |
 | summarize(seriesList) seriesList                               |              | Stable     |
 | sumSeries(seriesLists) series                                  | sum          | Stable     |
-| sumSeriesWithWildcards                                         |              | No         |
+| sumSeriesWithWildcards                                         |              | Stable     |
 | threshold                                                      |              | No         |
 | timeFunction                                                   | time         | No         |
 | timeShift                                                      |              | Stable     |

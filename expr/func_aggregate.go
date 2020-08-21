@@ -57,7 +57,7 @@ func (s *FuncAggregate) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	agg := seriesAggregator{function: getCrossSeriesAggFunc(s.name), name: s.name}
-	series = Normalize(dataMap, series)
+	series = Normalize(series, NewCOWCycler(dataMap))
 	return aggregate(dataMap, series, queryPatts, agg, s.xFilesFactor)
 }
 

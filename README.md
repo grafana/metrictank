@@ -1,3 +1,5 @@
+<img src="docs/assets/metrictank-logo.png" height="150px" alt="Metrictank logo">
+
 # Metrictank
 
 [![Circle CI](https://circleci.com/gh/grafana/metrictank.svg?style=shield)](https://circleci.com/gh/grafana/metrictank)

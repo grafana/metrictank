@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/seriescycle"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/schema"
 )
@@ -52,8 +53,7 @@ func TestNormalizeOneSeriesAdjustWithPreCanonicalize(t *testing.T) {
 			},
 		},
 	}
-	dataMap := NewDataMap()
-	got := Normalize(dataMap, in)
+	got := Normalize(in, seriescycle.NullCycler)
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
 	}
@@ -141,8 +141,7 @@ func TestNormalizeMultiLCMSeriesAdjustWithPreCanonicalize(t *testing.T) {
 			},
 		},
 	}
-	dataMap := NewDataMap()
-	got := Normalize(dataMap, in)
+	got := Normalize(in, seriescycle.NullCycler)
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
 	}
@@ -175,8 +174,7 @@ func TestNormalizeToWithMissingBeginning(t *testing.T) {
 			{Ts: 120, Val: 75 + 90 + 105 + 120},
 		},
 	}
-	dataMap := NewDataMap()
-	got := NormalizeTo(dataMap, in, 60)
+	got := NormalizeTo(in, 60, seriescycle.NullCycler)
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("TestNormalize() mismatch (-want +got):\n%s", diff)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/util/align"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/seriescycle"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata"
@@ -62,6 +63,8 @@ type getTargetsResp struct {
 // note: values are quantized to the right because we can't lie about the future:
 // e.g. if interval is 10 and we have a point at 8 or at 2, it will be quantized to 10, we should never move
 // values to earlier in time.
+// Note: `in` series is returned to the pool and should not be reused.
+// output series comes out of the pool if possible.
 func Fix(in []schema.Point, from, to, interval uint32) []schema.Point {
 
 	first := align.ForwardIfNotAligned(from, interval)
@@ -150,6 +153,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 	return pointsA
 }
 
+// getTargets retrieves the series for the given requests by querying local and/or remote nodes as needed
 func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
@@ -619,9 +623,9 @@ func (s *Server) getSeriesCachedStore(ctx *requestContext, ss *models.StorageSta
 // mergeSeries merges series together if applicable. It does this by categorizing
 // series into groups based on their target, query, consolidator etc. If they collide, they get merged.
 // each first uniquely-identified series's backing datapoints slice is reused
-// any subsequent non-uniquely-identified series is merged into the former and has its
-// datapoints slice returned to the pool. input series must be canonical
-func mergeSeries(in []models.Series, dataMap expr.DataMap) []models.Series {
+// any subsequent non-uniquely-identified series is merged into the former and is passed to the seriescycler
+// input series must be canonical
+func mergeSeries(in []models.Series, sc seriescycle.SeriesCycler) []models.Series {
 	type segment struct {
 		target  string
 		query   string
@@ -655,7 +659,7 @@ func mergeSeries(in []models.Series, dataMap expr.DataMap) []models.Series {
 			// we use the first series in the list as our result.  We check over every
 			// point and if it is null, we then check the other series for a non null
 			// value to use instead.
-			series = expr.Normalize(dataMap, series)
+			series = expr.Normalize(series, sc)
 			log.Debugf("DP mergeSeries: %s has multiple series.", series[0].Target)
 			for i := range series[0].Datapoints {
 				for j := 0; j < len(series); j++ {
@@ -666,7 +670,7 @@ func mergeSeries(in []models.Series, dataMap expr.DataMap) []models.Series {
 				}
 			}
 			for j := 1; j < len(series); j++ {
-				pointSlicePool.Put(series[j].Datapoints[:0])
+				sc.Done(series[j])
 			}
 			merged[i] = series[0]
 			for j := 1; j < len(series); j++ {

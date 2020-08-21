@@ -547,3 +547,21 @@ func aggKey(serie models.Series, nodes []expr) string {
 	}
 	return strings.Join(name, ".")
 }
+
+// filterNodesByPositions removes the node at the given position(s)
+// it is assumed that the node expressions are int ettype.
+func filterNodesByPositions(name string, nodes []expr) string {
+	parts := strings.Split(name, ".")
+	var newName []string
+
+	for i, word := range parts {
+		var found bool
+		for _, n := range nodes {
+			found = (n.int == int64(i)) || found
+		}
+		if !found {
+			newName = append(newName, word)
+		}
+	}
+	return strings.Join(newName, ".")
+}
