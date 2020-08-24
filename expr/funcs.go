@@ -129,6 +129,7 @@ func init() {
 		"sumSeries":                    {NewAggregateConstructor("sum"), true},
 		"sumSeriesWithWildcards":       {NewAggregateWithWildcardsConstructor("sum"), true},
 		"summarize":                    {NewSummarize, true},
+		"timeShift":                    {NewTimeShift, true},
 		"transformNull":                {NewTransformNull, true},
 		"unique":                       {NewUnique, true},
 	}

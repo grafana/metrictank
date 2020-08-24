@@ -170,7 +170,7 @@ See also:
 | sumSeriesWithWildcards                                         |              | Stable     |
 | threshold                                                      |              | No         |
 | timeFunction                                                   | time         | No         |
-| timeShift                                                      |              | No         |
+| timeShift                                                      |              | Stable     |
 | timeSlice                                                      |              | No         |
 | timeStack                                                      |              | No         |
 | transformNull(seriesList, default=0) seriesList                |              | Stable     |
