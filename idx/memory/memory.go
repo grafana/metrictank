@@ -493,9 +493,12 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	m.defByTagSet.add(def)
 
 	if MetaTagSupport {
-		m.Unlock()
-		m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
-		m.Lock()
+		if ok := m.getOrgMetaTagIndex(def.OrgId).enricher.tryAddMetric(*def); !ok {
+			log.Warnf("Failed to add metric def need to relinquish lock")
+			m.Unlock()
+			m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
+			m.Lock()
+		}
 	}
 }
 
@@ -525,9 +528,12 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 	m.defByTagSet.del(def)
 
 	if MetaTagSupport {
-		m.Unlock()
-		m.getOrgMetaTagIndex(def.OrgId).enricher.delMetric(def)
-		m.Lock()
+		if ok := m.getOrgMetaTagIndex(def.OrgId).enricher.tryDelMetric(def); !ok {
+			log.Warnf("Failed to del metric def, need to relinquish lock")
+			m.Unlock()
+			m.getOrgMetaTagIndex(def.OrgId).enricher.delMetric(def)
+			m.Lock()
+		}
 	}
 
 	return true
