@@ -37,16 +37,6 @@ func (pm *PriorityRWMutex) RUnlockHigh() {
 	pm.lock.RUnlock()
 }
 
-// RLock is an alias for RLockLow
-func (pm *PriorityRWMutex) RLock() BlockContext {
-	return pm.RLockLow()
-}
-
-// RUnlock is an alias for RUnlockLow
-func (pm *PriorityRWMutex) RUnlock(bc *BlockContext) {
-	pm.RUnlockLow(bc)
-}
-
 // RLockLow will block until requested writes complete. New writes that come in also get priority.
 func (pm *PriorityRWMutex) RLockLow() BlockContext {
 	// Wait for any pending writes
@@ -58,6 +48,7 @@ func (pm *PriorityRWMutex) RLockLow() BlockContext {
 }
 
 // RUnlockLow unlocks read lock called via RLockLow
+// Note: This function should not be called directly, but rather should be called via the returned BlockContext
 func (pm *PriorityRWMutex) RUnlockLow(bc *BlockContext) {
 	bc.postOpTime = time.Now()
 	pm.lock.RUnlock()
@@ -75,6 +66,7 @@ func (pm *PriorityRWMutex) Lock() BlockContext {
 }
 
 // Unlock unlocks mutex acquired via Lock
+// Note: This function should not be called directly, but rather should be called via the returned BlockContext
 func (pm *PriorityRWMutex) Unlock(bc *BlockContext) {
 	bc.postOpTime = time.Now()
 	pm.lock.Unlock()
