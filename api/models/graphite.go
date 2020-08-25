@@ -182,6 +182,13 @@ type GraphiteFind struct {
 	Jsonp  string `json:"jsonp" form:"jsonp"`
 }
 
+type GraphiteExpand struct {
+	Query       []string `json:"query" form:"query" binding:"Required"`
+	GroupByExpr bool     `json:"groupByExpr" form:"groupByExpr"`
+	LeavesOnly  bool     `json:"leavesOnly" form:"leavesOnly"`
+	Jsonp       string   `json:"jsonp" form:"jsonp"`
+}
+
 type MetricsDelete struct {
 	Query string `json:"query" form:"query" binding:"Required"`
 }

@@ -66,6 +66,30 @@ json and treejson are the same.
 curl -H "X-Org-Id: 12345" "http://localhost:6060/metrics/find?query=statsd.fakesite.counters.session_start.*.count"
 ```
 
+## Expand metric name patterns into all names matching it
+
+```
+GET /metrics/expand
+POST /metrics/expand
+```
+
+Returns metrics which match the given query/queries and are stored under the given org or are public data (see [multi-tenancy](https://github.com/grafana/metrictank/blob/master/docs/multi-tenancy.md)).
+Very similar to `/metrics/find`, the main difference is that it does not deduplicate the results by the last name node and it returns them in a more simple format.
+
+##### Parameters
+
+* header `X-Org-Id` required
+* query (required): a metric name, and can use all graphite glob patterns (`*`, `{}`, `[]`, `?`). can be specified multiple times
+* groupByExpr: if true, then the results get grouped by the query which yielded them, otherwise all results are in a flat list. (defaults to false)
+* leavesOnly: if true, only leaf nodes get returned, if false branch nodes also get returned. (defaults to false)
+* jsonp
+
+#### Example
+
+```bash
+curl 'http://localhost:6061/metrics/expand?groupByExpr=true&query=some.id.of.a.metric.*&query=other.metric.*.*'
+```
+
 ## Find tagged metrics
 
 ```

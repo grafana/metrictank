@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
 	"github.com/tinylib/msgp/msgp"
+	"golang.org/x/sync/errgroup"
 	macaron "gopkg.in/macaron.v1"
 
 	"github.com/grafana/metrictank/api/middleware"
@@ -368,6 +369,75 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
+	}
+}
+
+func (s *Server) metricsExpand(ctx *middleware.Context, request models.GraphiteExpand) {
+	g, errGroupCtx := errgroup.WithContext(ctx.Req.Context())
+	results := make([]map[string]struct{}, len(request.Query))
+	for i, query := range request.Query {
+		i, query := i, query
+		g.Go(func() error {
+			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0)
+			if err != nil {
+				return err
+			}
+			results[i] = make(map[string]struct{})
+			for _, s := range series {
+				for _, n := range s.Series {
+					if request.LeavesOnly && !n.Leaf {
+						continue
+					}
+
+					results[i][n.Path] = struct{}{}
+				}
+			}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+
+	// check to see if the request has been canceled, if so abort now.
+	select {
+	case <-ctx.Req.Context().Done():
+		//request canceled
+		response.Write(ctx, response.RequestCanceledErr)
+		return
+	default:
+	}
+
+	if request.GroupByExpr {
+		// keyed by query string
+		resultsGrouped := make(map[string][]string, len(results))
+		for resultIdx, queryResults := range results {
+			// query and results can be associated via their shared idx
+			query := request.Query[resultIdx]
+			resultsGrouped[query] = make([]string, 0, len(queryResults))
+			for queryResult := range queryResults {
+				resultsGrouped[query] = append(resultsGrouped[query], queryResult)
+			}
+			sort.StringSlice(resultsGrouped[query]).Sort()
+		}
+
+		response.Write(ctx, response.NewJson(200, resultsGrouped, request.Jsonp))
+	} else {
+		// all results in one flat list
+		resultsUngrouped := make(map[string]struct{})
+		for _, paths := range results {
+			for path := range paths {
+				resultsUngrouped[path] = struct{}{}
+			}
+		}
+		resultSlice := make([]string, 0, len(resultsUngrouped))
+		for result := range resultsUngrouped {
+			resultSlice = append(resultSlice, result)
+		}
+		sort.StringSlice(resultSlice).Sort()
+
+		response.Write(ctx, response.NewJson(200, resultSlice, request.Jsonp))
 	}
 }
 
