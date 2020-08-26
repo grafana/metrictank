@@ -109,7 +109,7 @@ func (bc *BlockContext) logLongOp(opType, op, details string) {
 
 	timeFormat := "15:04:05.000"
 
-	log.Infof("Long %s %s: lockWaitTime = %f, lockHoldTime = %f %s absoluteTimes = (%v -> %v -> %v)",
+	log.Infof("memory-idx: Long lock %s %s: lockWaitTime = %f, lockHoldTime = %f %s absoluteTimes = (%v -> %v -> %v)",
 		opType, op, waitSecs, holdsSecs, details,
 		bc.preLockTime.Format(timeFormat), bc.postLockTime.Format(timeFormat), bc.postOpTime.Format(timeFormat))
 }
