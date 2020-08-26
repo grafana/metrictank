@@ -37,11 +37,11 @@ func selectAndCompareResults(t *testing.T, expression tagquery.Expression, metaR
 	index.Init()
 
 	archives, _ := getTestArchives(10)
-	index.Lock()
+	bc := index.Lock()
 	for i := range archives {
 		index.add(archives[i])
 	}
-	index.Unlock()
+	bc.Unlock("TestLoad", nil)
 
 	for i := range metaRecords {
 		index.MetaTagRecordUpsert(1, metaRecords[i])

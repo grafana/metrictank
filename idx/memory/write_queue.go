@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -9,11 +10,12 @@ import (
 )
 
 type WriteQueue struct {
-	shutdown    chan struct{}
-	done        chan struct{}
-	maxBuffered int
-	maxDelay    time.Duration
-	flushed     chan struct{}
+	shutdown     chan struct{}
+	done         chan struct{}
+	maxBuffered  int
+	maxDelay     time.Duration
+	flushTrigger chan struct{}
+	flushPending bool
 
 	archives map[schema.MKey]*idx.Archive
 	sync.RWMutex
@@ -25,13 +27,14 @@ type WriteQueue struct {
 // in batches
 func NewWriteQueue(index *UnpartitionedMemoryIdx, maxDelay time.Duration, maxBuffered int) *WriteQueue {
 	wq := &WriteQueue{
-		archives:    make(map[schema.MKey]*idx.Archive),
-		shutdown:    make(chan struct{}),
-		done:        make(chan struct{}),
-		maxBuffered: maxBuffered,
-		maxDelay:    maxDelay,
-		flushed:     make(chan struct{}, 1),
-		idx:         index,
+		archives:     make(map[schema.MKey]*idx.Archive),
+		shutdown:     make(chan struct{}),
+		done:         make(chan struct{}),
+		maxBuffered:  maxBuffered,
+		maxDelay:     maxDelay,
+		flushTrigger: make(chan struct{}, 1),
+		flushPending: false,
+		idx:          index,
 	}
 	go wq.loop()
 	return wq
@@ -45,8 +48,12 @@ func (wq *WriteQueue) Stop() {
 func (wq *WriteQueue) Queue(archive *idx.Archive) {
 	wq.Lock()
 	wq.archives[archive.Id] = archive
-	if len(wq.archives) >= wq.maxBuffered {
-		wq.flush()
+	if !wq.flushPending && len(wq.archives) >= wq.maxBuffered {
+		wq.flushPending = true
+		select {
+		case wq.flushTrigger <- struct{}{}:
+		default:
+		}
 	}
 	wq.Unlock()
 }
@@ -59,29 +66,38 @@ func (wq *WriteQueue) Get(id schema.MKey) (*idx.Archive, bool) {
 }
 
 // flush adds the buffered archives to the memoryIdx.
-// callers need to acquire a writeLock before calling this function.
 func (wq *WriteQueue) flush() {
-	if len(wq.archives) == 0 {
-		// non blocking write to the flushed chan.
-		// if we cant write to the flushed chan it means there is a previous flush
-		// signal that hasnt been processed.  In that case, we dont need to send another one.
-		select {
-		case wq.flushed <- struct{}{}:
-		default:
-		}
+	// Quick check to see if we have any archives we need to flush
+	wq.Lock()
+	archiveSize := len(wq.archives)
+	wq.flushPending = archiveSize > 0
+	wq.Unlock()
+
+	if archiveSize == 0 {
 		return
 	}
-	wq.idx.Lock()
+
+	// wq.idx.Lock() can be very slow to acquire (if there are long read ops). wq.Lock has much
+	// smaller bounds on lock hold time. So, to avoid blocking writes while waiting on the idx,
+	// we make sure to acquire the index lock first and only then acquire wq.Lock
+	pre := time.Now()
+
+	bc := wq.idx.Lock()
+	defer bc.Unlock("WriteQueueFlush", func() interface{} {
+		return fmt.Sprintf("numAdds = %d", archiveSize)
+	})
+
+	wq.Lock()
+	defer wq.Unlock()
+
+	archiveSize = len(wq.archives)
 	for _, archive := range wq.archives {
 		wq.idx.add(archive)
 	}
-	wq.idx.Unlock()
 	wq.archives = make(map[schema.MKey]*idx.Archive)
+	wq.flushPending = false
 
-	select {
-	case wq.flushed <- struct{}{}:
-	default:
-	}
+	statAddDuration.Value(time.Since(pre))
 }
 
 func (wq *WriteQueue) loop() {
@@ -89,20 +105,17 @@ func (wq *WriteQueue) loop() {
 	timer := time.NewTimer(wq.maxDelay)
 	for {
 		select {
-		case <-wq.flushed:
+		case <-wq.flushTrigger:
 			if !timer.Stop() {
 				<-timer.C
 			}
+			wq.flush()
 			timer.Reset(wq.maxDelay)
 		case <-timer.C:
-			wq.Lock()
 			wq.flush()
-			wq.Unlock()
 			timer.Reset(wq.maxDelay)
 		case <-wq.shutdown:
-			wq.Lock()
 			wq.flush()
-			wq.Unlock()
 			if !timer.Stop() {
 				<-timer.C
 			}
