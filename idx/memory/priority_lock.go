@@ -10,18 +10,10 @@ import (
 
 // PriorityRWMutex is a mutex that allows fair access to high priority read operations while
 // blocking low priority operations if a write lock is waiting.
+// it supports 3 levels of service: high priority reads, low priority (potentially slow) reads, and writes
 type PriorityRWMutex struct {
 	lock        sync.RWMutex
 	lowPrioLock sync.RWMutex
-}
-
-// BlockContext is used to track the stages of lock acquisition and release so that timing
-// may be reported (and include salient details of the operation the lock was needed for)
-type BlockContext struct {
-	lock         *PriorityRWMutex
-	preLockTime  time.Time
-	postLockTime time.Time
-	postOpTime   time.Time
 }
 
 // RLockHigh allows *guaranteed fast* (or very high priority) ops to acquire the read lock as
@@ -49,6 +41,7 @@ func (pm *PriorityRWMutex) RLockLow() BlockContext {
 
 // RUnlockLow unlocks read lock called via RLockLow
 // Note: This function should not be called directly, but rather should be called via the returned BlockContext
+// BlockContext should be the BlockContext obtained by the respective RLockLow() call
 func (pm *PriorityRWMutex) RUnlockLow(bc *BlockContext) {
 	bc.postOpTime = time.Now()
 	pm.lock.RUnlock()
@@ -67,10 +60,20 @@ func (pm *PriorityRWMutex) Lock() BlockContext {
 
 // Unlock unlocks mutex acquired via Lock
 // Note: This function should not be called directly, but rather should be called via the returned BlockContext
+// BlockContext should be the BlockContext obtained by the respective Unlock() call
 func (pm *PriorityRWMutex) Unlock(bc *BlockContext) {
 	bc.postOpTime = time.Now()
 	pm.lock.Unlock()
 	pm.lowPrioLock.Unlock()
+}
+
+// BlockContext is used to track the stages of lock acquisition and release for low prio reads and writes
+// so that timing may be reported (and include salient details of the operation the lock was needed for)
+type BlockContext struct {
+	lock         *PriorityRWMutex
+	preLockTime  time.Time
+	postLockTime time.Time
+	postOpTime   time.Time
 }
 
 // RUnlockLow will unlock the associated lock and log if the lock was held for a long time
@@ -109,7 +112,7 @@ func (bc *BlockContext) logLongOp(opType, op, details string) {
 
 	timeFormat := "15:04:05.000"
 
-	log.Infof("Long %s %s: lockWaitTime = %f, lockHoldTime = %f %s absoluteTimes = (%v -> %v -> %v)",
+	log.Infof("memory-idx: Long lock %s %s: lockWaitTime = %f, lockHoldTime = %f %s absoluteTimes = (%v -> %v -> %v)",
 		opType, op, waitSecs, holdsSecs, details,
 		bc.preLockTime.Format(timeFormat), bc.postLockTime.Format(timeFormat), bc.postOpTime.Format(timeFormat))
 }
