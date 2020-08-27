@@ -84,21 +84,29 @@ func getOutput() out.Out {
 	}
 	for i := len(filterStrings) - 1; i >= 0; i-- {
 		filterString := filterStrings[i]
-		// <name>:<opts>
-		// in the future, <opts> will probably be multiple key=val pairs
+		// format for a filter is <name>:<opts>
+		// where <opts> can be multiple key=val pairs separated by ':'
+		// (note comma separator is already used to denote multiple filters)
 		splits := strings.SplitN(filterString, ":", 2)
-		switch splits[0] {
+		name := splits[0]
+		var opts string
+		if len(splits) == 2 {
+			opts = splits[1]
+		}
+		var err error
+		switch name {
 		case "offset":
-			if len(splits) != 2 {
-				log.Fatal("offset option must be specified for offset filter")
-			}
-			var err error
-			o, err = out.NewOffsetFilter(o, splits[1])
+			o, err = out.NewOffsetFilter(o, opts)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Fatalf("NewOffsetFilter: %s", err.Error())
+			}
+		case "period":
+			o, err = out.NewPeriodFilter(o, opts)
+			if err != nil {
+				log.Fatalf("NewPeriodFilter: %s", err.Error())
 			}
 		default:
-			log.Fatalf("unrecognized filter %q", splits[0])
+			log.Fatalf("unrecognized filter %q", name)
 		}
 	}
 	return o
