@@ -16,16 +16,7 @@ func NewSubstr() GraphiteFunc {
 	return &FuncSubstr{}
 }
 
-func NewAliasByMetric() GraphiteFunc {
-	return &FuncSubstr{start: -1, stop: 0}
-}
-
 func (s *FuncSubstr) Signature() ([]Arg, []Arg) {
-	if s.start != 0 || s.stop != 0 {
-		return []Arg{
-			ArgSeriesList{val: &s.in},
-		}, []Arg{ArgSeriesList{}}
-	}
 	return []Arg{
 		ArgSeriesList{val: &s.in},
 		ArgInt{val: &s.start, opt: true, key: "start"},
@@ -37,8 +28,8 @@ func (s *FuncSubstr) Context(context Context) Context {
 	return context
 }
 
-func (s *FuncSubstr) Exec(cache map[Req][]models.Series) ([]models.Series, error) {
-	series, err := s.in.Exec(cache)
+func (s *FuncSubstr) Exec(dataMap DataMap) ([]models.Series, error) {
+	series, err := s.in.Exec(dataMap)
 	if err != nil {
 		return nil, err
 	}
