@@ -37,7 +37,7 @@ func (s *Stdout) Flush(metrics []*schema.MetricData) error {
 	var n int64
 	s.Lock()
 	for _, m := range metrics {
-		num, err := fmt.Fprintf(os.Stdout, "%d %s (tags: %v) %f %d\n", m.OrgId, m.Name, m.Tags, m.Value, m.Time)
+		num, err := fmt.Fprintf(os.Stdout, "org=%d name=%s interval=%d tags=%v %f %d\n", m.OrgId, m.Name, m.Interval, m.Tags, m.Value, m.Time)
 		if err != nil {
 			s.PublishErrors.Inc(1)
 			return err
