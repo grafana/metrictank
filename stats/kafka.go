@@ -15,9 +15,9 @@ func NewKafka(prefix string, partitions []int32) Kafka {
 
 // KafkaPartition tracks the health of a partition consumer
 type KafkaPartition struct {
-	Offset   *Gauge64
-	LogSize  *Gauge64
-	Lag      *Gauge64
+	Offset   *Gauge64 // offset of consumed message
+	LogSize  *Gauge64 // last offset in the topic
+	Lag      *Gauge64 // difference between the two above
 	Priority *Gauge64
 	Ready    *Bool
 }
