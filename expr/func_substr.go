@@ -34,13 +34,14 @@ func (s *FuncSubstr) Exec(dataMap DataMap) ([]models.Series, error) {
 		return nil, err
 	}
 
-	for i := range series {
-		left := strings.LastIndex(series[i].Target, "(") + 1
-		right := strings.Index(series[i].Target, ")")
+	out := make([]models.Series, len(series))
+	for i, serie := range series {
+		left := strings.LastIndex(serie.Target, "(") + 1
+		right := strings.Index(serie.Target, ")")
 		if right < 0 {
-			right = len(series[i].Target)
+			right = len(serie.Target)
 		}
-		cleanName := series[i].Target[left:right]
+		cleanName := serie.Target[left:right]
 		cleanName = strings.SplitN(cleanName, ",", 2)[0]
 
 		var name string
@@ -67,8 +68,9 @@ func (s *FuncSubstr) Exec(dataMap DataMap) ([]models.Series, error) {
 			name = strings.Join(strings.Split(cleanName, ".")[s.start:s.stop], ".")
 		}
 
-		series[i].Target = name
+		serie.Target = name
+		out[i] = serie
 	}
 
-	return series, nil
+	return out, nil
 }
