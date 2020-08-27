@@ -74,6 +74,9 @@ var schemasbackfillCmd = &cobra.Command{
 			if name == "" {
 				name = "default"
 			}
+			if mpr > 1 {
+				name += ".%d"
+			}
 			go func(name string, period int) {
 				vp, err := policy.ParseValuePolicy(valuePolicy)
 				if err != nil {
