@@ -9,125 +9,136 @@ import (
 	"github.com/raintank/schema"
 )
 
-func getNewSubstr(in []models.Series, start, stop int64) *FuncSubstr {
-	f := NewSubstr()
-	s := f.(*FuncSubstr)
-	s.in = NewMock(in)
-	s.start = start
-	s.stop = stop
-	return s
-}
-
 func TestSubstrNoArgs(t *testing.T) {
-	f := getNewSubstr(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.b.c.d.*",
-				Target:     "a.b.c.d.e",
-				Datapoints: getCopy(a),
-			},
-		},
-		0,
-		0,
-	)
-	out := []models.Series{
+	input := []models.Series{
 		{
 			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
 			QueryPatt:  "a.b.c.d.*",
 			Target:     "a.b.c.d.e",
 			Datapoints: getCopy(a),
 		},
 	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
+	exp := []models.Series{
+		{
+			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
+			QueryPatt:  "a.b.c.d.*",
+			Target:     "a.b.c.d.e",
+			Datapoints: getCopy(a),
+		},
 	}
+	testSubstr("TestSubstrNoArgs", input, exp, 0, 0, t)
 }
 
 func TestSubstrStart(t *testing.T) {
-	f := getNewSubstr(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.b.c.d.*",
-				Target:     "a.b.c.d.e",
-				Datapoints: getCopy(a),
-			},
-		},
-		2,
-		0,
-	)
-	out := []models.Series{
+	input := []models.Series{
 		{
 			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
+			QueryPatt:  "a.b.c.d.*",
+			Target:     "a.b.c.d.e",
+			Datapoints: getCopy(a),
+		},
+	}
+	exp := []models.Series{
+		{
+			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
 			QueryPatt:  "a.b.c.d.*",
 			Target:     "c.d.e",
 			Datapoints: getCopy(a),
 		},
 	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	testSubstr("TestSubstrStart", input, exp, 2, 0, t)
 }
 
 func TestSubstrStartStop(t *testing.T) {
-	f := getNewSubstr(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "a.b.c.d.*",
-				Target:     "a.b.c.d.e",
-				Datapoints: getCopy(a),
-			},
-		},
-		2,
-		4,
-	)
-	out := []models.Series{
+	input := []models.Series{
 		{
 			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
+			QueryPatt:  "a.b.c.d.*",
+			Target:     "a.b.c.d.e",
+			Datapoints: getCopy(a),
+		},
+	}
+	exp := []models.Series{
+		{
+			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
 			QueryPatt:  "a.b.c.d.*",
 			Target:     "c.d",
 			Datapoints: getCopy(a),
 		},
 	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	testSubstr("TestSubstrStartStop", input, exp, 2, 4, t)
 }
 
 func TestSubstrWithFuncs(t *testing.T) {
-	f := getNewSubstr(
-		[]models.Series{
-			{
-				Interval:   10,
-				QueryPatt:  "foo(bar(a.b.c.d.*,foo))",
-				Target:     "foo(bar(a.b.c.d.e,foo))",
-				Datapoints: getCopy(a),
-			},
-		},
-		2,
-		4,
-	)
-	out := []models.Series{
+	input := []models.Series{
 		{
 			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
+			QueryPatt:  "foo(bar(a.b.c.d.*,foo))",
+			Target:     "foo(bar(a.b.c.d.e,foo))",
+			Datapoints: getCopy(a),
+		},
+	}
+	exp := []models.Series{
+		{
+			Interval:   10,
+			QueryFrom:  10,
+			QueryTo:    61,
 			QueryPatt:  "foo(bar(a.b.c.d.*,foo))",
 			Target:     "c.d",
 			Datapoints: getCopy(a),
 		},
 	}
+	testSubstr("TestSubstrWithFuncs", input, exp, 2, 4, t)
+}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+func testSubstr(name string, in []models.Series, out []models.Series, start, stop int64, t *testing.T) {
+	f := NewSubstr()
+	substr := f.(*FuncSubstr)
+	substr.in = NewMock(in)
+	substr.start = start
+	substr.stop = stop
+
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
+
+	dataMap := initDataMap(in)
+
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Case %s: %s", name, err)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			}
+		}
+	})
 }
 
 func BenchmarkSubstr10k_1NoNulls(b *testing.B) {
