@@ -331,7 +331,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 			}
 
 			if argCont.etype != etInt && argCont.etype != etFloat && argCont.etype != etName && argCont.etype != etString && argCont.etype != etBool {
-				return "", nil, nil, eCont, ErrBadArgumentStr{"int, float, name, bool or string", string(argCont.etype)}
+				return "", nil, nil, eCont, ErrBadArgumentStr{"int, float, name, bool or string", argCont.etype.String()}
 			}
 
 			if namedArgs == nil {
