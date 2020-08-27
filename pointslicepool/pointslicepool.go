@@ -18,11 +18,7 @@ type PointSlicePool struct {
 func New(defaultSize int) *PointSlicePool {
 	return &PointSlicePool{
 		defaultSize: defaultSize,
-		p: sync.Pool{
-			New: func() interface{} {
-				return make([]schema.Point, 0, defaultSize)
-			},
-		},
+		p:           sync.Pool{},
 	}
 }
 
@@ -31,16 +27,18 @@ func (p *PointSlicePool) Put(s []schema.Point) {
 }
 
 func (p *PointSlicePool) Get() []schema.Point {
-	return p.p.Get().([]schema.Point)
+	return p.GetMin(p.defaultSize)
 }
 
 // GetMin returns a pointslice that has at least minCap capacity
 func (p *PointSlicePool) GetMin(minCap int) []schema.Point {
-	candidate := p.Get()
-	if cap(candidate) >= minCap {
-		return candidate
+	candidate, ok := p.p.Get().([]schema.Point)
+	if ok {
+		if cap(candidate) >= minCap {
+			return candidate
+		}
+		p.p.Put(candidate)
 	}
-	p.p.Put(candidate)
 	if minCap > p.defaultSize {
 		return make([]schema.Point, 0, minCap)
 	}
