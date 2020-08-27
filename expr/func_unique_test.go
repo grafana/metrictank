@@ -47,11 +47,9 @@ func TestUnique(t *testing.T) {
 func testUnique(name string, in [][]models.Series, out []models.Series, t *testing.T) {
 	f := getNewUnique(in)
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([][]models.Series, len(in))
+	inputCopy := make([][]models.Series, len(in)) // to later verify that it is unchanged
 	for i := range in {
-		inputCopy[i] = make([]models.Series, len(in[i]))
-		copy(inputCopy[i], in[i])
+		inputCopy[i] = models.SeriesCopy(in[i])
 	}
 
 	dataMap := initDataMapMultiple(in)

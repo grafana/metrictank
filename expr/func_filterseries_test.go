@@ -144,9 +144,7 @@ func testFilterSeries(name string, fn string, operator string, threshold float64
 	f.(*FuncFilterSeries).operator = operator
 	f.(*FuncFilterSeries).threshold = threshold
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

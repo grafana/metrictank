@@ -858,9 +858,7 @@ func testSummarize(name string, in []models.Series, out []models.Series, interva
 	summarize.fn = fn
 	summarize.alignToFrom = alignToFrom
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

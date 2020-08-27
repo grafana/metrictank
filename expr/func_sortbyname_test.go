@@ -98,9 +98,7 @@ func TestSortByName(t *testing.T) {
 			sort.natural = e.natural
 			sort.in = NewMock(in)
 
-			// Copy input to check that it is unchanged later
-			inputCopy := make([]models.Series, len(in))
-			copy(inputCopy, in)
+			inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 			dataMap := initDataMap(in)
 

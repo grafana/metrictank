@@ -37,11 +37,8 @@ func makeFallbackSeries(in []models.Series, fallback []models.Series) *FuncFallb
 func testFallbackSeries(name string, in, fallback, out []models.Series, t *testing.T) {
 	f := makeFallbackSeries(in, fallback)
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
-	fallbackCopy := make([]models.Series, len(fallback))
-	copy(fallbackCopy, fallback)
+	inputCopy := models.SeriesCopy(in)          // to later verify that it is unchanged
+	fallbackCopy := models.SeriesCopy(fallback) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

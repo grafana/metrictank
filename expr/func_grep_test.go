@@ -66,9 +66,7 @@ func testGrep(pattern string, exclude bool, inStr, outStr []string, t *testing.T
 	}
 	f := makeGrepOrExclude(in, pattern, exclude)
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

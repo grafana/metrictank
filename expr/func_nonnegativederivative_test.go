@@ -127,9 +127,7 @@ func testNonNegativeDerivative(name string, maxValue float64, in []models.Series
 	f.(*FuncNonNegativeDerivative).in = NewMock(in)
 	f.(*FuncNonNegativeDerivative).maxValue = maxValue
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

@@ -54,8 +54,8 @@ func TestAbsoluteRandom(t *testing.T) {
 	input := []models.Series{
 		getSeries("rand", "random", random),
 	}
-	inputCopy := make([]models.Series, len(input))
-	copy(inputCopy, input)
+
+	inputCopy := models.SeriesCopy(input) // to later verify that it is unchanged
 
 	f := getNewAbsolute(input)
 	out := []models.Series{

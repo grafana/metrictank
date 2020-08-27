@@ -104,11 +104,8 @@ func testDivideSeries(name string, dividend, divisor []models.Series, out []mode
 	DivideSeries.dividend = NewMock(dividend)
 	DivideSeries.divisor = NewMock(divisor)
 
-	// Copy input to check that it is unchanged later
-	dividendCopy := make([]models.Series, len(dividend))
-	copy(dividendCopy, dividend)
-	divisorCopy := make([]models.Series, len(divisor))
-	copy(divisorCopy, divisor)
+	dividendCopy := models.SeriesCopy(dividend) // to later verify that it is unchanged
+	divisorCopy := models.SeriesCopy(divisor)   // to later verify that it is unchanged
 
 	dataMap := initDataMapMultiple([][]models.Series{dividend, divisor})
 

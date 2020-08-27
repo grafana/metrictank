@@ -45,8 +45,7 @@ func TestTimeShiftSingle(t *testing.T) {
 			Datapoints: shiftInput(a, -offset), // shift forward to avoid underflow
 		},
 	}
-	inputCopy := make([]models.Series, len(input))
-	copy(inputCopy, input)
+	inputCopy := models.SeriesCopy(input) // to later verify that it is unchanged
 
 	testTimeShift(
 		"identity",

@@ -240,16 +240,14 @@ func TestRoundTiny(t *testing.T) {
 	checkCases(t, []models.Series{input}, testData)
 }
 
-func checkCases(t *testing.T, input []models.Series, cases []TestCase) {
+func checkCases(t *testing.T, in []models.Series, cases []TestCase) {
 	for _, c := range cases {
-		f := getNewRound(input, c.precision)
+		f := getNewRound(in, c.precision)
 		out := []models.Series{getSeriesNamed(c.expectedName, c.expectedOutput)}
 
-		// Copy input to check that it is unchanged later
-		inputCopy := make([]models.Series, len(input))
-		copy(inputCopy, input)
+		inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
-		dataMap := initDataMap(input)
+		dataMap := initDataMap(in)
 
 		got, err := f.Exec(dataMap)
 		if err := equalOutput(out, got, nil, err); err != nil {
@@ -257,7 +255,7 @@ func checkCases(t *testing.T, input []models.Series, cases []TestCase) {
 		}
 
 		t.Run("DidNotModifyInput", func(t *testing.T) {
-			if err := equalOutput(inputCopy, input, nil, nil); err != nil {
+			if err := equalOutput(inputCopy, in, nil, nil); err != nil {
 				t.Fatalf("Input was modified, err = %s", err)
 			}
 		})

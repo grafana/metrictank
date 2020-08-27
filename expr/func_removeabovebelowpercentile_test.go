@@ -139,9 +139,7 @@ func testRemoveAboveBelowPercentile(name string, above bool, n float64, in []mod
 	f.(*FuncRemoveAboveBelowPercentile).in = NewMock(in)
 	f.(*FuncRemoveAboveBelowPercentile).n = n
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

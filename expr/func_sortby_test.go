@@ -133,9 +133,7 @@ func testSortBy(name string, fn string, reverse bool, in []models.Series, out []
 	f := NewSortByConstructor(fn, reverse)()
 	f.(*FuncSortBy).in = NewMock(in)
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 
