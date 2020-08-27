@@ -7,8 +7,9 @@ import (
 )
 
 type offsetMeasurement struct {
-	readOffset, highWaterMark int64
-	ts                        time.Time
+	readOffset    int64 // last offset consumed
+	highWaterMark int64 // last offset in the topic
+	ts            time.Time
 }
 
 // lagLogger maintains a set of most recent lag measurements
