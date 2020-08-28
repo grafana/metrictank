@@ -361,7 +361,7 @@ func benchmarkGroupByNodes(b *testing.B, numIn, numOut int) {
 		}
 
 		for _, serie := range results {
-			pointSlicePool.Put(serie.Datapoints[:0])
+			pointSlicePool.Put(serie.Datapoints)
 		}
 	}
 

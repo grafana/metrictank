@@ -26,7 +26,7 @@ func (dm DataMap) Add(r Req, s ...models.Series) {
 func (dm DataMap) Clean() {
 	for _, series := range dm {
 		for _, serie := range series {
-			pointSlicePool.Put(serie.Datapoints[:0])
+			pointSlicePool.Put(serie.Datapoints)
 		}
 	}
 }

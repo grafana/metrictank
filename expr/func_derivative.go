@@ -6,7 +6,6 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncDerivative struct {
@@ -39,7 +38,7 @@ func (s *FuncDerivative) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
 		serie.Consolidator = consolidation.None
 		serie.QueryCons = consolidation.None
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {

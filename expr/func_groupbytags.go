@@ -6,7 +6,6 @@ import (
 
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/errors"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncGroupByTags struct {
@@ -131,7 +130,7 @@ func (s *FuncGroupByTags) Exec(dataMap DataMap) ([]models.Series, error) {
 		}
 		newSeries.SetTags()
 
-		newSeries.Datapoints = pointSlicePool.Get().([]schema.Point)
+		newSeries.Datapoints = pointSlicePool.Get()
 		group.s = Normalize(group.s, NewCOWCycler(dataMap))
 		aggFunc(group.s, &newSeries.Datapoints)
 		dataMap.Add(Req{}, newSeries)

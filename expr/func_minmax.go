@@ -52,7 +52,7 @@ func (s *FuncMinMax) Exec(dataMap DataMap) ([]models.Series, error) {
 	outputs := make([]models.Series, 0, len(series))
 
 	for _, serie := range series {
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 
 		minVal := valOrDefault(batch.Min(serie.Datapoints), 0)
 		maxVal := valOrDefault(batch.Max(serie.Datapoints), 0)

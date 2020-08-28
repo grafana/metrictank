@@ -6,7 +6,6 @@ import (
 	"unsafe"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncAggregate struct {
@@ -69,7 +68,7 @@ func aggregate(dataMap DataMap, series []models.Series, queryPatts []string, agg
 		series[0].QueryPatt = name
 		return series, nil
 	}
-	out := pointSlicePool.Get().([]schema.Point)
+	out := pointSlicePool.Get()
 
 	agg.function(series, &out)
 

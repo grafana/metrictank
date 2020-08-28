@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncScaleToSeconds struct {
@@ -38,7 +37,7 @@ func (s *FuncScaleToSeconds) Exec(dataMap DataMap) ([]models.Series, error) {
 	output := make([]models.Series, 0, len(series))
 	for _, serie := range series {
 
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 		factor := float64(s.seconds) / float64(serie.Interval)
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {

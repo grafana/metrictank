@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 )
 
 type FuncTransformNull struct {
@@ -41,7 +40,7 @@ func (s *FuncTransformNull) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	output := make([]models.Series, 0, len(series))
 	for _, serie := range series {
-		out := pointSlicePool.Get().([]schema.Point)
+		out := pointSlicePool.Get()
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = s.def
