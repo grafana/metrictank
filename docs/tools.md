@@ -942,3 +942,29 @@ Usage of ./mt-whisper-importer-writer:
     	the URI on which we expect chunks to get posted (default "/metrics/import")
 ```
 
+
+## mt-write-delay-schema-explain
+
+```
+mt-write-delay-schema-explain
+use this tool to diagnose which retentions may be subject to chunks not showing, if your write queue (temporarily) doesn't drain well
+if the following applies to you:
+* metrictank is struggling to clear the write queue (e.g. cassandra/bigtable has become slow)
+* metrictank only keeps a limited amount of chunks in its ringbuffers (tank)
+* you are concerned that chunks needed to satisfy read queries, are not available in the chunk store
+then this tool will help you understand, which is especially useful if you have multiple retentions with different chunkspans and/or numchunks
+Usage:
+
+	mt-write-delay-schema-explain [flags] last-drain-time [schemas-file]
+           (config file defaults to /etc/metrictank/storage-schemas.conf)
+           last-drain-time is the last time the queue was empty
+
+Flags:
+  -int int
+    	specify an interval to apply interval-based matching in addition to metric matching (e.g. to simulate kafka-mdm input)
+  -version
+    	print version string
+  -window-factor int
+    	size of compaction window relative to TTL (default 20)
+```
+
