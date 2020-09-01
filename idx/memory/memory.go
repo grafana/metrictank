@@ -264,6 +264,25 @@ func (n *Node) String() string {
 	return fmt.Sprintf("branch - %s", n.Path)
 }
 
+func (n *Node) GetLeaves(tree *Tree) []*Node {
+	var nodes []*Node
+	if n.HasChildren() {
+		for _, child := range n.Children {
+			node, ok := tree.Items[n.Path+"."+child]
+			if !ok {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
+				continue
+			}
+			nodes = append(nodes, node)
+			if node.HasChildren() {
+				nodes = append(nodes, node.GetLeaves(tree)...)
+			}
+		}
+	}
+	return nodes
+}
+
 type UnpartitionedMemoryIdx struct {
 	PriorityRWMutex
 	*metaTagIdx
@@ -1524,9 +1543,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
 	var deletedDefs []idx.Archive
 	pre := time.Now()
-	bc := m.Lock()
 	defer func() {
-		bc.Unlock("Delete", nil)
 		if len(deletedDefs) == 0 {
 			return
 		}
@@ -1543,18 +1560,39 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 			}
 		}
 	}()
+
+	m.RLockHigh()
 	tree, ok := m.tree[orgId]
 	if !ok {
+		m.RUnlockHigh()
 		return nil, nil
 	}
 	found, err := find(tree, pattern)
+	m.RUnlockHigh()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, f := range found {
-		deleted := m.delete(orgId, f, true, true)
+	leafNodes := make([]*Node, 0)
+	for _, node := range found {
+		m.RLockHigh()
+		leafNodes = append(leafNodes, node.GetLeaves(tree)...)
+		m.RUnlockHigh()
+	}
+
+	bc := BlockContext{}
+
+	// limit delete operations holding a write lock to 200ms of every second
+	tl := NewTimeLimiter(time.Second, time.Millisecond*200, time.Now())
+
+	for _, node := range leafNodes {
+		tl.Wait()
+		lockStart := time.Now()
+		bc = m.Lock()
+		deleted := m.delete(orgId, node, true, false)
 		deletedDefs = append(deletedDefs, deleted...)
+		bc.Unlock("Delete", nil)
+		tl.Add(time.Since(lockStart))
 	}
 
 	statMetricsActive.DecUint32(uint32(len(deletedDefs)))
