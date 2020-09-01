@@ -264,25 +264,6 @@ func (n *Node) String() string {
 	return fmt.Sprintf("branch - %s", n.Path)
 }
 
-func (n *Node) GetLeaves(tree *Tree) []*Node {
-	var nodes []*Node
-	if n.HasChildren() {
-		for _, child := range n.Children {
-			node, ok := tree.Items[n.Path+"."+child]
-			if !ok {
-				corruptIndex.Inc()
-				log.Errorf("memory-idx: node %q missing. Index is corrupt.", n.Path+"."+child)
-				continue
-			}
-			nodes = append(nodes, node)
-			if node.HasChildren() {
-				nodes = append(nodes, node.GetLeaves(tree)...)
-			}
-		}
-	}
-	return nodes
-}
-
 type UnpartitionedMemoryIdx struct {
 	PriorityRWMutex
 	*metaTagIdx
@@ -1573,23 +1554,16 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 		return nil, err
 	}
 
-	leafNodes := make([]*Node, 0)
-	for _, node := range found {
-		m.RLockHigh()
-		leafNodes = append(leafNodes, node.GetLeaves(tree)...)
-		m.RUnlockHigh()
-	}
-
 	bc := BlockContext{}
 
 	// limit delete operations holding a write lock to 200ms of every second
 	tl := NewTimeLimiter(time.Second, time.Millisecond*200, time.Now())
 
-	for _, node := range leafNodes {
+	for _, node := range found {
 		tl.Wait()
 		lockStart := time.Now()
 		bc = m.Lock()
-		deleted := m.delete(orgId, node, true, false)
+		deleted := m.delete(orgId, node, true, true)
 		deletedDefs = append(deletedDefs, deleted...)
 		bc.Unlock("Delete", nil)
 		tl.Add(time.Since(lockStart))
@@ -1623,7 +1597,9 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 
 	// delete the metricDefs
 	for _, id := range n.Defs {
-		log.Debugf("memory-idx: deleting %s from index", id)
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("memory-idx: deleting %s from index", id)
+		}
 		archivePointer, ok := m.defById[id]
 		if archivePointer == nil {
 			corruptIndex.Inc()
