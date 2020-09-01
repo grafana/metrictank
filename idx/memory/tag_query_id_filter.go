@@ -115,7 +115,9 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 				}
 			}
 
-			metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
+			if !optimizeForOnlyEqualOperators {
+				metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
+			}
 		}
 
 		if optimizeForOnlyEqualOperators {
