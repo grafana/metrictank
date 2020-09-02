@@ -2,7 +2,6 @@ package memory
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/schema"
@@ -170,7 +169,6 @@ func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord) tagque
 	// is sufficient to let it pass the filter.
 	validValues := make(map[string]struct{})
 	validNames := make(map[string]struct{})
-	var builder strings.Builder
 	for _, record := range records {
 		if len(record.Expressions) < 1 {
 			corruptIndex.Inc()
@@ -181,9 +179,7 @@ func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord) tagque
 		if record.Expressions[0].GetKey() == "name" {
 			validNames[record.Expressions[0].GetValue()] = struct{}{}
 		} else {
-			record.Expressions[0].StringIntoWriter(&builder)
-			validValues[builder.String()] = struct{}{}
-			builder.Reset()
+			validValues[record.Expressions[0].GetKey()+"="+record.Expressions[0].GetValue()] = struct{}{}
 		}
 	}
 
@@ -211,16 +207,13 @@ func metaRecordFilterBySetOfValidValueSets(records []tagquery.MetaTagRecord) tag
 		name string
 		tags []string
 	}, len(records))
-	var builder strings.Builder
 	for i := range records {
 		validValueSets[i].tags = make([]string, 0, len(records[i].Expressions))
 		for j := range records[i].Expressions {
 			if records[i].Expressions[j].GetKey() == "name" {
 				validValueSets[i].name = records[i].Expressions[j].GetValue()
 			} else {
-				records[i].Expressions[j].StringIntoWriter(&builder)
-				validValueSets[i].tags = append(validValueSets[i].tags, builder.String())
-				builder.Reset()
+				validValueSets[i].tags = append(validValueSets[i].tags, records[i].Expressions[j].GetKey()+"="+records[i].Expressions[j].GetValue())
 			}
 		}
 
