@@ -88,9 +88,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 		// in a metric that gets filtered, compared to doing a full tag index lookup
 		// to check whether a metric has one of the necessary meta tags associated
 		// with it.
-		optimizeForOnlyEqualOperators := !invertSetOfMetaRecords
 		var metaRecordFilters []tagquery.MetricDefinitionFilter
-		singleExprPerRecord := true
 		records := make([]tagquery.MetaTagRecord, 0, len(metaRecordIds))
 		for _, id := range metaRecordIds {
 			record, ok := ctx.metaTagRecords.getMetaRecordById(id)
@@ -100,27 +98,12 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 				continue
 			}
 
-			if optimizeForOnlyEqualOperators {
-				for exprIdx := range record.Expressions {
-					if record.Expressions[exprIdx].GetOperator() != tagquery.EQUAL {
-						optimizeForOnlyEqualOperators = false
-						break
-					}
-				}
-				if optimizeForOnlyEqualOperators {
-					records = append(records, record)
-					if len(record.Expressions) > 1 {
-						singleExprPerRecord = false
-					}
-				}
-			}
-
-			if !optimizeForOnlyEqualOperators {
-				metaRecordFilters = append(metaRecordFilters, record.GetMetricDefinitionFilter(ctx.index.idHasTag))
-			}
+			records = append(records, record)
 		}
 
-		if optimizeForOnlyEqualOperators {
+		onlyEqualOperators, singleExprPerRecord := viableOptimizations(invertSetOfMetaRecords, records)
+
+		if onlyEqualOperators {
 			// there are two different ways how we optimize for the case where all expressions
 			// of all involved meta records are using the "=" operator. the first and fastest
 			// way can only be used if each involved meta record only has one single expression,
@@ -132,6 +115,10 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 				res.filters[i].testByMetaTags = metaRecordFilterBySetOfValidValueSets(records)
 			}
 		} else {
+			for recordIdx := range records {
+				metaRecordFilters = append(metaRecordFilters, records[recordIdx].GetMetricDefinitionFilter(ctx.index.idHasTag))
+			}
+
 			if invertSetOfMetaRecords {
 				res.filters[i].testByMetaTags = metaRecordFilterInverted(metaRecordFilters, res.filters[i].defaultDecision)
 			} else {
@@ -141,6 +128,34 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 	}
 
 	return &res
+}
+
+// viableOptimizations looks at a set of meta tag records and decides whether two possible
+// optimizations can be applied when filtering by these records. it returns two bools to
+// indicate which optimizations are or are not viable.
+// if invertSetOfMetaRecords is true then none of these optimizations can be used.
+//
+// * the first bool refers to the optimization for sets of records which all have only one
+//   expression and this expression is using the equal operator.
+// * the second bool refers to the optimization for sets of records which all only have
+//   expressions using the equal operator, but there may be more than one per record.
+func viableOptimizations(invertSetOfMetaRecords bool, records []tagquery.MetaTagRecord) (bool, bool) {
+	if invertSetOfMetaRecords {
+		return false, false
+	}
+	singleExprPerRecord := true
+	for recordIdx := range records {
+		for exprIdx := range records[recordIdx].Expressions {
+			if records[recordIdx].Expressions[exprIdx].GetOperator() != tagquery.EQUAL {
+				return false, false
+			}
+		}
+		if len(records[recordIdx].Expressions) > 1 {
+			singleExprPerRecord = false
+		}
+	}
+
+	return true, singleExprPerRecord
 }
 
 // metaRecordFilterBySetOfValidValues creates a filter function to filter by a meta tag
