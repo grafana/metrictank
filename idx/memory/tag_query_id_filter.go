@@ -80,14 +80,6 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			continue
 		}
 
-		// if we don't use an inverted set of meta records, then we want to check if
-		// all meta records involved in a meta tag filter use the "=" operator.
-		// if this is the case then it is cheaper to build a set of acceptable tags
-		// based on the meta record expressions and just check whether they are present
-		// in a metric that gets filtered, compared to doing a full tag index lookup
-		// to check whether a metric has one of the necessary meta tags associated
-		// with it.
-		var metaRecordFilters []tagquery.MetricDefinitionFilter
 		records := make([]tagquery.MetaTagRecord, 0, len(metaRecordIds))
 		for _, id := range metaRecordIds {
 			record, ok := ctx.metaTagRecords.getMetaRecordById(id)
@@ -100,6 +92,13 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			records = append(records, record)
 		}
 
+		// if we don't use an inverted set of meta records, then we check if
+		// all meta records involved in a meta tag filter use the "=" operator.
+		// if this is the case then it is cheaper to build a set of acceptable tags
+		// based on the meta record expressions and just check whether they are present
+		// in a metric that gets filtered, compared to doing a full tag index lookup
+		// to check whether a metric has one of the necessary meta tags associated
+		// with it.
 		onlyEqualOperators, singleExprPerRecord := viableOptimizations(invertSetOfMetaRecords, records)
 
 		if onlyEqualOperators {
@@ -114,6 +113,7 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 				res.filters[i].testByMetaTags = metaRecordFilterBySetOfValidValueSets(records)
 			}
 		} else {
+			metaRecordFilters := make([]tagquery.MetricDefinitionFilter, 0, len(records))
 			for recordIdx := range records {
 				metaRecordFilters = append(metaRecordFilters, records[recordIdx].GetMetricDefinitionFilter(ctx.index.idHasTag))
 			}
