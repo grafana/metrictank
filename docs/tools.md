@@ -473,7 +473,7 @@ NumBad - number of failed points since last successful add
 DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)
 DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)
 .Head.* - head is last successfully added message
-.Bad.* - Bad is the current point that could not be added (assuming no re-order buffer)
+.Bad.* - Bad is the current (last seen) point that could not be added (assuming no re-order buffer)
 under Head and Bad, the following subfields are available:
 Part (partition) and Seen (when the msg was consumed from kafka)
 for MetricData, prefix these with Md. : Time OrgId Id Name Metric Interval Value Unit Mtype Tags
@@ -484,7 +484,7 @@ Flags:
   -config string
     	configuration file path (default "/etc/metrictank/metrictank.ini")
   -do-unknown-mp
-    	process MetricPoint messages for which no MetricData messages have been seen, and hence for which we can't apply prefix/substr filter (default true)
+    	process MetricPoint messages for which no MetricData messages have been seen. If you use prefix/substr filter, this may report on metrics you wanted to filter out! (default true)
   -format string
     	template to render event with (default "{{.Bad.Md.Id}} {{.Bad.Md.Name}} {{.Bad.Mp.MKey}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}")
   -prefix string
