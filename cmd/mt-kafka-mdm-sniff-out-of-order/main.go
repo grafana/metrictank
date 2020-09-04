@@ -28,12 +28,12 @@ var (
 	format      = flag.String("format", "{{.Bad.Md.Id}} {{.Bad.Md.Name}} {{.Bad.Mp.MKey}} {{.DeltaTime}} {{.DeltaSeen}} {{.NumBad}}", "template to render event with")
 	prefix      = flag.String("prefix", "", "only show metrics with a name that has this prefix")
 	substr      = flag.String("substr", "", "only show metrics with a name that has this substring")
-	doUnknownMP = flag.Bool("do-unknown-mp", true, "process MetricPoint messages for which no MetricData messages have been seen, and hence for which we can't apply prefix/substr filter")
+	doUnknownMP = flag.Bool("do-unknown-mp", true, "process MetricPoint messages for which no MetricData messages have been seen. If you use prefix/substr filter, this may report on metrics you wanted to filter out!")
 )
 
 type Tracker struct {
 	Head      Msg    // last successfully added message
-	Bad       Msg    // current point that could not be added (assuming no re-order buffer)
+	Bad       Msg    // current (last seen) point that could not be added (assuming no re-order buffer)
 	NumBad    int    // number of failed points since last successful add
 	DeltaTime uint32 // delta between Head and Bad time properties in seconds (point timestamps)
 	DeltaSeen uint32 // delta between Head and Bad seen time in seconds (consumed from kafka)
@@ -99,7 +99,7 @@ func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition
 			tracker.NumBad = 0
 			ip.data[mkey] = tracker
 		} else {
-			// if metric time <= head point time, generate event and print
+			// if metric time <= head point time, update "bad", generate event and print
 			tracker.Bad = now
 			tracker.NumBad += 1
 			tracker.DeltaTime = tracker.Head.Time() - uint32(metric.Time)
@@ -131,11 +131,12 @@ func (ip *inputOOOFinder) ProcessMetricPoint(mp schema.MetricPoint, format msg.F
 		}
 	} else {
 		if mp.Time > tracker.Head.Time() {
+			// highest TS seen so far -> update "head"
 			tracker.Head = now
 			tracker.NumBad = 0
 			ip.data[mp.MKey] = tracker
 		} else {
-			// if metric time <= head point time, generate event and print
+			// if metric time <= head point time, update "bad", generate event and print
 			tracker.Bad = now
 			tracker.NumBad += 1
 			tracker.DeltaTime = tracker.Head.Time() - mp.Time
@@ -168,7 +169,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "DeltaTime - delta between Head and Bad time properties in seconds (point timestamps)")
 		fmt.Fprintln(os.Stderr, "DeltaSeen - delta between Head and Bad seen time in seconds (consumed from kafka)")
 		fmt.Fprintln(os.Stderr, ".Head.* - head is last successfully added message")
-		fmt.Fprintln(os.Stderr, ".Bad.* - Bad is the current point that could not be added (assuming no re-order buffer)")
+		fmt.Fprintln(os.Stderr, ".Bad.* - Bad is the current (last seen) point that could not be added (assuming no re-order buffer)")
 		fmt.Fprintln(os.Stderr, "under Head and Bad, the following subfields are available:")
 		fmt.Fprintln(os.Stderr, "Part (partition) and Seen (when the msg was consumed from kafka)")
 		fmt.Fprintln(os.Stderr, "for MetricData, prefix these with Md. : Time OrgId Id Name Metric Interval Value Unit Mtype Tags")
