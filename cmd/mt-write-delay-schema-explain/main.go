@@ -15,10 +15,8 @@ import (
 )
 
 var (
-	version      = "(none)"
-	showVersion  = flag.Bool("version", false, "print version string")
-	windowFactor = flag.Int("window-factor", 20, "size of compaction window relative to TTL")
-	interval     = flag.Int("int", 0, "specify an interval to apply interval-based matching in addition to metric matching (e.g. to simulate kafka-mdm input)")
+	version     = "(none)"
+	showVersion = flag.Bool("version", false, "print version string")
 )
 
 func init() {
@@ -82,6 +80,7 @@ func main() {
 func showTime(t uint32) string {
 	return time.Unix(int64(t), 0).UTC().Format("2006-01-02 15:04:05")
 }
+
 func display(schema conf.Schema, lastDrain, now uint32) {
 	fmt.Println("#", schema.Name)
 	fmt.Printf("pattern:   %10s\n", schema.Pattern)

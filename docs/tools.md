@@ -960,11 +960,7 @@ Usage:
            last-drain-time is the last time the queue was empty
 
 Flags:
-  -int int
-    	specify an interval to apply interval-based matching in addition to metric matching (e.g. to simulate kafka-mdm input)
   -version
     	print version string
-  -window-factor int
-    	size of compaction window relative to TTL (default 20)
 ```
 
