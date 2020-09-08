@@ -107,7 +107,7 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 }
 
 func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, shiftOffset uint32, xFilesFactor float64) (uint32, []schema.Point, error) {
-	out := pointSlicePool.Get().([]schema.Point)
+	out := pointSlicePool.Get()
 
 	numPoints := len(serie.Datapoints)
 	serieStart, serieEnd := serie.QueryFrom, serie.QueryTo
