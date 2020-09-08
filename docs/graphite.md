@@ -19,7 +19,7 @@ There are some small behavioral and functional differences with Graphite:
 * perl-style regex (pcre) are not supported in functions such as aliasSub, and if used, will return an error like so
   "error parsing regexp: invalid or unsupported Perl syntax: '(?!'...". See https://github.com/grafana/metrictank/issues/1776
 * Metrictank supports rolling up any given metric by multiple functions and using consolidateBy() to select a rollup
-
+* MovingWindow and variants currently only support the input 'windowSize' specified as a quoted string with length of time and not as number of points. More details in PR #1739.
 
 ## Processing functions
 
@@ -125,12 +125,12 @@ See also:
 | minMax                                                         |              | Stable     |
 | minSeries(seriesList) series                                   | min          | Stable     |
 | mostDeviant                                                    |              | No         |
-| movingAverage(seriesLists, windowSize) seriesList              |              | Unstable   |
-| movingMax                                                      |              | No         |
-| movingMedian                                                   |              | No         |
-| movingMin                                                      |              | No         |
-| movingSum                                                      |              | No         |
-| movingWindow                                                   |              | No         |
+| movingAverage(seriesLists, windowSize) seriesList              |              | Stable     |
+| movingMax                                                      |              | Stable     |
+| movingMedian                                                   |              | Stable     |
+| movingMin                                                      |              | Stable     |
+| movingSum                                                      |              | Stable     |
+| movingWindow                                                   |              | Stable     |
 | multiplySeries(seriesList) series                              |              | Stable     |
 | multiplySeriesWithWildcards                                    |              | Stable     |
 | nonNegatievDerivative(seriesList, maxValue) seriesList         |              | Stable     |

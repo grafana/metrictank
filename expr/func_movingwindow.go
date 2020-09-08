@@ -36,10 +36,20 @@ func NewMovingWindow() GraphiteFunc {
 }
 
 func (s *FuncMovingWindow) Signature() ([]Arg, []Arg) {
+	if s.fn == "" {
+		return []Arg{
+				ArgSeriesList{val: &s.in},
+				ArgString{key: "windowSize", val: &s.windowSize, validator: []Validator{IsSignedIntervalString}},
+				ArgString{key: "func", opt: true, val: &s.fn, validator: []Validator{IsConsolFunc}},
+				ArgFloat{key: "xFilesFactor", opt: true, val: &s.xFilesFactor, validator: []Validator{WithinZeroOneInclusiveInterval}},
+			}, []Arg{
+				ArgSeriesList{},
+			}
+	}
+
 	return []Arg{
 			ArgSeriesList{val: &s.in},
 			ArgString{key: "windowSize", val: &s.windowSize, validator: []Validator{IsSignedIntervalString}},
-			ArgString{key: "func", opt: true, val: &s.fn, validator: []Validator{IsConsolFunc}},
 			ArgFloat{key: "xFilesFactor", opt: true, val: &s.xFilesFactor, validator: []Validator{WithinZeroOneInclusiveInterval}},
 		}, []Arg{
 			ArgSeriesList{},
@@ -96,13 +106,15 @@ func (s *FuncMovingWindow) Exec(dataMap DataMap) ([]models.Series, error) {
 	return outputs, nil
 }
 
-func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint32, xFilesFactor float64) (uint32, []schema.Point, error) {
+func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, shiftOffset uint32, xFilesFactor float64) (uint32, []schema.Point, error) {
 	out := pointSlicePool.Get().([]schema.Point)
 
 	numPoints := len(serie.Datapoints)
 	serieStart, serieEnd := serie.QueryFrom, serie.QueryTo
-	queryStart := uint32(serieStart + interval)
+	queryStart := uint32(serieStart + shiftOffset)
 
+	// Sanity check to ensure that queryStart is between serieStart and
+	// serieEnd for the loop below to work (this should always be the case)"
 	if queryStart < serieStart || queryStart > serieEnd {
 		return 0, nil, errors.NewInternalf("query start %d doesn't lie within serie's intervals [%d,%d] ", queryStart, serieStart, serieEnd)
 	}
@@ -120,8 +132,8 @@ func aggregateOnWindow(serie models.Series, aggFunc batch.AggFunc, interval uint
 		ptTs = serie.Datapoints[ptIdx].Ts
 
 		// increment start index only if the difference between current and start times
-		// becomes greater than the windowSize (interval)
-		for stIdx <= ptIdx && ptTs-stTs > interval {
+		// becomes greater than the windowSize (captured in shiftOffset)
+		for stIdx <= ptIdx && ptTs-stTs > shiftOffset {
 			stIdx++
 			stTs = serie.Datapoints[stIdx].Ts
 		}
@@ -147,14 +159,6 @@ func (s *FuncMovingWindow) getWindowSeconds() (uint32, error) {
 	if durStr[0] == '-' || durStr[0] == '+' {
 		durStr = durStr[1:]
 	}
-
-	// Note: s.windowSize is not overwritten and will be appended as is to the
-	// new Target, QueryPatt and Tags (keeping it consistent with graphite)
-	// This implies a window size of '-2min' or '+2min' will be captured as is.
-	// However the time operation is always a look back over preceding points.
-	// If this needs to be corrected in the native implementation
-	// uncomment the line below.
-	// s.windowSize = durStr
 
 	// Input validation and operations above check for empty or signed widowSizes
 	// or for widowSize specified as points. Errors unlikely here
