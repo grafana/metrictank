@@ -1,6 +1,6 @@
 <img src="docs/assets/metrictank-logo.png" height="150px" alt="Metrictank logo">
 
-# Metrictank
+# Grafana Metrictank
 
 [![Circle CI](https://circleci.com/gh/grafana/metrictank.svg?style=shield)](https://circleci.com/gh/grafana/metrictank)
 [![Go Report Card](https://goreportcard.com/badge/github.com/grafana/metrictank)](https://goreportcard.com/report/github.com/grafana/metrictank)
@@ -8,12 +8,12 @@
 
 ## Introduction
 
-Metrictank is a multi-tenant timeseries platform that can be used as a backend or replacement for Graphite.
+Grafana Metrictank is a multi-tenant timeseries platform that can be used as a backend or replacement for Graphite.
 It provides long term storage, high availability, efficient storage, retrieval and processing for large scale environments.
 
-[GrafanaLabs](http://grafana.com) has been running metrictank in production since December 2015.
+[Grafana Labs](http://grafana.com) has been running Metrictank in production since December 2015.
 It currently requires an external datastore like Cassandra or Bigtable, and we highly recommend using Kafka to support clustering, as well
-as a clustering manager like Kubernetes. This makes it non-trivial to operate, though GrafanaLabs has an on-premise product
+as a clustering manager like Kubernetes. This makes it non-trivial to operate, though Grafana Labs has an on-premise product
 that makes this process much easier.
 
 ## Features
