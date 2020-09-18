@@ -607,7 +607,7 @@ func TestExpressionSortingByCost(t *testing.T) {
 		"g=h",  // metric tag
 		"i=~j", // metric tag
 		"k=l",  // metric and meta tag
-	}, 0)
+	}, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query: %s", err)
 	}
