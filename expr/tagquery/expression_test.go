@@ -292,7 +292,7 @@ func BenchmarkExpressionParsing(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < 4; i++ {
-			NewQueryFromStrings(expressions[i], 0)
+			NewQueryFromStrings(expressions[i], 0, 0)
 		}
 	}
 }

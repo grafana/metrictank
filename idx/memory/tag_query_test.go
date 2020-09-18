@@ -106,7 +106,7 @@ func TestIdHasTag(t *testing.T) {
 
 func TestQueryByTagSimpleEqual(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3=value3"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3=value3"}, 0, 0)
 
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
@@ -116,7 +116,7 @@ func TestQueryByTagSimpleEqual(t *testing.T) {
 
 func TestQueryByTagSimplePrefix(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key3^=val"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key3^=val"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -128,7 +128,7 @@ func TestQueryByTagSimplePrefix(t *testing.T) {
 
 func TestQueryByTagPrefixSpecialCaseName(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "name^=metric2"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "name^=metric2"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[2]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -136,7 +136,7 @@ func TestQueryByTagPrefixSpecialCaseName(t *testing.T) {
 
 func TestQueryByTagFilterByPrefix(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3^=val"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3^=val"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -145,7 +145,7 @@ func TestQueryByTagFilterByPrefix(t *testing.T) {
 
 func TestQueryByTagSimplePattern(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key4=~value[43]", "key3=~value[1-3]"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key4=~value[43]", "key3=~value[1-3]"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[6]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -154,7 +154,7 @@ func TestQueryByTagSimplePattern(t *testing.T) {
 
 func TestQueryByTagSimpleUnequal(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key4!=value4"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key4!=value4"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[0]] = struct{}{}
 	expect[ids[1]] = struct{}{}
@@ -164,7 +164,7 @@ func TestQueryByTagSimpleUnequal(t *testing.T) {
 
 func TestQueryByTagSimpleNotPattern(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=~value?", "key4!=~value[0-9]", "key2!=~va.+"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -172,7 +172,7 @@ func TestQueryByTagSimpleNotPattern(t *testing.T) {
 
 func TestQueryByTagWithEqualEmpty(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key2=", "key2=~"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key2=", "key2=~"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[2]] = struct{}{}
@@ -182,7 +182,7 @@ func TestQueryByTagWithEqualEmpty(t *testing.T) {
 
 func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3!="}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3!="}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -191,7 +191,7 @@ func TestQueryByTagWithUnequalEmpty(t *testing.T) {
 
 func TestQueryByTagNameEquals(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3=value3", "name=metric1"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3=value3", "name=metric1"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -199,7 +199,7 @@ func TestQueryByTagNameEquals(t *testing.T) {
 
 func TestQueryByTagNameRegex(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3=value3", "name=~metr"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1", "key3=value3", "name=~metr"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[1]] = struct{}{}
 	expect[ids[3]] = struct{}{}
@@ -208,7 +208,7 @@ func TestQueryByTagNameRegex(t *testing.T) {
 
 func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~na", "key2=value2"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~na", "key2=value2"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[0]] = struct{}{}
 	expect[ids[5]] = struct{}{}
@@ -217,34 +217,34 @@ func TestQueryByTagFilterByTagMatchWithExpressionAndNameException(t *testing.T) 
 
 func TestQueryByTagFilterByTagMatchWithExpression(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~a{1}", "key2=value2"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"__tag=~a{1}", "key2=value2"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[5]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{2}", "key2=value2"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{2}", "key2=value2"}, 0, 0)
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{3}", "key2=value2"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{3}", "key2=value2"}, 0, 0)
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{4}", "key2=value2"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag=~a{4}", "key2=value2"}, 0, 0)
 	delete(expect, ids[5])
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 }
 
 func TestQueryByTagFilterByTagPrefixWithExpression(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=aa", "key2=value2"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=aa", "key2=value2"}, 0, 0)
 
 	expect := make(IdSet)
 	expect[ids[5]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaa", "key2=value2"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaa", "key2=value2"}, 0, 0)
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaaa", "key2=value2"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaaa", "key2=value2"}, 0, 0)
 	delete(expect, ids[5])
 	delete(expect, ids[6])
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -252,7 +252,7 @@ func TestQueryByTagFilterByTagPrefixWithExpression(t *testing.T) {
 
 func TestQueryByTagFilterByTagPrefixWithFrom(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=aa"}, 7)
+	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=aa"}, 7, 0)
 	expect := make(IdSet)
 	expect[ids[6]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -260,18 +260,18 @@ func TestQueryByTagFilterByTagPrefixWithFrom(t *testing.T) {
 
 func TestQueryByTagFilterByTagPrefixWithDifferentLengths(t *testing.T) {
 	ids := getTestIDs()
-	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=a"}, 0)
+	q, _ := tagquery.NewQueryFromStrings([]string{"__tag^=a"}, 0, 0)
 	expect := make(IdSet)
 	expect[ids[3]] = struct{}{}
 	expect[ids[5]] = struct{}{}
 	expect[ids[6]] = struct{}{}
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaa"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaa"}, 0, 0)
 	delete(expect, ids[3])
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaaa"}, 0)
+	q, _ = tagquery.NewQueryFromStrings([]string{"__tag^=aaaa"}, 0, 0)
 	delete(expect, ids[5])
 	delete(expect, ids[6])
 	queryAndCompareResults(t, NewTagQueryContext(q), expect)
@@ -280,7 +280,7 @@ func TestQueryByTagFilterByTagPrefixWithDifferentLengths(t *testing.T) {
 func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 	tagIdx, byId := getTestIndex()
 
-	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1"}, 4)
+	q, _ := tagquery.NewQueryFromStrings([]string{"key1=value1"}, 4, 0)
 	qCtx := NewTagQueryContext(q)
 	resCh := make(chan schema.MKey, 100)
 	go func() {
@@ -296,7 +296,7 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 		t.Fatalf("Expected %d results, but got %d", 1, len(res))
 	}
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 3)
+	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 3, 0)
 	qCtx = NewTagQueryContext(q)
 	resCh = make(chan schema.MKey, 100)
 	go func() {
@@ -311,7 +311,7 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 		t.Fatalf("Expected %d results, but got %d", 2, len(res))
 	}
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 2)
+	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 2, 0)
 	qCtx = NewTagQueryContext(q)
 	resCh = make(chan schema.MKey, 100)
 	go func() {
@@ -326,7 +326,7 @@ func TestTagExpressionQueryByTagWithFrom(t *testing.T) {
 		t.Fatalf("Expected %d results, but got %d", 3, len(res))
 	}
 
-	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 1)
+	q, _ = tagquery.NewQueryFromStrings([]string{"key1=value1"}, 1, 0)
 	qCtx = NewTagQueryContext(q)
 	resCh = make(chan schema.MKey, 100)
 	go func() {
@@ -472,7 +472,7 @@ TEST_CASES:
 			builder.WriteString(";")
 		}
 		t.Run(builder.String(), func(t *testing.T) {
-			query, err := tagquery.NewQuery(expressions, 0)
+			query, err := tagquery.NewQuery(expressions, 0, 0)
 			if err != nil {
 				t.Fatalf("Unexpected error when getting query from expressions %q: %q", expressions, err)
 			}
@@ -570,7 +570,7 @@ func testGetByTag(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		q, err := tagquery.NewQueryFromStrings(tc.expressions, 0)
+		q, err := tagquery.NewQueryFromStrings(tc.expressions, 0, 0)
 		if err != nil {
 			t.Fatalf("Got an unexpected error with query %s: %s", tc.expressions, err)
 		}

@@ -49,16 +49,26 @@ type expressionCost struct {
 	expressionIdx int
 }
 
-// newerThanFrom takes a metric key, it returns true if the lastUpdate
-// property of the metric associated with that key is at least equal
-// to this queries' from timestamp.
+// withinTimeBounds takes a metric key and returns true if the lastUpdate
+// property of the metric associated with that key is in the range (From, To)
 // if the key doesn't exist it returns false
-func (q *TagQueryContext) newerThanFrom(id schema.MKey) bool {
+func (q *TagQueryContext) withinTimeBounds(id schema.MKey) bool {
+	if q.query.From <= 0 && q.query.To <= 0 {
+		// Nothing to check
+		return true
+	}
 	md, ok := q.byId[id]
 	if !ok {
 		return false
 	}
-	return atomic.LoadInt64(&md.LastUpdate) >= q.query.From
+	lastUpdateSnap := atomic.LoadInt64(&md.LastUpdate)
+	if q.query.From > 0 && lastUpdateSnap < q.query.From {
+		return false
+	}
+	if q.query.To > 0 && lastUpdateSnap > q.query.To {
+		return false
+	}
+	return true
 }
 
 func (q *TagQueryContext) useMetaTagIndex() bool {

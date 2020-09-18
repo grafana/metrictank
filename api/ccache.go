@@ -65,7 +65,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 				res.AddError(err)
 				code = http.StatusBadRequest
 			} else {
-				query, err := tagquery.NewQuery(expressions, 0)
+				query, err := tagquery.NewQuery(expressions, 0, 0)
 				if err != nil {
 					res.AddError(err)
 					code = http.StatusInternalServerError

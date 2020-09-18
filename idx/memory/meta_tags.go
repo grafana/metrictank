@@ -131,7 +131,7 @@ func (m *metaTagIdx) MetaTagRecordUpsert(orgId uint32, upsertRecord tagquery.Met
 
 	// initialize query in preparation to execute it once we have the swapMutex
 	// doing struct instantiations before acquiring lock to keep mutex time short
-	query, err := tagquery.NewQuery(upsertRecord.Expressions, 0)
+	query, err := tagquery.NewQuery(upsertRecord.Expressions, 0, 0)
 	if err != nil {
 		return fmt.Errorf("Invalid record with expressions/meta tags: %q/%q", upsertRecord.Expressions, upsertRecord.MetaTags)
 	}
@@ -213,7 +213,7 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 			continue
 		}
 
-		query, err := tagquery.NewQuery(newRecords[i].Expressions, 0)
+		query, err := tagquery.NewQuery(newRecords[i].Expressions, 0, 0)
 		if err != nil {
 			log.Errorf("Invalid record (%q/%q): %s", newRecords[i].Expressions.Strings(), newRecords[i].MetaTags.Strings(), err)
 			continue
@@ -271,7 +271,7 @@ func (m *metaTagIdx) MetaTagRecordSwap(orgId uint32, newRecords []tagquery.MetaT
 		// remove all references to the pruned meta records from the meta
 		// tag index and the enricher
 		for recordId, record := range pruned {
-			query, err := tagquery.NewQuery(record.Expressions, 0)
+			query, err := tagquery.NewQuery(record.Expressions, 0, 0)
 			if err != nil {
 				log.Errorf("Invalid record to prune, cannot instantiate query for (%q/%q): %s", record.Expressions.Strings(), record.MetaTags.Strings(), err)
 				continue
