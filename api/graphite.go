@@ -1412,7 +1412,7 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 				builder.Reset()
 			}
 
-			query, err := tagquery.NewQuery(expressions, 0)
+			query, err := tagquery.NewQuery(expressions, 0, 0)
 			if err != nil {
 				response.Write(ctx, response.WrapErrorForTagDB(err))
 				return
@@ -1445,6 +1445,44 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 			response.Write(ctx, response.WrapErrorForTagDB(err))
 			return
 		}
+		res.Peers[peer] = peerResp.Count
+	}
+
+	response.Write(ctx, response.NewJson(200, res, ""))
+}
+
+func (s *Server) graphiteTagDelByQuery(ctx *middleware.Context, request models.GraphiteTagDelByQuery) {
+	res := models.GraphiteTagDelByQueryResp{}
+
+	data := models.IndexTagDelByQuery{OrgId: ctx.OrgId, Expr: request.Expr, OlderThan: request.OlderThan, Execute: request.Execute}
+	responses, errors := s.queryAllPeers(ctx.Req.Context(), data, "clusterTagDelByQuery,", "/index/tags/delByQuery")
+
+	// nothing to do locally on query nodes.
+	if s.MetricIndex != nil {
+		matched, err := s.localTagDelByQuery(data)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+		res.Count += matched
+		res.Peers[cluster.Manager.ThisNode().GetName()] = matched
+	}
+
+	// if there are any errors, write one of them and return
+	for _, err := range errors {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	res.Peers = make(map[string]int, len(responses))
+	peerResp := models.IndexTagDelSeriesResp{}
+	for peer, resp := range responses {
+		_, err := peerResp.UnmarshalMsg(resp.buf)
+		if err != nil {
+			response.Write(ctx, response.WrapErrorForTagDB(err))
+			return
+		}
+		res.Count += peerResp.Count
 		res.Peers[peer] = peerResp.Count
 	}
 

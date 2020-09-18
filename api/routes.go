@@ -51,6 +51,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/index/tags/autoComplete/values", ready, bind(models.IndexAutoCompleteTagValues{})).Get(s.indexAutoCompleteTagValues).Post(s.indexAutoCompleteTagValues)
 	r.Combo("/index/tags/delSeries", ready, bind(models.IndexTagDelSeries{})).Get(s.indexTagDelSeries).Post(s.indexTagDelSeries)
 	r.Combo("/index/tags/terms", ready, bind(models.IndexTagTerms{})).Get(s.IndexTagTerms).Post(s.IndexTagTerms)
+	r.Combo("/index/tags/delByQuery", ready, bind(models.IndexTagDelByQuery{})).Get(s.IndexTagDelByQuery).Post(s.IndexTagDelByQuery)
 
 	r.Options("/*", func(ctx *macaron.Context) {
 		ctx.Write(nil)
@@ -60,6 +61,7 @@ func (s *Server) RegisterRoutes() {
 	r.Combo("/showplan", cBody, withOrg, ready, bind(models.GraphiteRender{})).Get(s.showPlan).Post(s.showPlan)
 	r.Combo("/tags/terms", ready, bind(models.GraphiteTagTerms{})).Get(s.graphiteTagTerms).Post(s.graphiteTagTerms)
 	r.Combo("/ccache/delete", bind(models.CCacheDelete{})).Post(s.ccacheDelete).Get(s.ccacheDelete)
+	r.Combo("/tags/delByQuery", withOrg, ready, bind(models.GraphiteTagDelByQuery{})).Post(s.graphiteTagDelByQuery).Get(s.graphiteTagDelByQuery)
 
 	// Graphite endpoints
 	r.Combo("/render", cBody, withOrg, ready, bind(models.GraphiteRender{})).Get(s.renderMetrics).Post(s.renderMetrics)
