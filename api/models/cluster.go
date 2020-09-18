@@ -53,3 +53,8 @@ type IndexFindByTagResp struct {
 type IndexTagDelSeriesResp struct {
 	Count int
 }
+
+//go:generate msgp
+type IndexTagDelByQueryResp struct {
+	Count int
+}
