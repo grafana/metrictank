@@ -24,7 +24,7 @@ func init() {
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
 //seriesByTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
 type Query struct {
-	// clauses that operates on LastUpdate field
+	// clauses that operate on LastUpdate field
 	From int64
 	To   int64
 
