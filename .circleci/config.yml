@@ -30,7 +30,7 @@ jobs:
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: cimg/go:1.12
+      - image: circleci/golang:1.12
     steps:
       - checkout
       - run: scripts/qa/gofmt.sh
