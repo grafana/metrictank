@@ -128,7 +128,7 @@ agent-addr = localhost:6831
 ```
 [cassandra]
 # see https://github.com/grafana/metrictank/blob/master/docs/cassandra.md for more details
-# enable the cassandra backend store plugin
+# enable the cassandra backend store plugin -- This setting is ignored and overridden (set to false) in query mode
 enabled = true
 # comma-separated list of hostnames to connect to
 addrs = localhost
@@ -192,7 +192,7 @@ max-chunkspan = 24h
 
 ```
 [bigtable-store]
-# enable the bigtable backend store plugin
+# enable the bigtable backend store plugin -- This setting is ignored and overridden (set to false) in query mode
 enabled = false
 # Name of GCP project the bigtable cluster resides in
 gcp-project = default
@@ -317,6 +317,7 @@ reject-invalid-input = true
 
 ```
 [carbon-in]
+# This setting is ignored and overridden (set to false) in query mode
 enabled = false
 # tcp address
 addr = :2003
@@ -328,6 +329,7 @@ partition = 0
 
 ```
 [kafka-mdm-in]
+# This setting is ignored and overridden (set to false) in query mode
 enabled = false
 # For incoming MetricPoint messages without org-id, assume this org id
 org-id = 0
@@ -479,6 +481,7 @@ tls-client-key =
 
 ```
 [cassandra-idx]
+# This setting is ignored and overridden (set to false) in query mode
 enabled = true
 # Cassandra keyspace to store metricDefinitions in.
 keyspace = metrictank
@@ -534,6 +537,7 @@ connection-check-timeout = 30s
 
 ```
 [memory-idx]
+# This setting is ignored and overridden (set to false) in query mode
 enabled = false
 # enables/disables querying based on tags
 tag-support = true
@@ -577,6 +581,7 @@ write-max-batch-size = 5000
 
 ```
 [bigtable-idx]
+# This setting is ignored and overridden (set to false) in query mode
 enabled = false
 # Name of GCP project the bigtable cluster resides in
 gcp-project = default
