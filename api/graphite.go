@@ -362,13 +362,13 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 
 	switch request.Format {
 	case "", "treejson", "json":
-		response.Write(ctx, response.NewJson(200, findTreejson(request.Query, nodes), request.Jsonp))
+		response.Write(ctx, response.NewJson(200, FindTreejson(request.Query, nodes), request.Jsonp))
 	case "completer":
-		response.Write(ctx, response.NewJson(200, findCompleter(nodes), request.Jsonp))
+		response.Write(ctx, response.NewJson(200, FindCompleter(nodes), request.Jsonp))
 	case "msgpack":
-		response.Write(ctx, response.NewMsgpack(200, findPickle(nodes, request, fromUnix, toUnix)))
+		response.Write(ctx, response.NewMsgpack(200, FindPickle(nodes, request, fromUnix, toUnix)))
 	case "pickle":
-		response.Write(ctx, response.NewPickle(200, findPickle(nodes, request, fromUnix, toUnix)))
+		response.Write(ctx, response.NewPickle(200, FindPickle(nodes, request, fromUnix, toUnix)))
 	}
 }
 
@@ -549,7 +549,7 @@ func (s *Server) metricsIndex(ctx *middleware.Context) {
 	response.Write(ctx, response.NewFastJson(200, models.MetricNames(series)))
 }
 
-func findCompleter(nodes []idx.Node) models.SeriesCompleter {
+func FindCompleter(nodes []idx.Node) models.SeriesCompleter {
 	var result = models.NewSeriesCompleter()
 	for _, g := range nodes {
 		c := models.SeriesCompleterItem{
@@ -577,7 +577,7 @@ func findCompleter(nodes []idx.Node) models.SeriesCompleter {
 	return result
 }
 
-func findPickle(nodes []idx.Node, request models.GraphiteFind, fromUnix, toUnix uint32) models.SeriesPickle {
+func FindPickle(nodes []idx.Node, request models.GraphiteFind, fromUnix, toUnix uint32) models.SeriesPickle {
 	result := make([]models.SeriesPickleItem, len(nodes))
 	var intervals [][]int64
 	if fromUnix != 0 && toUnix != 0 {
@@ -591,7 +591,7 @@ func findPickle(nodes []idx.Node, request models.GraphiteFind, fromUnix, toUnix 
 
 var treejsonContext = make(map[string]int)
 
-func findTreejson(query string, nodes []idx.Node) models.SeriesTree {
+func FindTreejson(query string, nodes []idx.Node) models.SeriesTree {
 	tree := models.SeriesTree{}
 	seen := make(map[string]struct{})
 
