@@ -57,7 +57,7 @@ func NewIdxConfig() *IdxConfig {
 
 var CliConfig = NewIdxConfig()
 
-func ConfigSetup() {
+func ConfigSetup() *flag.FlagSet {
 	btIdx := flag.NewFlagSet("bigtable-idx", flag.ExitOnError)
 
 	btIdx.BoolVar(&CliConfig.Enabled, "enabled", CliConfig.Enabled, "")
@@ -73,6 +73,7 @@ func ConfigSetup() {
 	btIdx.BoolVar(&CliConfig.CreateCF, "create-cf", CliConfig.CreateCF, "enable the creation of the table and column families")
 
 	globalconf.Register("bigtable-idx", btIdx, flag.ExitOnError)
+	return btIdx
 }
 
 func ConfigProcess() {

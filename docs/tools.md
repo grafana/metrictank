@@ -191,6 +191,8 @@ global config flags:
 
   -addr string
     	graphite/metrictank address (default "http://localhost:6060")
+  -bt-total-partitions int
+    	when using bigtable you must set this to the total number of partitions for the instance if you do not specify partitions with the 'partitions' setting (default -1)
   -from string
     	for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
   -limit int
@@ -221,7 +223,7 @@ tags filter:
      'valid'   only show metrics whose tags (if any) are valid
      'invalid' only show metrics that have one or more invalid tags
 
-idxtype: only 'cass' supported for now
+
 
 cass config flags:
 
@@ -276,6 +278,34 @@ cass config flags:
   -write-queue-size int
     	Max number of metricDefs allowed to be unwritten to cassandra (default 100000)
 
+
+bigtable config flags:
+
+  -bigtable-instance string
+    	Name of bigtable instance (default "default")
+  -create-cf
+    	enable the creation of the table and column families (default true)
+  -enabled
+    	
+  -gcp-project string
+    	Name of GCP project the bigtable cluster resides in (default "default")
+  -prune-interval duration
+    	Interval at which the index should be checked for stale series. (default 3h0m0s)
+  -table-name string
+    	Name of bigtable table used for metricDefs (default "metrics")
+  -update-bigtable-index
+    	synchronize index changes to bigtable. not all your nodes need to do this. (default true)
+  -update-interval duration
+    	frequency at which we should update the metricDef lastUpdate field, use 0s for instant updates (default 3h0m0s)
+  -write-concurrency int
+    	Number of writer threads to use (default 5)
+  -write-max-flush-size int
+    	Max number of metricDefs in each batch write to bigtable (default 10000)
+  -write-queue-size int
+    	Max number of metricDefs allowed to be unwritten to bigtable. Must be larger then write-max-flush-size (default 100000)
+
+
+
 output:
 
  * presets: dump|list|vegeta-render|vegeta-render-patterns
@@ -297,12 +327,18 @@ output:
      roundDuration: formats an integer-seconds duration using aggressive rounding. for the purpose of getting an idea of overal metrics age
 
 
-EXAMPLES:
+Cassandra Examples:
 mt-index-cat -from 60min cass -hosts cassandra:9042 list
 mt-index-cat -from 60min cass -hosts cassandra:9042 'sumSeries({{.Name | pattern}})'
 mt-index-cat -from 60min cass -hosts cassandra:9042 'GET http://localhost:6060/render?target=sumSeries({{.Name | pattern}})&from=-6h\nX-Org-Id: 1\n\n'
 mt-index-cat cass -hosts cassandra:9042 -timeout 60s '{{.LastUpdate | age | roundDuration}}\n' | sort | uniq -c
 mt-index-cat cass -hosts localhost:9042 -schema-file ../../scripts/config/schema-idx-cassandra.toml '{{.Name | patternCustom 15 "pass" 40 "1rcnw" 15 "2rcnw" 10 "3rcnw" 10 "3rccw" 10 "2rccw"}}\n'
+
+
+Bigtable Examples:
+mt-index-cat -max-stale 0 -bt-total-partitions 128 bt -gcp-project your_project -bigtable-instance the_bt_instance -table-name metric_idx -create-cf false list
+mt-index-cat -max-stale 768h -partitions 1,2,3 bt -gcp-project your_project -bigtable-instance the_bt_instance -table-name metric_idx -create-cf false '{{.NameWithTags}} {{.Id}} {{.OrgId}} {{.LastUpdate}} {{.Partition}}
+'
 ```
 
 
