@@ -181,6 +181,17 @@ func main() {
 	}
 	cluster.Init(*instance, version, startupTime, scheme, int(port))
 
+	// while in query mode, ensure all input, store, and idx plugins are turned off
+	if cluster.Mode == cluster.ModeQuery {
+		inCarbon.Enabled = false
+		inKafkaMdm.Enabled = false
+		memory.Enabled = false
+		cassandra.CliConfig.Enabled = false
+		bigtable.CliConfig.Enabled = false
+		cassandraStore.CliConfig.Enabled = false
+		bigtableStore.CliConfig.Enabled = false
+	}
+
 	/***********************************
 		Validate remaining settings
 	***********************************/

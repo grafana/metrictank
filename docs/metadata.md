@@ -33,6 +33,7 @@ Refer to the [cassandra guide](https://github.com/grafana/metrictank/blob/master
 #### Configuration
 ```
 [cassandra-idx]
+# This setting is ignored and overridden (set to false) in query mode
 enabled = false
 # Cassandra keyspace to store metricDefinitions in.
 keyspace = raintank
