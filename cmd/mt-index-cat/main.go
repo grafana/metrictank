@@ -88,7 +88,7 @@ func main() {
 		fmt.Println("     'valid'   only show metrics whose tags (if any) are valid")
 		fmt.Println("     'invalid' only show metrics that have one or more invalid tags")
 		fmt.Println()
-		fmt.Printf("\n\n")
+		fmt.Printf("idxtype: 'cass' (cassandra) or 'bt' (bigtable)\n\n")
 		fmt.Printf("cass config flags:\n\n")
 		cassFlags.PrintDefaults()
 		fmt.Printf("\n\n")
