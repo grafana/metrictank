@@ -56,7 +56,7 @@ func main() {
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
 	globalFlags.StringVar(&suffix, "suffix", "", "only show metrics that have this suffix")
 	globalFlags.StringVar(&partitionStr, "partitions", "*", "only show metrics from the comma separated list of partitions or * for all")
-	globalFlags.IntVar(&btTotalPartitions, "bt-total-partitions", -1, "when using bigtable you must set this to the total number of partitions for the instance if you do not specify partitions with the 'partitions' setting")
+	globalFlags.IntVar(&btTotalPartitions, "bt-total-partitions", -1, "total number of partitions (when using bigtable and partitions='*')")
 	globalFlags.StringVar(&regexStr, "regex", "", "only show metrics that match this regex")
 	globalFlags.StringVar(&tags, "tags", "", "tag filter. empty (default), 'some', 'none', 'valid', or 'invalid'")
 	globalFlags.StringVar(&from, "from", "30min", "for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp")
