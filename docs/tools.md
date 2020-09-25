@@ -192,7 +192,7 @@ global config flags:
   -addr string
     	graphite/metrictank address (default "http://localhost:6060")
   -bt-total-partitions int
-    	when using bigtable you must set this to the total number of partitions for the instance if you do not specify partitions with the 'partitions' setting (default -1)
+    	total number of partitions (when using bigtable and partitions='*') (default -1)
   -from string
     	for vegeta outputs, will generate requests for data starting from now minus... eg '30min', '5h', '14d', etc. or a unix timestamp (default "30min")
   -limit int
@@ -223,7 +223,7 @@ tags filter:
      'valid'   only show metrics whose tags (if any) are valid
      'invalid' only show metrics that have one or more invalid tags
 
-
+idxtype: 'cass' (cassandra) or 'bt' (bigtable)
 
 cass config flags:
 
