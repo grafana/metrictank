@@ -303,7 +303,7 @@ func main() {
 	processDefs := func(defs []schema.MetricDefinition) {
 		total += len(defs)
 		if shown >= limit && limit > 0 {
-			log.Infof("Limit (%d) reached while processing Metric Definitions", limit)
+			fmt.Fprintf(os.Stderr, "Limit (%d) reached while processing Metric Definitions", limit)
 			return
 		}
 		for _, d := range defs {
@@ -341,7 +341,7 @@ func main() {
 			show(d)
 			shown++
 			if shown >= limit && limit > 0 {
-				log.Infof("Limit (%d) reached while processing Metric Definitions", limit)
+				fmt.Fprintf(os.Stderr, "Limit (%d) reached while processing Metric Definitions", limit)
 				return
 			}
 		}
