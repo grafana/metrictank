@@ -170,6 +170,33 @@ func printMemUsage(t *testing.T) {
 	t.Logf("NumGC = \t\t%v\n\n\n", m.NumGC)
 }
 
+func ensureOrgLocksExist(ix MemoryIndex) {
+	if Partitioned {
+		um, ok := ix.(*PartitionedMemoryIdx)
+		if ok {
+			m := um.Partition[getPartitionFromName("name2")]
+			m.globalOrgLock.Lock()
+			for _, oid := range []uint32{idx.OrgIdPublic, 1, 2} {
+				if _, ok := m.orgLocks[oid]; !ok {
+					m.orgLocks[oid] = new(PriorityRWMutex)
+				}
+			}
+			m.globalOrgLock.Unlock()
+		}
+	} else {
+		m, ok := ix.(*UnpartitionedMemoryIdx)
+		if ok {
+			m.globalOrgLock.Lock()
+			for _, oid := range []uint32{idx.OrgIdPublic, 1, 2} {
+				if _, ok := m.orgLocks[oid]; !ok {
+					m.orgLocks[oid] = new(PriorityRWMutex)
+				}
+			}
+			m.globalOrgLock.Unlock()
+		}
+	}
+}
+
 // withAndWithoutTagSupport calls a test with the TagSupprt setting
 // turned on and off. This is to verify that something works as expected
 // no matter what this flag is set to, it does not mean that the behavior
@@ -244,9 +271,6 @@ func testGetAddKey(t *testing.T) {
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
 				numSeries := len(series)
-				if orgId != idx.OrgIdPublic {
-					numSeries += 5
-				}
 				So(defs, ShouldHaveLength, numSeries)
 
 			})
@@ -262,7 +286,7 @@ func testGetAddKey(t *testing.T) {
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
-			So(defs, ShouldHaveLength, 15)
+			So(defs, ShouldHaveLength, 10)
 		})
 	})
 
@@ -336,6 +360,9 @@ func testFind(t *testing.T) {
 		ix.AddOrUpdate(mkey, s, getPartition(s))
 	}
 
+	// workaround to ensure orgLock exists
+	ensureOrgLocksExist(ix)
+
 	Convey("When listing root nodes", t, func() {
 		Convey("root nodes for orgId 1", func() {
 			nodes, err := ix.Find(1, "*", 0)
@@ -404,7 +431,7 @@ func testFind(t *testing.T) {
 	})
 	Convey("When searching nodes for unknown orgId", t, func() {
 		nodes, err := ix.Find(4, "foo.demo.*", 0)
-		So(err, ShouldBeNil)
+		So(err, ShouldNotBeNil)
 		So(nodes, ShouldHaveLength, 0)
 	})
 
@@ -465,6 +492,9 @@ func testDelete(t *testing.T) {
 			}
 			ix.AddOrUpdate(mkey, s, getPartition(s))
 		}
+
+		// workaround to ensure orgLock exists
+		ensureOrgLocksExist(ix)
 
 		Convey("when a pattern is deleted from an org", func() {
 			archives, err := ix.Delete(idx.OrgIdPublic, "metric.*")
@@ -571,6 +601,8 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 		}
 		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
+	// workaround to ensure orgLock exists
+	ensureOrgLocksExist(ix)
 
 	Convey("when deleting 100k series", t, func() {
 		type resp struct {
@@ -1452,6 +1484,7 @@ func testMatchSchemaWithTags(t *testing.T) {
 
 	data := make([]*schema.MetricDefinition, 10)
 	archives := make([]*idx.Archive, 10)
+	metricdata := make([]*schema.MetricData, 10)
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("some.id.of.a.metric.%d", i)
 		data[i] = &schema.MetricDefinition{
@@ -1462,8 +1495,16 @@ func testMatchSchemaWithTags(t *testing.T) {
 			Partition: getPartitionFromName(name),
 		}
 		data[i].SetId()
+		metricdata[i] = &schema.MetricData{
+			Id:       data[i].Id.String(),
+			OrgId:    1,
+			Name:     name,
+			Interval: 1,
+			Tags:     []string{fmt.Sprintf("tag1=value%d", i), "tag2=othervalue"},
+		}
+		metricdata[i].SetId()
 		archives[i] = createArchive(data[i])
-		ix.add(archives[i])
+		ix.AddOrUpdate(data[i].Id, metricdata[i], data[i].Partition)
 	}
 
 	// only those MDs with tag1=value3 or tag1=value5 should get the first schema id

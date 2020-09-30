@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -202,9 +203,9 @@ func (t TagIndex) idHasTag(id schema.MKey, tag, value string) bool {
 func (defs defByTagSet) add(def *schema.MetricDefinition) {
 	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
 	var ok bool
-	if orgDefs, ok = defs[def.OrgId]; !ok {
+	if orgDefs, ok = defs[def.Id.Org]; !ok {
 		orgDefs = make(map[string]map[*schema.MetricDefinition]struct{})
-		defs[def.OrgId] = orgDefs
+		defs[def.Id.Org] = orgDefs
 	}
 
 	fullName := def.NameWithTags()
@@ -217,7 +218,7 @@ func (defs defByTagSet) add(def *schema.MetricDefinition) {
 func (defs defByTagSet) del(def *schema.MetricDefinition) {
 	var orgDefs map[string]map[*schema.MetricDefinition]struct{}
 	var ok bool
-	if orgDefs, ok = defs[def.OrgId]; !ok {
+	if orgDefs, ok = defs[def.Id.Org]; !ok {
 		return
 	}
 
@@ -229,7 +230,7 @@ func (defs defByTagSet) del(def *schema.MetricDefinition) {
 	}
 
 	if len(orgDefs) == 0 {
-		delete(defs, def.OrgId)
+		delete(defs, def.Id.Org)
 	}
 }
 
@@ -265,12 +266,13 @@ func (n *Node) String() string {
 }
 
 type UnpartitionedMemoryIdx struct {
-	PriorityRWMutex
+	globalOrgLock sync.RWMutex
+	orgLocks      map[uint32]*PriorityRWMutex
 	*metaTagIdx
 
 	// used for both hierarchy and tag index, so includes all MDs, with
-	// and without tags. It also mixes all orgs into one flat map.
-	defById map[schema.MKey]*idx.Archive
+	// and without tags.
+	defById map[uint32]map[schema.MKey]*idx.Archive // by orgId
 
 	// used by hierarchy index only
 	tree map[uint32]*Tree // by orgId
@@ -286,7 +288,8 @@ type UnpartitionedMemoryIdx struct {
 
 func NewUnpartitionedMemoryIdx() *UnpartitionedMemoryIdx {
 	m := &UnpartitionedMemoryIdx{
-		defById:     make(map[schema.MKey]*idx.Archive),
+		orgLocks:    make(map[uint32]*PriorityRWMutex),
+		defById:     make(map[uint32]map[schema.MKey]*idx.Archive),
 		defByTagSet: make(defByTagSet),
 		tree:        make(map[uint32]*Tree),
 		tags:        make(map[uint32]TagIndex),
@@ -321,10 +324,16 @@ func (m *UnpartitionedMemoryIdx) Stop() {
 	}
 
 	if MetaTagSupport && m.metaTagIdx != nil {
-		bc := m.Lock()
+		bcs := make([]BlockContext, 0)
+		for _, l := range m.orgLocks {
+			bc := l.Lock()
+			bcs = append(bcs, bc)
+		}
 		m.metaTagIdx.stop()
 		m.metaTagIdx = nil
-		bc.Unlock("Stop", nil)
+		for _, bc := range bcs {
+			bc.Unlock("Stop", nil)
+		}
 	}
 	return
 }
@@ -354,9 +363,17 @@ func updateExisting(existing *idx.Archive, partition int32, lastUpdate int64, pr
 func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int32) (idx.Archive, int32, bool) {
 	pre := time.Now()
 
-	m.RLockHigh()
-	existing, ok := m.defById[point.MKey]
-	m.RUnlockHigh()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[point.MKey.Org]; !ok {
+		// if we don't have an orgLock yet, then there is no data to update, we should just return. Also, this should not happen.
+		m.globalOrgLock.Unlock()
+		return idx.Archive{}, 0, false
+	}
+	m.globalOrgLock.Unlock()
+
+	m.orgLocks[point.MKey.Org].RLockHigh()
+	existing, ok := m.defById[point.MKey.Org][point.MKey]
+	m.orgLocks[point.MKey.Org].RUnlockHigh()
 	if ok {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
@@ -380,9 +397,9 @@ func (m *UnpartitionedMemoryIdx) Update(point schema.MetricPoint, partition int3
 
 		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
 		// when we released m.RLock() and when the call to m.writeQueue.Get() was able to obtain its own lock.
-		m.RLockHigh()
-		existing, ok = m.defById[point.MKey]
-		m.RUnlockHigh()
+		m.orgLocks[point.MKey.Org].RLockHigh()
+		existing, ok = m.defById[point.MKey.Org][point.MKey]
+		m.orgLocks[point.MKey.Org].RUnlockHigh()
 		if ok {
 			if log.IsLevelEnabled(log.DebugLevel) {
 				log.Debugf("memory-idx: metricDef with id %v already in index", point.MKey)
@@ -403,9 +420,16 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 
 	// we only need a lock while reading the m.defById map. All future operations on the archive
 	// use sync/atomic to allow concurrent read/writes
-	m.RLockHigh()
-	existing, ok := m.defById[mkey]
-	m.RUnlockHigh()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[mkey.Org]; !ok {
+		m.orgLocks[mkey.Org] = new(PriorityRWMutex)
+		// we need to create the map here, as it should now exist
+		m.defById[mkey.Org] = make(map[schema.MKey]*idx.Archive)
+	}
+	m.globalOrgLock.Unlock()
+	m.orgLocks[mkey.Org].RLockHigh()
+	existing, ok := m.defById[mkey.Org][mkey]
+	m.orgLocks[mkey.Org].RUnlockHigh()
 	if ok {
 		if log.IsLevelEnabled(log.DebugLevel) {
 			log.Debugf("memory-idx: metricDef with id %s already in the index", mkey)
@@ -418,7 +442,7 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 	archive := createArchive(def)
 	if m.writeQueue == nil {
 		// writeQueue not enabled, so acquire a wlock and immediately add to the index.
-		bc := m.Lock()
+		bc := m.orgLocks[mkey.Org].Lock()
 		m.add(archive)
 		bc.Unlock("AddOrUpdate", nil)
 		statAddDuration.Value(time.Since(pre))
@@ -433,9 +457,17 @@ func (m *UnpartitionedMemoryIdx) AddOrUpdate(mkey schema.MKey, data *schema.Metr
 
 // UpdateArchiveLastSave updates the LastSave timestamp of the archive
 func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition int32, lastSave uint32) {
-	m.RLockHigh()
-	existing, ok := m.defById[id]
-	m.RUnlockHigh()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[id.Org]; !ok {
+		// if we don't have an orgLock yet, then there is no data to update, we should just return. Also, this should not happen.
+		m.globalOrgLock.Unlock()
+		return
+	}
+	m.globalOrgLock.Unlock()
+
+	m.orgLocks[id.Org].RLockHigh()
+	existing, ok := m.defById[id.Org][id]
+	m.orgLocks[id.Org].RUnlockHigh()
 	if ok {
 		atomic.StoreUint32(&existing.LastSave, lastSave)
 		return
@@ -453,9 +485,9 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 		}
 		// we need to do one final check of m.defById, as the writeQueue may have been flushed between
 		// when we released m.RLock() and when the call to m.writeQueue.Get() was able to obtain its own lock.
-		m.RLockHigh()
-		existing, ok = m.defById[id]
-		m.RUnlockHigh()
+		m.orgLocks[id.Org].RLockHigh()
+		existing, ok := m.defById[id.Org][id]
+		m.orgLocks[id.Org].RUnlockHigh()
 		if ok {
 			atomic.StoreUint32(&existing.LastSave, lastSave)
 			return
@@ -467,10 +499,10 @@ func (m *UnpartitionedMemoryIdx) UpdateArchiveLastSave(id schema.MKey, partition
 // corresponding tag index entries to refer to it. It assumes a lock is
 // already held.
 func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
-	tags, ok := m.tags[def.OrgId]
+	tags, ok := m.tags[def.Id.Org]
 	if !ok {
 		tags = make(TagIndex)
-		m.tags[def.OrgId] = tags
+		m.tags[def.Id.Org] = tags
 	}
 
 	for _, tag := range def.Tags {
@@ -492,11 +524,13 @@ func (m *UnpartitionedMemoryIdx) indexTags(def *schema.MetricDefinition) {
 	m.defByTagSet.add(def)
 
 	if MetaTagSupport {
-		if ok := m.getOrgMetaTagIndex(def.OrgId).enricher.tryAddMetric(*def); !ok {
+		if ok := m.getOrgMetaTagIndex(def.Id.Org).enricher.tryAddMetric(*def); !ok {
 			log.Warnf("Failed to add metric def need to relinquish lock")
-			m.Unlock(&BlockContext{})
-			m.getOrgMetaTagIndex(def.OrgId).enricher.addMetric(*def)
-			m.Lock()
+			// this is called from add. The existence of the
+			// orgLock has already been verified at this point
+			m.orgLocks[def.Id.Org].Unlock(&BlockContext{})
+			m.getOrgMetaTagIndex(def.Id.Org).enricher.addMetric(*def)
+			m.orgLocks[def.Id.Org].Lock()
 		}
 	}
 }
@@ -527,11 +561,13 @@ func (m *UnpartitionedMemoryIdx) deindexTags(tags TagIndex, def *schema.MetricDe
 	m.defByTagSet.del(def)
 
 	if MetaTagSupport {
-		if ok := m.getOrgMetaTagIndex(def.OrgId).enricher.tryDelMetric(def); !ok {
+		if ok := m.getOrgMetaTagIndex(def.Id.Org).enricher.tryDelMetric(def); !ok {
 			log.Warnf("Failed to del metric def, need to relinquish lock")
-			m.Unlock(&BlockContext{})
-			m.getOrgMetaTagIndex(def.OrgId).enricher.delMetric(def)
-			m.Lock()
+			// this is called from deleteTaggedByIdSet. The existence of the
+			// orgLock has already been verified at this point
+			m.orgLocks[def.Id.Org].Unlock(&BlockContext{})
+			m.getOrgMetaTagIndex(def.Id.Org).enricher.delMetric(def)
+			m.orgLocks[def.Id.Org].Lock()
 		}
 	}
 
@@ -546,14 +582,19 @@ func (m *UnpartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.Me
 
 // Used to rebuild the index from an existing set of metricDefinitions.
 func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
-	bc := m.Lock()
-	defer bc.Unlock("Load", nil)
+	// here we use the globalOrgLock for loading partitions
+	m.globalOrgLock.Lock()
+	defer m.globalOrgLock.Unlock()
 	var pre time.Time
 	var num int
 	for i := range defs {
 		def := &defs[i]
 		pre = time.Now()
-		if _, ok := m.defById[def.Id]; ok {
+		// if it the archive map doesn't exist we must create it
+		if _, ok := m.defById[def.Id.Org]; !ok {
+			m.defById[def.Id.Org] = make(map[schema.MKey]*idx.Archive)
+		}
+		if _, ok := m.defById[def.Id.Org][def.Id]; ok {
 			continue
 		}
 
@@ -564,7 +605,7 @@ func (m *UnpartitionedMemoryIdx) Load(defs []schema.MetricDefinition) int {
 		// but it will be close enough and it will always be true that the lastSave was at
 		// or after this time.  For metrics that are sent at or close to real time (the typical
 		// use case), then the value will be within a couple of seconds of the true lastSave.
-		m.defById[def.Id].LastSave = uint32(def.LastUpdate)
+		m.defById[def.Id.Org][def.Id].LastSave = uint32(def.LastUpdate)
 		num++
 		statAddDuration.Value(time.Since(pre))
 	}
@@ -589,7 +630,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 	// there is a race condition that can lead to an archive being added
 	// to the writeQueue just after a queued copy of the archive was flushed.
 	// If that happens, we just do an update lastUpdate instead
-	if existing, ok := m.defById[archive.Id]; ok {
+	if existing, ok := m.defById[archive.Id.Org][archive.Id]; ok {
 		// We deliberately dont update existing.Partition as any change
 		// cant be passed back to the caller (cassandraIdx,BigtableIdx).
 		// If the partition has changed, then the next datapoint will update
@@ -612,8 +653,8 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		m.indexTags(def)
 
 		if len(def.Tags) > 0 {
-			if _, ok := m.defById[def.Id]; !ok {
-				m.defById[def.Id] = archive
+			if _, ok := m.defById[def.Id.Org][def.Id]; !ok {
+				m.defById[def.Id.Org][def.Id] = archive
 				statAdd.Inc()
 				log.Debugf("memory-idx: adding %s to DefById", path)
 			}
@@ -623,23 +664,23 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 
 	if m.findCache != nil {
 		defer func() {
-			go m.findCache.InvalidateFor(def.OrgId, path)
+			go m.findCache.InvalidateFor(def.Id.Org, path)
 		}()
 	}
 
 	//first check to see if a tree has been created for this OrgId
-	tree, ok := m.tree[def.OrgId]
+	tree, ok := m.tree[def.Id.Org]
 	if !ok || len(tree.Items) == 0 {
-		log.Debugf("memory-idx: first metricDef seen for orgId %d", def.OrgId)
+		log.Debugf("memory-idx: first metricDef seen for orgId %d", def.Id.Org)
 		root := &Node{
 			Path:     "",
 			Children: make([]string, 0),
 			Defs:     make([]schema.MKey, 0),
 		}
-		m.tree[def.OrgId] = &Tree{
+		m.tree[def.Id.Org] = &Tree{
 			Items: map[string]*Node{"": root},
 		}
-		tree = m.tree[def.OrgId]
+		tree = m.tree[def.Id.Org]
 	} else {
 		// now see if there is an existing branch or leaf with the same path.
 		// An existing leaf is possible if there are multiple metricDefs for the same path due
@@ -647,7 +688,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		if node, ok := tree.Items[path]; ok {
 			log.Debugf("memory-idx: existing index entry for %s. Adding %s to Defs list", path, def.Id)
 			node.Defs = append(node.Defs, def.Id)
-			m.defById[def.Id] = archive
+			m.defById[def.Id.Org][def.Id] = archive
 			statAdd.Inc()
 			return
 		}
@@ -693,7 +734,7 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 		Children: []string{},
 		Defs:     []schema.MKey{def.Id},
 	}
-	m.defById[def.Id] = archive
+	m.defById[def.Id.Org][def.Id] = archive
 	statAdd.Inc()
 
 	return
@@ -701,9 +742,17 @@ func (m *UnpartitionedMemoryIdx) add(archive *idx.Archive) {
 
 func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	pre := time.Now()
-	m.RLockHigh()
-	defer m.RUnlockHigh()
-	def, ok := m.defById[id]
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[id.Org]; !ok {
+		// if we don't have an orgLock yet, then there is no data to get, we should just return.
+		m.globalOrgLock.Unlock()
+		return idx.Archive{}, ok
+	}
+	m.globalOrgLock.Unlock()
+
+	m.orgLocks[id.Org].RLockHigh()
+	defer m.orgLocks[id.Org].RUnlockHigh()
+	def, ok := m.defById[id.Org][id]
 	statGetDuration.Value(time.Since(pre))
 	if ok {
 		return CloneArchive(def), ok
@@ -714,7 +763,15 @@ func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 // GetPath returns the node under the given org and path.
 // this is an alternative to Find for when you have a path, not a pattern, and want to lookup in a specific org tree only.
 func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archive {
-	bc := m.RLockLow()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
+	bc := m.orgLocks[orgId].RLockLow()
 	defer bc.RUnlockLow("GetPath", nil)
 	tree, ok := m.tree[orgId]
 	if !ok {
@@ -726,7 +783,7 @@ func (m *UnpartitionedMemoryIdx) GetPath(orgId uint32, path string) []idx.Archiv
 	}
 	archives := make([]idx.Archive, len(node.Defs))
 	for i, def := range node.Defs {
-		archive := m.defById[def]
+		archive := m.defById[orgId][def]
 		archives[i] = CloneArchive(archive)
 	}
 	return archives
@@ -738,6 +795,14 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 		return nil
 	}
 
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
 	var metaTagIdx *orgMetaTagIdx
 	if MetaTagSupport {
 		metaTagIdx = m.getOrgMetaTagIndex(orgId)
@@ -748,14 +813,14 @@ func (m *UnpartitionedMemoryIdx) FindByTag(orgId uint32, query tagquery.Query) [
 
 	resCh := make(chan schema.MKey, 100)
 
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgId].RLockLow()
 
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	m.idsByTagQuery(orgId, query, resCh, true)
 
 	byPath := make(map[string]*idx.Node)
 	for id := range resCh {
-		def, ok := m.defById[id]
+		def, ok := m.defById[orgId][id]
 		if !ok {
 			corruptIndex.Inc()
 			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
@@ -799,6 +864,14 @@ func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query ta
 		return 0, nil
 	}
 
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgID]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return 0, nil
+	}
+	m.globalOrgLock.Unlock()
+
 	needsName := false
 	terms := make(map[string]map[string]uint32)
 	for _, tag := range tags {
@@ -810,13 +883,13 @@ func (m *UnpartitionedMemoryIdx) FindTerms(orgID uint32, tags []string, query ta
 
 	resCh := make(chan schema.MKey, 100)
 
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgID].RLockLow()
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node for each path
 	m.idsByTagQuery(orgID, query, resCh, true)
 
 	var totalResults uint32
 	for id := range resCh {
-		def, ok := m.defById[id]
+		def, ok := m.defById[orgID][id]
 		if !ok {
 			corruptIndex.Inc()
 			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
@@ -857,7 +930,15 @@ func (m *UnpartitionedMemoryIdx) Tags(orgId uint32, filter *regexp.Regexp) []str
 		return nil
 	}
 
-	bc := m.RLockLow()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
+	bc := m.orgLocks[orgId].RLockLow()
 
 	tags, ok := m.tags[orgId]
 	if !ok {
@@ -899,7 +980,15 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 		return nil
 	}
 
-	bc := m.RLockLow()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
+	bc := m.orgLocks[orgId].RLockLow()
 
 	tags, ok := m.tags[orgId]
 	if !ok {
@@ -965,7 +1054,15 @@ func (m *UnpartitionedMemoryIdx) FindTags(orgId uint32, prefix string, limit uin
 		return nil
 	}
 
-	bc := m.RLockLow()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
+	bc := m.orgLocks[orgId].RLockLow()
 
 	tags, ok := m.tags[orgId]
 	if !ok {
@@ -1011,6 +1108,14 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 		return nil
 	}
 
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
 	var metaTagIdx *orgMetaTagIdx
 	if MetaTagSupport {
 		metaTagIdx = m.getOrgMetaTagIndex(orgId)
@@ -1023,10 +1128,10 @@ func (m *UnpartitionedMemoryIdx) FindTagsWithQuery(orgId uint32, prefix string, 
 	resMap := make(map[string]struct{})
 	resCh := make(chan schema.MKey, 100)
 
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgId].RLockLow()
 	m.idsByTagQuery(orgId, query, resCh, true)
 	for id := range resCh {
-		def, ok := m.defById[id]
+		def, ok := m.defById[orgId][id]
 		if !ok {
 			corruptIndex.Inc()
 			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
@@ -1088,7 +1193,15 @@ func (m *UnpartitionedMemoryIdx) FindTagValues(orgId uint32, tag, prefix string,
 		return nil
 	}
 
-	bc := m.RLockLow()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
+	bc := m.orgLocks[orgId].RLockLow()
 
 	values := m.tags[orgId][tag]
 	res := make([]string, 0, len(values))
@@ -1125,6 +1238,14 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 		return nil
 	}
 
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
 	var metaTagIdx *orgMetaTagIdx
 	if MetaTagSupport {
 		metaTagIdx = m.getOrgMetaTagIndex(orgId)
@@ -1137,11 +1258,11 @@ func (m *UnpartitionedMemoryIdx) FindTagValuesWithQuery(orgId uint32, tag, prefi
 	resMap := make(map[string]struct{})
 	resCh := make(chan schema.MKey, 100)
 
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgId].RLockLow()
 	m.idsByTagQuery(orgId, query, resCh, true)
 	tagPrefix := tag + "=" + prefix
 	for id := range resCh {
-		def, ok := m.defById[id]
+		def, ok := m.defById[orgId][id]
 		if !ok {
 			corruptIndex.Inc()
 			log.Errorf("memory-idx: corrupt. ID %q has been given, but it is not in the byId lookup table", id)
@@ -1211,9 +1332,9 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query tagquery.Quer
 	go func() {
 		if useMeta && MetaTagSupport {
 			metaTagIdx := m.getOrgMetaTagIndex(orgId)
-			queryCtx.Run(tags, m.defById, metaTagIdx.hierarchy, metaTagIdx.records, idCh)
+			queryCtx.Run(tags, m.defById[orgId], metaTagIdx.hierarchy, metaTagIdx.records, idCh)
 		} else {
-			queryCtx.Run(tags, m.defById, nil, nil, idCh)
+			queryCtx.Run(tags, m.defById[orgId], nil, nil, idCh)
 		}
 		close(idCh)
 	}()
@@ -1224,9 +1345,17 @@ func (m *UnpartitionedMemoryIdx) idsByTagQuery(orgId uint32, query tagquery.Quer
 // of metric ids to the given callback function before releasing the read lock.
 // It does not use the meta tag index.
 func (m *UnpartitionedMemoryIdx) idsByTagQueryIntoCallback(orgId uint32, query tagquery.Query, resultCb func([]schema.MKey)) {
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return
+	}
+	m.globalOrgLock.Unlock()
+
 	idCh := make(chan schema.MKey, 100)
 
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgId].RLockLow()
 	defer bc.RUnlockLow("idsByTagQueryIntoCallback", func() interface{} {
 		return query.Expressions.Strings()
 	})
@@ -1290,10 +1419,18 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, patte
 }
 
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil, fmt.Errorf("Find - No Org Lock exists for %d, so no data is available", orgId)
+	}
+	m.globalOrgLock.Unlock()
+
 	pre := time.Now()
 	var matchedNodes []*Node
 	var err error
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgId].RLockLow()
 	defer bc.RUnlockLow("Find", func() interface{} {
 		return pattern
 	})
@@ -1333,7 +1470,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) 
 			if idxNode.Leaf {
 				idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
 				for _, id := range n.Defs {
-					def := m.defById[id]
+					def := m.defById[orgId][id]
 					if def == nil {
 						// def could be nil if items from the findCache have been deleted.
 						log.Debugf("memory-idx: Find: def with id=%s from node with path=%s does not exist anymore", id, n.Path)
@@ -1453,13 +1590,21 @@ func find(tree *Tree, pattern string) ([]*Node, error) {
 }
 
 func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil
+	}
+	m.globalOrgLock.Unlock()
+
 	pre := time.Now()
-	bc := m.RLockLow()
+	bc := m.orgLocks[orgId].RLockLow()
 	defer bc.RUnlockLow("List", nil)
 
 	defs := make([]idx.Archive, 0)
-	for _, def := range m.defById {
-		if def.OrgId == orgId || def.OrgId == idx.OrgIdPublic {
+	for _, def := range m.defById[orgId] {
+		if def.Id.Org == orgId || def.Id.Org == idx.OrgIdPublic {
 			defs = append(defs, CloneArchive(def))
 		}
 	}
@@ -1475,7 +1620,15 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 		return nil, nil
 	}
 
-	bc := m.RLockLow()
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil, fmt.Errorf("DeleteTagged - No Org Lock exists for %d, so no data is available", orgId)
+	}
+	m.globalOrgLock.Unlock()
+
+	bc := m.orgLocks[orgId].RLockLow()
 	resCh := make(chan schema.MKey, 100)
 	m.idsByTagQuery(orgId, query, resCh, false)
 	ids := make(IdSet)
@@ -1486,7 +1639,7 @@ func (m *UnpartitionedMemoryIdx) DeleteTagged(orgId uint32, query tagquery.Query
 		return query.Expressions.Strings()
 	})
 
-	bc = m.Lock()
+	bc = m.orgLocks[orgId].Lock()
 	defer bc.Unlock("DeleteTagged", nil)
 	return m.deleteTaggedByIdSet(orgId, ids), nil
 }
@@ -1503,7 +1656,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 	deletedDefs := make([]idx.Archive, 0, len(ids))
 	for id := range ids {
 		idStr := id
-		def, ok := m.defById[idStr]
+		def, ok := m.defById[orgId][idStr]
 		if !ok {
 			// not necessarily a corruption, the id could have been deleted
 			// while we switched from read to write lock
@@ -1513,7 +1666,7 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 			continue
 		}
 		deletedDefs = append(deletedDefs, CloneArchive(def))
-		delete(m.defById, idStr)
+		delete(m.defById[orgId], idStr)
 	}
 
 	statMetricsActive.DecUint32(uint32(len(deletedDefs)))
@@ -1522,9 +1675,17 @@ func (m *UnpartitionedMemoryIdx) deleteTaggedByIdSet(orgId uint32, ids IdSet) []
 }
 
 func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Archive, error) {
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[orgId]; !ok {
+		// if we don't have an orgLock yet, then there is no data to find, we should just return.
+		m.globalOrgLock.Unlock()
+		return nil, fmt.Errorf("Delete - No Org Lock exists for %d, so no data is available", orgId)
+	}
+	m.globalOrgLock.Unlock()
+
 	var deletedDefs []idx.Archive
 	pre := time.Now()
-	bc := m.Lock()
+	bc := m.orgLocks[orgId].Lock()
 	defer func() {
 		bc.Unlock("Delete", nil)
 		if len(deletedDefs) == 0 {
@@ -1586,14 +1747,14 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 	// delete the metricDefs
 	for _, id := range n.Defs {
 		log.Debugf("memory-idx: deleting %s from index", id)
-		archivePointer, ok := m.defById[id]
+		archivePointer, ok := m.defById[orgId][id]
 		if archivePointer == nil {
 			corruptIndex.Inc()
 			log.Errorf("memory-idx: UnpartitionedMemoryIdx.delete() Index is corrupt. nil, %t := defById[%s]. path=%s ", ok, id.String(), n.Path)
 			continue
 		}
 		deletedDefs = append(deletedDefs, CloneArchive(archivePointer))
-		delete(m.defById, id)
+		delete(m.defById[orgId], id)
 	}
 
 	n.Defs = nil
@@ -1667,7 +1828,7 @@ func (m *UnpartitionedMemoryIdx) delete(orgId uint32, n *Node, deleteEmptyParent
 func (m *UnpartitionedMemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
 	log.Info("memory-idx: start pruning of series across all orgs")
 	orgs := make(map[uint32]struct{})
-	bc := m.RLockLow()
+	m.globalOrgLock.RLock()
 	for org := range m.tree {
 		orgs[org] = struct{}{}
 	}
@@ -1676,7 +1837,7 @@ func (m *UnpartitionedMemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
 			orgs[org] = struct{}{}
 		}
 	}
-	bc.RUnlockLow("Prune", nil)
+	m.globalOrgLock.RUnlock()
 
 	var pruned []idx.Archive
 	toPruneUntagged := make(map[uint32]map[string]struct{}, len(orgs))
@@ -1690,55 +1851,58 @@ func (m *UnpartitionedMemoryIdx) Prune(now time.Time) ([]idx.Archive, error) {
 	// getting all cutoffs once saves having to recompute everytime we have a match
 	cutoffs := IndexRules.Cutoffs(now)
 
-	bc = m.RLockLow()
+	// iterate by org
+	for orgID, l := range m.orgLocks {
+		bc := l.RLockLow()
 
-DEFS:
-	for _, def := range m.defById {
-		cutoff := cutoffs[def.IrId]
-		if atomic.LoadInt64(&def.LastUpdate) >= cutoff {
-			continue DEFS
-		}
-
-		if len(def.Tags) == 0 {
-			tree, ok := m.tree[def.OrgId]
-			if !ok {
+	DEFS:
+		for _, def := range m.defById[orgID] {
+			cutoff := cutoffs[def.IrId]
+			if atomic.LoadInt64(&def.LastUpdate) >= cutoff {
 				continue DEFS
 			}
 
-			n, ok := tree.Items[def.Name]
-			if !ok || !n.Leaf() {
-				continue DEFS
-			}
-
-			for _, id := range n.Defs {
-				if atomic.LoadInt64(&m.defById[id].LastUpdate) >= cutoff {
+			if len(def.Tags) == 0 {
+				tree, ok := m.tree[def.Id.Org]
+				if !ok {
 					continue DEFS
 				}
-			}
 
-			toPruneUntagged[def.OrgId][n.Path] = struct{}{}
-		} else {
-			defName := def.NameWithTags()
-			defs := m.defByTagSet.defs(def.OrgId, defName)
-			// if any other MetricDef with the same tag set is not expired yet,
-			// then we do not want to prune any of them
-			for sdef := range defs {
-				if atomic.LoadInt64(&sdef.LastUpdate) >= cutoff {
+				n, ok := tree.Items[def.Name]
+				if !ok || !n.Leaf() {
 					continue DEFS
 				}
-			}
 
-			for sdef := range defs {
-				if defName != sdef.NameWithTags() {
-					corruptIndex.Inc()
-					log.Errorf("Almost added bad def to prune list: def=%v, sdef=%v", def, sdef)
-				} else {
-					toPruneTagged[sdef.OrgId][sdef.Id] = struct{}{}
+				for _, id := range n.Defs {
+					if atomic.LoadInt64(&m.defById[orgID][id].LastUpdate) >= cutoff {
+						continue DEFS
+					}
+				}
+
+				toPruneUntagged[def.Id.Org][n.Path] = struct{}{}
+			} else {
+				defName := def.NameWithTags()
+				defs := m.defByTagSet.defs(def.Id.Org, defName)
+				// if any other MetricDef with the same tag set is not expired yet,
+				// then we do not want to prune any of them
+				for sdef := range defs {
+					if atomic.LoadInt64(&sdef.LastUpdate) >= cutoff {
+						continue DEFS
+					}
+				}
+
+				for sdef := range defs {
+					if defName != sdef.NameWithTags() {
+						corruptIndex.Inc()
+						log.Errorf("Almost added bad def to prune list: def=%v, sdef=%v", def, sdef)
+					} else {
+						toPruneTagged[sdef.Id.Org][sdef.Id] = struct{}{}
+					}
 				}
 			}
 		}
+		bc.RUnlockLow("Prune", nil)
 	}
-	bc.RUnlockLow("Prune", nil)
 
 	// create a new timeLimiter that allows us to limit the amount of time we spend
 	// holding a lock to maxPruneLockTime (default 100ms) every second.
@@ -1751,7 +1915,7 @@ DEFS:
 		// make sure we are not locking for too long.
 		tl.Wait()
 		lockStart := time.Now()
-		bc := m.Lock()
+		bc := m.orgLocks[org].Lock()
 		defs := m.deleteTaggedByIdSet(org, ids)
 		bc.Unlock("PruneTagged", nil)
 		tl.Add(time.Since(lockStart))
@@ -1771,7 +1935,7 @@ ORGS:
 		for path := range paths {
 			tl.Wait()
 			lockStart := time.Now()
-			bc := m.Lock()
+			bc := m.orgLocks[org].Lock()
 			tree, ok := m.tree[org]
 
 			if !ok {

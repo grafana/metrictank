@@ -148,9 +148,6 @@ func TestGetAddKey(t *testing.T) {
 			Convey(fmt.Sprintf("Then listing metrics for OrgId %d", orgId), func() {
 				defs := ix.List(orgId)
 				numSeries := len(series)
-				if orgId != idx.OrgIdPublic {
-					numSeries += 5
-				}
 				So(defs, ShouldHaveLength, numSeries)
 
 			})
@@ -170,7 +167,7 @@ func TestGetAddKey(t *testing.T) {
 		}
 		Convey("then listing metrics", func() {
 			defs := ix.List(1)
-			So(defs, ShouldHaveLength, 15)
+			So(defs, ShouldHaveLength, 10)
 		})
 	})
 }
@@ -406,7 +403,7 @@ func TestFind(t *testing.T) {
 	})
 	Convey("When searching nodes for unknown orgId", t, func() {
 		nodes, err := ix.Find(4, "foo.demo.*", 0)
-		So(err, ShouldBeNil)
+		So(err, ShouldNotBeNil)
 		So(nodes, ShouldHaveLength, 0)
 	})
 

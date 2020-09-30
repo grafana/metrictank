@@ -434,7 +434,7 @@ func BenchmarkMetaTagEnricher(b *testing.B) {
 	defs := make([]idx.Archive, len(keys))
 	i := 0
 	for _, key := range keys {
-		defs[i] = *memoryIdx.defById[key]
+		defs[i] = *memoryIdx.defById[key.Org][key]
 		i++
 	}
 

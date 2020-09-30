@@ -9,6 +9,26 @@ import (
 	"github.com/grafana/metrictank/schema"
 )
 
+func ensureWqIsFlushed(ix MemoryIndex) {
+	if Partitioned {
+		um, ok := ix.(*PartitionedMemoryIdx)
+		if ok {
+			for _, m := range um.Partition {
+				m.globalOrgLock.Lock()
+				m.writeQueue.flush()
+				m.globalOrgLock.Unlock()
+			}
+		}
+	} else {
+		m, ok := ix.(*UnpartitionedMemoryIdx)
+		if ok {
+			m.globalOrgLock.Lock()
+			m.writeQueue.flush()
+			m.globalOrgLock.Unlock()
+		}
+	}
+}
+
 func TestWriteQueue(t *testing.T) {
 	_writeQueueEnabled := writeQueueEnabled
 	defer func() {
@@ -56,8 +76,7 @@ func TestWriteQueue(t *testing.T) {
 	mkey, _ := schema.MKeyFromString(data.Id)
 	ix.AddOrUpdate(mkey, data, getPartition(data))
 
-	// TODO - make this less flaky (add flush counter? Flush wait func?)
-	time.Sleep(100 * time.Millisecond)
+	ensureWqIsFlushed(ix)
 
 	nodes, err = ix.Find(1, "some.metric.*", 0)
 	if err != nil {
@@ -103,7 +122,7 @@ func TestWriteQueueMultiThreads(t *testing.T) {
 
 	wg.Wait()
 
-	time.Sleep(10 * time.Millisecond)
+	ensureWqIsFlushed(ix)
 
 	nodes, err := ix.Find(1, "some.metric.*.*", 0)
 	if err != nil {

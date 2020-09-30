@@ -337,7 +337,8 @@ func benchmarkAggregate(b *testing.B, numSeries int, fn0, fn1 func() []schema.Po
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
-			Target: strconv.Itoa(i),
+			Target:   strconv.Itoa(i),
+			Interval: 1,
 		}
 		if i%1 == 0 {
 			series.Datapoints = fn0()

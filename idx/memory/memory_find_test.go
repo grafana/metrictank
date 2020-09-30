@@ -612,6 +612,9 @@ func testTagSortingInFindByTag(t *testing.T) {
 	}
 	md2[0].SetId()
 
+	// workaround to ensure orgLock exists
+	ensureOrgLocksExist(index)
+
 	// set out of order tags after SetId (because that would sort it)
 	// e.g. mimic the case where somebody sent us a MD with an id already set and out-of-order tags
 	md2[0].Tags = []string{"5=a", "1=a", "2=a", "4=a", "3=a"}

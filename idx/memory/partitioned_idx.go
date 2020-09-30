@@ -526,6 +526,15 @@ func (p *PartitionedMemoryIdx) LoadPartition(partition int32, defs []schema.Metr
 }
 
 func (p *PartitionedMemoryIdx) add(archive *idx.Archive) {
+	m := p.Partition[archive.Partition]
+	m.globalOrgLock.Lock()
+	if _, ok := m.orgLocks[archive.MetricDefinition.Id.Org]; !ok {
+		m.orgLocks[archive.MetricDefinition.Id.Org] = new(PriorityRWMutex)
+		// we need to create the map here, as it should now exist
+		m.defById[archive.MetricDefinition.Id.Org] = make(map[schema.MKey]*idx.Archive)
+	}
+	m.globalOrgLock.Unlock()
+
 	p.Partition[archive.Partition].add(archive)
 }
 

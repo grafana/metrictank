@@ -3,6 +3,7 @@ package memory
 import (
 	"testing"
 
+	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -15,11 +16,14 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 	index.Init()
 
 	archives, _ := getTestArchives(10)
-	bc := index.Lock()
+	index.globalOrgLock.Lock()
 	for i := range archives {
+		if _, ok := index.defById[archives[i].Id.Org]; !ok {
+			index.defById[archives[i].Id.Org] = make(map[schema.MKey]*idx.Archive)
+		}
 		index.add(archives[i])
 	}
-	bc.Unlock("TestLoad", nil)
+	index.globalOrgLock.Unlock()
 
 	for i := range metaRecords {
 		index.MetaTagRecordUpsert(1, metaRecords[i])
@@ -32,14 +36,14 @@ func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, met
 
 		ctx = &TagQueryContext{
 			index:          index.tags[1],
-			byId:           index.defById,
+			byId:           index.defById[1],
 			metaTagIndex:   metaTagIdx.hierarchy,
 			metaTagRecords: metaTagIdx.records,
 		}
 	} else {
 		ctx = &TagQueryContext{
 			index: index.tags[1],
-			byId:  index.defById,
+			byId:  index.defById[1],
 		}
 	}
 
