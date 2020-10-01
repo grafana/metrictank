@@ -17,8 +17,8 @@ const DefaultPointSliceSize = 1024
 // internally it has several pools for different size classes
 type PointSlicePool struct {
 	defaultSize int
-	sizes       [6]int
-	pools       [6]sync.Pool
+	sizes       [8]int
+	pools       [8]sync.Pool
 }
 
 func New(defaultSize int) *PointSlicePool {
@@ -33,7 +33,7 @@ func New(defaultSize int) *PointSlicePool {
 		// too many classes means you may allocate needlessly much (we could have useful slices, but they're in a higher size class)
 		// perhaps the ideal is many finegrained classes, and upon GetMin(), try multiple classes as needed
 		// we can also think about dynamically constructing size classes based on the real lengths/mincapacities we see at runtime
-		sizes: [6]int{0, 32, 128, 1024, 2048, 4096},
+		sizes: [8]int{0, 32, 128, 1024, 4096, 32768, 262144, 2097152},
 	}
 
 	return &p
