@@ -66,7 +66,7 @@ func (wq *WriteQueue) Get(id schema.MKey) (*idx.Archive, bool) {
 	if _, ok := wq.archives[id.Org]; !ok {
 		// doesn't exist, nothing to get
 		wq.RUnlock()
-		return &idx.Archive{}, false
+		return nil, false
 	}
 	a, ok := wq.archives[id.Org][id]
 	wq.RUnlock()
