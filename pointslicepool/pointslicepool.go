@@ -25,14 +25,14 @@ func New(defaultSize int) *PointSlicePool {
 	p := PointSlicePool{
 		defaultSize: defaultSize,
 
-		// these are lower bounds. Every class contains slices of the exact bound length, or larger. Thus:
+		// these are lower bounds. Every class contains slices of the exact bound capacity, or larger. Thus:
 		// * On Get, the right class is the smallest size that is larger or equal than the given slice
 		// * On Put, the right class for a given slice is the largest size that is equal or smaller than the given slice
 		// why these? they're just a first stab at it.
 		// too few size classes and Get() returns needlessly large slices
 		// too many classes means you may allocate needlessly much (we could have useful slices, but they're in a higher size class)
 		// perhaps the ideal is many finegrained classes, and upon GetMin(), try multiple classes as needed
-		// we can also think about dynamically constructing size classes based on the real lengths/mincapacities we see at runtime
+		// we can also think about dynamically constructing size classes based on the real capacity/mincapacities we see at runtime
 		sizes: [8]int{0, 32, 128, 1024, 4096, 32768, 262144, 2097152},
 	}
 
@@ -42,7 +42,7 @@ func New(defaultSize int) *PointSlicePool {
 // Put puts the the slice in the appropriate size class
 func (p *PointSlicePool) Put(s []schema.Point) {
 	for i := len(p.sizes) - 1; i >= 0; i-- {
-		if p.sizes[i] <= len(s) {
+		if p.sizes[i] <= cap(s) {
 			p.pools[i].Put(s[:0])
 			return
 		}
