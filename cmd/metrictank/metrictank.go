@@ -75,10 +75,11 @@ var (
 	blockProfileRate = flag.Int("block-profile-rate", 0, "see https://golang.org/pkg/runtime/#SetBlockProfileRate")
 	memProfileRate   = flag.Int("mem-profile-rate", 512*1024, "0 to disable. 1 for max precision (expensive!) see https://golang.org/pkg/runtime/#pkg-variables")
 
-	proftrigPath       = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
-	proftrigFreqStr    = flag.String("proftrigger-freq", "60s", "inspect status frequency. set to 0 to disable")
-	proftrigMinDiffStr = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
-	proftrigHeapThresh = flag.Int("proftrigger-heap-thresh", 25000000000, "if this many bytes allocated, trigger a profile")
+	proftrigPath           = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
+	proftrigFreqStr        = flag.String("proftrigger-freq", "10s", "inspect status frequency. set to 0 to disable")
+	proftrigMinDiffStr     = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
+	proftrigHeapThresh     = flag.Int("proftrigger-heap-thresh", 25000000000, "threshold for process RSS, the amount of RAM memory used. (see \"rss\" on dashboard)")
+	proftrigHeapThreshHeap = flag.Int("proftrigger-heap-thresh-heap", 0, "threshold for bytes allocated on heap (see \"allocated in heap\" on dashboard)")
 )
 
 func main() {
@@ -228,7 +229,15 @@ func main() {
 	proftrigMinDiff := int(dur.MustParseNDuration("proftrigger-min-diff", *proftrigMinDiffStr))
 	if proftrigFreq > 0 {
 		errors := make(chan error)
-		trigger, _ := heap.New(*proftrigPath, *proftrigHeapThresh, proftrigMinDiff, time.Duration(proftrigFreq)*time.Second, errors)
+		cfg := heap.Config{
+			Path:        *proftrigPath,
+			ThreshRSS:   *proftrigHeapThresh,
+			ThreshHeap:  *proftrigHeapThreshHeap,
+			MinTimeDiff: time.Duration(proftrigMinDiff) * time.Second,
+			CheckEvery:  time.Duration(proftrigFreq) * time.Second,
+		}
+
+		trigger, _ := heap.New(cfg, errors)
 		go func() {
 			for e := range errors {
 				log.Errorf("profiletrigger heap: %s", e)
