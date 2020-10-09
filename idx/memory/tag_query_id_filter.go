@@ -92,9 +92,8 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 			records = append(records, record)
 		}
 
-		// if we don't use an inverted set of meta records, then we check if
-		// all meta records involved in a meta tag filter use the "=" operator.
-		// if this is the case then it is cheaper to build a set of acceptable tags
+		// if a query only involves meta tags of which all underlying expressions
+		// use the "=" operator, then it is cheaper to build a set of acceptable tags
 		// based on the meta record expressions and just check whether they are present
 		// in a metric that gets filtered, compared to doing a full tag index lookup
 		// to check whether a metric has one of the necessary meta tags associated
@@ -132,7 +131,6 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 // viableOptimizations looks at a set of meta tag records and decides whether two possible
 // optimizations can be applied when filtering by these records. it returns two bools to
 // indicate which optimizations are or are not viable.
-// if invertSetOfMetaRecords is true then none of these optimizations can be used.
 //
 // * the first bool refers to the optimization for sets of records which all have only one
 //   expression and this expression is using the equal operator.
@@ -158,6 +156,8 @@ func viableOptimizations(records []tagquery.MetaTagRecord) (bool, bool) {
 // which only involves meta records of which each only has exactly one expression and that
 // expression is using the "=" operator. this is quite a narrow scenario, but since it is
 // a very common use case it makes sense to optimize for it.
+// The invertFilter bool flips the filter logic so that instead of removing metrics which
+// do not have a meta tag it filters metrics which do have a meta tag.
 func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord, invertFilter bool) tagquery.MetricDefinitionFilter {
 	// we first build a set of valid tags and names.
 	// since we know that each of the involved meta records uses exactly one expression
@@ -201,6 +201,8 @@ func metaRecordFilterBySetOfValidValues(records []tagquery.MetaTagRecord, invert
 // metaRecordFilterBySetOfValidValueSets creates a filter function to filter by a meta tag
 // which only involves meta records of which all expressions are only using the "=" operator,
 // it is ok if one meta record uses multiple such expressions.
+// The invertFilter bool flips the filter logic so that instead of removing metrics which
+// do not have a meta tag it filters metrics which do have a meta tag.
 func metaRecordFilterBySetOfValidValueSets(records []tagquery.MetaTagRecord, invertFilter bool) tagquery.MetricDefinitionFilter {
 	// we first build a set of tag and name value combinations of which each is sufficient
 	// to pass the generated filter when a metric contains all values of one of these
