@@ -78,8 +78,8 @@ var (
 	proftrigPath           = flag.String("proftrigger-path", "/tmp", "path to store triggered profiles")
 	proftrigFreqStr        = flag.String("proftrigger-freq", "10s", "inspect status frequency. set to 0 to disable")
 	proftrigMinDiffStr     = flag.String("proftrigger-min-diff", "1h", "minimum time between triggered profiles")
-	proftrigHeapThresh     = flag.Int("proftrigger-heap-thresh", 25000000000, "threshold for process RSS, the amount of RAM memory used. (see \"rss\" on dashboard)")
-	proftrigHeapThreshHeap = flag.Int("proftrigger-heap-thresh-heap", 0, "threshold for bytes allocated on heap (see \"allocated in heap\" on dashboard)")
+	proftrigHeapThresh     = flag.Int("proftrigger-heap-thresh", 25000000000, "threshold for process RSS, the amount of RAM memory used. (0 to disable) (see \"rss\" on dashboard)")
+	proftrigHeapThreshHeap = flag.Int("proftrigger-heap-thresh-heap", 0, "threshold for bytes allocated on heap (0 to disable) (see \"allocated in heap\" on dashboard)")
 )
 
 func main() {
