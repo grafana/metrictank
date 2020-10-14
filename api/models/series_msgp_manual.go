@@ -1,7 +1,6 @@
 package models
 
 import (
-	"github.com/grafana/metrictank/schema"
 	"github.com/tinylib/msgp/msgp"
 )
 
@@ -136,7 +135,7 @@ func (z *Series) DecodeMsg(dc *msgp.Reader) (err error) {
 			if cap(z.Datapoints) >= int(zb0004) {
 				z.Datapoints = (z.Datapoints)[:zb0004]
 			} else {
-				z.Datapoints = make([]schema.Point, zb0004)
+				z.Datapoints = pointSlicePool.GetMin(int(zb0004))[:zb0004]
 			}
 			for za0004 := range z.Datapoints {
 				err = z.Datapoints[za0004].DecodeMsg(dc)
@@ -512,7 +511,7 @@ func (z *Series) UnmarshalMsg(bts []byte) (o []byte, err error) {
 			if cap(z.Datapoints) >= int(zb0004) {
 				z.Datapoints = (z.Datapoints)[:zb0004]
 			} else {
-				z.Datapoints = make([]schema.Point, zb0004)
+				z.Datapoints = pointSlicePool.GetMin(int(zb0004))[:zb0004]
 			}
 			for za0004 := range z.Datapoints {
 				bts, err = z.Datapoints[za0004].UnmarshalMsg(bts)
