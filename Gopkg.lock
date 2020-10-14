@@ -40,11 +40,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bab97e18030f5f5676bfde674354f3484c064f52b228e52fd8c00dfefe594856"
+  digest = "1:6c4eb4786807047294c7a4e0d5582a48b9c71e81526282f495894d8a60f184b0"
   name = "github.com/Dieterbe/profiletrigger"
-  packages = ["heap"]
+  packages = [
+    "heap",
+    "procfs",
+  ]
   pruneopts = "NUT"
-  revision = "c507ee16f324a7fac721cda98a75e2b9596b7d0e"
+  revision = "3fc6b4ea613c05d6c3b0de46b001a4349fb36add"
 
 [[projects]]
   digest = "1:2941ec6eccc1bc46b6cff9eb416fc623524f554e474367d378bd0ed8301652db"

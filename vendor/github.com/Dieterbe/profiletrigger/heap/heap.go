@@ -6,64 +6,106 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"time"
+
+	"github.com/Dieterbe/profiletrigger/procfs"
 )
 
-// Heap will check every checkEvery for memory obtained from the system, by the process
-// - using the metric Sys at https://golang.org/pkg/runtime/#MemStats -
-// whether it reached or exceeds the threshold and take a memory profile to the path directory,
-// but no more often than every minTimeDiff seconds
-// any errors will be sent to the errors channel
+// Heap will check memory at the requested interval and report profiles if thresholds are breached.
+// See Config for configuration documentation
+// If non-nil, any runtime errors are sent on the errors channel
 type Heap struct {
-	path        string
-	threshold   int
-	minTimeDiff int
-	checkEvery  time.Duration
-	lastUnix    int64
-	Errors      chan error
+	cfg           Config
+	errors        chan error
+	lastTriggered time.Time
+	proc          procfs.Proc
+}
+
+// Config is the config for triggering heap profiles
+// It uses HeapAlloc from https://golang.org/pkg/runtime/#MemStats as well as RSS memory usage
+type Config struct {
+	Path        string        // directory to write profiles to.
+	ThreshHeap  int           // number of bytes to compare MemStats.HeapAlloc (bytes of allocated heap objects) to
+	ThreshRSS   int           // number of bytes to compare RSS usage to
+	MinTimeDiff time.Duration // report no more often than this
+	CheckEvery  time.Duration // check both thresholds at this rate
 }
 
 // New creates a new Heap trigger. use a nil channel if you don't care about any errors
-func New(path string, threshold, minTimeDiff int, checkEvery time.Duration, errors chan error) (*Heap, error) {
+func New(cfg Config, errors chan error) (*Heap, error) {
 	heap := Heap{
-		path,
-		threshold,
-		minTimeDiff,
-		checkEvery,
-		int64(0),
-		errors,
+		cfg:    cfg,
+		errors: errors,
 	}
+	if cfg.ThreshRSS != 0 {
+		proc, err := procfs.Self()
+		if err != nil {
+			return nil, err
+		}
+		heap.proc = proc
+	}
+
 	return &heap, nil
 }
 
 func (heap Heap) logError(err error) {
-	if heap.Errors != nil {
-		heap.Errors <- err
+	if heap.errors != nil {
+		heap.errors <- err
 	}
 }
 
-// Run runs the trigger. encountered errors go to the configured channel (if any).
+// Run runs the trigger. any encountered errors go to the configured errors channel.
 // you probably want to run this in a new goroutine.
 func (heap Heap) Run() {
-	tick := time.NewTicker(heap.checkEvery)
-	m := &runtime.MemStats{}
+	cfg := heap.cfg
+	tick := time.NewTicker(cfg.CheckEvery)
+
 	for ts := range tick.C {
-		runtime.ReadMemStats(m)
-		unix := ts.Unix()
-		if m.Sys >= uint64(heap.threshold) && unix >= heap.lastUnix+int64(heap.minTimeDiff) {
-			f, err := os.Create(fmt.Sprintf("%s/%d.profile-heap", heap.path, unix))
-			if err != nil {
-				heap.logError(err)
-				continue
-			}
-			err = pprof.WriteHeapProfile(f)
-			if err != nil {
-				heap.logError(err)
-			}
-			heap.lastUnix = unix
-			err = f.Close()
-			if err != nil {
-				heap.logError(err)
-			}
+		if !heap.shouldProfile(ts) {
+			continue
+		}
+		f, err := os.Create(fmt.Sprintf("%s/%d.profile-heap", cfg.Path, ts.Unix()))
+		if err != nil {
+			heap.logError(err)
+			continue
+		}
+		err = pprof.WriteHeapProfile(f)
+		if err != nil {
+			heap.logError(err)
+		}
+		heap.lastTriggered = ts
+		err = f.Close()
+		if err != nil {
+			heap.logError(err)
 		}
 	}
+}
+
+func (heap Heap) shouldProfile(ts time.Time) bool {
+	cfg := heap.cfg
+
+	if ts.Before(heap.lastTriggered.Add(cfg.MinTimeDiff)) {
+		return false
+	}
+
+	// Check RSS.
+	if cfg.ThreshRSS != 0 {
+		stat, err := heap.proc.NewStat()
+		if err != nil {
+			heap.logError(err)
+		} else if stat.ResidentMemory() >= cfg.ThreshRSS {
+			return true
+		}
+	}
+
+	// Check HeapAlloc
+	if cfg.ThreshHeap != 0 {
+		m := &runtime.MemStats{}
+		runtime.ReadMemStats(m)
+
+		if m.HeapAlloc >= uint64(cfg.ThreshHeap) {
+			return true
+		}
+	}
+
+	return false
 }

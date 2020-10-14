@@ -56,8 +56,7 @@ Metrictank crashed. What to do?
    Tips:
    * The [profiletrigger](https://github.com/grafana/metrictank/blob/master/docs/config.md#profiling-instrumentation-and-logging) functionality can automatically trigger
    a memory profile and save it to disk.  This can be very helpful if suddently memory usage spikes up and then metrictank gets killed in seconds or minutes.  
-   It helps diagnose problems in the codebase that may lead to memory savings.  The profiletrigger looks at the `bytes_sys` metric which is
-   the amount of memory consumed by the process.
+   It helps diagnose problems in the codebase that may lead to memory savings.   The profiletrigger can look at both RSS used and heap size.
    * Use [rollups](https://github.com/grafana/metrictank/blob/master/docs/consolidation.md#rollups) to be able to answer queries for long timeframes with less data
 2) Check the metrictank log.
    If it exited due to a panic, you should probably open a [ticket](https://github.com/grafana/metrictank/issues) with the output of `metrictank --version`, the panic, and perhaps preceding log data.
