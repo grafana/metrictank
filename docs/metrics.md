@@ -266,6 +266,20 @@ a counter of total number of bytes allocated during process lifetime
 a counter of the number of GC cycles since process start
 * `plan.run`:  
 the time spent running the plan for a request (function processing of all targets and runtime consolidation)
+* `pointslicepool.ops.get-candidate.hit`:  
+how many times we could satisfy a get with a pointslice from the pool
+* `pointslicepool.ops.get-candidate.miss`:  
+how many times there was nothing in the pool to satisfy a get
+* `pointslicepool.ops.get-candidate.unfit`:  
+how many times a pointslice from the pool was not large enough to satisfy a get
+* `pointslicepool.ops.get-make.large`:  
+how many times a pointslice is allocated that is larger or equal to the default size
+* `pointslicepool.ops.get-make.small`:  
+how many times a pointslice is allocated that is smaller than the default size
+* `pointslicepool.ops.put.large`:  
+how many times a pointslice is added to the pool that is the same size or larger than the default
+* `pointslicepool.ops.put.small`:  
+how many times a pointslice is added to the pool that is smaller than the default
 * `process.major_page_faults.counter64`:  
 the number of major faults the process has made which have required loading a memory page from disk
 * `process.minor_page_faults.counter64`:  
