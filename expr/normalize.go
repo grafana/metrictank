@@ -77,7 +77,7 @@ func NormalizeTo(in models.Series, interval uint32, sc seriescycle.SeriesCycler)
 	}
 
 	sc.Done(in)
-	in.Datapoints = consolidation.Consolidate(datapoints, interval/in.Interval, in.Consolidator)
+	in.Datapoints = consolidation.Consolidate(datapoints, 0, interval/in.Interval, in.Consolidator)
 	in.Interval = interval
 	sc.New(in)
 
