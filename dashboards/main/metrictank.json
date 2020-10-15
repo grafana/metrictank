@@ -14,7 +14,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "7.2.0"
+      "version": "7.2.1"
     },
     {
       "type": "panel",
@@ -51,7 +51,7 @@
   "gnetId": 279,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1601463050355,
+  "iteration": 1602706117408,
   "links": [],
   "panels": [
     {
@@ -111,7 +111,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -281,7 +281,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -415,7 +415,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -539,7 +539,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -862,7 +862,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1023,7 +1023,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1142,7 +1142,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1228,7 +1228,7 @@
       }
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "datasource": "${DS_METRICTANK}",
       "gridPos": {
         "h": 1,
@@ -1237,313 +1237,443 @@
         "y": 18
       },
       "id": 52,
-      "panels": [
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$datasource",
-          "editable": true,
-          "error": false,
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
-          "fill": 1,
-          "fillGradient": 0,
-          "grid": {},
-          "gridPos": {
-            "h": 5,
-            "w": 8,
-            "x": 0,
-            "y": 19
-          },
-          "hiddenSeries": false,
-          "id": 13,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": false,
-          "linewidth": 2,
-          "links": [],
-          "nullPointMode": "null",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.2.0",
-          "pointradius": 1,
-          "points": true,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "duration",
-              "lines": false,
-              "pointradius": 1,
-              "points": true,
-              "yaxis": 2
-            }
-          ],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
-            },
-            {
-              "refId": "B",
-              "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Golang GC",
-          "tooltip": {
-            "msResolution": false,
-            "shared": true,
-            "sort": 0,
-            "value_type": "cumulative"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "hertz",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "ns",
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        },
-        {
-          "aliasColors": {
-            "gogc": "#ba43a9"
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$datasource",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": {
-            "h": 5,
-            "w": 8,
-            "x": 8,
-            "y": 19
-          },
-          "hiddenSeries": false,
-          "id": 54,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 3,
-          "links": [],
-          "nullPointMode": "null",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.2.0",
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": true,
-          "targets": [
-            {
-              "refId": "A",
-              "target": "aliasByNode(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 3)"
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "GOGC",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        },
-        {
-          "aliasColors": {
-            "gogc": "#ba43a9",
-            "goroutines": "semi-dark-blue",
-            "total goroutines": "semi-dark-blue"
-          },
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$datasource",
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": []
-          },
-          "fill": 0,
-          "fillGradient": 0,
-          "gridPos": {
-            "h": 5,
-            "w": 8,
-            "x": 16,
-            "y": 19
-          },
-          "hiddenSeries": false,
-          "id": 60,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": false,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "options": {
-            "alertThreshold": true
-          },
-          "percentage": false,
-          "pluginVersion": "7.2.0",
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "refId": "A",
-              "target": "aliasByNode(metrictank.stats.$environment.$instance.runtime.goroutines.total.gauge64, 3)",
-              "textEditor": false
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Goroutines",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        }
-      ],
+      "panels": [],
       "title": "runtime",
       "type": "row"
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "editable": true,
+      "error": false,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 13,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": false,
+      "linewidth": 2,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
+      "pointradius": 1,
+      "points": true,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "duration",
+          "lines": false,
+          "pointradius": 1,
+          "points": true,
+          "yaxis": 2
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "alias(averageSeries(perSecond(metrictank.stats.$environment.$instance.memory.total_gc_cycles.counter64)), 'collections')"
+        },
+        {
+          "refId": "B",
+          "target": "alias(averageSeries(metrictank.stats.$environment.$instance.memory.gc.last_duration.gauge64), 'duration')"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Golang GC",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "hertz",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "ns",
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "gogc": "#ba43a9",
+        "goroutines": "semi-dark-blue",
+        "total goroutines": "semi-dark-blue"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 60,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.runtime.goroutines.total.gauge64, 3)",
+          "textEditor": false
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Goroutines",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "get-candidate.hit": "dark-green",
+        "get-candidate.miss": "dark-red",
+        "get-candidate.unfit": "dark-orange",
+        "get-make.large": "dark-purple",
+        "get-make.small": "super-light-purple",
+        "gogc": "#ba43a9",
+        "goroutines": "semi-dark-blue",
+        "put.large": "dark-purple",
+        "put.small": "super-light-purple",
+        "total goroutines": "semi-dark-blue"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 10,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 61,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": false,
+        "max": false,
+        "min": false,
+        "rightSide": true,
+        "show": true,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 0,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "/get/",
+          "stack": "A"
+        },
+        {
+          "alias": "/put/",
+          "stack": "B",
+          "transform": "negative-Y"
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "refCount": 0,
+          "refId": "A",
+          "target": "groupByNodes(metrictank.stats.$environment.$instance.pointslicepool.ops.get-candidate.*.rate32, 'sum', 6, 7)",
+          "textEditor": false
+        },
+        {
+          "refCount": 0,
+          "refId": "B",
+          "target": "groupByNodes(metrictank.stats.$environment.$instance.pointslicepool.ops.get-make.*.rate32, 'sum', 6, 7)",
+          "textEditor": false
+        },
+        {
+          "refCount": 0,
+          "refId": "C",
+          "target": "groupByNodes(metrictank.stats.$environment.$instance.pointslicepool.ops.put.*.rate32, 'sum', 6, 7)",
+          "textEditor": false
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "PointSlicePool",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {
+        "gogc": "#ba43a9"
+      },
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$datasource",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "fill": 0,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 24
+      },
+      "hiddenSeries": false,
+      "id": 54,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 3,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "7.2.1",
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": true,
+      "targets": [
+        {
+          "refId": "A",
+          "target": "aliasByNode(metrictank.stats.$environment.$instance.memory.gc.gogc.gauge32, 3)"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "GOGC",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
     },
     {
       "collapsed": false,
@@ -1552,7 +1682,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 29
       },
       "id": 40,
       "panels": [],
@@ -1578,7 +1708,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 20
+        "y": 30
       },
       "hiddenSeries": false,
       "id": 35,
@@ -1599,7 +1729,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1683,7 +1813,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 20
+        "y": 30
       },
       "hiddenSeries": false,
       "id": 33,
@@ -1704,7 +1834,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -1803,7 +1933,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 20
+        "y": 30
       },
       "hiddenSeries": false,
       "id": 34,
@@ -1828,7 +1958,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -1890,7 +2020,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 37
       },
       "id": 41,
       "panels": [],
@@ -1928,7 +2058,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 28
+        "y": 38
       },
       "hiddenSeries": false,
       "id": 4,
@@ -1949,7 +2079,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2077,7 +2207,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 28
+        "y": 38
       },
       "hiddenSeries": false,
       "id": 10,
@@ -2098,7 +2228,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2185,7 +2315,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 28
+        "y": 38
       },
       "hiddenSeries": false,
       "id": 16,
@@ -2206,7 +2336,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2297,7 +2427,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 34
+        "y": 44
       },
       "id": 42,
       "panels": [],
@@ -2329,7 +2459,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 35
+        "y": 45
       },
       "hiddenSeries": false,
       "id": 14,
@@ -2350,7 +2480,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -2460,7 +2590,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 35
+        "y": 45
       },
       "hiddenSeries": false,
       "id": 18,
@@ -2481,7 +2611,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": false,
       "renderer": "flot",
@@ -2602,7 +2732,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 35
+        "y": 45
       },
       "hiddenSeries": false,
       "id": 21,
@@ -2623,7 +2753,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2704,7 +2834,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 52
       },
       "id": 43,
       "panels": [],
@@ -2740,7 +2870,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 43
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 6,
@@ -2761,7 +2891,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2870,7 +3000,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 43
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 3,
@@ -2891,7 +3021,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -2980,7 +3110,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 43
+        "y": 53
       },
       "hiddenSeries": false,
       "id": 11,
@@ -3001,7 +3131,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3074,7 +3204,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 60
       },
       "id": 44,
       "panels": [],
@@ -3110,7 +3240,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 51
+        "y": 61
       },
       "hiddenSeries": false,
       "id": 7,
@@ -3132,7 +3262,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3244,7 +3374,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 51
+        "y": 61
       },
       "hiddenSeries": false,
       "id": 23,
@@ -3265,7 +3395,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3350,7 +3480,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 51
+        "y": 61
       },
       "hiddenSeries": false,
       "id": 8,
@@ -3371,7 +3501,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3432,7 +3562,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 58
+        "y": 68
       },
       "id": 45,
       "panels": [],
@@ -3458,7 +3588,7 @@
         "h": 7,
         "w": 2,
         "x": 0,
-        "y": 59
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 30,
@@ -3479,7 +3609,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -3562,7 +3692,7 @@
         "h": 7,
         "w": 10,
         "x": 2,
-        "y": 59
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 12,
@@ -3585,7 +3715,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3700,7 +3830,7 @@
         "h": 7,
         "w": 6,
         "x": 12,
-        "y": 59
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 20,
@@ -3723,7 +3853,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 2,
       "points": true,
       "renderer": "flot",
@@ -3826,7 +3956,7 @@
         "h": 7,
         "w": 6,
         "x": 18,
-        "y": 59
+        "y": 69
       },
       "hiddenSeries": false,
       "id": 22,
@@ -3847,7 +3977,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -3931,7 +4061,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 66
+        "y": 76
       },
       "hiddenSeries": false,
       "id": 56,
@@ -3952,7 +4082,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4048,7 +4178,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 66
+        "y": 76
       },
       "hiddenSeries": false,
       "id": 57,
@@ -4069,7 +4199,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4169,7 +4299,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 66
+        "y": 76
       },
       "hiddenSeries": false,
       "id": 58,
@@ -4190,7 +4320,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4254,7 +4384,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 80
       },
       "id": 46,
       "panels": [],
@@ -4283,7 +4413,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 71
+        "y": 81
       },
       "hiddenSeries": false,
       "id": 24,
@@ -4304,7 +4434,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4384,7 +4514,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 71
+        "y": 81
       },
       "hiddenSeries": false,
       "id": 25,
@@ -4405,7 +4535,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4500,7 +4630,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 71
+        "y": 81
       },
       "hiddenSeries": false,
       "id": 26,
@@ -4521,7 +4651,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -4588,7 +4718,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 88
       },
       "id": 47,
       "panels": [],
@@ -4620,7 +4750,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 79
+        "y": 89
       },
       "hiddenSeries": false,
       "id": 27,
@@ -4641,7 +4771,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4763,7 +4893,7 @@
         "h": 6,
         "w": 7,
         "x": 8,
-        "y": 79
+        "y": 89
       },
       "hiddenSeries": false,
       "id": 50,
@@ -4784,7 +4914,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -4911,7 +5041,7 @@
         "h": 6,
         "w": 9,
         "x": 15,
-        "y": 79
+        "y": 89
       },
       "hiddenSeries": false,
       "id": 28,
@@ -4932,7 +5062,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -5028,7 +5158,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 95
       },
       "id": 48,
       "panels": [],
@@ -5062,7 +5192,7 @@
         "h": 6,
         "w": 18,
         "x": 0,
-        "y": 86
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 32,
@@ -5083,7 +5213,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": true,
       "renderer": "flot",
@@ -5156,7 +5286,7 @@
         "h": 11,
         "w": 6,
         "x": 18,
-        "y": 86
+        "y": 96
       },
       "hiddenSeries": false,
       "id": 15,
@@ -5177,7 +5307,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
@@ -5264,7 +5394,7 @@
         "h": 5,
         "w": 18,
         "x": 0,
-        "y": 92
+        "y": 102
       },
       "hiddenSeries": false,
       "id": 59,
@@ -5285,7 +5415,7 @@
         "alertThreshold": true
       },
       "percentage": false,
-      "pluginVersion": "7.2.0",
+      "pluginVersion": "7.2.1",
       "pointradius": 1,
       "points": false,
       "renderer": "flot",
@@ -5361,6 +5491,7 @@
         "name": "datasource",
         "options": [],
         "query": "graphite",
+        "queryValue": "",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
