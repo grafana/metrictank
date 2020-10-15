@@ -100,7 +100,7 @@ type Series struct {
 	Node    cluster.Node
 }
 
-func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
+func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64, maxSeries int) ([]Series, error) {
 	data := models.IndexFind{
 		Patterns: patterns,
 		OrgId:    orgId,
@@ -121,12 +121,23 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 	series := make([]Series, 0)
 	resp := models.IndexFindResp{}
 	for _, r := range resps {
+		if len(series) == maxSeries {
+			return nil, response.NewError(
+				http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+		}
 		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
 
 		for pattern, nodes := range resp.Nodes {
+			if len(series) == maxSeries {
+				return nil, response.NewError(
+					http.StatusRequestEntityTooLarge,
+					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+			}
+
 			series = append(series, Series{
 				Pattern: pattern,
 				Node:    r.peer,
@@ -330,7 +341,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 	nodes := make([]idx.Node, 0)
 	reqCtx := ctx.Req.Context()
-	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix))
+	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix), maxSeriesPerReq)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -378,7 +389,7 @@ func (s *Server) metricsExpand(ctx *middleware.Context, request models.GraphiteE
 	for i, query := range request.Query {
 		i, query := i, query
 		g.Go(func() error {
-			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0)
+			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0, maxSeriesPerReq)
 			if err != nil {
 				return err
 			}
@@ -795,7 +806,10 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			}
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-int(reqs.cnt), false)
 		} else {
-			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
+			// find limit is the limit minus what we already consumed for other targets, adjusted for how many rawReqs we folded into this resolveSeriesRequest
+			// note that this doesn't account for duplicate requests like target=foo&target=foo because those are both represented by the same rawReq (see NewPlan)
+			findLimit := (maxSeriesPerReq - int(reqs.cnt)) / len(rawReqs)
+			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), findLimit)
 		}
 		if err != nil {
 			return nil, meta, err
