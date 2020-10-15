@@ -44,6 +44,12 @@ func New(defaultSize int) *PointSlicePool {
 	}
 }
 
+func (p *PointSlicePool) PutMaybeNil(s []schema.Point) {
+	if s != nil {
+		p.Put(s)
+	}
+}
+
 func (p *PointSlicePool) Put(s []schema.Point) {
 	if cap(s) >= p.defaultSize {
 		p.putLarge.Inc()
