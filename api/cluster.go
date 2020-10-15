@@ -385,6 +385,10 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 		return
 	}
 	response.Write(ctx, response.NewMsgp(200, &models.GetDataRespV1{Stats: ss, Series: series}))
+
+	for _, s := range series {
+		pointSlicePool.PutMaybeNil(s.Datapoints)
+	}
 }
 
 func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {
