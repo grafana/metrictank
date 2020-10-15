@@ -16,7 +16,7 @@ type testCase struct {
 
 func validate(cases []testCase, t *testing.T) {
 	for i, c := range cases {
-		out := Consolidate(c.in, c.num, c.consol)
+		out := Consolidate(c.in, 0, c.num, c.consol)
 		if len(out) != len(c.out) {
 			t.Fatalf("output for testcase %d mismatch: expected: %v, got: %v", i, c.out, out)
 
@@ -502,7 +502,7 @@ func benchmarkConsolidate(fn func() []schema.Point, aggNum uint32, consolidator 
 		in := fn()
 		l = len(in)
 		b.StartTimer()
-		ret := Consolidate(in, aggNum, consolidator)
+		ret := Consolidate(in, 0, aggNum, consolidator)
 		dummy = ret
 	}
 	b.SetBytes(int64(l * 12))
