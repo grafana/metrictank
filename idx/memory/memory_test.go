@@ -286,6 +286,48 @@ func TestFind(t *testing.T) {
 	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testFind))(t)
 }
 
+// note: currently no testing for partitionedIndex
+// because due to uneven partitioning and rounding errors it gets fuzzy to test that
+func TestFindLimit(t *testing.T) {
+
+	_partitioned := Partitioned
+	Partitioned = false
+	defer func() { Partitioned = _partitioned }()
+
+	ix := New()
+	ix.Init()
+	defer ix.Stop()
+
+	for _, s := range getMetricData(65, 2, 5, 10, "metric.demo", false) {
+		s.Time = 10 * 86400
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log("adding", s)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
+	}
+	Convey("When searching with met limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 6)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+	})
+	Convey("When searching with a barely met limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 5)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+	})
+	Convey("When searching with a breached limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 4)
+		So(err, ShouldNotBeNil)
+		So(nodes, ShouldHaveLength, 0)
+	})
+	Convey("When searching with a breached limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 3)
+		So(err, ShouldNotBeNil)
+		So(nodes, ShouldHaveLength, 0)
+	})
+}
 func testFind(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
