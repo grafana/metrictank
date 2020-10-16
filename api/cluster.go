@@ -475,6 +475,7 @@ func (s *Server) queryAllPeers(ctx context.Context, data cluster.Traceable, name
 // across the cluster. If any peer fails, we try another replica. If enough
 // peers have been heard from (based on speculation-threshold configuration), and we
 // are missing the others, try to speculatively query other members of the shard group.
+// all responses are collected and returned at once.
 // ctx:          request context
 // data:         request to be submitted
 // name:         name to be used in logging & tracing
@@ -501,7 +502,9 @@ func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, nam
 // across the cluster. If any peer fails, we try another replica. If enough
 // peers have been heard from (based on speculation-threshold configuration), and we
 // are missing the others, try to speculatively query other members of the shard group.
+// all responses and errors are streamed through the returned channels
 // ctx:          request context
+// name:         name to be used in logging & tracing
 // fetchFunc:    function to call to fetch the data from a peer
 func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFn fetchFunc) (<-chan GenericPeerResponse, <-chan error) {
 	peerGroups, err := cluster.MembersForSpeculativeQuery()
