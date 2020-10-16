@@ -482,7 +482,7 @@ func (s *Server) queryAllPeers(ctx context.Context, data cluster.Traceable, name
 func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
 	result := make(map[string]PeerResponse)
 
-	responseChan, errorChan := s.queryAllShardsGeneric(ctx, name, func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
+	responseChan, errorChan := s.queryAllShardsGeneric(ctx, name, func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
 		return peer.Post(reqCtx, name, path, data)
 	})
 
@@ -516,7 +516,13 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFn
 	return queryPeers(ctx, peerGroups, name, fetchFn)
 }
 
-type fetchFunc func(context.Context, cluster.Node) (interface{}, error)
+// fetchFunc is a function to query the given cluster.Node
+// the list of all nodes in the cluster is passed as well for additional context
+// Example: fetchFunc can use this to determine the ratio of how much data the target peer owns
+// compared to the cluster as a whole.  Caveat: this is based on live cluster state. If shardgroups
+// go completely down it'll look like the target peer owns more of the cluster than it actually does.
+// if query limits are set based on this, the limits would loosen up as shards leave the cluster.
+type fetchFunc func(context.Context, cluster.Node, map[int32][]cluster.Node) (interface{}, error)
 
 type shardResponse struct {
 	shardGroup int32
@@ -532,20 +538,20 @@ type shardState struct {
 }
 
 // AskPeer issues the query on the next peer, if available, and returns it
-func (state *shardState) AskPeer(ctx context.Context, fn fetchFunc, responses chan shardResponse) (cluster.Node, bool) {
+func (state *shardState) AskPeer(ctx context.Context, peerGroups map[int32][]cluster.Node, fn fetchFunc, responses chan shardResponse) (cluster.Node, bool) {
 	if len(state.remainingPeers) == 0 {
 		return nil, false
 	}
 	peer := state.remainingPeers[0]
 	state.remainingPeers = state.remainingPeers[1:]
 	state.inflight++
-	go state.askPeer(ctx, peer, fn, responses)
+	go state.askPeer(ctx, peerGroups, peer, fn, responses)
 	return peer, true
 }
 
-func (state *shardState) askPeer(ctx context.Context, peer cluster.Node, fetchFn fetchFunc, responses chan shardResponse) {
+func (state *shardState) askPeer(ctx context.Context, peerGroups map[int32][]cluster.Node, peer cluster.Node, fetchFn fetchFunc, responses chan shardResponse) {
 	//log.Debugf("HTTP Render querying %s%s", peer.GetName(), path)
-	resp, err := fetchFn(ctx, peer)
+	resp, err := fetchFn(ctx, peer, peerGroups)
 	select {
 	case <-ctx.Done():
 		return
@@ -593,7 +599,7 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 				shard:          shard,
 				remainingPeers: peers,
 			}
-			peer, _ := state.AskPeer(reqCtx, fetchFn, responses) // thanks to the above check we always know there was a peer available
+			peer, _ := state.AskPeer(reqCtx, peerGroups, fetchFn, responses) // thanks to the above check we always know there was a peer available
 			originalPeers[peer.GetName()] = struct{}{}
 			states[shard] = state
 		}
@@ -622,7 +628,7 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 
 				if resp.err != nil {
 					// if we can try another peer for this shardGroup, do it
-					_, ok := states[resp.shardGroup].AskPeer(reqCtx, fetchFn, responses)
+					_, ok := states[resp.shardGroup].AskPeer(reqCtx, peerGroups, fetchFn, responses)
 					if ok {
 						speculativeRequests.Inc()
 						continue
@@ -656,7 +662,7 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 							continue
 						}
 
-						if _, ok := states[shardGroup].AskPeer(specCtx, fetchFn, responses); ok {
+						if _, ok := states[shardGroup].AskPeer(specCtx, peerGroups, fetchFn, responses); ok {
 							speculativeRequests.Inc()
 						}
 					}

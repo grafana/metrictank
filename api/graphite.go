@@ -1161,7 +1161,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	responseChan, errorChan := s.queryAllShardsGeneric(newCtx, "clusterFindByTag",
-		func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
+		func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
 			resp := models.IndexFindByTagResp{}
 			body, err := peer.PostRaw(reqCtx, "clusterFindByTag", "/index/find_by_tag", data)
 			if body == nil || err != nil {
