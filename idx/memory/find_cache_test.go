@@ -88,21 +88,21 @@ func TestFindCache(t *testing.T) {
 		Convey("0 results should be returned", func() {
 			result, ok := c.Get(1, "foo.bar.*")
 			So(ok, ShouldBeFalse)
-			So(result, ShouldHaveLength, 0)
+			So(result.nodes, ShouldHaveLength, 0)
 		})
 		Convey("when adding entries to the cache", func() {
 			pattern := "foo.bar.*"
 			tree := newBareTree()
 			tree.add("foo.bar.foo")
-			results, err := find((*Tree)(tree), pattern)
+			results, err := find((*Tree)(tree), pattern, 0)
 			So(err, ShouldBeNil)
 			So(results, ShouldHaveLength, 1)
-			c.Add(1, "foo.bar.*", results)
+			c.Add(1, "foo.bar.*", results, nil)
 			So(c.cache[1].Len(), ShouldEqual, 1)
 			Convey("when getting cached pattern", func() {
 				result, ok := c.Get(1, "foo.bar.*")
 				So(ok, ShouldBeTrue)
-				So(result, ShouldHaveLength, 1)
+				So(result.nodes, ShouldHaveLength, 1)
 				Convey("After invalidating path that matches pattern", func() {
 					c.InvalidateFor(1, "foo.bar.baz")
 					time.Sleep(time.Second) // make sure we reach invalidateMaxWait
@@ -114,27 +114,27 @@ func TestFindCache(t *testing.T) {
 				})
 			})
 			Convey("when findCache invalidation falls behind", func() {
-				c.Add(1, "foo.{a,b,c}*.*", results)
-				c.Add(1, "foo.{a,b,e}*.*", results)
-				c.Add(1, "foo.{a,b,f}*.*", results)
+				c.Add(1, "foo.{a,b,c}*.*", results, nil)
+				c.Add(1, "foo.{a,b,e}*.*", results, nil)
+				c.Add(1, "foo.{a,b,f}*.*", results, nil)
 				c.triggerBackoff()
 				c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 
 				So(len(c.cache), ShouldEqual, 0)
 				Convey("when adding to cache in backoff", func() {
-					c.Add(1, "foo.*.*", results)
+					c.Add(1, "foo.*.*", results, nil)
 					So(len(c.cache), ShouldEqual, 0)
 					result, ok := c.Get(1, "foo.*.*")
 					So(ok, ShouldBeFalse)
-					So(result, ShouldHaveLength, 0)
+					So(result.nodes, ShouldHaveLength, 0)
 				})
 				Convey("when adding to cache after backoff time", func() {
 					time.Sleep(time.Millisecond * 2500)
-					c.Add(1, "foo.*.*", results)
+					c.Add(1, "foo.*.*", results, nil)
 					So(len(c.cache), ShouldEqual, 1)
 					result, ok := c.Get(1, "foo.*.*")
 					So(ok, ShouldBeTrue)
-					So(result, ShouldHaveLength, 1)
+					So(result.nodes, ShouldHaveLength, 1)
 				})
 			})
 		})

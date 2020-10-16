@@ -1282,7 +1282,7 @@ func benchmarkTagsWithoutFilter(b *testing.B) {
 func ixFind(b *testing.B, org uint32, q int) {
 	b.Helper()
 
-	nodes, err := ix.Find(org, queries[q].Pattern, 0)
+	nodes, err := ix.Find(org, queries[q].Pattern, 0, 0)
 	if err != nil {
 		panic(err)
 	}
