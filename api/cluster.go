@@ -503,7 +503,7 @@ func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, nam
 // are missing the others, try to speculatively query other members of the shard group.
 // ctx:          request context
 // fetchFunc:    function to call to fetch the data from a peer
-func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFunc func(context.Context, cluster.Node) (interface{}, error)) (<-chan GenericPeerResponse, <-chan error) {
+func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFn fetchFunc) (<-chan GenericPeerResponse, <-chan error) {
 	peerGroups, err := cluster.MembersForSpeculativeQuery()
 	if err != nil {
 		log.Errorf("HTTP peerQuery unable to get peers, %s", err.Error())
@@ -513,7 +513,7 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFu
 		return resultChan, errorChan
 	}
 
-	return queryPeers(ctx, peerGroups, name, fetchFunc)
+	return queryPeers(ctx, peerGroups, name, fetchFn)
 }
 
 type fetchFunc func(context.Context, cluster.Node) (interface{}, error)
