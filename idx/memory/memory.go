@@ -1276,7 +1276,7 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, patte
 		return find(tree, pattern, limit)
 	}
 
-	cr, ok := m.findCache.Get(orgId, pattern)
+	cr, ok := m.findCache.Get(orgId, pattern, limit)
 	if ok {
 		return cr.nodes, cr.err
 	}
@@ -1290,7 +1290,7 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, patte
 			return nil, err
 		}
 	}
-	m.findCache.Add(orgId, pattern, matchedNodes, err)
+	m.findCache.Add(orgId, pattern, limit, matchedNodes, err)
 	return matchedNodes, err
 }
 

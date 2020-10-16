@@ -60,6 +60,11 @@ type FindCache struct {
 	sync.RWMutex
 }
 
+type cacheKey struct {
+	patt  string
+	limit int64
+}
+
 type CacheResult struct {
 	nodes []*Node
 	err   error
@@ -85,7 +90,7 @@ func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMa
 	return fc
 }
 
-func (c *FindCache) Get(orgId uint32, pattern string) (CacheResult, bool) {
+func (c *FindCache) Get(orgId uint32, pattern string, limit int64) (CacheResult, bool) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
 	c.RUnlock()
@@ -93,7 +98,8 @@ func (c *FindCache) Get(orgId uint32, pattern string) (CacheResult, bool) {
 		findCacheMiss.Inc()
 		return CacheResult{}, ok
 	}
-	nodes, ok := cache.Get(pattern)
+	key := cacheKey{pattern, limit}
+	nodes, ok := cache.Get(key)
 	if !ok {
 		findCacheMiss.Inc()
 		return CacheResult{}, ok
@@ -102,11 +108,16 @@ func (c *FindCache) Get(orgId uint32, pattern string) (CacheResult, bool) {
 	return nodes.(CacheResult), ok
 }
 
-func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node, e error) {
+func (c *FindCache) Add(orgId uint32, pattern string, limit int64, nodes []*Node, e error) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
 	backoff := c.backoff
 	c.RUnlock()
+
+	key := cacheKey{
+		patt:  pattern,
+		limit: limit,
+	}
 
 	cr := CacheResult{
 		nodes: nodes,
@@ -133,7 +144,7 @@ func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node, e error) {
 		}
 		c.Unlock()
 	}
-	cache.Add(pattern, cr)
+	cache.Add(key, cr)
 }
 
 // Purge clears the cache for the specified orgId
@@ -289,7 +300,7 @@ func (c *FindCache) processInvalidateQueue() {
 			}
 
 			for _, k := range cache.Keys() {
-				matches, err := find((*Tree)(tree), k.(string), 0)
+				matches, err := find((*Tree)(tree), k.(cacheKey).patt, 0)
 				if err != nil {
 					log.Errorf("memory-idx: checking if cache key %q matches any of the %d invalid patterns resulted in error: %s", k, len(reqs), err)
 				}
