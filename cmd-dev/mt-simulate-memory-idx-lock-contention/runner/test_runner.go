@@ -222,7 +222,7 @@ func (t *TestRun) runQuery(pattern string, wg *sync.WaitGroup, active chan struc
 	}()
 	pre := time.Now()
 	active <- struct{}{}
-	_, err := t.index.Find(orgID, pattern, 0)
+	_, err := t.index.Find(orgID, pattern, 0, 0)
 	if err != nil {
 		log.Printf("Warning: Query failed with error: %s", err)
 	}
