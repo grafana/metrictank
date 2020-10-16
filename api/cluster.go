@@ -471,21 +471,18 @@ func (s *Server) queryAllPeers(ctx context.Context, data cluster.Traceable, name
 	return result, errors
 }
 
-// queryAllShards takes a request and the path to request it on, then fans it out
+// queryAllShards takes a function and calls it for one peer in each shard
 // across the cluster. If any peer fails, we try another replica. If enough
 // peers have been heard from (based on speculation-threshold configuration), and we
 // are missing the others, try to speculatively query other members of the shard group.
 // all responses are collected and returned at once.
 // ctx:          request context
-// data:         request to be submitted
 // name:         name to be used in logging & tracing
-// path:         path to request on
-func (s *Server) queryAllShards(ctx context.Context, data cluster.Traceable, name, path string) (map[string]PeerResponse, error) {
+// fetchFunc:    function to call to fetch the data from a peer
+func (s *Server) queryAllShards(ctx context.Context, name string, fetchFn fetchFunc) (map[string]PeerResponse, error) {
 	result := make(map[string]PeerResponse)
 
-	responseChan, errorChan := s.queryAllShardsGeneric(ctx, name, func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
-		return peer.Post(reqCtx, name, path, data)
-	})
+	responseChan, errorChan := s.queryAllShardsGeneric(ctx, name, fetchFn)
 
 	for resp := range responseChan {
 		result[resp.peer.GetName()] = PeerResponse{
@@ -526,6 +523,12 @@ func (s *Server) queryAllShardsGeneric(ctx context.Context, name string, fetchFn
 // go completely down it'll look like the target peer owns more of the cluster than it actually does.
 // if query limits are set based on this, the limits would loosen up as shards leave the cluster.
 type fetchFunc func(context.Context, cluster.Node, map[int32][]cluster.Node) (interface{}, error)
+
+func fetchFuncPost(data cluster.Traceable, name, path string) fetchFunc {
+	return func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
+		return peer.Post(reqCtx, name, path, data)
+	}
+}
 
 type shardResponse struct {
 	shardGroup int32
@@ -630,6 +633,8 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 				}
 
 				if resp.err != nil {
+					// TODO complete abort if error is limit breached!
+
 					// if we can try another peer for this shardGroup, do it
 					_, ok := states[resp.shardGroup].AskPeer(reqCtx, peerGroups, fetchFn, responses)
 					if ok {
