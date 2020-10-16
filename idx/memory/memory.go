@@ -1289,7 +1289,7 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, patte
 	return matchedNodes, nil
 }
 
-func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit int64) ([]idx.Node, error) {
 	pre := time.Now()
 	var matchedNodes []*Node
 	var err error

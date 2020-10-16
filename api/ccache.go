@@ -49,7 +49,7 @@ func (s *Server) ccacheDelete(ctx *middleware.Context, req models.CCacheDelete) 
 		var toClear []idx.Node
 		if len(req.Patterns) > 0 {
 			for _, pattern := range req.Patterns {
-				nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0)
+				nodes, err := s.MetricIndex.Find(req.OrgId, pattern, 0, 0)
 				if err != nil {
 					res.AddError(err)
 					code = http.StatusInternalServerError

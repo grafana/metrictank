@@ -297,7 +297,7 @@ func (c *CasIdx) updateCassandra(now uint32, inMemory bool, archive idx.Archive,
 	return archive
 }
 
-func (c *CasIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, error) {
+func (c *CasIdx) Find(orgId uint32, pattern string, from, limit int64) ([]idx.Node, error) {
 	// The lastUpdate timestamp does not get updated in the cassandra index every time when
 	// a data point is received, there can be a delay of up to c.updateInterval32. To avoid
 	// falsely excluding a metric based on its lastUpdate timestamp we offset the from time
@@ -305,7 +305,7 @@ func (c *CasIdx) Find(orgId uint32, pattern string, from int64) ([]idx.Node, err
 	if from > int64(c.updateInterval32) {
 		from -= int64(c.updateInterval32)
 	}
-	return c.MemoryIndex.Find(orgId, pattern, from)
+	return c.MemoryIndex.Find(orgId, pattern, from, limit)
 }
 
 func (c *CasIdx) rebuildIndex() {

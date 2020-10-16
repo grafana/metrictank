@@ -128,7 +128,7 @@ func (s *Server) indexFind(ctx *middleware.Context, req models.IndexFind) {
 	}
 
 	for _, pattern := range req.Patterns {
-		nodes, err := s.MetricIndex.Find(req.OrgId, pattern, req.From)
+		nodes, err := s.MetricIndex.Find(req.OrgId, pattern, req.From, req.Limit)
 		if err != nil {
 			response.Write(ctx, response.WrapError(err))
 			return
