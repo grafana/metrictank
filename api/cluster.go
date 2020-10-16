@@ -633,7 +633,13 @@ func queryPeers(ctx context.Context, peerGroups map[int32][]cluster.Node, name s
 				}
 
 				if resp.err != nil {
-					// TODO complete abort if error is limit breached!
+					if resp.err.Error() == "400 Bad Request" {
+						// if we got bad request, then retrying it on a different replica will result in the same
+						// Cancel the reqCtx, which will cancel all in-flight requests.
+						cancel()
+						errorChan <- resp.err
+						return
+					}
 
 					// if we can try another peer for this shardGroup, do it
 					_, ok := states[resp.shardGroup].AskPeer(reqCtx, peerGroups, fetchFn, responses)
