@@ -16,7 +16,7 @@ import (
 )
 
 //go:generate msgp
-//msgp:ignore SeriesMetaPropertiesExport
+//msgp:ignore SeriesMetaPropertiesExport Series
 
 type Series struct {
 	Target       string            // for fetched data, set from models.Req.Target, i.e. the metric graphite key. for function output, whatever should be shown as target string (legend)
