@@ -239,7 +239,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	rCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	resultChan, errorChan := queryPeers(rCtx, requiredPeers, "getTargetsRemote", func(ctx context.Context, node cluster.Node) (interface{}, error) {
+	resultChan, errorChan := queryPeers(rCtx, requiredPeers, "getTargetsRemote", func(ctx context.Context, node cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
 		var resp models.GetDataRespV1
 		reqs, ok := shardReqs[node.GetPartitions()[0]]
 		if !ok {

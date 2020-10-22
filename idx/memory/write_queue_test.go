@@ -34,7 +34,7 @@ func TestWriteQueue(t *testing.T) {
 		ix.AddOrUpdate(mkey, data, getPartition(data))
 	}
 
-	nodes, err := ix.Find(1, "some.metric.*", 0)
+	nodes, err := ix.Find(1, "some.metric.*", 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestWriteQueue(t *testing.T) {
 	// TODO - make this less flaky (add flush counter? Flush wait func?)
 	time.Sleep(100 * time.Millisecond)
 
-	nodes, err = ix.Find(1, "some.metric.*", 0)
+	nodes, err = ix.Find(1, "some.metric.*", 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestWriteQueueMultiThreads(t *testing.T) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	nodes, err := ix.Find(1, "some.metric.*.*", 0)
+	nodes, err := ix.Find(1, "some.metric.*.*", 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

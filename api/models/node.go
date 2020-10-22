@@ -166,6 +166,7 @@ type IndexFind struct {
 	Patterns []string `json:"patterns" form:"patterns" binding:"Required"`
 	OrgId    uint32   `json:"orgId" form:"orgId" binding:"Required"`
 	From     int64    `json:"from" form:"from"`
+	Limit    int64    `json:"limit"`
 }
 
 func (i IndexFind) Trace(span opentracing.Span) {

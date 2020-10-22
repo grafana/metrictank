@@ -286,6 +286,48 @@ func TestFind(t *testing.T) {
 	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testFind))(t)
 }
 
+// note: currently no testing for partitionedIndex
+// because due to uneven partitioning and rounding errors it gets fuzzy to test that
+func TestFindLimit(t *testing.T) {
+
+	_partitioned := Partitioned
+	Partitioned = false
+	defer func() { Partitioned = _partitioned }()
+
+	ix := New()
+	ix.Init()
+	defer ix.Stop()
+
+	for _, s := range getMetricData(65, 2, 5, 10, "metric.demo", false) {
+		s.Time = 10 * 86400
+		mkey, err := schema.MKeyFromString(s.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Log("adding", s)
+		ix.AddOrUpdate(mkey, s, getPartition(s))
+	}
+	Convey("When searching with met limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 6)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+	})
+	Convey("When searching with a barely met limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 5)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+	})
+	Convey("When searching with a breached limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 4)
+		So(err, ShouldNotBeNil)
+		So(nodes, ShouldHaveLength, 0)
+	})
+	Convey("When searching with a breached limit", t, func() {
+		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 3)
+		So(err, ShouldNotBeNil)
+		So(nodes, ShouldHaveLength, 0)
+	})
+}
 func testFind(t *testing.T) {
 	idx.OrgIdPublic = 100
 	defer func() { idx.OrgIdPublic = 0 }()
@@ -338,7 +380,7 @@ func testFind(t *testing.T) {
 
 	Convey("When listing root nodes", t, func() {
 		Convey("root nodes for orgId 1", func() {
-			nodes, err := ix.Find(1, "*", 0)
+			nodes, err := ix.Find(1, "*", 0, 0)
 			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 2)
 			So(nodes[0].Path, ShouldBeIn, "metric", "foo")
@@ -346,7 +388,7 @@ func testFind(t *testing.T) {
 			So(nodes[0].Leaf, ShouldBeFalse)
 		})
 		Convey("root nodes for orgId 2", func() {
-			nodes, err := ix.Find(2, "*", 0)
+			nodes, err := ix.Find(2, "*", 0, 0)
 			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 1)
 			So(nodes[0].Path, ShouldEqual, "metric")
@@ -355,7 +397,7 @@ func testFind(t *testing.T) {
 	})
 
 	Convey("When searching with GLOB", t, func() {
-		nodes, err := ix.Find(2, "metric.{f*,demo}.*", 0)
+		nodes, err := ix.Find(2, "metric.{f*,demo}.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 10)
 		for _, n := range nodes {
@@ -364,7 +406,7 @@ func testFind(t *testing.T) {
 	})
 
 	Convey("When searching with multiple wildcards", t, func() {
-		nodes, err := ix.Find(1, "*.*", 0)
+		nodes, err := ix.Find(1, "*.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 2)
 		for _, n := range nodes {
@@ -373,24 +415,24 @@ func testFind(t *testing.T) {
 	})
 
 	Convey("When searching nodes not in public series", t, func() {
-		nodes, err := ix.Find(1, "foo.demo.*", 0)
+		nodes, err := ix.Find(1, "foo.demo.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 5)
 		Convey("When searching for specific series", func() {
-			found, err := ix.Find(1, nodes[0].Path, 0)
+			found, err := ix.Find(1, nodes[0].Path, 0, 0)
 			So(err, ShouldBeNil)
 			So(found, ShouldHaveLength, 1)
 			So(found[0].Path, ShouldEqual, nodes[0].Path)
 		})
 		Convey("When searching nodes that are children of a leaf", func() {
-			found, err := ix.Find(1, nodes[0].Path+".*", 0)
+			found, err := ix.Find(1, nodes[0].Path+".*", 0, 0)
 			So(err, ShouldBeNil)
 			So(found, ShouldHaveLength, 0)
 		})
 	})
 
 	Convey("When searching with multiple wildcards mixed leaf/branch", t, func() {
-		nodes, err := ix.Find(1, "*.demo.*", 0)
+		nodes, err := ix.Find(1, "*.demo.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 15)
 		for _, n := range nodes {
@@ -403,26 +445,26 @@ func testFind(t *testing.T) {
 		}
 	})
 	Convey("When searching nodes for unknown orgId", t, func() {
-		nodes, err := ix.Find(4, "foo.demo.*", 0)
+		nodes, err := ix.Find(4, "foo.demo.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)
 	})
 
 	Convey("When searching nodes that don't exist", t, func() {
-		nodes, err := ix.Find(1, "foo.demo.blah.*", 0)
+		nodes, err := ix.Find(1, "foo.demo.blah.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)
 	})
 
 	Convey("When searching with from timestamp", t, func() {
-		nodes, err := ix.Find(1, "*.demo.*", 4*86400)
+		nodes, err := ix.Find(1, "*.demo.*", 4*86400, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 10)
 		for _, n := range nodes {
 			So(n.Path, ShouldNotContainSubstring, "foo.demo")
 		}
 		Convey("When searching with from timestamp on series with multiple defs.", func() {
-			nodes, err := ix.Find(1, "*.demo.*", 2*86400)
+			nodes, err := ix.Find(1, "*.demo.*", 2*86400, 0)
 			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 15)
 			for _, n := range nodes {
@@ -476,13 +518,13 @@ func testDelete(t *testing.T) {
 			})
 
 			Convey("the deleted metrics should not be in the index", func() {
-				nodes, err := ix.Find(idx.OrgIdPublic, "metric.*", 0)
+				nodes, err := ix.Find(idx.OrgIdPublic, "metric.*", 0, 0)
 				So(err, ShouldBeNil)
 				So(nodes, ShouldHaveLength, 0)
 			})
 
 			Convey("metrics from different orgs should not be impacted", func() {
-				nodes, err := ix.Find(1, "metric.*", 0)
+				nodes, err := ix.Find(1, "metric.*", 0, 0)
 				So(err, ShouldBeNil)
 				So(nodes, ShouldHaveLength, 1)
 			})
@@ -719,10 +761,10 @@ func testMixedBranchLeafDelete(t *testing.T) {
 			_, ok := ix.Get(mkeys[0])
 			So(ok, ShouldEqual, false)
 			Convey("series should not be present in searches", func() {
-				found, err := ix.Find(1, "a.b.c", 0)
+				found, err := ix.Find(1, "a.b.c", 0, 0)
 				So(err, ShouldBeNil)
 				So(found, ShouldHaveLength, 0)
-				found, err = ix.Find(1, "a.b.c.d", 0)
+				found, err = ix.Find(1, "a.b.c.d", 0, 0)
 				So(err, ShouldBeNil)
 				So(found, ShouldHaveLength, 0)
 			})
@@ -740,10 +782,10 @@ func testMixedBranchLeafDelete(t *testing.T) {
 			_, ok := ix.Get(mkeys[3])
 			So(ok, ShouldEqual, false)
 			Convey("deleted series should not be present in searches", func() {
-				found, err := ix.Find(1, "a.b.c2.*", 0)
+				found, err := ix.Find(1, "a.b.c2.*", 0, 0)
 				So(err, ShouldBeNil)
 				So(found, ShouldHaveLength, 1)
-				found, err = ix.Find(1, "a.b.c2.d", 0)
+				found, err = ix.Find(1, "a.b.c2.d", 0, 0)
 				So(err, ShouldBeNil)
 				So(found, ShouldHaveLength, 0)
 			})
@@ -1013,10 +1055,10 @@ func testPrune(t *testing.T) {
 		pruned, err := ix.Prune(time.Unix(11, 0))
 		So(err, ShouldBeNil)
 		So(pruned, ShouldHaveLength, 5)
-		nodes, err := ix.Find(1, "metric.bah.*", 0)
+		nodes, err := ix.Find(1, "metric.bah.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 0)
-		nodes, err = ix.Find(1, "metric.foo.*", 0)
+		nodes, err = ix.Find(1, "metric.foo.*", 0, 0)
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 5)
 
@@ -1042,7 +1084,7 @@ func testPrune(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(pruned, ShouldHaveLength, 4)
 			ix.ForceInvalidationFindCache()
-			nodes, err := ix.Find(1, "metric.foo.*", 0)
+			nodes, err := ix.Find(1, "metric.foo.*", 0, 0)
 			So(err, ShouldBeNil)
 			So(nodes, ShouldHaveLength, 1)
 		})

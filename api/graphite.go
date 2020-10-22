@@ -100,14 +100,29 @@ type Series struct {
 	Node    cluster.Node
 }
 
-func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64) ([]Series, error) {
-	data := models.IndexFind{
-		Patterns: patterns,
-		OrgId:    orgId,
-		From:     seenAfter,
-	}
+func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64, maxSeries int) ([]Series, error) {
 
-	resps, err := s.queryAllShards(ctx, data, "findSeriesRemote", "/index/find")
+	fetchFn := func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
+		ourParts := len(peer.GetPartitions())
+
+		// assign a fractional maxSeries limit (not global, but relative to how much data the peer has)
+		// look at each shardgroup and check how many partitions it has
+		// (we assume each shardgroup is consistent across different peers for that shardgroup)
+		var totalParts int
+		for _, otherPeers := range peerGroups {
+			if len(otherPeers) > 0 {
+				totalParts += len(otherPeers[0].GetPartitions())
+			}
+		}
+		data := models.IndexFind{
+			Patterns: patterns,
+			OrgId:    orgId,
+			From:     seenAfter,
+			Limit:    int64(maxSeries * ourParts / totalParts),
+		}
+		return peer.Post(reqCtx, "findSeriesRemote", "/index/find", data)
+	}
+	resps, err := s.queryAllShards(ctx, "findSeriesRemote", fetchFn)
 	if err != nil {
 		return nil, err
 	}
@@ -121,12 +136,23 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 	series := make([]Series, 0)
 	resp := models.IndexFindResp{}
 	for _, r := range resps {
+		if len(series) == maxSeries {
+			return nil, response.NewError(
+				http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+		}
 		_, err = resp.UnmarshalMsg(r.buf)
 		if err != nil {
 			return nil, err
 		}
 
 		for pattern, nodes := range resp.Nodes {
+			if len(series) == maxSeries {
+				return nil, response.NewError(
+					http.StatusRequestEntityTooLarge,
+					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+			}
+
 			series = append(series, Series{
 				Pattern: pattern,
 				Node:    r.peer,
@@ -330,7 +356,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 	nodes := make([]idx.Node, 0)
 	reqCtx := ctx.Req.Context()
-	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix))
+	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix), maxSeriesPerReq)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -378,7 +404,7 @@ func (s *Server) metricsExpand(ctx *middleware.Context, request models.GraphiteE
 	for i, query := range request.Query {
 		i, query := i, query
 		g.Go(func() error {
-			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0)
+			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0, maxSeriesPerReq)
 			if err != nil {
 				return err
 			}
@@ -795,7 +821,10 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			}
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-int(reqs.cnt), false)
 		} else {
-			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From))
+			// find limit is the limit minus what we already consumed for other targets, adjusted for how many rawReqs we folded into this resolveSeriesRequest
+			// note that this doesn't account for duplicate requests like target=foo&target=foo because those are both represented by the same rawReq (see NewPlan)
+			findLimit := (maxSeriesPerReq - int(reqs.cnt)) / len(rawReqs)
+			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), findLimit)
 		}
 		if err != nil {
 			return nil, meta, err
@@ -1046,7 +1075,7 @@ func (s *Server) clusterTagDetails(ctx context.Context, orgId uint32, tag, filte
 	result := make(map[string]uint64)
 
 	data := models.IndexTagDetails{OrgId: orgId, Tag: tag, Filter: filter}
-	resps, err := s.queryAllShards(ctx, data, "clusterTagDetails", "/index/tag_details")
+	resps, err := s.queryAllShards(ctx, "clusterTagDetails", fetchFuncPost(data, "clusterTagDetails", "/index/tag_details"))
 	if err != nil {
 		return nil, err
 	}
@@ -1147,7 +1176,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	responseChan, errorChan := s.queryAllShardsGeneric(newCtx, "clusterFindByTag",
-		func(reqCtx context.Context, peer cluster.Node) (interface{}, error) {
+		func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
 			resp := models.IndexFindByTagResp{}
 			body, err := peer.PostRaw(reqCtx, "clusterFindByTag", "/index/find_by_tag", data)
 			if body == nil || err != nil {
@@ -1222,7 +1251,7 @@ func (s *Server) graphiteTags(ctx *middleware.Context, request models.GraphiteTa
 
 func (s *Server) clusterTags(ctx context.Context, orgId uint32, filter string) ([]string, error) {
 	data := models.IndexTags{OrgId: orgId, Filter: filter}
-	resps, err := s.queryAllShards(ctx, data, "clusterTags", "/index/tags")
+	resps, err := s.queryAllShards(ctx, "clusterTags", fetchFuncPost(data, "clusterTags", "/index/tags"))
 	if err != nil {
 		return nil, err
 	}
@@ -1274,7 +1303,7 @@ func (s *Server) clusterAutoCompleteTags(ctx context.Context, orgId uint32, pref
 	tagSet := make(map[string]struct{})
 
 	data := models.IndexAutoCompleteTags{OrgId: orgId, Prefix: prefix, Expr: expressions, Limit: limit}
-	responses, err := s.queryAllShards(ctx, data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags")
+	responses, err := s.queryAllShards(ctx, "clusterAutoCompleteTags", fetchFuncPost(data, "clusterAutoCompleteTags", "/index/tags/autoComplete/tags"))
 	if err != nil {
 		return nil, err
 	}
@@ -1321,7 +1350,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32,
 	valSet := make(map[string]struct{})
 
 	data := models.IndexAutoCompleteTagValues{OrgId: orgId, Tag: tag, Prefix: prefix, Expr: expressions, Limit: limit}
-	responses, err := s.queryAllShards(ctx, data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values")
+	responses, err := s.queryAllShards(ctx, "clusterAutoCompleteValues", fetchFuncPost(data, "clusterAutoCompleteValues", "/index/tags/autoComplete/values"))
 	if err != nil {
 		return nil, err
 	}
@@ -1352,7 +1381,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32,
 
 func (s *Server) graphiteTagTerms(ctx *middleware.Context, request models.GraphiteTagTerms) {
 	data := models.IndexTagTerms{OrgId: ctx.OrgId, Tags: request.Tags, Expr: request.Expr}
-	responses, err := s.queryAllShards(ctx.Req.Context(), data, "graphiteTagTerms", "/index/tags/terms")
+	responses, err := s.queryAllShards(ctx.Req.Context(), "graphiteTagTerms", fetchFuncPost(data, "graphiteTagTerms", "/index/tags/terms"))
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))
 		return
