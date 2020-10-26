@@ -789,6 +789,9 @@ func getClusterFindLimit(maxSeriesPerReq int, outstanding, multiplier int) int {
 	// note that we can't detect duplicate requests like target=foo&target=foo because those
 	// are both represented by the same rawReq (see NewPlan)
 	// thus that case is a way to breach the limit undetectedly (unlikely)
+	if maxSeriesPerReq == 0 {
+		return 0
+	}
 	return (maxSeriesPerReq - outstanding) / multiplier
 }
 
