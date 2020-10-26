@@ -841,18 +841,20 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			return nil, meta, nil
 		default:
 		}
+
+		findLimit := getClusterFindLimit(maxSeriesPerReq, int(reqs.cnt), len(rawReqs))
+
 		var err error
 		var series []Series
-		var exprs tagquery.Expressions
+
 		if tagquery.IsSeriesByTagExpression(r.Query) {
+			var exprs tagquery.Expressions
 			exprs, err = tagquery.ParseSeriesByTagExpression(r.Query)
 			if err != nil {
 				return nil, meta, err
 			}
-			findLimit := getClusterFindLimit(maxSeriesPerReq, int(reqs.cnt), len(rawReqs))
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), findLimit, false)
 		} else {
-			findLimit := getClusterFindLimit(maxSeriesPerReq, int(reqs.cnt), len(rawReqs))
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), findLimit)
 		}
 		if err != nil {
