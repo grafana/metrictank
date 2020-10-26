@@ -375,11 +375,20 @@ func (s *Server) getData(ctx *middleware.Context, request models.GetData) {
 	if err != nil {
 		// the only errors returned are from us catching panics, so we should treat them
 		// all as internalServerErrors
+
+		for _, s := range series {
+			pointSlicePool.PutMaybeNil(s.Datapoints)
+		}
+
 		log.Errorf("HTTP getData() %s", err.Error())
 		response.Write(ctx, response.WrapError(err))
 		return
 	}
 	response.Write(ctx, response.NewMsgp(200, &models.GetDataRespV1{Stats: ss, Series: series}))
+
+	for _, s := range series {
+		pointSlicePool.PutMaybeNil(s.Datapoints)
+	}
 }
 
 func (s *Server) indexDelete(ctx *middleware.Context, req models.IndexDelete) {

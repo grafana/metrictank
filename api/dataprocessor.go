@@ -148,6 +148,7 @@ func divide(pointsA, pointsB []schema.Point) []schema.Point {
 }
 
 // getTargets retrieves the series for the given requests by querying local and/or remote nodes as needed
+// if an error occurs, it returns all intermediate series to the pool and returns only the error
 func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	// split reqs into local and remote.
 	localReqs := make([]models.Req, 0)
@@ -198,17 +199,25 @@ func (s *Server) getTargets(ctx context.Context, ss *models.StorageStats, reqs [
 	}()
 
 	out := make([]models.Series, 0)
+	var firstErr error
 	for resp := range responses {
-		if resp.err != nil {
-			return nil, resp.err
+		// even when we run into an error, still collect any series so we can feed them back to the pool
+		if resp.err != nil && firstErr == nil {
+			firstErr = resp.err
 		}
 		out = append(out, resp.series...)
+	}
+	if firstErr != nil {
+		for _, s := range out {
+			pointSlicePool.PutMaybeNil(s.Datapoints)
+		}
+		return nil, firstErr
 	}
 	log.Debugf("DP getTargets: %d series found on cluster", len(out))
 	return out, nil
 }
 
-// getTargetsRemote issues the requests - keyed by node name - on other nodes
+// getTargetsRemote issues the requests - keyed by node name - on other nodes and returns corresponding series, along with the first error encountered
 func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, remoteReqs map[string][]models.Req) ([]models.Series, error) {
 
 	allPeers, err := cluster.MembersForSpeculativeQuery()
@@ -269,7 +278,7 @@ func (s *Server) getTargetsRemote(ctx context.Context, ss *models.StorageStats, 
 	return out, err
 }
 
-// error is the error of the first failing target request
+// getTargetsLocal returns the series corresponding to the given requests, along with the first error encountered
 func (s *Server) getTargetsLocal(ctx context.Context, ss *models.StorageStats, reqs []models.Req) ([]models.Series, error) {
 	log.Debugf("DP getTargetsLocal: handling %d reqs locally", len(reqs))
 	rCtx, span := tracing.NewSpan(ctx, s.Tracer, "getTargetsLocal")
@@ -310,14 +319,17 @@ LOOP:
 		close(responses)
 	}()
 	out := make([]models.Series, 0, len(reqs))
+	var firstErr error
 	for resp := range responses {
-		if resp.err != nil {
+		if resp.err != nil && firstErr == nil {
 			tags.Error.Set(span, true)
-			return nil, resp.err
+			firstErr = resp.err
 		}
 		out = append(out, resp.series)
 	}
-
+	if firstErr != nil {
+		return out, firstErr
+	}
 	ss.Trace(span)
 	log.Debugf("DP getTargetsLocal: %d series found locally", len(out))
 	return out, nil
