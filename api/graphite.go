@@ -779,6 +779,19 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 	return resp.DeletedDefs, nil
 }
 
+// getClusterFindLimit returns what the limit should be for a find request across the cluster.
+// * maxSeriesPerReq: the global per-req limit (which covers multiple targets in the same request)
+// * outstanding: the number of requests already outstanding (e.g. for previously processed requests)
+// * multiplier: accounts for the find request covering (deduplicating) multiple equivalent requests
+func getClusterFindLimit(maxSeriesPerReq int, outstanding, multiplier int) int {
+	// find limit is the global limit minus what we already consumed for other targets' requests,
+	// adjusted by the multiplier
+	// note that we can't detect duplicate requests like target=foo&target=foo because those
+	// are both represented by the same rawReq (see NewPlan)
+	// thus that case is a way to breach the limit undetectedly (unlikely)
+	return (maxSeriesPerReq - outstanding) / multiplier
+}
+
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the individual series from the peer, and then sum here. that could be optimized
@@ -819,11 +832,10 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			if err != nil {
 				return nil, meta, err
 			}
-			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-int(reqs.cnt), false)
+			findLimit := getClusterFindLimit(maxSeriesPerReq, int(reqs.cnt), len(rawReqs))
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), findLimit, false)
 		} else {
-			// find limit is the limit minus what we already consumed for other targets, adjusted for how many rawReqs we folded into this resolveSeriesRequest
-			// note that this doesn't account for duplicate requests like target=foo&target=foo because those are both represented by the same rawReq (see NewPlan)
-			findLimit := (maxSeriesPerReq - int(reqs.cnt)) / len(rawReqs)
+			findLimit := getClusterFindLimit(maxSeriesPerReq, int(reqs.cnt), len(rawReqs))
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), findLimit)
 		}
 		if err != nil {
