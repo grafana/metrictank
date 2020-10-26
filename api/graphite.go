@@ -789,6 +789,7 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 // * maxSeriesPerReq: the global per-req limit (which covers multiple targets in the same request)
 // * outstanding: the number of requests already outstanding (e.g. for previously processed requests)
 // * multiplier: accounts for the find request covering (deduplicating) multiple equivalent requests
+// NOTE: caller must assure that outstanding <= maxSeriesPerReq
 func getClusterFindLimit(maxSeriesPerReq int, outstanding, multiplier int) int {
 	// find limit is the global limit minus what we already consumed for other targets' requests,
 	// adjusted by the multiplier
@@ -886,6 +887,14 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 				}
 			}
 		}
+
+		// if we already breached the limit, no point in doing any further finds
+		if int(reqs.cnt) > maxSeriesPerReq {
+			return nil, meta, response.NewError(
+				http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+		}
+
 	}
 	meta.RenderStats.ResolveSeriesDuration = time.Since(pre)
 
