@@ -109,9 +109,9 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 		// look at each shardgroup and check how many partitions it has
 		// (we assume each shardgroup is consistent across different peers for that shardgroup)
 		var totalParts int
-		for _, otherPeers := range peerGroups {
-			if len(otherPeers) > 0 {
-				totalParts += len(otherPeers[0].GetPartitions())
+		for _, shardPeers := range peerGroups {
+			if len(shardPeers) > 0 {
+				totalParts += len(shardPeers[0].GetPartitions())
 			}
 		}
 		data := models.IndexFind{
