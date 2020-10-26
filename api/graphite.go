@@ -107,7 +107,13 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 
 		// assign a fractional maxSeries limit (not global, but relative to how much data the peer has)
 		// look at each shardgroup and check how many partitions it has
-		// (we assume each shardgroup is consistent across different peers for that shardgroup)
+		// we have 2 assumptions here
+		// 1) on the cluster topology: each shardgroup is consistent across different peers for that shardgroup.
+		//    (e.g. you can't have one node with shards [2,3] and another one with just [2] or with [3,4], it should be [2,3] each.
+		// 2) any dataset is evenly distributed across shards. e.g. if foo.* matches 1000 series and you have 4 shardgroups, then we assume
+		//    that each shardgroup holds exactly 250 series. In practice we are fairly close, but rarely exact. In some unlikely scenarios
+		//    this may mean unfairly being prematurely rejected.
+		//    (e.g. if one shardgroup holds 249 and another 251, a limit of 1000 would set 250 on both)
 		var totalParts int
 		for _, shardPeers := range peerGroups {
 			if len(shardPeers) > 0 {
