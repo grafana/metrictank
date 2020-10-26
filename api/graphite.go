@@ -789,13 +789,20 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 // * maxSeriesPerReq: the global per-req limit (which covers multiple targets in the same request)
 // * outstanding: the number of requests already outstanding (e.g. for previously processed requests)
 // * multiplier: accounts for the find request covering (deduplicating) multiple equivalent requests
-// NOTE: caller must assure that outstanding <= maxSeriesPerReq
+// NOTE: caller must assure that outstanding <= maxSeriesPerReq and multiplier > 0
 func getClusterFindLimit(maxSeriesPerReq int, outstanding, multiplier int) int {
 	// find limit is the global limit minus what we already consumed for other targets' requests,
 	// adjusted by the multiplier
-	// note that we can't detect duplicate requests like target=foo&target=foo because those
-	// are both represented by the same rawReq (see NewPlan)
-	// thus that case is a way to breach the limit undetectedly (unlikely)
+	// caveats:
+	// * we can't detect duplicate requests like target=foo&target=foo because those
+	//   are both represented by the same rawReq (see NewPlan)
+	//   thus that case is a way to breach the limit undetectedly (unlikely)
+	// * a request like target=foo.bar&target=foo.*&target=foo.{b,z}* result in overlapping requests
+	//   this may lead to metrictank claiming the limit is breached while in reality it may not be
+	//   we'll consider that a known limitation.
+	// * series that are identical (e.g. exact same serie but subject to a different PNGroup like target=foo.*&target=sum(foo.*)
+	//   or equivalent and would be merged afterwards (e.g. when changing the interval) all get counted as distinct series
+	//   towards the limit
 	if maxSeriesPerReq == 0 {
 		return 0
 	}
