@@ -107,11 +107,17 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 
 		// assign a fractional maxSeries limit (not global, but relative to how much data the peer has)
 		// look at each shardgroup and check how many partitions it has
-		// (we assume each shardgroup is consistent across different peers for that shardgroup)
+		// we have 2 assumptions here
+		// 1) on the cluster topology: each shardgroup is consistent across different peers for that shardgroup.
+		//    (e.g. you can't have one node with shards [2,3] and another one with just [2] or with [3,4], it should be [2,3] each.
+		// 2) any dataset is evenly distributed across shards. e.g. if foo.* matches 1000 series and you have 4 shardgroups, then we assume
+		//    that each shardgroup holds exactly 250 series. In practice we are fairly close, but rarely exact. In some unlikely scenarios
+		//    this may mean unfairly being prematurely rejected.
+		//    (e.g. if one shardgroup holds 249 and another 251, a limit of 1000 would set 250 on both)
 		var totalParts int
-		for _, otherPeers := range peerGroups {
-			if len(otherPeers) > 0 {
-				totalParts += len(otherPeers[0].GetPartitions())
+		for _, shardPeers := range peerGroups {
+			if len(shardPeers) > 0 {
+				totalParts += len(shardPeers[0].GetPartitions())
 			}
 		}
 		data := models.IndexFind{
@@ -779,6 +785,30 @@ func (s *Server) metricsDeleteRemote(ctx context.Context, orgId uint32, query st
 	return resp.DeletedDefs, nil
 }
 
+// getClusterFindLimit returns what the limit should be for a find request across the cluster.
+// * maxSeriesPerReq: the global per-req limit (which covers multiple targets in the same request)
+// * outstanding: the number of requests already outstanding (e.g. for previously processed requests)
+// * multiplier: accounts for the find request covering (deduplicating) multiple equivalent requests
+// NOTE: caller must assure that outstanding <= maxSeriesPerReq and multiplier > 0
+func getClusterFindLimit(maxSeriesPerReq int, outstanding, multiplier int) int {
+	// find limit is the global limit minus what we already consumed for other targets' requests,
+	// adjusted by the multiplier
+	// caveats:
+	// * we can't detect duplicate requests like target=foo&target=foo because those
+	//   are both represented by the same rawReq (see NewPlan)
+	//   thus that case is a way to breach the limit undetectedly (unlikely)
+	// * a request like target=foo.bar&target=foo.*&target=foo.{b,z}* result in overlapping requests
+	//   this may lead to metrictank claiming the limit is breached while in reality it may not be
+	//   we'll consider that a known limitation.
+	// * series that are identical (e.g. exact same serie but subject to a different PNGroup like target=foo.*&target=sum(foo.*)
+	//   or equivalent and would be merged afterwards (e.g. when changing the interval) all get counted as distinct series
+	//   towards the limit
+	if maxSeriesPerReq == 0 {
+		return 0
+	}
+	return (maxSeriesPerReq - outstanding) / multiplier
+}
+
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the individual series from the peer, and then sum here. that could be optimized
@@ -811,19 +841,20 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			return nil, meta, nil
 		default:
 		}
+
+		findLimit := getClusterFindLimit(maxSeriesPerReq, int(reqs.cnt), len(rawReqs))
+
 		var err error
 		var series []Series
-		var exprs tagquery.Expressions
+
 		if tagquery.IsSeriesByTagExpression(r.Query) {
+			var exprs tagquery.Expressions
 			exprs, err = tagquery.ParseSeriesByTagExpression(r.Query)
 			if err != nil {
 				return nil, meta, err
 			}
-			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), maxSeriesPerReq-int(reqs.cnt), false)
+			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), findLimit, false)
 		} else {
-			// find limit is the limit minus what we already consumed for other targets, adjusted for how many rawReqs we folded into this resolveSeriesRequest
-			// note that this doesn't account for duplicate requests like target=foo&target=foo because those are both represented by the same rawReq (see NewPlan)
-			findLimit := (maxSeriesPerReq - int(reqs.cnt)) / len(rawReqs)
 			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), findLimit)
 		}
 		if err != nil {
@@ -865,6 +896,14 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 				}
 			}
 		}
+
+		// if we already breached the limit, no point in doing any further finds
+		if int(reqs.cnt) > maxSeriesPerReq {
+			return nil, meta, response.NewError(
+				http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+		}
+
 	}
 	meta.RenderStats.ResolveSeriesDuration = time.Since(pre)
 

@@ -173,6 +173,7 @@ func (i IndexFind) Trace(span opentracing.Span) {
 	span.SetTag("orgId", i.OrgId)
 	span.LogFields(
 		traceLog.Int64("from", i.From),
+		traceLog.Int64("limit", i.Limit),
 		traceLog.String("q", fmt.Sprintf("%q", i.Patterns)),
 	)
 }

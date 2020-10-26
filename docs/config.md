@@ -288,6 +288,8 @@ max-points-per-req-soft = 1000000
 # limit of number of datapoints a request can return. Requests that exceed this limit will be rejected. (0 disables limit)
 max-points-per-req-hard = 20000000
 # limit of number of series a request can operate on. Requests that exceed this limit will be rejected. (0 disables limit)
+# note here we look at all lowlevel series (even if they will be merged or are equivalent), and can't accurately account for
+# requests with duplicate or overlapping targets. See PR #1926 and #1929 for details
 max-series-per-req = 250000
 # require x-org-id authentication to auth as a specific org. otherwise orgId 1 is assumed
 multi-tenant = true
