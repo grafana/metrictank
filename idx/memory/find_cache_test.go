@@ -94,7 +94,7 @@ func TestFindCache(t *testing.T) {
 			pattern := "foo.bar.*"
 			tree := newBareTree()
 			tree.add("foo.bar.foo")
-			results, err := find((*Tree)(tree), pattern)
+			results, err := findOneShot((*Tree)(tree), pattern)
 			So(err, ShouldBeNil)
 			So(results, ShouldHaveLength, 1)
 			c.Add(1, "foo.bar.*", results)

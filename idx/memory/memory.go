@@ -1270,23 +1270,35 @@ func (m *UnpartitionedMemoryIdx) finalizeResult(res []string, limit uint, dedupl
 	return res
 }
 
-func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
-
-	if m.findCache == nil {
-		return find(tree, pattern)
+func (m *UnpartitionedMemoryIdx) getCachedIterator(orgId uint32, pattern string) (Iter, bool) {
+	var iter Iter
+	if m.findCache != nil {
+		nodes, ok := m.findCache.Get(orgId, pattern)
+		if ok {
+			iter = &NodesIterator{nodes: nodes}
+			return iter, true
+		}
 	}
-
-	matchedNodes, ok := m.findCache.Get(orgId, pattern)
-	if ok {
-		return matchedNodes, nil
+	iter, ok := m.newFindIterator(orgId, pattern)
+	if !ok {
+		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
 	}
+	return iter, ok
+}
 
-	matchedNodes, err := find(tree, pattern)
-	if err != nil {
-		return nil, err
+func (m *UnpartitionedMemoryIdx) newFindIterator(orgID uint32, pattern string) (*FindIter, bool) {
+	tree, ok := m.tree[orgID]
+	if !ok {
+		return nil, false
 	}
-	m.findCache.Add(orgId, pattern, matchedNodes)
-	return matchedNodes, err
+	return NewFindIter(tree, orgID, pattern, m.findCache), true
+}
+
+type findProgress struct {
+	foundNodes          int // number of nodes coming from the find iterators (prior to from filtering)
+	foundFilteredLeaves int // number of nodes coming from the find iterators that passed the from filter and are leaves
+	results             []idx.Node
+	seenByPath          map[string]struct{}
 }
 
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit int64) ([]idx.Node, error) {
@@ -1298,40 +1310,52 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 	// as one
 
 	pre := time.Now()
-	var matchedNodes []*Node
-	var err error
 	bc := m.RLockLow()
 	defer bc.RUnlockLow("Find", func() interface{} {
 		return pattern
 	})
-	tree, ok := m.tree[orgId]
-	if !ok {
-		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
-	} else {
-		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern)
+
+	fp := &findProgress{
+		seenByPath: make(map[string]struct{}),
+	}
+
+	if iter, ok := m.getCachedIterator(orgId, pattern); ok {
+		err := m.consumeIter(fp, iter, from, limit)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
-		tree, ok = m.tree[idx.OrgIdPublic]
-		if ok {
-			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
+		if iter, ok := m.getCachedIterator(idx.OrgIdPublic, pattern); ok {
+			err := m.consumeIter(fp, iter, from, limit)
 			if err != nil {
 				return nil, err
 			}
-			matchedNodes = append(matchedNodes, publicNodes...)
 		}
 	}
-	log.Debugf("memory-idx: %d nodes matching pattern %s found", len(matchedNodes), pattern)
-	results := make([]idx.Node, 0)
-	byPath := make(map[string]struct{})
+	log.Debugf("memory-idx: %d nodes has %d unique paths.", fp.foundNodes, len(fp.results))
+	statFindDuration.Value(time.Since(pre))
+	return fp.results, nil
+}
+
+// consumeIter drains an iterator, applying the limit and closing the iterator if everything succeeded without issues
+func (m *UnpartitionedMemoryIdx) consumeIter(fp *findProgress, iter Iter, from, limit int64) error {
 	// construct the output slice of idx.Node's such that there is only 1 idx.Node
-	// for each path, and it holds all defs that the Node refers too.
+	// for each path, and it holds all defs that the Node refers to.
 	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
 	// path, then the public metricDefs will be excluded.
-	for _, n := range matchedNodes {
-		if _, ok := byPath[n.Path]; ok {
+	for {
+		n, err := iter.Next()
+		if err != nil {
+			return err
+		}
+		if n == nil {
+			iter.Close()
+			return nil
+		}
+		fp.foundNodes++
+		if _, ok := fp.seenByPath[n.Path]; ok {
 			log.Debugf("memory-idx: path %s already seen", n.Path)
 			continue
 		}
@@ -1363,17 +1387,23 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 			if len(idxNode.Defs) == 0 {
 				continue
 			}
+			fp.foundFilteredLeaves++
+			if limit > 0 && fp.foundFilteredLeaves == int(limit)+1 {
+				return errors.NewBadRequest("limit exhausted")
+			}
 		}
-		results = append(results, idxNode)
-		byPath[n.Path] = struct{}{}
+
+		fp.results = append(fp.results, idxNode)
+		fp.seenByPath[n.Path] = struct{}{}
 	}
-	log.Debugf("memory-idx: %d nodes has %d unique paths.", len(matchedNodes), len(results))
-	statFindDuration.Value(time.Since(pre))
-	return results, nil
 }
 
-// find returns all Nodes matching the pattern for the given tree
-func find(tree *Tree, pattern string) ([]*Node, error) {
+// findWorker returns all Nodes matching the pattern for the given tree and feeds them on the channel
+func findWorker(tree *Tree, pattern string, out chan *Node, errChan chan error) {
+
+	defer close(errChan)
+	defer close(out)
+
 	var nodes []string
 	if strings.Index(pattern, ";") == -1 {
 		nodes = strings.Split(pattern, ".")
@@ -1396,68 +1426,99 @@ func find(tree *Tree, pattern string) ([]*Node, error) {
 			break
 		}
 	}
+
+	matchers := make([]matcher, len(nodes))
+	for i := pos; i < len(nodes); i++ {
+		var err error
+		matchers[i], err = getMatcher(nodes[i])
+
+		if err != nil {
+			errChan <- err
+			return
+		}
+	}
+
 	var branch string
 	if pos != 0 {
 		branch = strings.Join(nodes[:pos], ".")
 	}
+
 	log.Debugf("memory-idx: starting search at node %q", branch)
 	startNode, ok := tree.Items[branch]
 
 	if !ok {
 		log.Debugf("memory-idx: branch %q does not exist in the index", branch)
-		return nil, nil
+		return
 	}
 
 	if startNode == nil {
 		corruptIndex.Inc()
 		log.Errorf("memory-idx: startNode is nil. patt=%q,pos=%d,branch=%q", pattern, pos, branch)
-		return nil, errors.NewInternal("hit an empty path in the index")
+		errChan <- errors.NewInternal("hit an empty path in the index")
+		return
 	}
 
-	children := []*Node{startNode}
-	for i := pos; i < len(nodes); i++ {
-		p := nodes[i]
+	var search func(node *Node, pos int) error
+	search = func(node *Node, pos int) error {
+		if !node.HasChildren() {
+			log.Debugf("memory-idx: end of branch reached at %s with no match found for %s", node.Path, pattern)
+			return nil
+		}
+		log.Debugf("memory-idx: searching %d children of %s that match %s", len(node.Children), node.Path, nodes[pos])
+		matches := matchers[pos](node.Children)
 
-		matcher, err := getMatcher(p)
+		for _, m := range matches {
+			newBranch := node.Path + "." + m
+			if node.Path == "" {
+				newBranch = m
+			}
+			child := tree.Items[newBranch]
+			if child == nil {
+				corruptIndex.Inc()
+				log.Errorf("memory-idx: child is nil. patt=%q,pos=%d,p=%q,path=%q", pattern, pos, nodes[pos], newBranch)
+				return errors.NewInternal("hit an empty path in the index")
+			}
 
+			// we reached the full length of the pattern. don't traverse any deeper.
+			if pos == len(nodes)-1 {
+				out <- child
+				continue
+			}
+			err := search(child, pos+1)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// if the pattern stipulated an.exact.path then we only need the startNode
+	if pos == len(nodes) {
+		out <- startNode
+		return
+	}
+
+	err := search(startNode, pos)
+	if err != nil {
+		errChan <- err
+	}
+}
+
+// findOneShot mimics the legacy "find" behavior: returns all raw results (unfiltered) and without adding to the cache
+func findOneShot(tree *Tree, pattern string) ([]*Node, error) {
+	// note: we don't use caching and the orgID will be ignored
+	iter := NewFindIter(tree, 0, pattern, nil)
+
+	for {
+		n, err := iter.Next()
 		if err != nil {
 			return nil, err
 		}
-
-		var grandChildren []*Node
-		for _, c := range children {
-			if !c.HasChildren() {
-				log.Debugf("memory-idx: end of branch reached at %s with no match found for %s", c.Path, pattern)
-				// expecting a branch
-				continue
-			}
-			log.Debugf("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[i])
-			matches := matcher(c.Children)
-
-			for _, m := range matches {
-				newBranch := c.Path + "." + m
-				if c.Path == "" {
-					newBranch = m
-				}
-				grandChild := tree.Items[newBranch]
-				if grandChild == nil {
-					corruptIndex.Inc()
-					log.Errorf("memory-idx: grandChild is nil. patt=%q,i=%d,pos=%d,p=%q,path=%q", pattern, i, pos, p, newBranch)
-					return nil, errors.NewInternal("hit an empty path in the index")
-				}
-
-				grandChildren = append(grandChildren, grandChild)
-			}
-		}
-		children = grandChildren
-		if len(children) == 0 {
-			log.Debug("memory-idx: pattern does not match any series.")
+		if n == nil {
 			break
 		}
 	}
-
-	log.Debugf("memory-idx: reached pattern length. %d nodes matched", len(children))
-	return children, nil
+	return iter.found, nil
 }
 
 func (m *UnpartitionedMemoryIdx) List(orgId uint32) []idx.Archive {
@@ -1555,7 +1616,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	if !ok {
 		return nil, nil
 	}
-	found, err := find(tree, pattern)
+	found, err := findOneShot(tree, pattern)
 	if err != nil {
 		return nil, err
 	}
