@@ -60,16 +60,6 @@ type FindCache struct {
 	sync.RWMutex
 }
 
-type cacheKey struct {
-	patt  string
-	limit int64
-}
-
-type CacheResult struct {
-	nodes []*Node
-	err   error
-}
-
 func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMaxWait, backoffTime time.Duration) *FindCache {
 	fc := &FindCache{
 		size:                size,
@@ -90,40 +80,28 @@ func NewFindCache(size, invalidateQueueSize, invalidateMaxSize int, invalidateMa
 	return fc
 }
 
-func (c *FindCache) Get(orgId uint32, pattern string, limit int64) (CacheResult, bool) {
+func (c *FindCache) Get(orgId uint32, pattern string) ([]*Node, bool) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
 	c.RUnlock()
 	if !ok {
 		findCacheMiss.Inc()
-		return CacheResult{}, ok
+		return nil, ok
 	}
-	key := cacheKey{pattern, limit}
-	nodes, ok := cache.Get(key)
+	nodes, ok := cache.Get(pattern)
 	if !ok {
 		findCacheMiss.Inc()
-		return CacheResult{}, ok
+		return nil, ok
 	}
 	findCacheHit.Inc()
-	return nodes.(CacheResult), ok
+	return nodes.([]*Node), ok
 }
 
-func (c *FindCache) Add(orgId uint32, pattern string, limit int64, nodes []*Node, e error) {
+func (c *FindCache) Add(orgId uint32, pattern string, nodes []*Node) {
 	c.RLock()
 	cache, ok := c.cache[orgId]
 	backoff := c.backoff
 	c.RUnlock()
-
-	key := cacheKey{
-		patt:  pattern,
-		limit: limit,
-	}
-
-	cr := CacheResult{
-		nodes: nodes,
-		err:   e,
-	}
-
 	var err error
 	if !ok {
 		// don't init the cache if we are in backoff mode.
@@ -144,7 +122,7 @@ func (c *FindCache) Add(orgId uint32, pattern string, limit int64, nodes []*Node
 		}
 		c.Unlock()
 	}
-	cache.Add(key, cr)
+	cache.Add(pattern, nodes)
 }
 
 // Purge clears the cache for the specified orgId
@@ -179,9 +157,6 @@ func (c *FindCache) PurgeAll() {
 // goroutines processing the invalidations, we purge the cache and
 // disable it for `backoffTime`. Future InvalidateFor calls made during
 // the backoff time will then return immediately.
-// Note: if we have a cached entry for a find that resulted in "too many series requested"
-// we shouldn't have to clear that when entries are added to the cache
-// (only when entries are removed). but that's an optimization for later.
 func (c *FindCache) InvalidateFor(orgId uint32, path string) {
 	c.Lock()
 	findCacheInvalidationsReceived.Inc()
@@ -300,7 +275,7 @@ func (c *FindCache) processInvalidateQueue() {
 			}
 
 			for _, k := range cache.Keys() {
-				matches, err := find((*Tree)(tree), k.(cacheKey).patt)
+				matches, err := find((*Tree)(tree), k.(string))
 				if err != nil {
 					log.Errorf("memory-idx: checking if cache key %q matches any of the %d invalid patterns resulted in error: %s", k, len(reqs), err)
 				}
