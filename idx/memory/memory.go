@@ -1348,41 +1348,41 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 	// if there are public (orgId OrgIdPublic) and private leaf nodes with the same series
 	// path, then the public metricDefs will be excluded.
 	for _, n := range matchedNodes {
-		if _, ok := byPath[n.Path]; !ok {
-			idxNode := idx.Node{
-				Path:        n.Path,
-				Leaf:        n.Leaf(),
-				HasChildren: n.HasChildren(),
-			}
-			if idxNode.Leaf {
-				idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
-				for _, id := range n.Defs {
-					def := m.defById[id]
-					if def == nil {
-						// def could be nil if items from the findCache have been deleted.
-						log.Debugf("memory-idx: Find: def with id=%s from node with path=%s does not exist anymore", id, n.Path)
-						continue
-					}
-					if from != 0 && atomic.LoadInt64(&def.LastUpdate) < from {
-						statFiltered.Inc()
-						log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
-						continue
-					}
-					if log.IsLevelEnabled(log.DebugLevel) {
-						lastSave := atomic.LoadUint32(&def.LastSave)
-						log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
-					}
-					idxNode.Defs = append(idxNode.Defs, CloneArchive(def))
-				}
-				if len(idxNode.Defs) == 0 {
+		if _, ok := byPath[n.Path]; ok {
+			log.Debugf("memory-idx: path %s already seen", n.Path)
+			continue
+		}
+		idxNode := idx.Node{
+			Path:        n.Path,
+			Leaf:        n.Leaf(),
+			HasChildren: n.HasChildren(),
+		}
+		if idxNode.Leaf {
+			idxNode.Defs = make([]idx.Archive, 0, len(n.Defs))
+			for _, id := range n.Defs {
+				def := m.defById[id]
+				if def == nil {
+					// def could be nil if items from the findCache have been deleted.
+					log.Debugf("memory-idx: Find: def with id=%s from node with path=%s does not exist anymore", id, n.Path)
 					continue
 				}
+				if from != 0 && atomic.LoadInt64(&def.LastUpdate) < from {
+					statFiltered.Inc()
+					log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
+					continue
+				}
+				if log.IsLevelEnabled(log.DebugLevel) {
+					lastSave := atomic.LoadUint32(&def.LastSave)
+					log.Debugf("memory-idx: Find: adding to path %s archive id=%s name=%s int=%d schemaId=%d aggId=%d irId=%d lastSave=%d", n.Path, def.Id, def.Name, def.Interval, def.SchemaId, def.AggId, def.IrId, lastSave)
+				}
+				idxNode.Defs = append(idxNode.Defs, CloneArchive(def))
 			}
-			results = append(results, idxNode)
-			byPath[n.Path] = struct{}{}
-		} else {
-			log.Debugf("memory-idx: path %s already seen", n.Path)
+			if len(idxNode.Defs) == 0 {
+				continue
+			}
 		}
+		results = append(results, idxNode)
+		byPath[n.Path] = struct{}{}
 	}
 	log.Debugf("memory-idx: %d nodes has %d unique paths.", len(matchedNodes), len(results))
 	statFindDuration.Value(time.Since(pre))
