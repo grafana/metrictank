@@ -300,7 +300,7 @@ func (c *FindCache) processInvalidateQueue() {
 			}
 
 			for _, k := range cache.Keys() {
-				matches, err := find((*Tree)(tree), k.(cacheKey).patt, 0)
+				matches, err := find((*Tree)(tree), k.(cacheKey).patt)
 				if err != nil {
 					log.Errorf("memory-idx: checking if cache key %q matches any of the %d invalid patterns resulted in error: %s", k, len(reqs), err)
 				}

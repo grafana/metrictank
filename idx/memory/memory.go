@@ -1273,7 +1273,7 @@ func (m *UnpartitionedMemoryIdx) finalizeResult(res []string, limit uint, dedupl
 func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string, limit int64) ([]*Node, error) {
 
 	if m.findCache == nil {
-		return find(tree, pattern, limit)
+		return find(tree, pattern)
 	}
 
 	cr, ok := m.findCache.Get(orgId, pattern, limit)
@@ -1281,7 +1281,7 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, patte
 		return cr.nodes, cr.err
 	}
 
-	matchedNodes, err := find(tree, pattern, limit)
+	matchedNodes, err := find(tree, pattern)
 
 	// we want to cache bad requests from the user
 	if err != nil {
@@ -1390,7 +1390,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 }
 
 // find returns all Nodes matching the pattern for the given tree
-func find(tree *Tree, pattern string, limit int64) ([]*Node, error) {
+func find(tree *Tree, pattern string) ([]*Node, error) {
 	var nodes []string
 	if strings.Index(pattern, ";") == -1 {
 		nodes = strings.Split(pattern, ".")
@@ -1450,10 +1450,6 @@ func find(tree *Tree, pattern string, limit int64) ([]*Node, error) {
 			}
 			log.Debugf("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[i])
 			matches := matcher(c.Children)
-
-			if limit > 0 && int64(len(grandChildren)+len(matches)) > limit {
-				return nil, errors.NewBadRequest("limit exhausted")
-			}
 
 			for _, m := range matches {
 				newBranch := c.Path + "." + m
@@ -1576,7 +1572,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	if !ok {
 		return nil, nil
 	}
-	found, err := find(tree, pattern, 0)
+	found, err := find(tree, pattern)
 	if err != nil {
 		return nil, err
 	}
