@@ -1824,7 +1824,9 @@ ORGS:
 	return pruned, nil
 }
 
-func getMatcher(path string) (func([]string) []string, error) {
+type matcher func([]string) []string
+
+func getMatcher(path string) (matcher, error) {
 	// Matches everything
 	if path == "*" {
 		return func(children []string) []string {
