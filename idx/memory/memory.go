@@ -1270,27 +1270,22 @@ func (m *UnpartitionedMemoryIdx) finalizeResult(res []string, limit uint, dedupl
 	return res
 }
 
-func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string, limit int64) ([]*Node, error) {
+func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
 
 	if m.findCache == nil {
 		return find(tree, pattern)
 	}
 
-	cr, ok := m.findCache.Get(orgId, pattern, limit)
+	matchedNodes, ok := m.findCache.Get(orgId, pattern)
 	if ok {
-		return cr.nodes, cr.err
+		return matchedNodes, nil
 	}
 
 	matchedNodes, err := find(tree, pattern)
-
-	// we want to cache bad requests from the user
 	if err != nil {
-		_, ok := err.(errors.BadRequest)
-		if !ok {
-			return nil, err
-		}
+		return nil, err
 	}
-	m.findCache.Add(orgId, pattern, limit, matchedNodes, err)
+	m.findCache.Add(orgId, pattern, matchedNodes)
 	return matchedNodes, err
 }
 
@@ -1313,7 +1308,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
 	} else {
-		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern, limit)
+		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern)
 		if err != nil {
 			return nil, err
 		}
@@ -1333,7 +1328,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 					return nil, errors.NewBadRequest("limit exhausted")
 				}
 			}
-			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern, limit)
+			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
 			if err != nil {
 				return nil, err
 			}
