@@ -1316,18 +1316,6 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
 		tree, ok = m.tree[idx.OrgIdPublic]
 		if ok {
-			if limit > 0 {
-				limit -= int64(len(matchedNodes))
-				// technically, this is off by one:
-				// if limit was 10 and we found 10 nodes, then the request will still be OK
-				// if the find for publicNodes doesn't find anything.
-				// but we already use 0 to mean unlimited, can't use it for "this may not match anything"
-				// but this seems like an acceptable edge case. What we certainly want to avoid is the limit
-				// going negative or being set to 0 which would mean unlimited.
-				if limit < 1 {
-					return nil, errors.NewBadRequest("limit exhausted")
-				}
-			}
 			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
 			if err != nil {
 				return nil, err
