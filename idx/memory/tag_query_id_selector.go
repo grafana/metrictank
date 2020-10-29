@@ -205,7 +205,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 
 				select {
 				case <-i.stopCh:
-					break
+					return
 				case i.rawResCh <- id:
 				}
 			}
