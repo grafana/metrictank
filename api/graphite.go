@@ -100,7 +100,9 @@ type Series struct {
 	Node    cluster.Node
 }
 
-func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64, maxSeries int) ([]Series, error) {
+// findSeries returns for each requested pattern, a list of index nodes (collected across the entire cluster), these can be both leaves or branches
+// whether or not the caller wants only leaves, the limit only applies to leaves (series), not branches
+func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string, seenAfter int64, leavesOnly bool, maxSeries int) ([]Series, error) {
 
 	fetchFn := func(reqCtx context.Context, peer cluster.Node, peerGroups map[int32][]cluster.Node) (interface{}, error) {
 		ourParts := len(peer.GetPartitions())
@@ -128,46 +130,55 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 		}
 		return peer.Post(reqCtx, "findSeriesRemote", "/index/find", data)
 	}
-	resps, err := s.queryAllShards(ctx, "findSeriesRemote", fetchFn)
-	if err != nil {
-		return nil, err
-	}
-	select {
-	case <-ctx.Done():
-		//request canceled
-		return nil, nil
-	default:
-	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var leavesCnt int
 	series := make([]Series, 0)
-	resp := models.IndexFindResp{}
-	for _, r := range resps {
-		if len(series) == maxSeries {
-			return nil, response.NewError(
-				http.StatusRequestEntityTooLarge,
-				fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
-		}
-		_, err = resp.UnmarshalMsg(r.buf)
-		if err != nil {
+
+	responseChan, errorChan := s.queryAllShardsGeneric(ctx, "findSeriesRemote", fetchFn)
+
+MainLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			//request canceled
+			return nil, nil
+		case err := <-errorChan:
 			return nil, err
-		}
-
-		for pattern, nodes := range resp.Nodes {
-			if len(series) == maxSeries {
-				return nil, response.NewError(
-					http.StatusRequestEntityTooLarge,
-					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+		case r, ok := <-responseChan:
+			if !ok {
+				break MainLoop
 			}
-
-			series = append(series, Series{
-				Pattern: pattern,
-				Node:    r.peer,
-				Series:  nodes,
-			})
-			log.Debugf("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, r.peer.GetName())
+			resp := models.IndexFindResp{}
+			_, err := resp.UnmarshalMsg(r.resp.([]byte))
+			if err != nil {
+				return nil, err
+			}
+			for pattern, nodes := range resp.Nodes {
+				s := Series{
+					Pattern: pattern,
+					Node:    r.peer,
+				}
+				for _, node := range nodes {
+					if node.Leaf {
+						leavesCnt++
+						if maxSeries > 0 && leavesCnt > maxSeries {
+							return nil, response.NewError(
+								http.StatusRequestEntityTooLarge,
+								fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
+						}
+					} else if leavesOnly {
+						continue
+					}
+					s.Series = append(s.Series, node)
+				}
+				series = append(series, s)
+				log.Debugf("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, r.peer.GetName())
+			}
 		}
 	}
-
 	return series, nil
 }
 
@@ -362,7 +373,7 @@ func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFin
 	}
 	nodes := make([]idx.Node, 0)
 	reqCtx := ctx.Req.Context()
-	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix), maxSeriesPerReq)
+	series, err := s.findSeries(reqCtx, ctx.OrgId, []string{request.Query}, int64(fromUnix), false, maxSeriesPerReq)
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -410,17 +421,13 @@ func (s *Server) metricsExpand(ctx *middleware.Context, request models.GraphiteE
 	for i, query := range request.Query {
 		i, query := i, query
 		g.Go(func() error {
-			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0, maxSeriesPerReq)
+			series, err := s.findSeries(errGroupCtx, ctx.OrgId, []string{query}, 0, request.LeavesOnly, maxSeriesPerReq)
 			if err != nil {
 				return err
 			}
 			results[i] = make(map[string]struct{})
 			for _, s := range series {
 				for _, n := range s.Series {
-					if request.LeavesOnly && !n.Leaf {
-						continue
-					}
-
 					results[i][n.Path] = struct{}{}
 				}
 			}
@@ -855,7 +862,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			}
 			series, err = s.clusterFindByTag(ctx, orgId, exprs, int64(r.From), findLimit, false)
 		} else {
-			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), findLimit)
+			series, err = s.findSeries(ctx, orgId, []string{r.Query}, int64(r.From), true, findLimit)
 		}
 		if err != nil {
 			return nil, meta, err
