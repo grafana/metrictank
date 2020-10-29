@@ -1270,32 +1270,28 @@ func (m *UnpartitionedMemoryIdx) finalizeResult(res []string, limit uint, dedupl
 	return res
 }
 
-func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string, limit int64) ([]*Node, error) {
+func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, pattern string) ([]*Node, error) {
 
 	if m.findCache == nil {
-		return find(tree, pattern, limit)
+		return find(tree, pattern)
 	}
 
-	cr, ok := m.findCache.Get(orgId, pattern, limit)
+	matchedNodes, ok := m.findCache.Get(orgId, pattern)
 	if ok {
-		return cr.nodes, cr.err
+		return matchedNodes, nil
 	}
 
-	matchedNodes, err := find(tree, pattern, limit)
-
-	// we want to cache bad requests from the user
+	matchedNodes, err := find(tree, pattern)
 	if err != nil {
-		_, ok := err.(errors.BadRequest)
-		if !ok {
-			return nil, err
-		}
+		return nil, err
 	}
-	m.findCache.Add(orgId, pattern, limit, matchedNodes, err)
+	m.findCache.Add(orgId, pattern, matchedNodes)
 	return matchedNodes, err
 }
 
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit int64) ([]idx.Node, error) {
 
+	// NOTE: `limit` checking temporarily disabled here. see #1930
 	// note that we apply the limit on the raw memory.Node count for find()
 	// if you have a metric with the same path both in the public tree as well as the tree for your org
 	// we count it each time, even though we would merge it by path before returning.
@@ -1313,7 +1309,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 	if !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
 	} else {
-		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern, limit)
+		matchedNodes, err = m.findMaybeCached(tree, orgId, pattern)
 		if err != nil {
 			return nil, err
 		}
@@ -1321,19 +1317,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 	if orgId != idx.OrgIdPublic && idx.OrgIdPublic > 0 {
 		tree, ok = m.tree[idx.OrgIdPublic]
 		if ok {
-			if limit > 0 {
-				limit -= int64(len(matchedNodes))
-				// technically, this is off by one:
-				// if limit was 10 and we found 10 nodes, then the request will still be OK
-				// if the find for publicNodes doesn't find anything.
-				// but we already use 0 to mean unlimited, can't use it for "this may not match anything"
-				// but this seems like an acceptable edge case. What we certainly want to avoid is the limit
-				// going negative or being set to 0 which would mean unlimited.
-				if limit < 1 {
-					return nil, errors.NewBadRequest("limit exhausted")
-				}
-			}
-			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern, limit)
+			publicNodes, err := m.findMaybeCached(tree, idx.OrgIdPublic, pattern)
 			if err != nil {
 				return nil, err
 			}
@@ -1390,7 +1374,7 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 }
 
 // find returns all Nodes matching the pattern for the given tree
-func find(tree *Tree, pattern string, limit int64) ([]*Node, error) {
+func find(tree *Tree, pattern string) ([]*Node, error) {
 	var nodes []string
 	if strings.Index(pattern, ";") == -1 {
 		nodes = strings.Split(pattern, ".")
@@ -1450,10 +1434,6 @@ func find(tree *Tree, pattern string, limit int64) ([]*Node, error) {
 			}
 			log.Debugf("memory-idx: searching %d children of %s that match %s", len(c.Children), c.Path, nodes[i])
 			matches := matcher(c.Children)
-
-			if limit > 0 && int64(len(grandChildren)+len(matches)) > limit {
-				return nil, errors.NewBadRequest("limit exhausted")
-			}
 
 			for _, m := range matches {
 				newBranch := c.Path + "." + m
@@ -1576,7 +1556,7 @@ func (m *UnpartitionedMemoryIdx) Delete(orgId uint32, pattern string) ([]idx.Arc
 	if !ok {
 		return nil, nil
 	}
-	found, err := find(tree, pattern, 0)
+	found, err := find(tree, pattern)
 	if err != nil {
 		return nil, err
 	}

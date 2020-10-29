@@ -317,16 +317,18 @@ func TestFindLimit(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(nodes, ShouldHaveLength, 5)
 	})
-	Convey("When searching with a breached limit", t, func() {
-		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 4)
-		So(err, ShouldNotBeNil)
-		So(nodes, ShouldHaveLength, 0)
-	})
-	Convey("When searching with a breached limit", t, func() {
-		nodes, err := ix.Find(65, "metric.demo.*.*", 0, 3)
-		So(err, ShouldNotBeNil)
-		So(nodes, ShouldHaveLength, 0)
-	})
+	/*
+		Convey("When searching with a breached limit", t, func() {
+			nodes, err := ix.Find(65, "metric.demo.*.*", 0, 4)
+			So(err, ShouldNotBeNil)
+			So(nodes, ShouldHaveLength, 0)
+		})
+		Convey("When searching with a breached limit", t, func() {
+			nodes, err := ix.Find(65, "metric.demo.*.*", 0, 3)
+			So(err, ShouldNotBeNil)
+			So(nodes, ShouldHaveLength, 0)
+		})
+	*/
 }
 func testFind(t *testing.T) {
 	idx.OrgIdPublic = 100

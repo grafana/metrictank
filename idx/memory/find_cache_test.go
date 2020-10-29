@@ -86,23 +86,23 @@ func TestFindCache(t *testing.T) {
 	Convey("when findCache is empty", t, func() {
 		c := NewFindCache(10, 5, 2, 100*time.Millisecond, time.Second*2)
 		Convey("0 results should be returned", func() {
-			result, ok := c.Get(1, "foo.bar.*", 0)
+			result, ok := c.Get(1, "foo.bar.*")
 			So(ok, ShouldBeFalse)
-			So(result.nodes, ShouldHaveLength, 0)
+			So(result, ShouldHaveLength, 0)
 		})
 		Convey("when adding entries to the cache", func() {
 			pattern := "foo.bar.*"
 			tree := newBareTree()
 			tree.add("foo.bar.foo")
-			results, err := find((*Tree)(tree), pattern, 0)
+			results, err := find((*Tree)(tree), pattern)
 			So(err, ShouldBeNil)
 			So(results, ShouldHaveLength, 1)
-			c.Add(1, "foo.bar.*", 0, results, nil)
+			c.Add(1, "foo.bar.*", results)
 			So(c.cache[1].Len(), ShouldEqual, 1)
 			Convey("when getting cached pattern", func() {
-				result, ok := c.Get(1, "foo.bar.*", 0)
+				result, ok := c.Get(1, "foo.bar.*")
 				So(ok, ShouldBeTrue)
-				So(result.nodes, ShouldHaveLength, 1)
+				So(result, ShouldHaveLength, 1)
 				Convey("After invalidating path that matches pattern", func() {
 					c.InvalidateFor(1, "foo.bar.baz")
 					time.Sleep(time.Second) // make sure we reach invalidateMaxWait
@@ -114,27 +114,27 @@ func TestFindCache(t *testing.T) {
 				})
 			})
 			Convey("when findCache invalidation falls behind", func() {
-				c.Add(1, "foo.{a,b,c}*.*", 0, results, nil)
-				c.Add(1, "foo.{a,b,e}*.*", 0, results, nil)
-				c.Add(1, "foo.{a,b,f}*.*", 0, results, nil)
+				c.Add(1, "foo.{a,b,c}*.*", results)
+				c.Add(1, "foo.{a,b,e}*.*", results)
+				c.Add(1, "foo.{a,b,f}*.*", results)
 				c.triggerBackoff()
 				c.InvalidateFor(1, "foo.baz.foo.a.b.c.d.e.f.g.h")
 
 				So(len(c.cache), ShouldEqual, 0)
 				Convey("when adding to cache in backoff", func() {
-					c.Add(1, "foo.*.*", 0, results, nil)
+					c.Add(1, "foo.*.*", results)
 					So(len(c.cache), ShouldEqual, 0)
-					result, ok := c.Get(1, "foo.*.*", 0)
+					result, ok := c.Get(1, "foo.*.*")
 					So(ok, ShouldBeFalse)
-					So(result.nodes, ShouldHaveLength, 0)
+					So(result, ShouldHaveLength, 0)
 				})
 				Convey("when adding to cache after backoff time", func() {
 					time.Sleep(time.Millisecond * 2500)
-					c.Add(1, "foo.*.*", 0, results, nil)
+					c.Add(1, "foo.*.*", results)
 					So(len(c.cache), ShouldEqual, 1)
-					result, ok := c.Get(1, "foo.*.*", 0)
+					result, ok := c.Get(1, "foo.*.*")
 					So(ok, ShouldBeTrue)
-					So(result.nodes, ShouldHaveLength, 1)
+					So(result, ShouldHaveLength, 1)
 				})
 			})
 		})
