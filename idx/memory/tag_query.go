@@ -190,7 +190,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 	q.metaTagRecords = mtr
 	q.prepareExpressions()
 
-	timeoutChan := make(chan struct{})
+	stopChan := make(chan struct{})
 	finishedChan := make(chan struct{})
 
 	// no initial expression has been chosen, returning empty result
@@ -206,7 +206,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		q.wg.Add(1)
 		go func() {
 			defer q.wg.Done()
-			q.selector.getIds(idCh, timeoutChan)
+			q.selector.getIds(idCh, stopChan)
 			close(idCh)
 		}()
 
@@ -222,7 +222,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		q.wg.Add(1)
 		go func() {
 			defer q.wg.Done()
-			q.selector.getIds(resCh, timeoutChan)
+			q.selector.getIds(resCh, stopChan)
 		}()
 	}
 
@@ -231,13 +231,19 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		finishedChan <- struct{}{}
 	}()
 
-	timeout := time.NewTimer(TagQueryTimeout)
-	defer timeout.Stop()
+	var timeoutChan <-chan time.Time
+	if TagQueryTimeout >= time.Nanosecond {
+		timeout := time.NewTimer(TagQueryTimeout)
+		timeoutChan = timeout.C
+		defer timeout.Stop()
+	}
 	select {
-	case <-timeout.C:
+	case <-timeoutChan:
 		// Took too long
 		log.Errorf("Canceling request due to timeout: %v", q.query.Expressions.Strings())
-		timeoutChan <- struct{}{}
+		// Signal background routines to abort
+		close(stopChan)
+		// Block until background routines are done
 		<-finishedChan
 	case <-finishedChan:
 		// Success
