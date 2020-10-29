@@ -698,6 +698,46 @@ func BenchmarkFilter100kByMetaTagWithIndexSize1mAnd50kMetaRecordsWithMultipleExp
 	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
 }
 
+func BenchmarkFilterByAbsenceOfMetaTag(b *testing.B) {
+	metaRecordCnt := 50000
+	metricCnt := 1000000
+	expectedResCount := 50000
+	expectedTagsPerDef := 5
+	expectedMetaTagsPerDef := 1
+
+	metaRecordGen := func(metaRecordId int) struct {
+		expressions []string
+		metaTags    []string
+	} {
+		res := struct {
+			expressions []string
+			metaTags    []string
+		}{}
+		if metaRecordId < metaRecordCnt/2 {
+			res.metaTags = []string{"stage=prod"}
+		} else {
+			// half of all meta records assign the meta tag filterBy=thisTag,
+			// in the query we will filter for the absence of this tag
+			res.metaTags = []string{"filterBy=thisTag"}
+		}
+		res.expressions = []string{fmt.Sprintf("host=hostname%d", metaRecordId)}
+
+		return res
+	}
+
+	tagGen := func(id int) []string {
+		metaRecordId := id % metaRecordCnt
+		// each host value will be assigned to 1M/50k = 20 metrics
+		return []string{fmt.Sprintf("host=hostname%d", metaRecordId), fmt.Sprintf("other=property%d", metaRecordId), fmt.Sprintf("cluster=cluster%d", id%10)}
+	}
+
+	queryGen := func(id uint32) []string {
+		return []string{fmt.Sprintf("cluster=cluster%d", id%10), "filterBy="}
+	}
+
+	benchmarkFindByMetaTag(b, metricCnt, metaRecordCnt, expectedResCount, expectedTagsPerDef, expectedMetaTagsPerDef, queryGen, tagGen, metaRecordGen)
+}
+
 func getMetaRecordsForMetaTagQueryBenchmark(b *testing.B, metaRecordCount int, metaRecordGen func(metaRecordId int) struct {
 	expressions []string
 	metaTags    []string
