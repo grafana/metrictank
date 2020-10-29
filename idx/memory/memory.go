@@ -53,7 +53,7 @@ var (
 	maxPruneLockTimeStr          string
 	TagSupport                   bool
 	TagQueryWorkers              int               // number of workers to spin up when evaluation tag expressions
-	TagQueryTimeout              = 5 * time.Minute // max duration of tag query operation.
+	TagQueryTimeout              = 0 * time.Second // max duration of tag query operation.
 	metaTagEnricherQueueSize     = 100
 	metaTagEnricherBufferSize    = 10000
 	metaTagEnricherBufferTime    = 5 * time.Second
@@ -78,7 +78,7 @@ func ConfigSetup() *flag.FlagSet {
 	memoryIdx.BoolVar(&TagSupport, "tag-support", true, "enables/disables querying based on tags")
 	memoryIdx.BoolVar(&Partitioned, "partitioned", false, "use separate indexes per partition. experimental feature")
 	memoryIdx.IntVar(&TagQueryWorkers, "tag-query-workers", 5, "number of workers to spin up to evaluate tag queries")
-	memoryIdx.DurationVar(&TagQueryTimeout, "tag-query-timeout", time.Minute*5, "max allowed runtime for any single tag query")
+	memoryIdx.DurationVar(&TagQueryTimeout, "tag-query-timeout", 0*time.Second, "max allowed runtime for any single tag query. 0 means no timeout")
 	memoryIdx.IntVar(&metaTagEnricherQueueSize, "meta-tag-enricher-queue-size", 100, "size of event queue in the meta tag enricher")
 	memoryIdx.IntVar(&metaTagEnricherBufferSize, "meta-tag-enricher-buffer-size", 10000, "size of add metric event buffer in enricher")
 	memoryIdx.DurationVar(&metaTagEnricherBufferTime, "meta-tag-enricher-buffer-time", time.Second*5, "how long to buffer enricher events before they must be processed")
