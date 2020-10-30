@@ -95,6 +95,7 @@ var tagQueries = []testQuery{
 	{Expressions: []string{"dc=dc1", "host!=~host10[0-9]{2}", "device!=~c.*"}, ExpectedResults: 4000},
 }
 
+// cpuMetrics returns dcCount*hostCount*cpuCount*8 metrics mimicing cpu metrics with tags
 func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []metric {
 	var series []metric
 	for dc := 0; dc < dcCount; dc++ {
@@ -119,6 +120,7 @@ func cpuMetrics(dcCount, hostCount, hostOffset, cpuCount int, prefix string) []m
 	return series
 }
 
+// diskMetrics returns dcCount*hostCount*diskCount*8 metrics mimicking disk metrics with tags
 func diskMetrics(dcCount, hostCount, hostOffset, diskCount int, prefix string) []metric {
 	var series []metric
 	for dc := 0; dc < dcCount; dc++ {
