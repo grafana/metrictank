@@ -134,7 +134,7 @@ func (s *Server) findSeries(ctx context.Context, orgId uint32, patterns []string
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var leavesCnt int
+	var leavesTotal int
 	series := make([]Series, 0)
 
 	responseChan, errorChan := s.queryAllShardsGeneric(ctx, "findSeriesRemote", fetchFn)
@@ -161,10 +161,12 @@ MainLoop:
 					Pattern: pattern,
 					Node:    r.peer,
 				}
+				var leavesInResp int
 				for _, node := range nodes {
 					if node.Leaf {
-						leavesCnt++
-						if maxSeries > 0 && leavesCnt > maxSeries {
+						leavesTotal++
+						leavesInResp++
+						if maxSeries > 0 && leavesTotal > maxSeries {
 							return nil, response.NewError(
 								http.StatusRequestEntityTooLarge,
 								fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
@@ -175,7 +177,7 @@ MainLoop:
 					s.Series = append(s.Series, node)
 				}
 				series = append(series, s)
-				log.Debugf("HTTP findSeries %d matches for %s found on %s", len(nodes), pattern, r.peer.GetName())
+				log.Debugf("HTTP findSeries %d matches (of which %d leaves) for %s found on %s", len(nodes), leavesInResp, pattern, r.peer.GetName())
 			}
 		}
 	}
