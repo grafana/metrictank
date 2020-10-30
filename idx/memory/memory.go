@@ -1291,7 +1291,6 @@ func (m *UnpartitionedMemoryIdx) findMaybeCached(tree *Tree, orgId uint32, patte
 
 func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit int64) ([]idx.Node, error) {
 
-	// NOTE: `limit` checking temporarily disabled here. see #1930
 	// note that we apply the limit on the raw memory.Node count for find()
 	// if you have a metric with the same path both in the public tree as well as the tree for your org
 	// we count it each time, even though we would merge it by path before returning.
