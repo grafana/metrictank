@@ -145,7 +145,10 @@ MainLoop:
 		case <-ctx.Done():
 			//request canceled
 			return nil, nil
-		case err := <-errorChan:
+		case err, ok := <-errorChan:
+			if !ok {
+				break MainLoop
+			}
 			return nil, err
 		case r, ok := <-responseChan:
 			if !ok {
