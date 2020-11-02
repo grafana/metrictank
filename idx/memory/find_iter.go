@@ -82,7 +82,9 @@ func (f *FindIter) Close() {
 	if !f.done {
 		panic("Close called on !done FindIter")
 	}
-	log.Debugf("memory-idx: reached pattern length. %d nodes matched", len(f.found))
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("memory-idx: reached pattern length. %d nodes matched", len(f.found))
+	}
 	if f.findCache == nil {
 		return
 	}

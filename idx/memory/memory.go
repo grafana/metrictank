@@ -1280,7 +1280,7 @@ func (m *UnpartitionedMemoryIdx) getCachedIterator(orgId uint32, pattern string)
 		}
 	}
 	iter, ok := m.newFindIterator(orgId, pattern)
-	if !ok {
+	if log.IsLevelEnabled(log.DebugLevel) && !ok {
 		log.Debugf("memory-idx: orgId %d has no metrics indexed.", orgId)
 	}
 	return iter, ok
@@ -1334,7 +1334,9 @@ func (m *UnpartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit 
 			}
 		}
 	}
-	log.Debugf("memory-idx: %d nodes has %d unique paths.", fp.foundNodes, len(fp.results))
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("memory-idx: %d nodes has %d unique paths.", fp.foundNodes, len(fp.results))
+	}
 	statFindDuration.Value(time.Since(pre))
 	return fp.results, nil
 }
@@ -1356,7 +1358,9 @@ func (m *UnpartitionedMemoryIdx) consumeIter(fp *findProgress, iter Iter, from, 
 		}
 		fp.foundNodes++
 		if _, ok := fp.seenByPath[n.Path]; ok {
-			log.Debugf("memory-idx: path %s already seen", n.Path)
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("memory-idx: path %s already seen", n.Path)
+			}
 			continue
 		}
 		idxNode := idx.Node{
@@ -1369,13 +1373,17 @@ func (m *UnpartitionedMemoryIdx) consumeIter(fp *findProgress, iter Iter, from, 
 			for _, id := range n.Defs {
 				def := m.defById[id]
 				if def == nil {
-					// def could be nil if items from the findCache have been deleted.
-					log.Debugf("memory-idx: Find: def with id=%s from node with path=%s does not exist anymore", id, n.Path)
+					if log.IsLevelEnabled(log.DebugLevel) {
+						// def could be nil if items from the findCache have been deleted.
+						log.Debugf("memory-idx: Find: def with id=%s from node with path=%s does not exist anymore", id, n.Path)
+					}
 					continue
 				}
 				if from != 0 && atomic.LoadInt64(&def.LastUpdate) < from {
 					statFiltered.Inc()
-					log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
+					if log.IsLevelEnabled(log.DebugLevel) {
+						log.Debugf("memory-idx: from is %d, so skipping %s which has LastUpdate %d", from, def.Id, atomic.LoadInt64(&def.LastUpdate))
+					}
 					continue
 				}
 				if log.IsLevelEnabled(log.DebugLevel) {
@@ -1421,7 +1429,9 @@ func findWorker(tree *Tree, pattern string, out chan *Node, errChan chan error) 
 	pos := len(nodes)
 	for i := 0; i < len(nodes); i++ {
 		if strings.ContainsAny(nodes[i], "*{}[]?") {
-			log.Debugf("memory-idx: found first pattern sequence at node %s pos %d", nodes[i], i)
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("memory-idx: found first pattern sequence at node %s pos %d", nodes[i], i)
+			}
 			pos = i
 			break
 		}
@@ -1443,11 +1453,15 @@ func findWorker(tree *Tree, pattern string, out chan *Node, errChan chan error) 
 		branch = strings.Join(nodes[:pos], ".")
 	}
 
-	log.Debugf("memory-idx: starting search at node %q", branch)
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.Debugf("memory-idx: starting search at node %q", branch)
+	}
 	startNode, ok := tree.Items[branch]
 
 	if !ok {
-		log.Debugf("memory-idx: branch %q does not exist in the index", branch)
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("memory-idx: branch %q does not exist in the index", branch)
+		}
 		return
 	}
 
@@ -1461,10 +1475,14 @@ func findWorker(tree *Tree, pattern string, out chan *Node, errChan chan error) 
 	var search func(node *Node, pos int) error
 	search = func(node *Node, pos int) error {
 		if !node.HasChildren() {
-			log.Debugf("memory-idx: end of branch reached at %s with no match found for %s", node.Path, pattern)
+			if log.IsLevelEnabled(log.DebugLevel) {
+				log.Debugf("memory-idx: end of branch reached at %s with no match found for %s", node.Path, pattern)
+			}
 			return nil
 		}
-		log.Debugf("memory-idx: searching %d children of %s that match %s", len(node.Children), node.Path, nodes[pos])
+		if log.IsLevelEnabled(log.DebugLevel) {
+			log.Debugf("memory-idx: searching %d children of %s that match %s", len(node.Children), node.Path, nodes[pos])
+		}
 		matches := matchers[pos](node.Children)
 
 		for _, m := range matches {
