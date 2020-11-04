@@ -50,6 +50,7 @@ func (s *FuncMovingWindow) Signature() ([]Arg, []Arg) {
 	return []Arg{
 			ArgSeriesList{val: &s.in},
 			ArgString{key: "windowSize", val: &s.windowSize, validator: []Validator{IsSignedIntervalString}},
+			ArgString{key: "func", opt: true, val: &s.fn, validator: []Validator{IsConsolFunc}},
 			ArgFloat{key: "xFilesFactor", opt: true, val: &s.xFilesFactor, validator: []Validator{WithinZeroOneInclusiveInterval}},
 		}, []Arg{
 			ArgSeriesList{},
