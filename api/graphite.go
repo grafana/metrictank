@@ -316,7 +316,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	execCtx, execSpan := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
 	defer execSpan.Finish()
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, &plan)
-	defer plan.Clean()
+	defer plan.CheckedClean(request.Targets)
 	if err != nil {
 		err := response.WrapError(err)
 		if err.HTTPStatusCode() == http.StatusBadRequest && !request.NoProxy && proxyBadRequests {
