@@ -17,6 +17,7 @@ import (
 
 type FuncMovingWindow struct {
 	in           GraphiteFunc
+	generic      bool
 	windowSize   string
 	fn           string
 	xFilesFactor float64
@@ -24,15 +25,19 @@ type FuncMovingWindow struct {
 	shiftOffset uint32
 }
 
-// NewMovingWindowConstructor takes an agg string and returns a constructor function
-func NewMovingWindowConstructor(name string) func() GraphiteFunc {
+// NewMovingWindowParticular constructs a known, particular function (movingAverage, movingMax, etc)
+func NewMovingWindowParticular(name string) func() GraphiteFunc {
 	return func() GraphiteFunc {
 		return &FuncMovingWindow{fn: name}
 	}
 }
 
-func NewMovingWindow() GraphiteFunc {
-	return &FuncMovingWindow{fn: "average", xFilesFactor: 0}
+// NewMovingWindowGeneric constructs a generic movingWindow function
+func NewMovingWindowGeneric() GraphiteFunc {
+	return &FuncMovingWindow{
+		fn:      "average",
+		generic: true,
+	}
 }
 
 func (s *FuncMovingWindow) Signature() ([]Arg, []Arg) {
