@@ -346,11 +346,12 @@ func getSeriesNamed(name string, data []schema.Point) models.Series {
 	}
 }
 
-func getTimeRangeSeriesListNamed(target, patt string, from, to uint32, data ...[]schema.Point) []models.Series {
+func getTimeRangeSeriesListNamed(target, patt string, interval, from, to uint32, data ...[]schema.Point) []models.Series {
 	outputs := make([]models.Series, 0, len(data))
 	for _, datum := range data {
 		serie := models.Series{
 			Target:     target,
+			Interval:   interval,
 			QueryPatt:  patt,
 			QueryFrom:  from,
 			QueryTo:    to,

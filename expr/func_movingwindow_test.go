@@ -122,9 +122,9 @@ func TestMovingWindowWithDefaultValues(t *testing.T) {
 	offset10s := uint32(10)
 	testMovingWindow(
 		"defaults",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesA, seriesB),
 		getTimeRangeSeriesListNamed("movingAverage(t,\"10s\")", "movingAverage(p,\"10s\")",
-			10+offset10s, 80, resSinglePtInA, resSinglePtInB),
+			10, 10+offset10s, 80, resSinglePtInA, resSinglePtInB),
 		offset10s,
 		"10s",
 		"",         // defaults to "average"
@@ -134,9 +134,9 @@ func TestMovingWindowWithDefaultValues(t *testing.T) {
 	offset20s := uint32(20)
 	testMovingWindow(
 		"defaults",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesA, seriesB),
 		getTimeRangeSeriesListNamed("movingAverage(t,\"20s\")", "movingAverage(p,\"20s\")",
-			10+offset20s, 80, avg2PtsA, res2PtsB),
+			10, 10+offset20s, 80, avg2PtsA, res2PtsB),
 		offset20s,
 		"20s",
 		"",         // defaults to "average"
@@ -148,9 +148,9 @@ func TestMovingWindowByWindowSizes(t *testing.T) {
 	offset10s := uint32(10)
 	testMovingWindow(
 		"signed window(negative)",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesA),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesA, seriesA),
 		getTimeRangeSeriesListNamed("movingAverage(t,\"-10s\")", "movingAverage(p,\"-10s\")",
-			10+offset10s, 80, resSinglePtInA, resSinglePtInA),
+			10, 10+offset10s, 80, resSinglePtInA, resSinglePtInA),
 		offset10s,
 		"-10s",
 		"average",
@@ -159,9 +159,9 @@ func TestMovingWindowByWindowSizes(t *testing.T) {
 
 	testMovingWindow(
 		"signed window (positive)",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesA),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesA, seriesA),
 		getTimeRangeSeriesListNamed("movingSum(t,\"+10s\")", "movingSum(p,\"+10s\")",
-			10+offset10s, 80, resSinglePtInA, resSinglePtInA),
+			10, 10+offset10s, 80, resSinglePtInA, resSinglePtInA),
 		offset10s,
 		"+10s",
 		"sum",
@@ -171,9 +171,9 @@ func TestMovingWindowByWindowSizes(t *testing.T) {
 	offsetZero := uint32(0)
 	testMovingWindow(
 		"empty window",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesA, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesA, seriesB),
 		getTimeRangeSeriesListNamed("movingAverage(t,\"0m\")", "movingAverage(p,\"0m\")",
-			10+offsetZero, 80, allNullPts, allNullPts),
+			10, 10+offsetZero, 80, allNullPts, allNullPts),
 		offsetZero,
 		"0m",
 		"average",
@@ -185,9 +185,9 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 	offset20s := uint32(20)
 	testMovingWindow(
 		"xFilesFactor > 0.5",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesB),
 		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
-			10+offset20s, 80, allNullsB),
+			10, 10+offset20s, 80, allNullsB),
 		offset20s,
 		"20s",
 		"sum",
@@ -196,9 +196,9 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 
 	testMovingWindow(
 		"xFilesFactor < 0.5",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesB),
 		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
-			10+offset20s, 80, res2PtsB),
+			10, 10+offset20s, 80, res2PtsB),
 		offset20s,
 		"20s",
 		"sum",
@@ -207,9 +207,9 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 
 	testMovingWindow(
 		"xFilesFactor 1",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesB),
 		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
-			10+offset20s, 80, allNullsB),
+			10, 10+offset20s, 80, allNullsB),
 		offset20s,
 		"20s",
 		"sum",
@@ -218,9 +218,9 @@ func TestMovingWindowWithXFilesFactorFilter(t *testing.T) {
 
 	testMovingWindow(
 		"xFilesFactor 0",
-		getTimeRangeSeriesListNamed("t", "p", 10, 80, seriesB),
+		getTimeRangeSeriesListNamed("t", "p", 10, 10, 80, seriesB),
 		getTimeRangeSeriesListNamed("movingSum(t,\"20s\")", "movingSum(p,\"20s\")",
-			10+offset20s, 80, res2PtsB),
+			10, 10+offset20s, 80, res2PtsB),
 		offset20s,
 		"20s",
 		"sum",
@@ -233,9 +233,9 @@ func TestMovingWindowWindowWhenTimeShiftGoesBeyondAvailableSeriesStartPoints(t *
 
 	testMovingWindow(
 		"movingSum of 1 min windowSize",
-		getTimeRangeSeriesListNamed("t", "p", 0, 210, seriesC30secs),
+		getTimeRangeSeriesListNamed("t", "p", 30, 0, 210, seriesC30secs),
 		getTimeRangeSeriesListNamed("movingSum(t,\"1min\")", "movingSum(p,\"1min\")",
-			0+offset1min, 210, sumC2Pts),
+			30, 0+offset1min, 210, sumC2Pts),
 		offset1min,
 		"1min",
 		"sum",
@@ -244,9 +244,9 @@ func TestMovingWindowWindowWhenTimeShiftGoesBeyondAvailableSeriesStartPoints(t *
 
 	testMovingWindow(
 		"movingMin of 1 min windowSize",
-		getTimeRangeSeriesListNamed("t", "p", 0, 210, seriesC30secs),
+		getTimeRangeSeriesListNamed("t", "p", 30, 0, 210, seriesC30secs),
 		getTimeRangeSeriesListNamed("movingMin(t,\"1min\")", "movingMin(p,\"1min\")",
-			0+offset1min, 210, minC2Pts),
+			30, 0+offset1min, 210, minC2Pts),
 		offset1min,
 		"1min",
 		"min",
@@ -257,10 +257,9 @@ func TestMovingWindowWindowWhenTimeShiftGoesBeyondAvailableSeriesStartPoints(t *
 func testMovingWindow(name string, in []models.Series, out []models.Series, offset uint32, windowSize, fn string, xFilesFactor float64, t *testing.T) {
 	var f GraphiteFunc
 	if fn != "" {
-		f = NewMovingWindowConstructor(fn)()
-		f.(*FuncMovingWindow).fn = fn
+		f = NewMovingWindowParticular(fn)()
 	} else {
-		f = NewMovingWindow()
+		f = NewMovingWindowGeneric()
 	}
 	f.(*FuncMovingWindow).in = NewMock(in)
 	f.(*FuncMovingWindow).windowSize = windowSize
@@ -269,14 +268,35 @@ func testMovingWindow(name string, in []models.Series, out []models.Series, offs
 		f.(*FuncMovingWindow).xFilesFactor = xFilesFactor
 	}
 
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
+	dataMap := initDataMapMultiple([][]models.Series{in})
+
 	// Calling Context causes the time shift in QueryFrom
 	callContext(name, f, in[0].QueryFrom, in[0].QueryTo, offset, t)
 
-	got, err := f.Exec(make(map[Req][]models.Series))
+	got, err := f.Exec(dataMap)
 	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal("Failed test:", name, err)
+		t.Fatalf("Case %s: %s", name, err)
 	}
 
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(in, inputCopy, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			}
+		}
+	})
 }
 
 func callContext(name string, f GraphiteFunc, from, to, offset uint32, t *testing.T) {
@@ -316,7 +336,7 @@ func benchmarkMovingWindow(b *testing.B, numSeries int, fn0, fn1 func() []schema
 	b.ResetTimer()
 	dataMap := DataMap(make(map[Req][]models.Series))
 	for i := 0; i < b.N; i++ {
-		f := NewMovingWindow()
+		f := NewMovingWindowGeneric()
 		f.(*FuncMovingWindow).in = NewMock(input)
 		f.(*FuncMovingWindow).windowSize = "10m"
 		got, err := f.Exec(dataMap)
