@@ -67,9 +67,7 @@ func testOffset(name string, factor float64, in []models.Series, out []models.Se
 	f.(*FuncOffset).in = NewMock(in)
 	f.(*FuncOffset).factor = factor
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

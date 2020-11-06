@@ -55,6 +55,8 @@ func (s *FuncInvert) Exec(dataMap DataMap) ([]models.Series, error) {
 			Meta:         serie.Meta,
 			QueryMDP:     serie.QueryMDP,
 			QueryPNGroup: serie.QueryPNGroup,
+			QueryFrom:    serie.QueryFrom,
+			QueryTo:      serie.QueryTo,
 		}
 
 		outputs[i] = s

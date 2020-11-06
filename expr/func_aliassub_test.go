@@ -34,9 +34,7 @@ func testAliasSub(search, replace string, inStr, outStr []string, t *testing.T) 
 	alias.replace = replace
 	alias.in = NewMock(in)
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

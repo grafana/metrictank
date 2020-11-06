@@ -62,9 +62,7 @@ func makeAliasByNode(in []models.Series, nodes []expr) GraphiteFunc {
 func testAliasByNode(name string, in []models.Series, out []models.Series, t *testing.T) {
 	f := makeAliasByNode(in, []expr{{etype: etInt, int: 0}})
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

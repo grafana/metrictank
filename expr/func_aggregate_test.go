@@ -255,11 +255,9 @@ func makeAggregate(agg string, in [][]models.Series, xFilesFactor float64) Graph
 }
 
 func testAggregate(name, agg string, in [][]models.Series, out models.Series, t *testing.T, xFilesFactor float64) {
-	// Copy input to check that it is unchanged later
-	inputCopy := make([][]models.Series, len(in))
+	inputCopy := make([][]models.Series, len(in)) // to later verify that it is unchanged
 	for i := range in {
-		inputCopy[i] = make([]models.Series, len(in[i]))
-		copy(inputCopy[i], in[i])
+		inputCopy[i] = models.SeriesCopy(in[i])
 	}
 
 	f := makeAggregate(agg, in, xFilesFactor)

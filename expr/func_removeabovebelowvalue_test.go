@@ -106,9 +106,7 @@ func testRemoveAboveBelowValue(name string, above bool, n float64, in []models.S
 	f.(*FuncRemoveAboveBelowValue).in = NewMock(in)
 	f.(*FuncRemoveAboveBelowValue).n = n
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

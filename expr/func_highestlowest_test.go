@@ -277,9 +277,7 @@ func testHighestLowest(name string, fn string, n int64, highest bool, in []model
 	f.(*FuncHighestLowest).in = NewMock(in)
 	f.(*FuncHighestLowest).n = n
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	//inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

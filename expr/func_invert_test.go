@@ -30,6 +30,18 @@ var datapointsInvert = []schema.Point{
 	{Val: math.Pow(math.MaxFloat64, -1), Ts: 70},
 }
 
+var datapointsInterval20 = []schema.Point{
+	{Val: -5.5, Ts: 20},
+	{Val: -math.MaxFloat64, Ts: 40},
+	{Val: 1234567890, Ts: 60},
+}
+
+var datapointsInterval20Invert = []schema.Point{
+	{Val: math.Pow(-5.5, -1), Ts: 20},
+	{Val: math.Pow(-math.MaxFloat64, -1), Ts: 40},
+	{Val: math.Pow(1234567890, -1), Ts: 60},
+}
+
 func TestInvertBasic(t *testing.T) {
 	in := []models.Series{
 		{
@@ -37,73 +49,23 @@ func TestInvertBasic(t *testing.T) {
 			QueryPatt:  "queryPattHere",
 			Target:     "targetHere",
 			Datapoints: getCopy(datapoints),
+			QueryFrom:  8,
+			QueryTo:    75,
 		},
 	}
 
-	f := getNewInvert(in)
 	out := []models.Series{
 		{
 			Interval:   10,
 			QueryPatt:  "invert(queryPattHere)",
 			Target:     "invert(targetHere)",
 			Datapoints: getCopy(datapointsInvert),
+			QueryFrom:  8,
+			QueryTo:    75,
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInvertInputUnchanged(t *testing.T) {
-	in := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "queryPattHere",
-			Target:     "targetHere",
-			Datapoints: getCopy(datapoints),
-		},
-	}
-
-	// store copy of the original input
-	inCopy := make([]models.Series, len(in))
-	copy(inCopy, in)
-
-	f := getNewInvert(in)
-	_, err := f.Exec(make(map[Req][]models.Series))
-
-	// make sure input hasn't changed after call to invert
-	if err := equalOutput(in, inCopy, nil, err); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestInvertZero(t *testing.T) {
-	in := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "queryPattHere",
-			Target:     "targetHere",
-			Datapoints: []schema.Point{},
-		},
-	}
-
-	f := getNewInvert(in)
-
-	out := []models.Series{
-		{
-			Interval:   10,
-			QueryPatt:  "invert(queryPattHere)",
-			Target:     "invert(targetHere)",
-			Datapoints: []schema.Point{},
-		},
-	}
-
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	testInvertSeries("basic", in, out, t)
 }
 
 func TestInvertMultiple(t *testing.T) {
@@ -113,35 +75,39 @@ func TestInvertMultiple(t *testing.T) {
 			QueryPatt:  "queryPattHere",
 			Target:     "targetHere",
 			Datapoints: getCopy(datapoints),
+			QueryFrom:  8,
+			QueryTo:    75,
 		},
 		{
 			Interval:   20,
 			QueryPatt:  "queryPattHere2",
 			Target:     "targetHere2",
-			Datapoints: getCopy(datapoints),
+			Datapoints: getCopy(datapointsInterval20),
+			QueryFrom:  8,
+			QueryTo:    75,
 		},
 	}
 
-	f := getNewInvert(in)
 	out := []models.Series{
 		{
 			Interval:   10,
 			QueryPatt:  "invert(queryPattHere)",
 			Target:     "invert(targetHere)",
 			Datapoints: getCopy(datapointsInvert),
+			QueryFrom:  8,
+			QueryTo:    75,
 		},
 		{
 			Interval:   20,
 			QueryPatt:  "invert(queryPattHere2)",
 			Target:     "invert(targetHere2)",
-			Datapoints: getCopy(datapointsInvert),
+			Datapoints: getCopy(datapointsInterval20Invert),
+			QueryFrom:  8,
+			QueryTo:    75,
 		},
 	}
 
-	got, err := f.Exec(make(map[Req][]models.Series))
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatal(err)
-	}
+	testInvertSeries("multiple", in, out, t)
 }
 
 func getNewInvert(in []models.Series) *FuncInvert {
@@ -149,6 +115,37 @@ func getNewInvert(in []models.Series) *FuncInvert {
 	ps := f.(*FuncInvert)
 	ps.in = NewMock(in)
 	return ps
+}
+
+func testInvertSeries(name string, in []models.Series, out []models.Series, t *testing.T) {
+	f := getNewInvert(in)
+
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
+
+	dataMap := initDataMapMultiple([][]models.Series{in})
+	got, err := f.Exec(dataMap)
+	if err := equalOutput(out, got, nil, err); err != nil {
+		t.Fatalf("Case %s: %s", name, err)
+	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
+		}
+	})
+
+	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+		if err := dataMap.CheckForOverlappingPoints(); err != nil {
+			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
+		}
+	})
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			}
+		}
+	})
 }
 
 func BenchmarkInvert10k_1NoNulls(b *testing.B) {

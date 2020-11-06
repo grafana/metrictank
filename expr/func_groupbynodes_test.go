@@ -227,9 +227,7 @@ func testGroupByNodes(name string, in []models.Series, expected []models.Series,
 	f.(*FuncGroupByNodes).aggregator = aggr
 	f.(*FuncGroupByNodes).nodes = nodes
 
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 

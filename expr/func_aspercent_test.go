@@ -204,9 +204,7 @@ func getNewAsPercent(in []models.Series) (*FuncAsPercent, []models.Series) {
 }
 
 func execAndCheck(in, out []models.Series, f GraphiteFunc, t *testing.T) {
-	// Copy input to check that it is unchanged later
-	inputCopy := make([]models.Series, len(in))
-	copy(inputCopy, in)
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	dataMap := initDataMap(in)
 	got, err := f.Exec(dataMap)
