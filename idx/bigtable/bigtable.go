@@ -278,14 +278,14 @@ func (b *BigtableIdx) rebuildIndex() {
 	num := 0
 	var defs []schema.MetricDefinition
 	for _, partition := range cluster.Manager.GetPartitions() {
-		defs = b.LoadPartition(partition, defs[:0], pre)
+		defs = b.LoadPartition(partition, defs[:0], pre, -1)
 		num += b.MemoryIndex.LoadPartition(partition, defs)
 	}
 
 	log.Infof("bigtable-idx: Rebuilding Memory Index Complete. Imported %d. Took %s", num, time.Since(pre))
 }
 
-func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
+func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, now time.Time, orgFilter int) []schema.MetricDefinition {
 	ctx := context.Background()
 	rr := bigtable.PrefixRange(fmt.Sprintf("%d_", partition))
 	defsByNames := make(map[string][]schema.MetricDefinition)
@@ -295,6 +295,9 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 		marshalErr = RowToSchema(r, &def)
 		if marshalErr != nil {
 			return false
+		}
+		if orgFilter != -1 && def.OrgId != uint32(orgFilter) {
+			return true
 		}
 		log.Debugf("bigtable-idx: found def %+v", def)
 		nameWithTags := def.NameWithTags()
