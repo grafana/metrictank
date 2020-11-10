@@ -168,6 +168,14 @@ func testTimeShift(name string, in []models.Series, out []models.Series, t *test
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal("Failed test:", name, err)
 	}
+
+	t.Run("OutputIsCanonical", func(t *testing.T) {
+		for i, s := range got {
+			if !s.IsCanonical() {
+				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			}
+		}
+	})
 }
 
 func BenchmarkTimeShift10k_1NoNulls(b *testing.B) {
