@@ -14,9 +14,12 @@ cd ${DIR}/../..
 
 
 # list filenames of test files for all non-trivial graphite function implementations
+# TODO remove exceptions for smartsummarize once this function "goes live"
+# can't just remove the empty stub implementations because smartSummarize is used in TestArgs()
 function getExpectedTestFiles () {
     ls -1 expr/func_*.go \
         | grep -v func_get.go \
+        | grep -v func_smartsummarize.go \
         | grep -v '_test.go' \
         | sed 's/\.go$/_test.go/' \
         | LC_ALL=en_US sort
