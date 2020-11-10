@@ -33,6 +33,7 @@ jobs:
       - image: circleci/golang:1.15.2
     steps:
       - checkout
+      - run: scripts/qa/expr-funcs.sh
       - run: scripts/qa/gofmt.sh
       - run: scripts/qa/go-generate.sh --force
       - run: scripts/qa/ineffassign.sh

@@ -39,6 +39,7 @@ qa-debug: bin-debug qa-common
 
 qa-common:
 	# regular qa steps (can run directly on code)
+	scripts/qa/expr-funcs.sh
 	scripts/qa/gofmt.sh
 	scripts/qa/go-generate.sh
 	scripts/qa/ineffassign.sh
