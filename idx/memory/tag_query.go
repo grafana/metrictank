@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/grafana/metrictank/schema"
 
@@ -189,6 +190,9 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 	q.metaTagRecords = mtr
 	q.prepareExpressions()
 
+	stopChan := make(chan struct{})
+	finishedChan := make(chan struct{})
+
 	// no initial expression has been chosen, returning empty result
 	if q.startWith < 0 || q.startWith >= len(q.query.Expressions) {
 		return
@@ -202,7 +206,7 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		q.wg.Add(1)
 		go func() {
 			defer q.wg.Done()
-			q.selector.getIds(idCh, nil)
+			q.selector.getIds(idCh, stopChan)
 			close(idCh)
 		}()
 
@@ -218,9 +222,30 @@ func (q *TagQueryContext) Run(index TagIndex, byId map[schema.MKey]*idx.Archive,
 		q.wg.Add(1)
 		go func() {
 			defer q.wg.Done()
-			q.selector.getIds(resCh, nil)
+			q.selector.getIds(resCh, stopChan)
 		}()
 	}
 
-	q.wg.Wait()
+	go func() {
+		q.wg.Wait()
+		finishedChan <- struct{}{}
+	}()
+
+	var timeoutChan <-chan time.Time
+	if TagQueryTimeout >= time.Nanosecond {
+		timeout := time.NewTimer(TagQueryTimeout)
+		timeoutChan = timeout.C
+		defer timeout.Stop()
+	}
+	select {
+	case <-timeoutChan:
+		// Took too long
+		log.Errorf("Canceling request due to timeout: %v", q.query.Expressions.Strings())
+		// Signal background routines to abort
+		close(stopChan)
+		// Block until background routines are done
+		<-finishedChan
+	case <-finishedChan:
+		// Success
+	}
 }
