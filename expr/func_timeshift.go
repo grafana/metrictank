@@ -71,6 +71,8 @@ func (s *FuncTimeShift) Exec(dataMap DataMap) ([]models.Series, error) {
 		}
 
 		serie.Target = newName(serie.Target)
+		serie.QueryFrom = uint32(int(serie.QueryFrom) + negativeOffset)
+		serie.QueryTo = uint32(int(serie.QueryTo) + negativeOffset)
 		serie.QueryPatt = newName(serie.QueryPatt)
 		serie.Tags = serie.CopyTagsWith("timeShift", s.timeShift)
 		serie.Datapoints = out
