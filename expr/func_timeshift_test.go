@@ -45,7 +45,6 @@ func TestTimeShiftSingle(t *testing.T) {
 			Datapoints: shiftInput(a, -offset), // shift forward to avoid underflow
 		},
 	}
-	inputCopy := models.SeriesCopy(input) // to later verify that it is unchanged
 
 	testTimeShift(
 		"identity",
@@ -64,12 +63,6 @@ func TestTimeShiftSingle(t *testing.T) {
 		true,
 		false,
 	)
-
-	t.Run("DidNotModifyInput", func(t *testing.T) {
-		if err := equalOutput(inputCopy, input, nil, nil); err != nil {
-			t.Fatal("Input was modified: ", err)
-		}
-	})
 }
 
 func TestTimeShiftMultiple(t *testing.T) {
@@ -141,6 +134,8 @@ func TestTimeShiftPositive(t *testing.T) {
 }
 
 func testTimeShift(name string, in []models.Series, out []models.Series, t *testing.T, expectedOffset int, shift string, resetEnd, alignDST bool) {
+	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
+
 	f := NewTimeShift()
 	f.(*FuncTimeShift).in = NewMock(in)
 	f.(*FuncTimeShift).timeShift = shift
@@ -163,6 +158,12 @@ func testTimeShift(name string, in []models.Series, out []models.Series, t *test
 	if actualOffset != expectedOffset {
 		t.Fatalf("case %q: Expected context offset = %d, got %d", name, expectedOffset, actualOffset)
 	}
+
+	t.Run("DidNotModifyInput", func(t *testing.T) {
+		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
+			t.Fatal("Input was modified: ", err)
+		}
+	})
 
 	got, err := f.Exec(make(map[Req][]models.Series))
 	if err := equalOutput(out, got, nil, err); err != nil {
