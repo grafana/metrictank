@@ -134,6 +134,13 @@ func TestTimeShiftPositive(t *testing.T) {
 }
 
 func testTimeShift(name string, in []models.Series, out []models.Series, t *testing.T, expectedOffset int, shift string, resetEnd, alignDST bool) {
+	for i := range in {
+		in[i].QueryFrom = in[i].Datapoints[0].Ts
+		in[i].QueryTo = in[i].Datapoints[len(in[i].Datapoints)-1].Ts
+		out[i].QueryFrom = uint32(int(in[i].QueryFrom) - expectedOffset)
+		out[i].QueryTo = uint32(int(in[i].QueryTo) - expectedOffset)
+	}
+
 	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
 
 	f := NewTimeShift()
