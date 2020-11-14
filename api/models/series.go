@@ -120,7 +120,8 @@ func (a SeriesMeta) CopyWithChange(fn func(in SeriesMetaProperties) SeriesMetaPr
 // SetTags fills in the Tags property with tags parsed out of s.Target
 // the "name" tag is always set from s.Target, overriding any attempted override
 func (s *Series) SetTags() {
-	numTags := strings.Count(s.Target, ";")
+	lastClosingParenthesis := strings.LastIndexByte(s.Target, ')')
+	numTags := strings.Count(s.Target[lastClosingParenthesis+1:], ";")
 
 	if s.Tags == nil {
 		// +1 for the name tag
