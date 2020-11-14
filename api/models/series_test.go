@@ -132,6 +132,14 @@ func TestSetTags(t *testing.T) {
 		},
 		{
 			in: Series{
+				Target: "func(a;b=c,d;e=f)",
+			},
+			out: map[string]string{
+				"name": "func(a;b=c,d;e=f)",
+			},
+		},
+		{
+			in: Series{
 				Target: "a;biglongtagkeyhere=andithasabiglongtagvaluetoo;c=d",
 			},
 			out: map[string]string{
