@@ -8,6 +8,8 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 type Optimizations struct {
@@ -357,4 +359,29 @@ func (p *Plan) Run(dataMap DataMap) ([]models.Series, error) {
 
 func (p Plan) Clean() {
 	p.dataMap.Clean()
+}
+
+func (p Plan) CheckedClean(targets []string) bool {
+	type ReqSeries struct {
+		req    Req
+		series models.Series
+	}
+	// Map of pointer to end of slice to the first series we found with that address
+	addrs := make(map[*schema.Point]ReqSeries)
+	for req, series := range p.dataMap {
+		for _, serie := range series {
+			dpCap := cap(serie.Datapoints)
+			if dpCap > 0 {
+				addr := &(serie.Datapoints[0:dpCap][dpCap-1])
+				if val, ok := addrs[addr]; ok {
+					log.Errorf("Found results sharing a slice: query = %v, req1 = %v, series = %v, req2 = %v, series = %v", targets, val.req, val.series, req, serie)
+					// Don't want to spew errors so move on (don't clean this one)
+					return false
+				}
+				addrs[addr] = ReqSeries{req, serie}
+			}
+		}
+	}
+	p.Clean()
+	return true
 }
