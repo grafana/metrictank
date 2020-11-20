@@ -165,6 +165,28 @@ type GraphiteTagDelSeriesResp struct {
 	Peers map[string]int `json:"peers"`
 }
 
+type GraphiteTagDelByQuery struct {
+	Expr      []string `json:"expressions" binding:"Required"`
+	OlderThan int64    `json:"olderThan" form:"olderThan"`
+	Execute   bool     `json:execute binding:"Default(false)"`
+}
+
+func (g GraphiteTagDelByQuery) Trace(span opentracing.Span) {
+	span.LogFields(
+		traceLog.String("expressions", fmt.Sprintf("%q", g.Expr)),
+		traceLog.String("olderThan", fmt.Sprintf("%d", g.OlderThan)),
+		traceLog.String("execute", fmt.Sprintf("%t", g.Execute)),
+	)
+}
+
+func (g GraphiteTagDelByQuery) TraceDebug(span opentracing.Span) {
+}
+
+type GraphiteTagDelByQueryResp struct {
+	Count int            `json:"count"`
+	Peers map[string]int `json:"peers"`
+}
+
 type GraphiteTagTerms struct {
 	Tags []string `json:"tags"`
 	Expr []string `json:"expressions"`

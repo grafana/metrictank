@@ -209,7 +209,7 @@ func (s *Server) indexAutoCompleteTags(ctx *middleware.Context, req models.Index
 		expressions = append(expressions, "__tag^="+req.Prefix)
 	}
 
-	query, err := tagquery.NewQueryFromStrings(expressions, 0)
+	query, err := tagquery.NewQueryFromStrings(expressions, 0, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -240,7 +240,7 @@ func (s *Server) indexAutoCompleteTagValues(ctx *middleware.Context, req models.
 		expressions = append(expressions, req.Tag+"^="+req.Prefix)
 	}
 
-	query, err := tagquery.NewQueryFromStrings(expressions, 0)
+	query, err := tagquery.NewQueryFromStrings(expressions, 0, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -280,7 +280,7 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 			builder.Reset()
 		}
 
-		query, err := tagquery.NewQuery(expressions, 0)
+		query, err := tagquery.NewQuery(expressions, 0, 0)
 		if err != nil {
 			response.Write(ctx, response.WrapErrorForTagDB(err))
 			return
@@ -297,6 +297,40 @@ func (s *Server) indexTagDelSeries(ctx *middleware.Context, request models.Index
 	response.Write(ctx, response.NewMsgp(200, res))
 }
 
+func (s *Server) localTagDelByQuery(request models.IndexTagDelByQuery) (int, error) {
+	query, err := tagquery.NewQueryFromStrings(request.Expr, 0, request.OlderThan)
+	if err != nil {
+		return 0, err
+	}
+
+	if request.Execute {
+		deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, query)
+		return len(deleted), err
+	}
+	matched, _ := s.MetricIndex.FindTerms(request.OrgId, []string{}, query)
+	return int(matched), nil
+}
+
+func (s *Server) IndexTagDelByQuery(ctx *middleware.Context, request models.IndexTagDelByQuery) {
+
+	res := models.IndexTagDelByQueryResp{}
+
+	// nothing to do on query nodes.
+	if s.MetricIndex == nil {
+		response.Write(ctx, response.NewMsgp(200, res))
+		return
+	}
+
+	var err error
+	res.Count, err = s.localTagDelByQuery(request)
+	if err != nil {
+		response.Write(ctx, response.WrapErrorForTagDB(err))
+		return
+	}
+
+	response.Write(ctx, response.NewMsgp(200, res))
+}
+
 func (s *Server) IndexTagTerms(ctx *middleware.Context, req models.IndexTagTerms) {
 	// query nodes don't own any data.
 	if s.MetricIndex == nil {
@@ -304,7 +338,7 @@ func (s *Server) IndexTagTerms(ctx *middleware.Context, req models.IndexTagTerms
 		return
 	}
 
-	query, err := tagquery.NewQueryFromStrings(req.Expr, 0)
+	query, err := tagquery.NewQueryFromStrings(req.Expr, 0, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -323,7 +357,7 @@ func (s *Server) indexFindByTag(ctx *middleware.Context, req models.IndexFindByT
 		return
 	}
 
-	query, err := tagquery.NewQueryFromStrings(req.Expr, req.From)
+	query, err := tagquery.NewQueryFromStrings(req.Expr, req.From, 0)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

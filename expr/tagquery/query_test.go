@@ -6,14 +6,14 @@ import (
 )
 
 func TestQueryByTagFilterByTagPrefixWithEmptyString(t *testing.T) {
-	_, err := NewQueryFromStrings([]string{"__tag^="}, 0)
+	_, err := NewQueryFromStrings([]string{"__tag^="}, 0, 0)
 	if err == nil {
 		t.Fatalf("Expected an error, but didn't get it")
 	}
 }
 
 func TestQueryByTagInvalidQuery(t *testing.T) {
-	_, err := NewQueryFromStrings([]string{"key!=value1"}, 0)
+	_, err := NewQueryFromStrings([]string{"key!=value1"}, 0, 0)
 	if err != errInvalidQuery {
 		t.Fatalf("Expected an error, but didn't get it")
 	}
@@ -194,7 +194,7 @@ func TestNewQueryFromStrings(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewQueryFromStrings(tt.args.expressionStrs, tt.args.from)
+			got, err := NewQueryFromStrings(tt.args.expressionStrs, tt.args.from, 0)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewQueryFromStrings() error = %v, wantErr %v", err, tt.wantErr)
 				return

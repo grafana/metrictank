@@ -24,8 +24,9 @@ func init() {
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
 //seriesByTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
 type Query struct {
-	// clause that operates on LastUpdate field
+	// clauses that operate on LastUpdate field
 	From int64
+	To   int64
 
 	// slice of expressions sorted by the estimated cost of their operators
 	Expressions Expressions
@@ -40,17 +41,17 @@ type Query struct {
 //tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
 //seriesByTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
 //Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
-func NewQueryFromStrings(expressionStrs []string, from int64) (Query, error) {
+func NewQueryFromStrings(expressionStrs []string, from int64, to int64) (Query, error) {
 	var res Query
 	expressions, err := ParseExpressions(expressionStrs)
 	if err != nil {
 		return res, err
 	}
-	return NewQuery(expressions, from)
+	return NewQuery(expressions, from, to)
 }
 
-func NewQuery(expressions Expressions, from int64) (Query, error) {
-	q := Query{From: from, tagClause: -1}
+func NewQuery(expressions Expressions, from int64, to int64) (Query, error) {
+	q := Query{From: from, To: to, tagClause: -1}
 
 	if len(expressions) == 0 {
 		return q, errInvalidQuery

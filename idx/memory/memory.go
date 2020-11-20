@@ -934,7 +934,7 @@ func (m *UnpartitionedMemoryIdx) TagDetails(orgId uint32, key string, filter *re
 				continue
 			}
 
-			query, err := tagquery.NewQuery(record.Expressions, 0)
+			query, err := tagquery.NewQuery(record.Expressions, 0, 0)
 			if err != nil {
 				corruptIndex.Inc()
 				log.Errorf("memory-idx: corrupt. record expressions cannot instantiate query: %+v results in %s", record.Expressions, err)

@@ -122,7 +122,7 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 	// this is faster than having to call expr.Matches on each value
 	if i.expr.MatchesExactly() {
 		for id := range i.ctx.index[i.expr.GetKey()][i.expr.GetValue()] {
-			if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+			if !i.ctx.withinTimeBounds(id) {
 				continue
 			}
 
@@ -145,7 +145,7 @@ func (i *idSelector) byTagValueFromMetricTagIndex() {
 		}
 
 		for id := range ids {
-			if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+			if !i.ctx.withinTimeBounds(id) {
 				continue
 			}
 
@@ -199,7 +199,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 	if i.expr.MatchesExactly() {
 		for _, ids := range i.ctx.index[i.expr.GetKey()] {
 			for id := range ids {
-				if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+				if !i.ctx.withinTimeBounds(id) {
 					continue
 				}
 
@@ -221,7 +221,7 @@ func (i *idSelector) byTagFromMetricTagIndex() {
 
 		for _, ids := range i.ctx.index[tag] {
 			for id := range ids {
-				if i.ctx.query.From > 0 && !i.ctx.newerThanFrom(id) {
+				if !i.ctx.withinTimeBounds(id) {
 					continue
 				}
 
@@ -279,7 +279,7 @@ func (i *idSelector) evaluateMetaRecord(id recordId) {
 func (i *idSelector) subQueryFromExpressions(expressions tagquery.Expressions) (TagQueryContext, error) {
 	var queryCtx TagQueryContext
 
-	query, err := tagquery.NewQuery(expressions, i.ctx.query.From)
+	query, err := tagquery.NewQuery(expressions, i.ctx.query.From, 0)
 	if err != nil {
 		// this means we've stored a meta record containing invalid queries
 		corruptIndex.Inc()

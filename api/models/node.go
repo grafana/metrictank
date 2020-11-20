@@ -158,6 +158,24 @@ func (t IndexTagDelSeries) Trace(span opentracing.Span) {
 func (i IndexTagDelSeries) TraceDebug(span opentracing.Span) {
 }
 
+type IndexTagDelByQuery struct {
+	OrgId     uint32   `json:"orgId" binding:"Required"`
+	Expr      []string `json:"expressions" binding:"Required"`
+	OlderThan int64    `json:"olderThan" form:"olderThan"`
+	Execute   bool     `json:execute binding:"Default(false)"`
+}
+
+func (t IndexTagDelByQuery) Trace(span opentracing.Span) {
+	span.LogFields(
+		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
+		traceLog.String("olderThan", fmt.Sprintf("%d", t.OlderThan)),
+		traceLog.String("execute", fmt.Sprintf("%t", t.Execute)),
+	)
+}
+
+func (t IndexTagDelByQuery) TraceDebug(span opentracing.Span) {
+}
+
 type IndexGet struct {
 	MKey schema.MKey `json:"id" form:"id" binding:"Required"`
 }

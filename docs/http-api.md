@@ -187,8 +187,37 @@ POST /metrics/delete
 curl -H "X-Org-Id: 12345" --data query=statsd.fakesite.counters.session_start.*.count "http://localhost:6060/metrics/delete"
 ```
 
+## Deleting tagged metrics (Preferred Method)
 
-## Deleting tagged metrics
+This will delete (if `execute` is true) metrics matching all of the specified `expressions` parameters and that have not been seen since before the `olderThan` parameter.
+Note that the data stays in the datastore until it expires.
+Should the metrics enter the system again with the same metadata, the data will show up again.
+
+```
+POST /tags/delByQuery
+```
+
+* header `X-Org-Id` required
+* expr (required, multiple allowed): A tag filter expression (e.g. `name=reqs.count`)
+* olderThan (optional): A unix epoch time. Series seen more recently than this will not be deleted.
+* execute (optional, default false): Execute this deletion. If false, just returns the count that *would* have been deleted
+
+#### Example
+
+The following request will delete series with tag `cluster=decommed`.
+```bash
+curl -H "X-Org-Id: 12345" "expr=cluster=decommed" -d "execute=true" "http://localhost:6060/tags/delByQuery"
+
+{
+    "count": 120,
+    "peers": {
+        "m1": 120
+    }
+}
+```
+
+
+## Deleting tagged metrics (Method 2)
 
 This will delete the metrics (technically metricdefinitions) matching the `path` parameter(s).
 Note that the data stays in the datastore until it expires.

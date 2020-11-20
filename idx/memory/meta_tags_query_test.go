@@ -50,7 +50,7 @@ func getTestIndexWithMetaTags(t testing.TB, metaRecords []tagquery.MetaTagRecord
 func queryAndCompareResultsWithMetaTags(t *testing.T, idx *UnpartitionedMemoryIdx, expressions tagquery.Expressions, expectedData IdSet) {
 	t.Helper()
 
-	query, err := tagquery.NewQuery(expressions, 0)
+	query, err := tagquery.NewQuery(expressions, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query from expressions %q: %s", expressions, err)
 	}
@@ -200,7 +200,7 @@ func TestMetaTagEnrichmentForQueryByMetricTag(t *testing.T) {
 		t.Fatalf("Error when parsing expressions: %s", err)
 	}
 
-	query, err := tagquery.NewQuery(expressions, 0)
+	query, err := tagquery.NewQuery(expressions, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query from expressions %q: %s", expressions, err)
 	}
@@ -262,7 +262,7 @@ func TestMetaTagEnrichmentForQueryByMetaTag(t *testing.T) {
 		t.Fatalf("Error when parsing expressions: %s", err)
 	}
 
-	query, err := tagquery.NewQuery(expressions, 0)
+	query, err := tagquery.NewQuery(expressions, 0, 0)
 	if err != nil {
 		t.Fatalf("Unexpected error when instantiating query from expressions %q: %s", expressions, err)
 	}
@@ -764,7 +764,7 @@ func getQueriesForMetaTagQueryBenchmark(b *testing.B, count int, queryGen func(u
 	queries := make([]tagquery.Query, count)
 	var err error
 	for i := 0; i < 2; i++ {
-		queries[i], err = tagquery.NewQueryFromStrings(queryGen(uint32(i)), 0)
+		queries[i], err = tagquery.NewQueryFromStrings(queryGen(uint32(i)), 0, 0)
 		if err != nil {
 			b.Fatalf("Error when parsing query: %s", err.Error())
 		}

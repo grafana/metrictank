@@ -225,6 +225,397 @@ func (z *GraphiteExpand) Msgsize() (s int) {
 }
 
 // DecodeMsg implements msgp.Decodable
+func (z *GraphiteTagDelByQuery) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Expr":
+			var zb0002 uint32
+			zb0002, err = dc.ReadArrayHeader()
+			if err != nil {
+				err = msgp.WrapError(err, "Expr")
+				return
+			}
+			if cap(z.Expr) >= int(zb0002) {
+				z.Expr = (z.Expr)[:zb0002]
+			} else {
+				z.Expr = make([]string, zb0002)
+			}
+			for za0001 := range z.Expr {
+				z.Expr[za0001], err = dc.ReadString()
+				if err != nil {
+					err = msgp.WrapError(err, "Expr", za0001)
+					return
+				}
+			}
+		case "OlderThan":
+			z.OlderThan, err = dc.ReadInt64()
+			if err != nil {
+				err = msgp.WrapError(err, "OlderThan")
+				return
+			}
+		case "Execute":
+			z.Execute, err = dc.ReadBool()
+			if err != nil {
+				err = msgp.WrapError(err, "Execute")
+				return
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z *GraphiteTagDelByQuery) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 3
+	// write "Expr"
+	err = en.Append(0x83, 0xa4, 0x45, 0x78, 0x70, 0x72)
+	if err != nil {
+		return
+	}
+	err = en.WriteArrayHeader(uint32(len(z.Expr)))
+	if err != nil {
+		err = msgp.WrapError(err, "Expr")
+		return
+	}
+	for za0001 := range z.Expr {
+		err = en.WriteString(z.Expr[za0001])
+		if err != nil {
+			err = msgp.WrapError(err, "Expr", za0001)
+			return
+		}
+	}
+	// write "OlderThan"
+	err = en.Append(0xa9, 0x4f, 0x6c, 0x64, 0x65, 0x72, 0x54, 0x68, 0x61, 0x6e)
+	if err != nil {
+		return
+	}
+	err = en.WriteInt64(z.OlderThan)
+	if err != nil {
+		err = msgp.WrapError(err, "OlderThan")
+		return
+	}
+	// write "Execute"
+	err = en.Append(0xa7, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65)
+	if err != nil {
+		return
+	}
+	err = en.WriteBool(z.Execute)
+	if err != nil {
+		err = msgp.WrapError(err, "Execute")
+		return
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *GraphiteTagDelByQuery) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 3
+	// string "Expr"
+	o = append(o, 0x83, 0xa4, 0x45, 0x78, 0x70, 0x72)
+	o = msgp.AppendArrayHeader(o, uint32(len(z.Expr)))
+	for za0001 := range z.Expr {
+		o = msgp.AppendString(o, z.Expr[za0001])
+	}
+	// string "OlderThan"
+	o = append(o, 0xa9, 0x4f, 0x6c, 0x64, 0x65, 0x72, 0x54, 0x68, 0x61, 0x6e)
+	o = msgp.AppendInt64(o, z.OlderThan)
+	// string "Execute"
+	o = append(o, 0xa7, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65)
+	o = msgp.AppendBool(o, z.Execute)
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *GraphiteTagDelByQuery) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Expr":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Expr")
+				return
+			}
+			if cap(z.Expr) >= int(zb0002) {
+				z.Expr = (z.Expr)[:zb0002]
+			} else {
+				z.Expr = make([]string, zb0002)
+			}
+			for za0001 := range z.Expr {
+				z.Expr[za0001], bts, err = msgp.ReadStringBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "Expr", za0001)
+					return
+				}
+			}
+		case "OlderThan":
+			z.OlderThan, bts, err = msgp.ReadInt64Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "OlderThan")
+				return
+			}
+		case "Execute":
+			z.Execute, bts, err = msgp.ReadBoolBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Execute")
+				return
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *GraphiteTagDelByQuery) Msgsize() (s int) {
+	s = 1 + 5 + msgp.ArrayHeaderSize
+	for za0001 := range z.Expr {
+		s += msgp.StringPrefixSize + len(z.Expr[za0001])
+	}
+	s += 10 + msgp.Int64Size + 8 + msgp.BoolSize
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
+func (z *GraphiteTagDelByQueryResp) DecodeMsg(dc *msgp.Reader) (err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, err = dc.ReadMapHeader()
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, err = dc.ReadMapKeyPtr()
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Count":
+			z.Count, err = dc.ReadInt()
+			if err != nil {
+				err = msgp.WrapError(err, "Count")
+				return
+			}
+		case "Peers":
+			var zb0002 uint32
+			zb0002, err = dc.ReadMapHeader()
+			if err != nil {
+				err = msgp.WrapError(err, "Peers")
+				return
+			}
+			if z.Peers == nil {
+				z.Peers = make(map[string]int, zb0002)
+			} else if len(z.Peers) > 0 {
+				for key := range z.Peers {
+					delete(z.Peers, key)
+				}
+			}
+			for zb0002 > 0 {
+				zb0002--
+				var za0001 string
+				var za0002 int
+				za0001, err = dc.ReadString()
+				if err != nil {
+					err = msgp.WrapError(err, "Peers")
+					return
+				}
+				za0002, err = dc.ReadInt()
+				if err != nil {
+					err = msgp.WrapError(err, "Peers", za0001)
+					return
+				}
+				z.Peers[za0001] = za0002
+			}
+		default:
+			err = dc.Skip()
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	return
+}
+
+// EncodeMsg implements msgp.Encodable
+func (z *GraphiteTagDelByQueryResp) EncodeMsg(en *msgp.Writer) (err error) {
+	// map header, size 2
+	// write "Count"
+	err = en.Append(0x82, 0xa5, 0x43, 0x6f, 0x75, 0x6e, 0x74)
+	if err != nil {
+		return
+	}
+	err = en.WriteInt(z.Count)
+	if err != nil {
+		err = msgp.WrapError(err, "Count")
+		return
+	}
+	// write "Peers"
+	err = en.Append(0xa5, 0x50, 0x65, 0x65, 0x72, 0x73)
+	if err != nil {
+		return
+	}
+	err = en.WriteMapHeader(uint32(len(z.Peers)))
+	if err != nil {
+		err = msgp.WrapError(err, "Peers")
+		return
+	}
+	for za0001, za0002 := range z.Peers {
+		err = en.WriteString(za0001)
+		if err != nil {
+			err = msgp.WrapError(err, "Peers")
+			return
+		}
+		err = en.WriteInt(za0002)
+		if err != nil {
+			err = msgp.WrapError(err, "Peers", za0001)
+			return
+		}
+	}
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *GraphiteTagDelByQueryResp) MarshalMsg(b []byte) (o []byte, err error) {
+	o = msgp.Require(b, z.Msgsize())
+	// map header, size 2
+	// string "Count"
+	o = append(o, 0x82, 0xa5, 0x43, 0x6f, 0x75, 0x6e, 0x74)
+	o = msgp.AppendInt(o, z.Count)
+	// string "Peers"
+	o = append(o, 0xa5, 0x50, 0x65, 0x65, 0x72, 0x73)
+	o = msgp.AppendMapHeader(o, uint32(len(z.Peers)))
+	for za0001, za0002 := range z.Peers {
+		o = msgp.AppendString(o, za0001)
+		o = msgp.AppendInt(o, za0002)
+	}
+	return
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *GraphiteTagDelByQueryResp) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	var field []byte
+	_ = field
+	var zb0001 uint32
+	zb0001, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if err != nil {
+		err = msgp.WrapError(err)
+		return
+	}
+	for zb0001 > 0 {
+		zb0001--
+		field, bts, err = msgp.ReadMapKeyZC(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		switch msgp.UnsafeString(field) {
+		case "Count":
+			z.Count, bts, err = msgp.ReadIntBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Count")
+				return
+			}
+		case "Peers":
+			var zb0002 uint32
+			zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Peers")
+				return
+			}
+			if z.Peers == nil {
+				z.Peers = make(map[string]int, zb0002)
+			} else if len(z.Peers) > 0 {
+				for key := range z.Peers {
+					delete(z.Peers, key)
+				}
+			}
+			for zb0002 > 0 {
+				var za0001 string
+				var za0002 int
+				zb0002--
+				za0001, bts, err = msgp.ReadStringBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "Peers")
+					return
+				}
+				za0002, bts, err = msgp.ReadIntBytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "Peers", za0001)
+					return
+				}
+				z.Peers[za0001] = za0002
+			}
+		default:
+			bts, err = msgp.Skip(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *GraphiteTagDelByQueryResp) Msgsize() (s int) {
+	s = 1 + 6 + msgp.IntSize + 6 + msgp.MapHeaderSize
+	if z.Peers != nil {
+		for za0001, za0002 := range z.Peers {
+			_ = za0002
+			s += msgp.StringPrefixSize + len(za0001) + msgp.IntSize
+		}
+	}
+	return
+}
+
+// DecodeMsg implements msgp.Decodable
 func (z *GraphiteTagDelSeries) DecodeMsg(dc *msgp.Reader) (err error) {
 	var field []byte
 	_ = field
