@@ -12,6 +12,7 @@
 /cmd/mt-index-cat/mt-index-cat
 /cmd/mt-index-migrate/mt-index-migrate
 /cmd/mt-index-prune/mt-index-prune
+/cmd/mt-indexdump-rules-analyzer/mt-indexdump-rules-analyzer
 /cmd/mt-kafka-mdm-sniff-out-of-order/mt-kafka-mdm-sniff-out-of-order
 /cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
 /cmd/mt-kafka-persist-sniff/mt-kafka-persist-sniff

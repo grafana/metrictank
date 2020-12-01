@@ -342,6 +342,15 @@ mt-index-cat -max-stale 768h -partitions 1,2,3 bt -gcp-project your_project -big
 ```
 
 
+## mt-indexdump-rules-analyzer
+
+```
+Usage of ./mt-indexdump-rules-analyzer:
+  -index-rules-file string
+    	name of file which defines the max-stale times (default "/etc/metrictank/index-rules.conf")
+```
+
+
 ## mt-index-migrate
 
 ```

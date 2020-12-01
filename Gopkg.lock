@@ -310,6 +310,14 @@
   revision = "4b53e1bddba0e2f734514aeb6c02db652f4c6fe8"
 
 [[projects]]
+  digest = "1:612074ec7b285dcc15931b38c18c89f7a32c607a1808c26ca0d239883d60ba56"
+  name = "github.com/gosuri/uilive"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "11a6ee751a6abd840dd858d3ce569bdddb7d8ba2"
+  version = "v0.0.4"
+
+[[projects]]
   branch = "master"
   digest = "1:817bb03ae4cb923f024602aa1753f1dcea87c83e10fb3a175ca4fa7a088b1cc7"
   name = "github.com/grafana/globalconf"
@@ -483,6 +491,14 @@
   pruneopts = "NUT"
   revision = "de8848e004dd33dc07a2947b3d76f618a7fc7ef1"
   version = "v1.8.1"
+
+[[projects]]
+  digest = "1:4c2c63bfd4c2ae0c5a9d7f75cab1f4fac4e8c2ce58f52a73322cefc9bdb4c5bd"
+  name = "github.com/mattn/go-isatty"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "7b513a986450394f7bbf1476909911b3aa3a55ce"
+  version = "v0.0.12"
 
 [[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
@@ -1184,6 +1200,7 @@
     "github.com/gocql/gocql",
     "github.com/golang/snappy",
     "github.com/google/go-cmp/cmp",
+    "github.com/gosuri/uilive",
     "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
     "github.com/hashicorp/golang-lru",
