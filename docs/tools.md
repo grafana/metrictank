@@ -346,6 +346,7 @@ mt-index-cat -max-stale 768h -partitions 1,2,3 bt -gcp-project your_project -big
 
 ```
 Usage of ./mt-indexdump-rules-analyzer:
+reads metric names from stdin and reports the number of metrics that match each index-rules.conf rule
   -index-rules-file string
     	name of file which defines the max-stale times (default "/etc/metrictank/index-rules.conf")
 ```
