@@ -39,6 +39,7 @@ func main() {
 	var prefix string
 	var substr string
 	var suffix string
+	var orgFilter int
 	var regexStr string
 	var regex *regexp.Regexp
 	var tags string
@@ -55,6 +56,7 @@ func main() {
 	globalFlags.StringVar(&prefix, "prefix", "", "only show metrics that have this prefix")
 	globalFlags.StringVar(&substr, "substr", "", "only show metrics that have this substring")
 	globalFlags.StringVar(&suffix, "suffix", "", "only show metrics that have this suffix")
+	globalFlags.IntVar(&orgFilter, "org", -1, "show only metrics with this OrgID (-1 to disable)")
 	globalFlags.StringVar(&partitionStr, "partitions", "*", "only show metrics from the comma separated list of partitions or * for all")
 	globalFlags.IntVar(&btTotalPartitions, "bt-total-partitions", -1, "total number of partitions (when using bigtable and partitions='*')")
 	globalFlags.StringVar(&regexStr, "regex", "", "only show metrics that match this regex")
@@ -318,6 +320,11 @@ func main() {
 			if !strings.Contains(d.Name, substr) {
 				continue
 			}
+
+			if orgFilter != -1 && d.OrgId != uint32(orgFilter) {
+				continue
+			}
+
 			if tags == "none" && len(d.Tags) != 0 {
 				continue
 			}
@@ -364,7 +371,7 @@ func main() {
 		} else {
 			now := time.Now()
 			for _, p := range partitions {
-				defs = btIdx.LoadPartition(p, nil, now)
+				defs = btIdx.LoadPartition(p, nil, now, orgFilter)
 				// set this after doing the query, to assure age can't possibly be negative unless if clocks are misconfigured.
 				out.QueryTime = time.Now().Unix()
 				processDefs(defs)

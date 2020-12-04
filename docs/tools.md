@@ -201,6 +201,8 @@ global config flags:
     	exclude series that have not been seen for this much time (compared against LastUpdate).  use 0 to disable (default "6h30min")
   -min-stale string
     	exclude series that have been seen in this much time (compared against LastUpdate).  use 0 to disable (default "0")
+  -org int
+    	show only metrics with this OrgID (-1 to disable) (default -1)
   -partitions string
     	only show metrics from the comma separated list of partitions or * for all (default "*")
   -prefix string
