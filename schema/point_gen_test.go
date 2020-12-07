@@ -74,7 +74,7 @@ func TestEncodeDecodePoint(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodePoint Msgsize() is inaccurate")
 	}
 
 	vn := Point{}

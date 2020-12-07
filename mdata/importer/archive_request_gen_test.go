@@ -74,7 +74,7 @@ func TestEncodeDecodeArchiveRequest(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeArchiveRequest Msgsize() is inaccurate")
 	}
 
 	vn := ArchiveRequest{}

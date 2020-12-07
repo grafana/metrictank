@@ -74,7 +74,7 @@ func TestEncodeDecodeTag(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeTag Msgsize() is inaccurate")
 	}
 
 	vn := Tag{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeTags(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeTags Msgsize() is inaccurate")
 	}
 
 	vn := Tags{}

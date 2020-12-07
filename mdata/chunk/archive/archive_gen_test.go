@@ -74,7 +74,7 @@ func TestEncodeDecodeArchive(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeArchive Msgsize() is inaccurate")
 	}
 
 	vn := Archive{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeMetric(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeMetric Msgsize() is inaccurate")
 	}
 
 	vn := Metric{}

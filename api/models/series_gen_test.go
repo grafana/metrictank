@@ -74,7 +74,7 @@ func TestEncodeDecodeSeriesByTarget(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesByTarget Msgsize() is inaccurate")
 	}
 
 	vn := SeriesByTarget{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeSeriesForPickle(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesForPickle Msgsize() is inaccurate")
 	}
 
 	vn := SeriesForPickle{}
@@ -300,7 +300,7 @@ func TestEncodeDecodeSeriesListForPickle(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesListForPickle Msgsize() is inaccurate")
 	}
 
 	vn := SeriesListForPickle{}
@@ -413,7 +413,7 @@ func TestEncodeDecodeSeriesMeta(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesMeta Msgsize() is inaccurate")
 	}
 
 	vn := SeriesMeta{}
@@ -526,7 +526,7 @@ func TestEncodeDecodeSeriesMetaProperties(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesMetaProperties Msgsize() is inaccurate")
 	}
 
 	vn := SeriesMetaProperties{}

@@ -74,7 +74,7 @@ func TestEncodeDecodeKey(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeKey Msgsize() is inaccurate")
 	}
 
 	vn := Key{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeMKey(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeMKey Msgsize() is inaccurate")
 	}
 
 	vn := MKey{}

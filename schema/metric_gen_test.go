@@ -74,7 +74,7 @@ func TestEncodeDecodeMetricData(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeMetricData Msgsize() is inaccurate")
 	}
 
 	vn := MetricData{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeMetricDataArray(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeMetricDataArray Msgsize() is inaccurate")
 	}
 
 	vn := MetricDataArray{}
@@ -300,7 +300,7 @@ func TestEncodeDecodeMetricDefinition(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeMetricDefinition Msgsize() is inaccurate")
 	}
 
 	vn := MetricDefinition{}

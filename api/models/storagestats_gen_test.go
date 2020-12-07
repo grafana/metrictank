@@ -74,7 +74,7 @@ func TestEncodeDecodeStorageStats(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeStorageStats Msgsize() is inaccurate")
 	}
 
 	vn := StorageStats{}
