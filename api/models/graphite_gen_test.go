@@ -74,7 +74,7 @@ func TestEncodeDecodeGraphiteExpand(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteExpand Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteExpand{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeGraphiteTagDelByQuery(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteTagDelByQuery Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteTagDelByQuery{}
@@ -300,7 +300,7 @@ func TestEncodeDecodeGraphiteTagDelByQueryResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteTagDelByQueryResp Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteTagDelByQueryResp{}
@@ -413,7 +413,7 @@ func TestEncodeDecodeGraphiteTagDelSeries(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteTagDelSeries Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteTagDelSeries{}
@@ -526,7 +526,7 @@ func TestEncodeDecodeGraphiteTagDelSeriesResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteTagDelSeriesResp Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteTagDelSeriesResp{}
@@ -639,7 +639,7 @@ func TestEncodeDecodeGraphiteTagTerms(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteTagTerms Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteTagTerms{}
@@ -752,7 +752,7 @@ func TestEncodeDecodeGraphiteTagTermsResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeGraphiteTagTermsResp Msgsize() is inaccurate")
 	}
 
 	vn := GraphiteTagTermsResp{}
@@ -865,7 +865,7 @@ func TestEncodeDecodeSeriesPickle(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesPickle Msgsize() is inaccurate")
 	}
 
 	vn := SeriesPickle{}
@@ -978,7 +978,7 @@ func TestEncodeDecodeSeriesPickleItem(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeSeriesPickleItem Msgsize() is inaccurate")
 	}
 
 	vn := SeriesPickleItem{}

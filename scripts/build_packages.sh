@@ -13,6 +13,8 @@ rm -rf $BUILD_TMP $BUILD_PKG
 mkdir $BUILD_TMP
 mkdir $BUILD_PKG
 
+sudo apt-get update # so the following apt-get command doesn't fail
+
 sudo apt-get install rpm # to be able to make rpms
 
 ARCH="$(uname -m)"

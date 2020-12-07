@@ -74,7 +74,7 @@ func TestEncodeDecodeIterGen(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
+		t.Log("WARNING: TestEncodeDecodeIterGen Msgsize() is inaccurate")
 	}
 
 	vn := IterGen{}
