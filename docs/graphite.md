@@ -44,6 +44,7 @@ See also:
 | Function name and signature                                    | Alias        | Metrictank |
 | -------------------------------------------------------------- | ------------ | ---------- |
 | absolute                                                       |              | Stable     |
+| add                                                            |              | No         |
 | aggregate                                                      |              | Stable     |
 | aggregateLine                                                  |              | No         |
 | aggregateWithWildcards                                         |              | Stable     |
@@ -80,6 +81,7 @@ See also:
 | drawAsInfinite                                                 |              | No         |
 | events                                                         |              | No         |
 | exclude(seriesList, pattern) seriesList                        |              | Stable     |
+| exp                                                            |              | No         |
 | exponentialMovingAverage                                       |              | No         |
 | fallbackSeries                                                 |              | Stable     |
 | filterSeries(seriesList, func, operator, threshold) seriesList |              | Stable     |
@@ -107,8 +109,10 @@ See also:
 | legendValue                                                    |              | No         |
 | limit                                                          |              | No         |
 | linearRegression                                               |              | No         |
+| linearRegressionAnalysis                                       |              | No         |
 | lineWidth                                                      |              | No         |
 | logarithm                                                      |              | No         |
+| logit                                                          |              | No         |
 | lowest(seriesList, n, func) seriesList                         |              | Stable     |
 | lowestAverage(seriesList, n, func) seriesList                  |              | Stable     |
 | lowestCurrent(seriesList, n, func) seriesList                  |              | Stable     |
@@ -155,6 +159,7 @@ See also:
 | secondYAxis                                                    |              | No         |
 | seriesByTag                                                    |              | No         |
 | setXFilesFactor                                                | xFilesFactor | No         |
+| sigmoid                                                        |              | No         |
 | sinFunction                                                    | sin          | No         |
 | smartSummarize                                                 |              | No         |
 | sortBy(seriesList, func, reverse) seriesList                   |              | Stable     |
