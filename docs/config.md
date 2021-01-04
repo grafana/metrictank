@@ -373,6 +373,14 @@ tls-skip-verify = false
 tls-client-cert =
 # Client key for client authentication (use with -tls-enabled and -tls-client-cert)
 tls-client-key =
+# Whether to enable SASL
+sasl-enabled = false
+# The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)
+sasl-mechanism =
+# Username for client authentication (use with -sasl-enabled and -sasl-password)
+sasl-username =
+# Password for client authentication (use with -sasl-enabled and -sasl-user)
+sasl-password =
 ```
 
 ## basic clustering settings ##
@@ -482,6 +490,14 @@ tls-skip-verify = false
 tls-client-cert =
 # Client key for client authentication (use with -tls-enabled and -tls-client-cert)
 tls-client-key =
+# Whether to enable SASL
+sasl-enabled = false
+# The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)
+sasl-mechanism =
+# Username for client authentication (use with -sasl-enabled and -sasl-password)
+sasl-username =
+# Password for client authentication (use with -sasl-enabled and -sasl-user)
+sasl-password =
 ```
 
 ## metric metadata index ##
