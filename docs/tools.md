@@ -562,6 +562,14 @@ Flags:
     	Set the offset to start consuming from. Can be oldest, newest or a time duration (default "newest")
   -partitions string
     	kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in (default "*")
+  -sasl-enabled
+    	Whether to enable SASL
+  -sasl-mechanism
+    	The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)
+  -sasl-username
+    	Username for client authentication (use with -sasl-enabled and -sasl-password)
+  -sasl-password
+    	Password for client authentication (use with -sasl-enabled and -sasl-user)
   -tls-client-cert string
     	Client cert for client authentication (use with -tls-enabled and -tls-client-key)
   -tls-client-key string
