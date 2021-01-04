@@ -66,6 +66,10 @@ var tlsEnabled bool
 var tlsSkipVerify bool
 var tlsClientCert string
 var tlsClientKey string
+var saslEnabled bool
+var saslMechanism string
+var saslUsername string
+var saslPassword string
 
 func ConfigSetup() {
 	inKafkaMdm := flag.NewFlagSet("kafka-mdm-in", flag.ExitOnError)
@@ -86,6 +90,10 @@ func ConfigSetup() {
 	inKafkaMdm.BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "Whether to skip TLS server cert verification")
 	inKafkaMdm.StringVar(&tlsClientCert, "tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
 	inKafkaMdm.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with -tls-enabled and -tls-client-cert)")
+	inKafkaMdm.BoolVar(&saslEnabled, "sasl-enabled", false, "Whether to enable SASL")
+	inKafkaMdm.StringVar(&saslMechanism, "sasl-mechanism", "", "The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)")
+	inKafkaMdm.StringVar(&saslUsername, "sasl-username", "", "Username for client authentication (use with -sasl-enabled and -sasl-password)")
+	inKafkaMdm.StringVar(&saslPassword, "sasl-password", "", "Password for client authentication (use with -sasl-enabled and -sasl-user)")
 	globalconf.Register("kafka-mdm-in", inKafkaMdm, flag.ExitOnError)
 }
 
@@ -139,6 +147,19 @@ func ConfigProcess(instance string) {
 		config.Net.TLS.Enable = true
 		config.Net.TLS.Config = tlsConfig
 		config.Net.TLS.Config.InsecureSkipVerify = tlsSkipVerify
+	}
+	
+	if saslEnabled {
+		config.Net.SASL.Enable = true
+		config.Net.SASL.User = saslUsername
+		config.Net.SASL.Password = saslPassword
+		if saslMechanism == "SCRAM-SHA-256" {
+			config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
+			config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA256} }
+		} else if saslMechanism == "SCRAM-SHA-512" {
+			config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA512
+			config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA512} }
+		}
 	}
 
 	err = config.Validate()
