@@ -564,12 +564,12 @@ Flags:
     	kafka partitions to consume. use '*' or a comma separated list of id's. This should match the partitions used for kafka-mdm-in (default "*")
   -sasl-enabled
     	Whether to enable SASL
-  -sasl-mechanism
+  -sasl-mechanism string
     	The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)
-  -sasl-username
-    	Username for client authentication (use with -sasl-enabled and -sasl-password)
-  -sasl-password
+  -sasl-password string
     	Password for client authentication (use with -sasl-enabled and -sasl-user)
+  -sasl-username string
+    	Username for client authentication (use with -sasl-enabled and -sasl-password)
   -tls-client-cert string
     	Client cert for client authentication (use with -tls-enabled and -tls-client-key)
   -tls-client-key string
