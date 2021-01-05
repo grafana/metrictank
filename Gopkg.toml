@@ -153,7 +153,3 @@ unused-packages = true
 [[override]]
   name = "github.com/jtolds/gls"
   revision = "b4936e06046bbecbb94cae9c18127ebe510a2cb9"
-
-[[constraint]]
-  name = "github.com/xdg/scram"
-  branch = "master"
