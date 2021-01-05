@@ -148,7 +148,7 @@ func ConfigProcess(instance string) {
 		config.Net.TLS.Config = tlsConfig
 		config.Net.TLS.Config.InsecureSkipVerify = tlsSkipVerify
 	}
-	
+
 	if saslEnabled {
 		config.Net.SASL.Enable = true
 		config.Net.SASL.User = saslUsername
