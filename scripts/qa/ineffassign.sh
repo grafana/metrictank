@@ -9,4 +9,4 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir
 cd ${DIR}/../..
 go get -u github.com/gordonklaus/ineffassign
-ineffassign .
+ineffassign ./...
