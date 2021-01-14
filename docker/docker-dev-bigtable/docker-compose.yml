@@ -32,7 +32,7 @@ services:
 
   bigtable:
     hostname: bigtable
-    image: google/cloud-sdk
+    image: google/cloud-sdk:321.0.0
     command: gcloud beta emulators bigtable start --host-port=0.0.0.0:8086
     ports:
      - "8086:8086"
