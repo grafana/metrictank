@@ -1,6 +1,40 @@
-# master (unreleased)
+# 1.1 Jan 14, 2021.
+
+## query api
 
 * Graphite pipe query syntax. #1854
+* Implement /metrics/expand endpoint #1795
+* Meta tags: avoid frequent write locks #1881
+* Native aggregateWithWildcards (and sum / multiply / avg) #1863
+* Native substr #1363
+* Native timeShift #1873
+* Tagged delete #1902
+
+## monitoring and limits
+
+* Update profiletrigger: switch from vsz to rss and add threshold for heap as well #1914
+* Monitoring of number of goroutines and other stats tweaks #1866
+* Apply max-series-per-req to non-tagged queries #1926
+* MaxSeries limit fixes #1929
+* Fix Server.findSeries() limit application #1932, #1934
+* Index op timeout #1944
+* Various dashboard fixes #1883, #1910
+
+## tools
+
+* mt-index-cat: bigtable support #1909
+* mt-index-cat: add orgID filter #1942
+* add mt-write-delay-schema-explain tool #1895
+* add mt-indexdump-rules-analyzer tool #1840
+
+## other
+
+* leverage in-flight requests of other replicas to possibly overcome shard query errors #1869
+* priority index locking and logging of long operations #1847, #1887
+* slice pooling improvements resulting in memory/GC improvements #1858, #1921, #1922, #1923, #1924
+* enable index write queue by default #1891
+* Improve performance of metatag doesnt exist expr #1920
+* SASL support for kafka input and cluster plugins #1956
 
 # 1.0 July 30, 2020.
 
