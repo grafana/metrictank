@@ -165,12 +165,7 @@ func (s *FuncMovingWindow) getWindowSeconds() (uint32, error) {
 		durStr = durStr[1:]
 	}
 
-	// Input validation and operations above check for empty or signed widowSizes
-	// or for widowSize specified as points. Errors unlikely here
-	shiftOffset, err := dur.ParseDuration(durStr)
-	if err != nil {
-		return 0, err
-	}
-
-	return shiftOffset, nil
+	// Input was already validated to be a valid duration after an optional sign.
+	// errors should never trigger here.
+	return dur.ParseDuration(durStr)
 }
