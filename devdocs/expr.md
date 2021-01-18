@@ -1,6 +1,6 @@
 # Request deduplication throughout the render path
 
-# Plan construction
+## Plan construction
 
 During plan construction, identical requests can be deduplicated.
 Requests are identical based on:
@@ -17,18 +17,18 @@ Examples:
 If they are identical, they lead to identical expr.Req objects, and will be saved in the plan only a single time.
 Importantly, equivalent requests may appear (e.g. requests for the same series, once with and once without a pngroup)
 
-# index lookups
+## index lookups
 
 For the purpose of index lookups we deduplicate more aggressively and only look at query/from/to.
 Other properties such as pngroup, consolidator are not relevant for this purpose.
 Note that a query like `target=foo.*&target=foo.bar` will return the series foo.bar twice, these are currently not deduplicated.
 
-# ReqMap
+## ReqMap
 
 For each combination of a plan.Req and all its resulting series, we generate a models.Req and save it into ReqMap.
 Again, these requests may only differ by pngroup, consolidator or query pattern, despite covering the same data fetch
 
-# Request planning: planRequests()
+## Request planning: planRequests()
 
 The ReqsPlan returned by planRequests() may have equivalent or identical requests.
 E.g. a PNGroup may only change the effective fetch parameters if there's multiple different series, with different intervals, with the same PNGroup, because in that case, pre-normalization may kick in, and a different archive may be selected. (or the same archive/fetch but normalization at runtime)
@@ -36,7 +36,7 @@ Also, since max-points-per-req-soft gets applied group by group, and then the si
 
 The point being, requests may be non-identical though equivalent in the ReqsPlan.
 
-# getTargets
+## getTargets
 
 As described above, the list of models.Req to fetch, may contain requests that are non-identical though equivalent
 
@@ -49,7 +49,7 @@ As described above, the list of models.Req to fetch, may contain requests that a
 
 The fields that materially affect fetching are MKey, archive, from, to (and Consolidator if a rollup is fetched)
 
-# datamap
+## datamap
 
 The datamap is a list of series, grouped by expr.Req (which tracks the requested consolidator, but not the used consolidator)
 There are a few cases where different expr.Req entries may have overlapping, or even identical lists of series:
@@ -58,7 +58,7 @@ There are a few cases where different expr.Req entries may have overlapping, or 
 
 Note: even if the same series is present elsewhere in the datamap, each copy is a full/independent/deep copy.
 
-# function processing
+## function processing
 
 Loading data and feeding into the function processing chain happens through FuncGet, which looks up data based on the expr.Req coming from the user, which maps 1:1 to the datamap above.
 In particular: it takes into account pngroups (even if they lead to equivalent fetches and thus identical series). But each copy of a series is a distinct, deep copy.
