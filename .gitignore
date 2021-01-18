@@ -10,6 +10,7 @@
 /cmd/mt-fakemetrics/mt-fakemetrics
 /cmd/mt-gateway/mt-gateway
 /cmd/mt-index-cat/mt-index-cat
+/cmd/mt-index-deleter/mt-index-deleter
 /cmd/mt-index-migrate/mt-index-migrate
 /cmd/mt-index-prune/mt-index-prune
 /cmd/mt-indexdump-rules-analyzer/mt-indexdump-rules-analyzer
