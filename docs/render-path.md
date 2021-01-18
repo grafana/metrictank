@@ -51,6 +51,8 @@ After a serie is fetched and normalized, it is often combined with other series:
 For these aggregations and merging to work well, the series need to have the same length and the same timestamps.
 Note that the other series don't necessarily have to be series that are "native" series of that interval.
 Continuing the example again, it could be another series that had a raw interval of 15s and is normalized with AggNum=2.
+Using canonical form is a good way to make everything work. Although the technical details are a bit more nuanced. 
+See [devdocs](../devdocs/render-request-handling.md#how-series-are-processed-and-ramifications-on-their-required-form)
 
 ## pre-canonical
 
