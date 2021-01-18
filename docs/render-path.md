@@ -20,9 +20,8 @@ To achieve this, points with null values may be added.
 
 ## canonical form
 
-canonical form comes into play when we need to normalize (through consolidation of points) a series, to be at a higher interval.
-It essentially means a series looks like a "native" fixed series of that higher interval,
-with respect to how many points it contains and which timestamps they have.
+a series is in canonical form when after it is normalized (through consolidation of points) to be at a higher interval, it
+has the same amount of points with the same timestamps as a "native" quantized series of that higher interval.
 
 It is important here to keep in mind that consolidated points get the timestamp of the last of its input points (postmarking).
 
@@ -60,7 +59,12 @@ I.O.W. is a series that is fetched in such a way that when it is fed to Consolid
 See above for more details.
 Note: this can only be done to the extent we know what the normalization looks like.
 (by setting up req.AggNum and req.OutInterval for normalization). For series that get (further) normalized at runtime,
-we can't predict this at fetch time and have to either:
+we can't predict this at fetch time and have to pre-canonicalize:
+
+## pre-canonicalization
+
+A process which takes a series in fixed or quantized form, and makes it pre-canonical wrt a given interval.
+This can be done in two ways:
 A) remove points to make the output canonical, which removes some information
 B) add null points at the beginning or end as needed, which may lead to inaccurate leading or trailing points that
 go potentially out of the bounds of the query.
@@ -79,8 +83,6 @@ such that:
 * across different requests, where points arrive on the right and leave the window on the left,
   the same timestamps are always aggregated together, and the timestamp is always consistent
   and divisible by the postInterval.
-
-
 
 In metrictank we do the same, via nudge(), invoked when doing MDP-based consolidation.
 Except, when we have only few points, strict application of nudging may result in confusing,
