@@ -62,3 +62,34 @@ mdp set from GET param, but 0 if came from graphite
                         -> planRequests(): used for MDP-optimization
             -> plan.MaxDatapoints used for final runtime consolidation
 	    -> and also used in planRequests() for reporting
+
+## How Series are processed and ramifications on their required form
+
+Here we determine through the entire request path, which functions have certain requirements on the models.Series they work with.
+Note:
+* Anything below getSeriesFixed is outside of our interest, because that's all about fetching details as opposed to "using" the series.
+* The requirement for any series to be in fixed form is implied everywhere, but this is always true once a series leaves getSeriesFixed.
+
+The request path looks like so:
+
+```
+/render -> renderMetrics -> executePlan -> getTargets -> getTargetsRemote -> /getdata
+                                                   L---> getTargetsLocal  -> getTarget -> getSeriesFixed -> getSeries
+                                                         ^
+/getdata -> getData -------------------------------------^
+```
+
+all of these functions do nothing noteworthy as far as combining series or normalizing them, except:
+* getTarget:
+  - applies aggNum consolidation (pre-normalization). does not require series to be canonical or pre-canonical
+  - for avg rollups, fetches sum and count and divides them by one another. requires these series to have the same length. this is always true because it's 2 archives for the same metric.
+* executePlan:
+  - mergeSeries has these criteria for series with the same name+tags+query+from+to:
+                 input series with same interval must have equal length and corresponding timestamps
+		 input series with different intervals will be pre-canonicalized by expr.Normalize. They must pre-canonicalize to the same pre-canonical form (by being in fixed form, this is true)
+		 it uses expr.makePreCanonicalCopy which requires inputs in canonical form. This can probably be relaxed in the future. (allow for consolidation of non-canonical series)
+  - plan.Run
+    - executes all functions : functions assume series have same number of points and matching timestamps.
+    - MDP consolidation: no requirements. Consolidate itself just takes groups of AggNum and postmarks. involves nudging which is meant for quantized input but should work without it too.
+
+Conclusion: canonical form is currently only strictly needed for certain mergeSeries use cases (e.g. you changed interval of data)

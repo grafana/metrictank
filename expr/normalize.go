@@ -86,6 +86,7 @@ func NormalizeTo(in models.Series, interval uint32, sc seriescycle.SeriesCycler)
 
 // makePreCanonicalCopy returns a copy of in's datapoints slice, but adjusted to be pre-canonical with respect to interval.
 // for this, it reuses the 'datapoints' slice.
+// note for this to work, in must be in canonical form
 func makePreCanonicalCopy(in models.Series, interval uint32, datapoints []schema.Point) []schema.Point {
 	// to achieve this we need to assure our input starts and ends with the right timestamp.
 

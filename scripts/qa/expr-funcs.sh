@@ -46,8 +46,8 @@ for f in $(getActualTestFiles); do
     if [ -z "$testFunc" ]; then
         echo "$f is missing a test helper function!"
         ret=2
-    elif [ $(egrep -c 't\.Run\("(DidNotModifyInput|DoesNotDoubleReturnPoints|OutputIsCanonical)"' <<< "$testFunc") -ne 3 ]; then
-        echo "$f has a test helper function which is missing one of DidNotModifyInput|DoesNotDoubleReturnPoints|OutputIsCanonical clauses"
+    elif [ $(egrep -c 't\.Run\("(DidNotModifyInput|DoesNotDoubleReturnPoints)"' <<< "$testFunc") -ne 3 ]; then
+        echo "$f has a test helper function which is missing one of DidNotModifyInput|DoesNotDoubleReturnPoints clauses"
         ret=2
     fi
 done
