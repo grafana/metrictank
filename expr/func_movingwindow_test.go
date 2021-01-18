@@ -290,13 +290,6 @@ func testMovingWindow(name string, in []models.Series, out []models.Series, offs
 			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
 		}
 	})
-	t.Run("OutputIsCanonical", func(t *testing.T) {
-		for i, s := range got {
-			if !s.IsCanonical() {
-				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
-			}
-		}
-	})
 }
 
 func callContext(name string, f GraphiteFunc, from, to, offset uint32, t *testing.T) {
