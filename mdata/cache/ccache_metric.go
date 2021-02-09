@@ -345,13 +345,13 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 	// add all consecutive chunks to search results, starting at the one containing "from"
 	for ; ts != 0; ts = mc.chunks[ts].Next {
 		log.Debugf("CCacheMetric searchForward: forward search adds chunk ts %d to start", ts)
-		_, ok := mc.chunks[ts]
+		chunk, ok := mc.chunks[ts]
 		if !ok {
 			log.Errorf("CCacheMetric searchForward: chunk with ts %d is not cached", ts)
 			res.Type = Miss
 			return
 		}
-		res.Start = append(res.Start, mc.chunks[ts].Itgen)
+		res.Start = append(res.Start, chunk.Itgen)
 		nextTs := mc.nextTs(ts)
 		res.From = nextTs
 
@@ -359,8 +359,8 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 			res.Type = Hit
 			break
 		}
-		if mc.chunks[ts].Next != 0 && ts >= mc.chunks[ts].Next {
-			log.Warnf("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, mc.chunks[ts].Next)
+		if chunk.Next != 0 && ts >= chunk.Next {
+			log.Warnf("CCacheMetric: suspected bug suppressed. searchForward(%q, %d, %d, res) ts is %d while Next is %d", metric, from, until, ts, chunk.Next)
 			span := opentracing.SpanFromContext(ctx)
 			span.SetTag("searchForwardBug", true)
 			searchFwdBug.Inc()
@@ -385,13 +385,13 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 		}
 
 		log.Debugf("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
-		_, ok := mc.chunks[ts]
+		chunk, ok := mc.chunks[ts]
 		if !ok {
 			log.Errorf("CCacheMetric searchBackward: chunk with ts %d is not cached", ts)
 			res.Type = Miss
 			return
 		}
-		res.End = append(res.End, mc.chunks[ts].Itgen)
+		res.End = append(res.End, chunk.Itgen)
 		res.Until = ts
 	}
 
