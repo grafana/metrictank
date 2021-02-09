@@ -348,8 +348,7 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 		chunk, ok := mc.chunks[ts]
 		if !ok {
 			log.Errorf("CCacheMetric searchForward: chunk with ts %d is not cached", ts)
-			res.Type = Miss
-			return
+			break
 		}
 		res.Start = append(res.Start, chunk.Itgen)
 		nextTs := mc.nextTs(ts)
@@ -388,8 +387,7 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 		chunk, ok := mc.chunks[ts]
 		if !ok {
 			log.Errorf("CCacheMetric searchBackward: chunk with ts %d is not cached", ts)
-			res.Type = Miss
-			return
+			break
 		}
 		res.End = append(res.End, chunk.Itgen)
 		res.Until = ts
