@@ -345,6 +345,12 @@ func (mc *CCacheMetric) searchForward(ctx context.Context, metric schema.AMKey, 
 	// add all consecutive chunks to search results, starting at the one containing "from"
 	for ; ts != 0; ts = mc.chunks[ts].Next {
 		log.Debugf("CCacheMetric searchForward: forward search adds chunk ts %d to start", ts)
+		_, ok := mc.chunks[ts]
+		if !ok {
+			log.Errorf("CCacheMetric searchForward: chunk with ts %d is not cached", ts)
+			res.Type = Miss
+			return
+		}
 		res.Start = append(res.Start, mc.chunks[ts].Itgen)
 		nextTs := mc.nextTs(ts)
 		res.From = nextTs
@@ -379,6 +385,12 @@ func (mc *CCacheMetric) searchBackward(from, until uint32, res *CCSearchResult) 
 		}
 
 		log.Debugf("CCacheMetric searchBackward: backward search adds chunk ts %d to end", ts)
+		_, ok := mc.chunks[ts]
+		if !ok {
+			log.Errorf("CCacheMetric searchBackward: chunk with ts %d is not cached", ts)
+			res.Type = Miss
+			return
+		}
 		res.End = append(res.End, mc.chunks[ts].Itgen)
 		res.Until = ts
 	}
