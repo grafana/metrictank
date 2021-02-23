@@ -69,20 +69,11 @@ func ReadAggregations(file string) (Aggregations, error) {
 		aggregationMethodStr := s.ValueOf("aggregationMethod")
 		methodStrs := strings.Split(aggregationMethodStr, ",")
 		for _, methodStr := range methodStrs {
-			switch methodStr {
-			case "average", "avg":
-				item.AggregationMethod = append(item.AggregationMethod, Avg)
-			case "sum":
-				item.AggregationMethod = append(item.AggregationMethod, Sum)
-			case "last":
-				item.AggregationMethod = append(item.AggregationMethod, Lst)
-			case "max":
-				item.AggregationMethod = append(item.AggregationMethod, Max)
-			case "min":
-				item.AggregationMethod = append(item.AggregationMethod, Min)
-			default:
-				return result, fmt.Errorf("[%s]: unknown aggregation method %q", item.Name, methodStr)
+			agg, err := NewMethod(methodStr)
+			if err != nil {
+				return result, fmt.Errorf("[%s]: %s", item.Name, err.Error())
 			}
+			item.AggregationMethod = append(item.AggregationMethod, agg)
 		}
 
 		result.Data = append(result.Data, item)
