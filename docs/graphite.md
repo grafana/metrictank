@@ -20,6 +20,7 @@ There are some small behavioral and functional differences with Graphite:
   "error parsing regexp: invalid or unsupported Perl syntax: '(?!'...". See https://github.com/grafana/metrictank/issues/1776
 * Metrictank supports rolling up any given metric by multiple functions and using consolidateBy() to select a rollup
 * MovingWindow and variants currently only support the input 'windowSize' specified as a quoted string with length of time and not as number of points. More details in PR #1739.
+  (you can use http.proxy-bad-requests to proxy such requests to graphite)
 
 ## Processing functions
 

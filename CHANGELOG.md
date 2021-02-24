@@ -1,3 +1,12 @@
+# master (unreleased)
+
+* add movingAverage, movingMax, movingMedian, movingMin, movingSum, movingWindow
+  these behave as in graphite, with one exception: we only support specifying the window as a duration,
+  not as a count of points. If a number of points is specified, the query will be considered invalid.
+  Note that http.proxy-bad-requests (which defaults to true), when enabled will seamlessly proxy to graphite in this case.
+  See #1941
+* add some error checking in ccache metric search. #1961
+
 # 1.1 Jan 14, 2021.
 
 ## query api
