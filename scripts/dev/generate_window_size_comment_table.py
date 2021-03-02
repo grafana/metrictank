@@ -52,4 +52,4 @@ while ttl < 5*365*24:
     ttl *= 2                                                                                                                         
                                                                                                                                      
 t.align = 'r'                                                                                                                        
-print t 
+print(t)
