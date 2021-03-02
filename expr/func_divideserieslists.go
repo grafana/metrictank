@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 // FuncDivideSeriesLists divides dividends by divisors, pairwise
@@ -53,6 +54,15 @@ func (s *FuncDivideSeriesLists) Exec(dataMap DataMap) ([]models.Series, error) {
 	var series []models.Series
 	for i := range dividends {
 		dividend, divisor := NormalizeTwo(dividends[i], divisors[i], NewCOWCycler(dataMap))
+
+		// this should not happen
+		if len(dividend.Datapoints) != len(divisor.Datapoints) {
+			log.Errorf("DivideSeriesList: len of dividend datapoints (%v) does not match len of divisor datapoints (%v) - truncating", len(dividend.Datapoints), len(divisor.Datapoints))
+			if len(dividend.Datapoints) > len(divisor.Datapoints) {
+				dividend.Datapoints = dividend.Datapoints[:len(divisor.Datapoints)]
+			}
+			divisor.Datapoints = divisor.Datapoints[:len(dividend.Datapoints)]
+		}
 
 		out := pointSlicePool.Get()
 		for i := 0; i < len(dividend.Datapoints); i++ {

@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/util"
+	log "github.com/sirupsen/logrus"
 )
 
 // FuncDivideSeries divides 1-N dividend series by 1 dividend series
@@ -79,6 +80,16 @@ func (s *FuncDivideSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 				divisorsByRes[lcm] = divisor
 			}
 		}
+
+		// this should not happen
+		if len(dividend.Datapoints) != len(divisor.Datapoints) {
+			log.Errorf("DivideSeries: len of dividend datapoints (%v) does not match len of divisor datapoints (%v) - truncating", len(dividend.Datapoints), len(divisor.Datapoints))
+			if len(dividend.Datapoints) > len(divisor.Datapoints) {
+				dividend.Datapoints = dividend.Datapoints[:len(divisor.Datapoints)]
+			}
+			divisor.Datapoints = divisor.Datapoints[:len(dividend.Datapoints)]
+		}
+
 		for i := 0; i < len(dividend.Datapoints); i++ {
 			p := schema.Point{
 				Ts: dividend.Datapoints[i].Ts,
