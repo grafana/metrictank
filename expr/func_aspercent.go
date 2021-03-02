@@ -227,6 +227,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 		}
 		if len(totalsSerie.Datapoints) > 0 {
 			serie, totalsSerie = NormalizeTwo(serie, totalsSerie, NewCOWCycler(dataMap))
+			serie = serie.Copy(pointSlicePool.Get())
 
 			// this should not happen
 			if len(serie.Datapoints) != len(totalsSerie.Datapoints) {
@@ -236,7 +237,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 				}
 				totalsSerie.Datapoints = totalsSerie.Datapoints[:len(serie.Datapoints)]
 			}
-			serie = serie.Copy(pointSlicePool.Get())
+
 			for i := range serie.Datapoints {
 				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
 			}
