@@ -1,4 +1,5 @@
 #!/usr/bin/env python                                                                                                                    
+# see store/cassandra/table.go
                                                                                                                                      
 import math                                                                                                                          
 from prettytable import PrettyTable                                                                                                  

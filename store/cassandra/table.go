@@ -52,7 +52,7 @@ func GetTable(ttl uint32, windowFactor int, nameFormat string) Table {
 	 * in hours. This lets us control the amount of sstables used for each table/TTL.
 	 * For example with a window factor of 20 we want to group the metrics like this:
 	 *
-	 * generated with: https://gist.github.com/replay/69ad7cfd523edfa552cd12851fa74c58
+	 * generated with: scripts/dev/store-cassandra-generate-window-size-comment-table.py
 	 *
 	 * +------------------------+---------------+---------------------+----------+
 	 * |              TTL hours |   table_name | window_size (hours) | sstables |
