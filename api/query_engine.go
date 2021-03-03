@@ -127,6 +127,8 @@ func planRequests(now uint32, reqs *ReqMap, planMDP uint32, mpprSoft, mpprHard i
 		}
 	}
 
+	pointsInitial := rp.PointsFetch()
+
 	// 2) pick coarser data if needed to honor max-points-per-req-soft
 	if mpprSoft > 0 {
 		// at this point, MDP-optimizable series have already seen a decent resolution reduction
@@ -193,9 +195,11 @@ HonoredSoft:
 
 	// 3) honor max-points-per-req-hard
 	if mpprHard > 0 && int(rp.PointsFetch()) > mpprHard {
+		log.Infof("API planRequests: initial points: %d, after mpprSoft: %d, after mpprHard: REJECT", pointsInitial, rp.PointsFetch())
 		return nil, errMaxPointsPerReq
-
 	}
+
+	log.Infof("API planRequests: initial points: %d, after mpprSoft: %d, after mpprHard: PASS", pointsInitial, rp.PointsFetch())
 
 	// 4) send out some metrics and we're done!
 	for _, reqs := range rp.single.mdpyes {
