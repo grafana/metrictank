@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/metrictank/archives"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/util"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
