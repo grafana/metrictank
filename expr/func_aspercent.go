@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/errors"
 	"github.com/grafana/metrictank/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 type FuncAsPercent struct {
@@ -158,6 +159,16 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMa
 				// key found in both inByKey and totalSerieByKey
 				serie1, serie2 := NormalizeTwo(serie1, totalSerieByKey[key], NewCOWCycler(dataMap))
 				serie1 = serie1.Copy(pointSlicePool.Get())
+
+				// this should not happen
+				if len(serie1.Datapoints) != len(serie2.Datapoints) {
+					log.Errorf("AsPercent: len of serie1 datapoints (%v) does not match len of serie2 datapoints (%v) - truncating", len(serie1.Datapoints), len(serie2.Datapoints))
+					if len(serie1.Datapoints) > len(serie2.Datapoints) {
+						serie1.Datapoints = serie1.Datapoints[:len(serie2.Datapoints)]
+					}
+					serie2.Datapoints = serie2.Datapoints[:len(serie1.Datapoints)]
+				}
+
 				serie1.QueryPatt = fmt.Sprintf("asPercent(%s,%s)", serie1.QueryPatt, serie2.QueryPatt)
 				serie1.Target = fmt.Sprintf("asPercent(%s,%s)", serie1.Target, serie2.Target)
 				serie1.Tags = map[string]string{"name": serie1.Target}
@@ -217,6 +228,16 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 		if len(totalsSerie.Datapoints) > 0 {
 			serie, totalsSerie = NormalizeTwo(serie, totalsSerie, NewCOWCycler(dataMap))
 			serie = serie.Copy(pointSlicePool.Get())
+
+			// this should not happen
+			if len(serie.Datapoints) != len(totalsSerie.Datapoints) {
+				log.Errorf("AsPercent: len of serie datapoints (%v) does not match len of totalsSerie datapoints (%v) - truncating", len(serie.Datapoints), len(totalsSerie.Datapoints))
+				if len(serie.Datapoints) > len(totalsSerie.Datapoints) {
+					serie.Datapoints = serie.Datapoints[:len(totalsSerie.Datapoints)]
+				}
+				totalsSerie.Datapoints = totalsSerie.Datapoints[:len(serie.Datapoints)]
+			}
+
 			for i := range serie.Datapoints {
 				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
 			}
