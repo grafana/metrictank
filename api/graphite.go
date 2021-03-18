@@ -821,6 +821,11 @@ func getClusterFindLimit(maxSeriesPerReq int, outstanding, multiplier int) int {
 	return (maxSeriesPerReq - outstanding) / multiplier
 }
 
+type consolidatorTuple struct {
+	primary conf.Method
+	used    consolidation.Consolidator
+}
+
 // executePlan looks up the needed data, retrieves it, and then invokes the processing
 // note if you do something like sum(foo.*) and all of those metrics happen to be on another node,
 // we will collect all the individual series from the peer, and then sum here. that could be optimized
@@ -873,6 +878,8 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 			return nil, meta, err
 		}
 
+		nonPrimaryRollups := make(map[consolidatorTuple]int)
+
 		for _, s := range series {
 			for _, metric := range s.Series {
 				for _, archive := range metric.Defs {
@@ -888,13 +895,17 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 							//   from cluster peers; it's more efficient to have them normalize the data at the source.
 							// * a pattern may expand to multiple series, each of which can have their own aggregation method.
 							fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-							cons = consolidation.Consolidator(fn) // we use the same number assignments so we can cast them
+							cons = consolidation.Consolidator(fn)
 						} else {
 							// user specified a runtime consolidation function via consolidateBy()
 							// get the consolidation method of the most appropriate rollup based on the consolidation method
 							// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
 							// use 'avg'.
-							cons = closestAggMethod(consReq, mdata.Aggregations.Get(archive.AggId).AggregationMethod)
+							confMethods := mdata.Aggregations.Get(archive.AggId).AggregationMethod
+							cons = closestAggMethod(consReq, confMethods)
+							if cons != consolidation.Consolidator(confMethods[0]) {
+								nonPrimaryRollups[consolidatorTuple{confMethods[0], cons}]++
+							}
 						}
 
 						newReq := rawReq.ToModel()
@@ -905,6 +916,12 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 
 				if tagquery.MetaTagSupport && len(metric.Defs) > 0 && len(metric.MetaTags) > 0 {
 					metaTagEnrichmentData[metric.Defs[0].NameWithTags()] = metric.MetaTags
+				}
+			}
+
+			if len(nonPrimaryRollups) > 0 {
+				for tuple, cnt := range nonPrimaryRollups {
+					log.Infof("API: query uses non-primary rollup. orgid=%d query=%q primary=%q used=%q cnt=%d", orgId, r.Query, tuple.primary, tuple.used, cnt)
 				}
 			}
 		}
