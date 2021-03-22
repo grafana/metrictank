@@ -26,7 +26,7 @@ var (
 	reqRenderPointsReturned = stats.NewMeter32("api.request.render.points_returned", false)
 
 	errUnSatisfiable   = response.NewError(http.StatusNotFound, "request cannot be satisfied due to lack of available retentions")
-	errMaxPointsPerReq = response.NewError(http.StatusRequestEntityTooLarge, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
+	errMaxPointsPerReq = response.NewError(http.StatusForbidden, "request exceeds max-points-per-req-hard limit. Reduce the time range or number of targets or ask your admin to increase the limit.")
 )
 
 // planRequests updates the requests with all details for fetching.

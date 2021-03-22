@@ -171,7 +171,7 @@ MainLoop:
 						leavesInResp++
 						if maxSeries > 0 && leavesTotal > maxSeries {
 							return nil, response.NewError(
-								http.StatusRequestEntityTooLarge,
+								http.StatusForbidden,
 								fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
 						}
 					} else if leavesOnly {
@@ -929,7 +929,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 		// if we already breached the limit, no point in doing any further finds
 		if int(reqs.cnt) > maxSeriesPerReq {
 			return nil, meta, response.NewError(
-				http.StatusRequestEntityTooLarge,
+				http.StatusForbidden,
 				fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
 		}
 
@@ -1277,7 +1277,7 @@ func (s *Server) clusterFindByTag(ctx context.Context, orgId uint32, expressions
 			}
 			return nil,
 				response.NewError(
-					http.StatusRequestEntityTooLarge,
+					http.StatusForbidden,
 					fmt.Sprintf("Request exceeds max-series-per-req limit (%d). Reduce the number of targets or ask your admin to increase the limit.", maxSeriesPerReq))
 		}
 
