@@ -29,14 +29,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:622bc18c663f130b5b16abe3c723a5ce0f91413b0e59e1f2e319d8dae337ecb3"
+  digest = "1:f22d3adc5cce620ef57db3ac11e370c38e87e0175f49a3615fc09c47fd451ac5"
   name = "github.com/Dieterbe/artisanalhistogram"
   packages = [
     "hist12h",
     "hist15s",
   ]
   pruneopts = "NUT"
-  revision = "f61b7225d304620f6f2c5cbb21435d0957115429"
+  revision = "f7596a8a7dbe2fb241997babbeeaf5f04e2b5d5a"
 
 [[projects]]
   branch = "master"
@@ -118,11 +118,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:07e80adc1161a63d37f382328ebabbf4f50e027cfaadf718515c3f39a65eb18f"
+  digest = "1:04ba1e51f282720bc3b9a2ab0664999c4e1241d7c403662e18e3c983cdd0a27d"
   name = "github.com/dgryski/go-linlog"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "edcf2dfd90ff209a4434491d7f38e203b3163de2"
+  revision = "ef0e282fbe892f97164156fcc579939f0c4279cc"
 
 [[projects]]
   digest = "1:3cabbabc9e0e4aa7e12b882bdc213f41cf8bd2b2ce2a7b5e0aceaf8a6a78049b"
