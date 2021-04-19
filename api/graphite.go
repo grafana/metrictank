@@ -918,11 +918,11 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 					metaTagEnrichmentData[metric.Defs[0].NameWithTags()] = metric.MetaTags
 				}
 			}
+		}
 
-			if len(nonPrimaryRollups) > 0 {
-				for tuple, cnt := range nonPrimaryRollups {
-					log.Infof("API: query uses non-primary rollup. orgid=%d query=%q primary=%q used=%q cnt=%d", orgId, r.Query, tuple.primary, tuple.used, cnt)
-				}
+		if len(nonPrimaryRollups) > 0 {
+			for tuple, cnt := range nonPrimaryRollups {
+				log.Infof("API: query uses non-primary rollup. orgid=%d query=%q primary=%q used=%q cnt=%d", orgId, r.Query, tuple.primary, tuple.used, cnt)
 			}
 		}
 
