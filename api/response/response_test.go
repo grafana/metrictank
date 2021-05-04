@@ -1,6 +1,8 @@
 package response
 
 import (
+	"math"
+
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/schema"
 )
@@ -57,7 +59,7 @@ func testSeries() []series {
 					Target: "foo(bar)",
 					Datapoints: []schema.Point{
 						{123.456, 10},
-						{123.7, 20},
+						{math.NaN(), 20},
 						{124.10, 30},
 						{125.0, 40},
 						{126.0, 50},
@@ -65,7 +67,7 @@ func testSeries() []series {
 					Interval: 10,
 				},
 			},
-			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[123.7,20],[124.1,30],[125,40],[126,50]]}]`,
+			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[null,20],[124.1,30],[125,40],[126,50]]}]`,
 		},
 	}
 	return cases
