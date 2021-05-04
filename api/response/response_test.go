@@ -8,8 +8,9 @@ import (
 )
 
 type series struct {
-	in  []models.Series
-	out string
+	in     []models.Series
+	out    string
+	outCsv string
 }
 
 func testSeries() []series {
@@ -26,7 +27,8 @@ func testSeries() []series {
 					Interval:   60,
 				},
 			},
-			out: `[{"target":"a","datapoints":[]}]`,
+			out:    `[{"target":"a","datapoints":[]}]`,
+			outCsv: ``,
 		},
 		{
 			in: []models.Series{
@@ -42,6 +44,11 @@ func testSeries() []series {
 				},
 			},
 			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]}]`,
+			outCsv: `a,1970-01-01 00:01:00,123
+a,1970-01-01 00:02:00,10000
+a,1970-01-01 00:03:00,0
+a,1970-01-01 00:04:00,1
+`,
 		},
 		{
 			in: []models.Series{
@@ -68,6 +75,16 @@ func testSeries() []series {
 				},
 			},
 			out: `[{"target":"a","datapoints":[[123,60],[10000,120],[0,180],[1,240]]},{"target":"foo(bar)","datapoints":[[123.456,10],[null,20],[124.1,30],[125,40],[126,50]]}]`,
+			outCsv: `a,1970-01-01 00:01:00,123
+a,1970-01-01 00:02:00,10000
+a,1970-01-01 00:03:00,0
+a,1970-01-01 00:04:00,1
+foo(bar),1970-01-01 00:00:10,123.456
+foo(bar),1970-01-01 00:00:20,
+foo(bar),1970-01-01 00:00:30,124.1
+foo(bar),1970-01-01 00:00:40,125
+foo(bar),1970-01-01 00:00:50,126
+`,
 		},
 	}
 	return cases

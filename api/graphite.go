@@ -359,6 +359,8 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 		response.Write(ctx, response.NewMsgpack(200, models.SeriesByTarget(out).ForGraphite("msgpack")))
 	case "pickle":
 		response.Write(ctx, response.NewPickle(200, models.SeriesByTarget(out)))
+	case "csv":
+		response.Write(ctx, response.NewCsv(200, models.SeriesByTarget(out)))
 	default:
 		if request.Meta {
 			response.Write(ctx, response.NewFastJson(200, models.ResponseWithMeta{Series: models.SeriesByTarget(out), Meta: meta}))
