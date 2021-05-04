@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/expr/tagquery"
@@ -436,4 +437,48 @@ type SeriesForPickle struct {
 	Step           uint32        `pickle:"step" msg:"step"`
 	Values         []interface{} `pickle:"values" msg:"values"`
 	PathExpression string        `pickle:"pathExpression" msg:"pathExpression"`
+}
+
+// Csv formats like graphite's render&format=csv , like so: (note the null points)
+// sumSeries(carbon.agents.graphitemon-a.*),2021-05-04 11:27:41,
+// sumSeries(carbon.agents.graphitemon-a.*),2021-05-04 11:27:42,28066914.362149723
+// sumSeries(carbon.agents.graphitemon-a.*),2021-05-04 11:27:43,
+// sumSeries(carbon.agents.graphitemon-a.*),2021-05-04 11:27:44,
+func (series SeriesByTarget) Csv(buf []byte) ([]byte, error) {
+	buffer := bytes.NewBuffer(buf)
+	for _, serie := range series {
+		for _, point := range serie.Datapoints {
+
+			_, err := buffer.WriteString(serie.Target)
+			if err != nil {
+				return nil, err
+			}
+			_, err = buffer.WriteRune(',')
+			if err != nil {
+				return nil, err
+			}
+
+			time := time.Unix(int64(point.Ts), 0).UTC()
+			_, err = buffer.WriteString(time.Format("2006-01-02 15:04:05"))
+			if err != nil {
+				return nil, err
+			}
+			_, err = buffer.WriteRune(',')
+			if err != nil {
+				return nil, err
+			}
+
+			if !math.IsNaN(point.Val) {
+				_, err = buffer.WriteString(strconv.FormatFloat(point.Val, 'f', -1, 64))
+				if err != nil {
+					return nil, err
+				}
+			}
+			_, err = buffer.WriteRune('\n')
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return buffer.Bytes(), nil
 }

@@ -250,8 +250,8 @@ POST /render
 * target: mandatory. one or more metric names or patterns, like graphite.
 * from: see [timespec format](#tspec) (default: 24h ago) (exclusive)
 * to/until : see [timespec format](#tspec)(default: now) (inclusive)
-* format: json, msgp, pickle, or msgpack (default: json). (note: msgp and msgpack are similar, but msgpack is for use with graphite)
-* meta: use 'meta=true' to enable metadata in response (see below).
+* format: json, msgp, pickle, csv or msgpack (default: json). (note: msgp and msgpack are similar, but msgpack is for use with graphite)
+* meta: use 'meta=true' to enable metadata in response (see below). Only supported for json responses.
 * process: all, stable, none (default: stable). Controls metrictank's eagerness of fulfilling the request with its built-in processing functions
   (as opposed to proxying to the fallback graphite).
   - all: process request without fallback if we have all the needed functions, even if they are marked unstable (under development)
@@ -271,7 +271,7 @@ curl -H "X-Org-Id: 12345" "http://localhost:6060/render?target=statsd.fakesite.c
 
 #### Metadata
 
-The metadata of a render response (provided when `meta=true` is passed), includes:
+The metadata of a render response (provided when `meta=true` is passed and format is json), includes:
 
 * response global performance measurements
 * series-specific lineage information describing storage-schemas, read archive, archive interval and any consolidation and normalization applied.
