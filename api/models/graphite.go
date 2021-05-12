@@ -168,7 +168,8 @@ type GraphiteTagDelSeriesResp struct {
 type GraphiteTagDelByQuery struct {
 	Expr      []string `json:"expressions" binding:"Required"`
 	OlderThan int64    `json:"olderThan" form:"olderThan"`
-	Execute   bool     `json:execute binding:"Default(false)"`
+	Execute   bool     `json:"execute" binding:"Default(false)"`
+	Method    string   `json:"method" binding:"Default(delete);OmitEmpty;In(delete,archive)"`
 }
 
 func (g GraphiteTagDelByQuery) Trace(span opentracing.Span) {
@@ -176,6 +177,7 @@ func (g GraphiteTagDelByQuery) Trace(span opentracing.Span) {
 		traceLog.String("expressions", fmt.Sprintf("%q", g.Expr)),
 		traceLog.String("olderThan", fmt.Sprintf("%d", g.OlderThan)),
 		traceLog.String("execute", fmt.Sprintf("%t", g.Execute)),
+		traceLog.String("method", fmt.Sprintf("%s", g.Method)),
 	)
 }
 

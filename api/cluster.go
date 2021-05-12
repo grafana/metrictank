@@ -19,6 +19,7 @@ import (
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/idx/cassandra"
 	"github.com/grafana/metrictank/stats"
 	"github.com/grafana/metrictank/tracing"
 	log "github.com/sirupsen/logrus"
@@ -303,12 +304,24 @@ func (s *Server) localTagDelByQuery(request models.IndexTagDelByQuery) (int, err
 		return 0, err
 	}
 
-	if request.Execute {
+	if !request.Execute {
+		// Use FindTerms to count what would be deleted
+		matched, _ := s.MetricIndex.FindTerms(request.OrgId, []string{}, query)
+		return int(matched), nil
+	}
+
+	if request.Method == "archive" {
+		casidx, ok := s.MetricIndex.(*cassandra.CasIdx)
+		if !ok {
+			return 0, errors.New("Only cassandra index supports 'archive' method")
+		}
+		deleted, err := casidx.ArchiveTagged(request.OrgId, query)
+		return len(deleted), err
+	} else if request.Method == "delete" {
 		deleted, err := s.MetricIndex.DeleteTagged(request.OrgId, query)
 		return len(deleted), err
 	}
-	matched, _ := s.MetricIndex.FindTerms(request.OrgId, []string{}, query)
-	return int(matched), nil
+	return 0, fmt.Errorf("Unknown delete method '%s'", request.Method)
 }
 
 func (s *Server) IndexTagDelByQuery(ctx *middleware.Context, request models.IndexTagDelByQuery) {
