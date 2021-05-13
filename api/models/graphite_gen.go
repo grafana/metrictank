@@ -273,6 +273,12 @@ func (z *GraphiteTagDelByQuery) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "Execute")
 				return
 			}
+		case "Method":
+			z.Method, err = dc.ReadString()
+			if err != nil {
+				err = msgp.WrapError(err, "Method")
+				return
+			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -286,9 +292,9 @@ func (z *GraphiteTagDelByQuery) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *GraphiteTagDelByQuery) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 3
+	// map header, size 4
 	// write "Expr"
-	err = en.Append(0x83, 0xa4, 0x45, 0x78, 0x70, 0x72)
+	err = en.Append(0x84, 0xa4, 0x45, 0x78, 0x70, 0x72)
 	if err != nil {
 		return
 	}
@@ -324,15 +330,25 @@ func (z *GraphiteTagDelByQuery) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "Execute")
 		return
 	}
+	// write "Method"
+	err = en.Append(0xa6, 0x4d, 0x65, 0x74, 0x68, 0x6f, 0x64)
+	if err != nil {
+		return
+	}
+	err = en.WriteString(z.Method)
+	if err != nil {
+		err = msgp.WrapError(err, "Method")
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *GraphiteTagDelByQuery) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 3
+	// map header, size 4
 	// string "Expr"
-	o = append(o, 0x83, 0xa4, 0x45, 0x78, 0x70, 0x72)
+	o = append(o, 0x84, 0xa4, 0x45, 0x78, 0x70, 0x72)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Expr)))
 	for za0001 := range z.Expr {
 		o = msgp.AppendString(o, z.Expr[za0001])
@@ -343,6 +359,9 @@ func (z *GraphiteTagDelByQuery) MarshalMsg(b []byte) (o []byte, err error) {
 	// string "Execute"
 	o = append(o, 0xa7, 0x45, 0x78, 0x65, 0x63, 0x75, 0x74, 0x65)
 	o = msgp.AppendBool(o, z.Execute)
+	// string "Method"
+	o = append(o, 0xa6, 0x4d, 0x65, 0x74, 0x68, 0x6f, 0x64)
+	o = msgp.AppendString(o, z.Method)
 	return
 }
 
@@ -395,6 +414,12 @@ func (z *GraphiteTagDelByQuery) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "Execute")
 				return
 			}
+		case "Method":
+			z.Method, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Method")
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -413,7 +438,7 @@ func (z *GraphiteTagDelByQuery) Msgsize() (s int) {
 	for za0001 := range z.Expr {
 		s += msgp.StringPrefixSize + len(z.Expr[za0001])
 	}
-	s += 10 + msgp.Int64Size + 8 + msgp.BoolSize
+	s += 10 + msgp.Int64Size + 8 + msgp.BoolSize + 7 + msgp.StringPrefixSize + len(z.Method)
 	return
 }
 
