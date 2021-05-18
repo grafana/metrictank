@@ -201,12 +201,15 @@ POST /tags/delByQuery
 * expr (required, multiple allowed): A tag filter expression (e.g. `name=reqs.count`)
 * olderThan (optional): A unix epoch time. Series seen more recently than this will not be deleted.
 * execute (optional, default false): Execute this deletion. If false, just returns the count that *would* have been deleted
+* method (optional, default `delete`): Method of deletion to use.
+  - `delete` - delete from index table
+  - `archive` - move from index table to index archive. Currently only supported by cassandra index.
 
 #### Example
 
 The following request will delete series with tag `cluster=decommed`.
 ```bash
-curl -H "X-Org-Id: 12345" "expr=cluster=decommed" -d "execute=true" "http://localhost:6060/tags/delByQuery"
+curl -H "X-Org-Id: 12345" -d "expr=cluster=decommed" -d "execute=true" "http://localhost:6060/tags/delByQuery"
 
 {
     "count": 120,

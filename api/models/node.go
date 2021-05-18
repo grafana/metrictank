@@ -162,7 +162,8 @@ type IndexTagDelByQuery struct {
 	OrgId     uint32   `json:"orgId" binding:"Required"`
 	Expr      []string `json:"expressions" binding:"Required"`
 	OlderThan int64    `json:"olderThan" form:"olderThan"`
-	Execute   bool     `json:execute binding:"Default(false)"`
+	Execute   bool     `json:"execute" binding:"Default(false)"`
+	Method    string   `json:"method" binding:"Default(delete);OmitEmpty;In(delete,archive)"`
 }
 
 func (t IndexTagDelByQuery) Trace(span opentracing.Span) {
@@ -170,6 +171,7 @@ func (t IndexTagDelByQuery) Trace(span opentracing.Span) {
 		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
 		traceLog.String("olderThan", fmt.Sprintf("%d", t.OlderThan)),
 		traceLog.String("execute", fmt.Sprintf("%t", t.Execute)),
+		traceLog.String("method", fmt.Sprintf("%s", t.Method)),
 	)
 }
 

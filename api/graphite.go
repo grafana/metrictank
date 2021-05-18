@@ -1553,7 +1553,14 @@ func (s *Server) graphiteTagDelSeries(ctx *middleware.Context, request models.Gr
 func (s *Server) graphiteTagDelByQuery(ctx *middleware.Context, request models.GraphiteTagDelByQuery) {
 	res := models.GraphiteTagDelByQueryResp{}
 
-	data := models.IndexTagDelByQuery{OrgId: ctx.OrgId, Expr: request.Expr, OlderThan: request.OlderThan, Execute: request.Execute}
+	data := models.IndexTagDelByQuery{
+		OrgId:     ctx.OrgId,
+		Expr:      request.Expr,
+		OlderThan: request.OlderThan,
+		Execute:   request.Execute,
+		Method:    request.Method,
+	}
+	log.Infof("Sending request to peers: %v", data)
 	responses, errors := s.queryAllPeers(ctx.Req.Context(), data, "clusterTagDelByQuery,", "/index/tags/delByQuery")
 
 	// nothing to do locally on query nodes.

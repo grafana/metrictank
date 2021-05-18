@@ -617,6 +617,29 @@ func (c *CasIdx) DeleteTagged(orgId uint32, query tagquery.Query) ([]idx.Archive
 	return defs, err
 }
 
+func (c *CasIdx) ArchiveTagged(orgId uint32, query tagquery.Query) ([]idx.Archive, error) {
+
+	archives, err := c.MemoryIndex.DeleteTagged(orgId, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Due to an unfortunate evolution, Archive and delete have 2 different
+	// interfaces (idx.Archive vs schema.MetricDefinition). So one more
+	// translation step to what ArchiveDefs needs.
+	defs := make([]schema.MetricDefinition, 0, len(archives))
+	for _, archive := range archives {
+		defs = append(defs, archive.MetricDefinition)
+	}
+
+	_, err = c.ArchiveDefs(defs)
+	if err != nil {
+		return nil, err
+	}
+
+	return archives, err
+}
+
 func (c *CasIdx) deleteDefs(defs []idx.Archive) error {
 	var err error
 
