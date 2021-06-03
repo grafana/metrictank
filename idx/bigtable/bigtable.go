@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/metrictank/idx/memory"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util"
 	"github.com/jpillora/backoff"
 	log "github.com/sirupsen/logrus"
 )
@@ -261,13 +262,6 @@ func (b *BigtableIdx) updateBigtable(now uint32, inMemory bool, archive idx.Arch
 }
 
 func (b *BigtableIdx) Find(orgId uint32, pattern string, from, limit int64) ([]idx.Node, error) {
-	// The lastUpdate timestamp does not get updated in the bigtable index every time when
-	// a data point is received, there can be a delay of up to b.cfg.updateInterval32. To
-	// avoid falsely excluding a metric based on its lastUpdate timestamp we offset the
-	// from time by updateInterval32, this way we err on the "too inclusive" side
-	if from > int64(b.cfg.updateInterval32) {
-		from -= int64(b.cfg.updateInterval32)
-	}
 	return b.MemoryIndex.Find(orgId, pattern, from, limit)
 }
 
@@ -286,6 +280,10 @@ func (b *BigtableIdx) rebuildIndex() {
 }
 
 func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinition, now time.Time, orgFilter int) []schema.MetricDefinition {
+
+	maxLastUpdate := time.Now().Unix()
+	updateInterval := int64(b.cfg.updateInterval32)
+
 	ctx := context.Background()
 	rr := bigtable.PrefixRange(fmt.Sprintf("%d_", partition))
 	defsByNames := make(map[string][]schema.MetricDefinition)
@@ -300,6 +298,16 @@ func (b *BigtableIdx) LoadPartition(partition int32, defs []schema.MetricDefinit
 			return true
 		}
 		log.Debugf("bigtable-idx: found def %+v", def)
+
+		// because metricdefs get saved no more frequently than every updateInterval
+		// the lastUpdate field may be out of date by that amount (or more if the process
+		// struggled writing data. See updateBigtable() )
+		// To compensate, we set bump it here.  This should make sure to include all series
+		// that have data for queries but didn't see an update to the index, at the cost
+		// of potentially including some series in queries that don't have data, but that's OK
+		// (that's how Graphite works anyway)
+		def.LastUpdate = util.MinInt64(maxLastUpdate, def.LastUpdate+updateInterval)
+
 		nameWithTags := def.NameWithTags()
 		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], def)
 		return true
