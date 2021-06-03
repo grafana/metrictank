@@ -385,7 +385,7 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time
 			// because metricdefs get saved no more frequently than every updateInterval
 			// the lastUpdate field may be out of date by that amount (or more if the process
 			// struggled writing data. See updateCassandra() )
-			// To compensate, we set bump it here.  This should make sure to include all series
+			// To compensate, we bump it here.  This should make sure to include all series
 			// that have data for queries but didn't see an update to the index, at the cost
 			// of potentially including some series in queries that don't have data, but that's OK
 			// (that's how Graphite works anyway)
