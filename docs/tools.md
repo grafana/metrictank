@@ -359,8 +359,6 @@ reads rowkeys from stdin and deletes them from the index. only BigTable is suppo
     	number of concurrent delete workers (default 20)
   -gcp-project string
     	Name of GCP project the bigtable cluster resides in (default "default")
-  -log.level value
-    	Only log messages with the given severity or above. Valid levels: [debug, info, warn, error, fatal, panic].
 ```
 
 
