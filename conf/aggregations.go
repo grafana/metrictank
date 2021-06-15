@@ -9,6 +9,13 @@ import (
 	"github.com/alyu/configparser"
 )
 
+var defaultAggregation = Aggregation{
+	Name:              "default",
+	Pattern:           regexp.MustCompile(".*"),
+	XFilesFactor:      0.5,
+	AggregationMethod: []Method{Avg},
+}
+
 // Aggregations holds the aggregation definitions
 type Aggregations struct {
 	Data               []Aggregation
@@ -16,22 +23,17 @@ type Aggregations struct {
 }
 
 type Aggregation struct {
-	Name              string
-	Pattern           *regexp.Regexp
-	XFilesFactor      float64
-	AggregationMethod []Method
+	Name              string         // mandatory (I *think* carbon allows empty name, but the docs say you should provide one)
+	Pattern           *regexp.Regexp // mandatory (I *think* carbon allows empty pattern, but the docs say you should provide one)
+	XFilesFactor      float64        // optional. defaults to 0.5
+	AggregationMethod []Method       // optional. defaults to ['average']
 }
 
 // NewAggregations create instance of Aggregations
 func NewAggregations() Aggregations {
 	return Aggregations{
-		Data: make([]Aggregation, 0),
-		DefaultAggregation: Aggregation{
-			Name:              "default",
-			Pattern:           regexp.MustCompile(".*"),
-			XFilesFactor:      0.5,
-			AggregationMethod: []Method{Avg},
-		},
+		Data:               make([]Aggregation, 0),
+		DefaultAggregation: defaultAggregation,
 	}
 }
 
@@ -100,4 +102,41 @@ func (a Aggregations) Get(i uint16) Aggregation {
 		return a.DefaultAggregation
 	}
 	return a.Data[i]
+}
+
+func (a Aggregations) Equals(b Aggregations) bool {
+	if !a.DefaultAggregation.Equals(b.DefaultAggregation) {
+		return false
+	}
+
+	if len(a.Data) != len(b.Data) {
+		return false
+	}
+
+	for i := range a.Data {
+		if !a.Data[i].Equals(b.Data[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (a Aggregation) Equals(b Aggregation) bool {
+	if a.Name != b.Name || a.Pattern.String() != b.Pattern.String() {
+		return false
+	}
+	diff := a.XFilesFactor - b.XFilesFactor
+	if diff > 0.001 || diff < -0.001 {
+		return false
+	}
+	if len(a.AggregationMethod) != len(b.AggregationMethod) {
+		return false
+	}
+	for i := range a.AggregationMethod {
+		if a.AggregationMethod[i] != b.AggregationMethod[i] {
+			return false
+		}
+	}
+	return true
+
 }
