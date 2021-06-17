@@ -319,6 +319,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:9ed757cafe0929abbd54fba5b5e50450b22b037bc3858e03cb975ea3214be333"
+  name = "github.com/grafana/configparser"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "f5c9e475c7f0f1f8ea64b45bd9c1d226d01d391f"
+
+[[projects]]
+  branch = "master"
   digest = "1:817bb03ae4cb923f024602aa1753f1dcea87c83e10fb3a175ca4fa7a088b1cc7"
   name = "github.com/grafana/globalconf"
   packages = ["."]
@@ -1217,6 +1225,7 @@
     "github.com/golang/snappy",
     "github.com/google/go-cmp/cmp",
     "github.com/gosuri/uilive",
+    "github.com/grafana/configparser",
     "github.com/grafana/globalconf",
     "github.com/hailocab/go-hostpool",
     "github.com/hashicorp/golang-lru",

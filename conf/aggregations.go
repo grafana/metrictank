@@ -1,12 +1,13 @@
 package conf
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/alyu/configparser"
+	"github.com/grafana/configparser"
 )
 
 var defaultAggregation = Aggregation{
@@ -24,7 +25,7 @@ type Aggregations struct {
 
 type Aggregation struct {
 	Name              string         // mandatory (I *think* carbon allows empty name, but the docs say you should provide one)
-	Pattern           *regexp.Regexp // mandatory (I *think* carbon allows empty pattern, but the docs say you should provide one)
+	Pattern           *regexp.Regexp // mandatory (I *think* carbon allows empty pattern, the docs say you should provide one. but an empty string is still a pattern)
 	XFilesFactor      float64        // optional. defaults to 0.5
 	AggregationMethod []Method       // optional. defaults to ['average']
 }
@@ -40,11 +41,11 @@ func NewAggregations() Aggregations {
 // ReadAggregations returns the defined aggregations from a storage-aggregation.conf file
 // and adds the default
 func ReadAggregations(file string) (Aggregations, error) {
-	config, err := configparser.Read(file)
+	config, err := configparser.ReadFile(file)
 	if err != nil {
 		return Aggregations{}, err
 	}
-	sections, err := config.AllSections()
+	_, sections, err := config.AllSections()
 	if err != nil {
 		return Aggregations{}, err
 	}
@@ -52,10 +53,17 @@ func ReadAggregations(file string) (Aggregations, error) {
 	result := NewAggregations()
 
 	for _, s := range sections {
-		item := Aggregation{}
-		item.Name = strings.Trim(strings.SplitN(s.String(), "\n", 2)[0], " []")
-		if item.Name == "" || strings.HasPrefix(item.Name, "#") {
-			continue
+		item := Aggregation{
+			XFilesFactor:      0.5,
+			AggregationMethod: []Method{Avg},
+		}
+		item.Name = s.Name()
+		if item.Name == "" {
+			return Aggregations{}, errors.New("encountered a storage-aggregation.conf section name with empty name")
+		}
+
+		if !s.Exists("pattern") {
+			return Aggregations{}, fmt.Errorf("[%s]: missing pattern", item.Name)
 		}
 
 		item.Pattern, err = regexp.Compile(s.ValueOf("pattern"))
@@ -63,19 +71,24 @@ func ReadAggregations(file string) (Aggregations, error) {
 			return Aggregations{}, fmt.Errorf("[%s]: failed to parse pattern %q: %s", item.Name, s.ValueOf("pattern"), err.Error())
 		}
 
-		item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
-		if err != nil {
-			return Aggregations{}, fmt.Errorf("[%s]: failed to parse xFilesFactor %q: %s", item.Name, s.ValueOf("xFilesFactor"), err.Error())
+		if s.Exists("xFilesFactor") {
+			item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
+			if err != nil {
+				return Aggregations{}, fmt.Errorf("[%s]: failed to parse xFilesFactor %q: %s", item.Name, s.ValueOf("xFilesFactor"), err.Error())
+			}
 		}
 
-		aggregationMethodStr := s.ValueOf("aggregationMethod")
-		methodStrs := strings.Split(aggregationMethodStr, ",")
-		for _, methodStr := range methodStrs {
-			agg, err := NewMethod(methodStr)
-			if err != nil {
-				return result, fmt.Errorf("[%s]: %s", item.Name, err.Error())
+		if s.Exists("aggregationMethod") {
+			aggregationMethodStr := s.ValueOf("aggregationMethod")
+			methodStrs := strings.Split(aggregationMethodStr, ",")
+			item.AggregationMethod = []Method{}
+			for _, methodStr := range methodStrs {
+				agg, err := NewMethod(methodStr)
+				if err != nil {
+					return result, fmt.Errorf("[%s]: %s", item.Name, err.Error())
+				}
+				item.AggregationMethod = append(item.AggregationMethod, agg)
 			}
-			item.AggregationMethod = append(item.AggregationMethod, agg)
 		}
 
 		result.Data = append(result.Data, item)
