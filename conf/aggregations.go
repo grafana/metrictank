@@ -10,11 +10,13 @@ import (
 	"github.com/grafana/configparser"
 )
 
-var defaultAggregation = Aggregation{
-	Name:              "default",
-	Pattern:           regexp.MustCompile(".*"),
-	XFilesFactor:      0.5,
-	AggregationMethod: []Method{Avg},
+func defaultAggregation() Aggregation {
+	return Aggregation{
+		Name:              "default",
+		Pattern:           regexp.MustCompile(".*"),
+		XFilesFactor:      0.5,
+		AggregationMethod: []Method{Avg},
+	}
 }
 
 // Aggregations holds the aggregation definitions
@@ -34,7 +36,7 @@ type Aggregation struct {
 func NewAggregations() Aggregations {
 	return Aggregations{
 		Data:               make([]Aggregation, 0),
-		DefaultAggregation: defaultAggregation,
+		DefaultAggregation: defaultAggregation(),
 	}
 }
 
@@ -53,10 +55,7 @@ func ReadAggregations(file string) (Aggregations, error) {
 	result := NewAggregations()
 
 	for _, s := range sections {
-		item := Aggregation{
-			XFilesFactor:      0.5,
-			AggregationMethod: []Method{Avg},
-		}
+		item := defaultAggregation()
 		item.Name = s.Name()
 		if item.Name == "" {
 			return Aggregations{}, errors.New("encountered a storage-aggregation.conf section name with empty name")

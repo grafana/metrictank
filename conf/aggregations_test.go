@@ -59,7 +59,7 @@ func TestReadAggregations(t *testing.T) {
 						AggregationMethod: []Method{Avg},
 					},
 				},
-				DefaultAggregation: defaultAggregation,
+				DefaultAggregation: defaultAggregation(),
 			},
 		},
 		{
@@ -78,7 +78,7 @@ aggregationMethod = avg,sum`,
 						AggregationMethod: []Method{Avg, Sum},
 					},
 				},
-				DefaultAggregation: defaultAggregation,
+				DefaultAggregation: defaultAggregation(),
 			},
 		},
 		{
@@ -148,7 +148,7 @@ aggregationMethod = average
 						AggregationMethod: []Method{Avg},
 					},
 				},
-				DefaultAggregation: defaultAggregation,
+				DefaultAggregation: defaultAggregation(),
 			},
 		},
 		{
@@ -237,7 +237,7 @@ aggregationMethod = average
 						AggregationMethod: []Method{Avg},
 					},
 				},
-				DefaultAggregation: defaultAggregation,
+				DefaultAggregation: defaultAggregation(),
 			},
 		},
 	}
