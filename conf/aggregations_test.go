@@ -46,6 +46,12 @@ func TestReadAggregations(t *testing.T) {
 			expErr: true,
 		},
 		{
+			title: "commented out pattern is still missing",
+			in: `[foo]
+			;pattern = foo.*`,
+			expErr: true,
+		},
+		{
 			title: "defaults",
 			in: `[foo]
 			pattern = foo.*`,
@@ -57,6 +63,52 @@ func TestReadAggregations(t *testing.T) {
 						Pattern:           regexp.MustCompile("foo.*"),
 						XFilesFactor:      0.5,
 						AggregationMethod: []Method{Avg},
+					},
+				},
+				DefaultAggregation: defaultAggregation(),
+			},
+		},
+		{
+			title: "defaults with some comments",
+			in: `[foo] # comment here [does it confuse the parser if i do this?]
+			pattern = foo.* # another comment here
+			# pattern = this-should-be-ignored
+			# and a final comment on its own line`,
+			expErr: false,
+			expAgg: Aggregations{
+				Data: []Aggregation{
+					{
+						Name:              "foo",
+						Pattern:           regexp.MustCompile("foo.*"),
+						XFilesFactor:      0.5,
+						AggregationMethod: []Method{Avg},
+					},
+				},
+				DefaultAggregation: defaultAggregation(),
+			},
+		},
+		{
+			title: "lots of comments",
+			in: `;[this is not a section]
+			[foo] # [commented]
+			pattern = foo.* # another comment here
+			; pattern = this-should-be-ignored
+			xFilesFactor = 0.8 # comment
+			;xFilesFactor = 0.9
+			;aggregationMethod = min,avg
+			#aggregationMethod = min,avg
+			aggregationMethod = max
+			;aggregationMethod = min,avg
+			#aggregationMethod = min,avg
+			; and a final comment on its own line`,
+			expErr: false,
+			expAgg: Aggregations{
+				Data: []Aggregation{
+					{
+						Name:              "foo",
+						Pattern:           regexp.MustCompile("foo.*"),
+						XFilesFactor:      0.8,
+						AggregationMethod: []Method{Max},
 					},
 				},
 				DefaultAggregation: defaultAggregation(),
