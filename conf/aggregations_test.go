@@ -93,7 +93,7 @@ func TestReadAggregations(t *testing.T) {
 			title: "lots of comments",
 			in: `;[this is not a section]
 			[foo] # [commented]
-			pattern = foo.* # another comment here
+			pattern = fo#ooo;.* # another comment here. note that literal ; and # are allowed
 			; pattern = this-should-be-ignored
 			xFilesFactor = 0.8 # comment
 			;xFilesFactor = 0.9
@@ -108,7 +108,7 @@ func TestReadAggregations(t *testing.T) {
 				Data: []Aggregation{
 					{
 						Name:              "foo",
-						Pattern:           regexp.MustCompile("foo.*"),
+						Pattern:           regexp.MustCompile("fo#ooo;.*"),
 						XFilesFactor:      0.8,
 						AggregationMethod: []Method{Max},
 					},
