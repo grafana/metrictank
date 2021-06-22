@@ -65,20 +65,24 @@ func ReadAggregations(file string) (Aggregations, error) {
 			return Aggregations{}, fmt.Errorf("[%s]: missing pattern", item.Name)
 		}
 
-		item.Pattern, err = regexp.Compile(s.ValueOf("pattern"))
+		// people may want to use # and ; in general as part of the metric name and regex (not a good idea but that's up to them)
+		// but seems safe to assume that ' ;' and ' #' initiate a comment
+		patt := s.ValueOfWithoutComments("pattern")
+		item.Pattern, err = regexp.Compile(patt)
 		if err != nil {
-			return Aggregations{}, fmt.Errorf("[%s]: failed to parse pattern %q: %s", item.Name, s.ValueOf("pattern"), err.Error())
+			return Aggregations{}, fmt.Errorf("[%s]: failed to parse pattern %q: %s", item.Name, patt, err.Error())
 		}
 
 		if s.Exists("xFilesFactor") {
-			item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
+			xff := s.ValueOfWithoutComments("xFilesFactor")
+			item.XFilesFactor, err = strconv.ParseFloat(xff, 64)
 			if err != nil {
-				return Aggregations{}, fmt.Errorf("[%s]: failed to parse xFilesFactor %q: %s", item.Name, s.ValueOf("xFilesFactor"), err.Error())
+				return Aggregations{}, fmt.Errorf("[%s]: failed to parse xFilesFactor %q: %s", item.Name, xff, err.Error())
 			}
 		}
 
 		if s.Exists("aggregationMethod") {
-			aggregationMethodStr := s.ValueOf("aggregationMethod")
+			aggregationMethodStr := s.ValueOfWithoutComments("aggregationMethod")
 			methodStrs := strings.Split(aggregationMethodStr, ",")
 			item.AggregationMethod = []Method{}
 			for _, methodStr := range methodStrs {
