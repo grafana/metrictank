@@ -5,6 +5,8 @@ import (
 	"os"
 	"regexp"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestReadAggregations(t *testing.T) {
@@ -315,8 +317,8 @@ aggregationMethod = average
 			t.Fatalf("testcase %q expected error but got no error", c.title)
 		}
 		if err == nil {
-			if !agg.Equals(c.expAgg) {
-				t.Fatalf("testcase %q expected\nexp agg %+v\ngot agg %+v", c.title, c.expAgg, agg)
+			if diff := cmp.Diff(c.expAgg, agg); diff != "" {
+				t.Errorf("testcase %q mismatch (-want +got):\n%s", c.title, diff)
 			}
 		}
 	}

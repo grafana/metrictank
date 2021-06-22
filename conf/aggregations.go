@@ -116,8 +116,8 @@ func (a Aggregations) Get(i uint16) Aggregation {
 	return a.Data[i]
 }
 
-func (a Aggregations) Equals(b Aggregations) bool {
-	if !a.DefaultAggregation.Equals(b.DefaultAggregation) {
+func (a Aggregations) Equal(b Aggregations) bool {
+	if !a.DefaultAggregation.Equal(b.DefaultAggregation) {
 		return false
 	}
 
@@ -126,14 +126,14 @@ func (a Aggregations) Equals(b Aggregations) bool {
 	}
 
 	for i := range a.Data {
-		if !a.Data[i].Equals(b.Data[i]) {
+		if !a.Data[i].Equal(b.Data[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-func (a Aggregation) Equals(b Aggregation) bool {
+func (a Aggregation) Equal(b Aggregation) bool {
 	if a.Name != b.Name || a.Pattern.String() != b.Pattern.String() {
 		return false
 	}
