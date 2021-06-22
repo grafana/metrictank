@@ -338,6 +338,23 @@ func (s *Section) ValueOf(option string) string {
 	return s.options[option]
 }
 
+// ValueOf returns the value of specified option without any trailing comments (denoted by ' #' or ' ;')
+func (s *Section) ValueOfWithoutComments(option string) string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	val := s.options[option]
+	pos := strings.Index(val, " #")
+	if pos != -1 {
+		val = val[:pos]
+	}
+	pos = strings.Index(val, " ;")
+	if pos != -1 {
+		val = val[:pos]
+	}
+	return val
+}
+
 // SetValueFor sets the value for the specified option and returns the old value.
 func (s *Section) SetValueFor(option string, value string) string {
 	s.mutex.Lock()
