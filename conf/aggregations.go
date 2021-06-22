@@ -1,13 +1,23 @@
 package conf
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/alyu/configparser"
+	"github.com/grafana/configparser"
 )
+
+func defaultAggregation() Aggregation {
+	return Aggregation{
+		Name:              "default",
+		Pattern:           regexp.MustCompile(".*"),
+		XFilesFactor:      0.5,
+		AggregationMethod: []Method{Avg},
+	}
+}
 
 // Aggregations holds the aggregation definitions
 type Aggregations struct {
@@ -16,33 +26,28 @@ type Aggregations struct {
 }
 
 type Aggregation struct {
-	Name              string
-	Pattern           *regexp.Regexp
-	XFilesFactor      float64
-	AggregationMethod []Method
+	Name              string         // mandatory (I *think* carbon allows empty name, but the docs say you should provide one)
+	Pattern           *regexp.Regexp // mandatory (I *think* carbon allows empty pattern, the docs say you should provide one. but an empty string is still a pattern)
+	XFilesFactor      float64        // optional. defaults to 0.5
+	AggregationMethod []Method       // optional. defaults to ['average']
 }
 
 // NewAggregations create instance of Aggregations
 func NewAggregations() Aggregations {
 	return Aggregations{
-		Data: make([]Aggregation, 0),
-		DefaultAggregation: Aggregation{
-			Name:              "default",
-			Pattern:           regexp.MustCompile(".*"),
-			XFilesFactor:      0.5,
-			AggregationMethod: []Method{Avg},
-		},
+		Data:               make([]Aggregation, 0),
+		DefaultAggregation: defaultAggregation(),
 	}
 }
 
 // ReadAggregations returns the defined aggregations from a storage-aggregation.conf file
 // and adds the default
 func ReadAggregations(file string) (Aggregations, error) {
-	config, err := configparser.Read(file)
+	config, err := configparser.ReadFile(file)
 	if err != nil {
 		return Aggregations{}, err
 	}
-	sections, err := config.AllSections()
+	_, sections, err := config.AllSections()
 	if err != nil {
 		return Aggregations{}, err
 	}
@@ -50,30 +55,43 @@ func ReadAggregations(file string) (Aggregations, error) {
 	result := NewAggregations()
 
 	for _, s := range sections {
-		item := Aggregation{}
-		item.Name = strings.Trim(strings.SplitN(s.String(), "\n", 2)[0], " []")
-		if item.Name == "" || strings.HasPrefix(item.Name, "#") {
-			continue
+		item := defaultAggregation()
+		item.Name = s.Name()
+		if item.Name == "" {
+			return Aggregations{}, errors.New("encountered a storage-aggregation.conf section name with empty name")
 		}
 
-		item.Pattern, err = regexp.Compile(s.ValueOf("pattern"))
+		if !s.Exists("pattern") {
+			return Aggregations{}, fmt.Errorf("[%s]: missing pattern", item.Name)
+		}
+
+		// people may want to use # and ; in general as part of the metric name and regex (not a good idea but that's up to them)
+		// but seems safe to assume that ' ;' and ' #' initiate a comment
+		patt := s.ValueOfWithoutComments("pattern")
+		item.Pattern, err = regexp.Compile(patt)
 		if err != nil {
-			return Aggregations{}, fmt.Errorf("[%s]: failed to parse pattern %q: %s", item.Name, s.ValueOf("pattern"), err.Error())
+			return Aggregations{}, fmt.Errorf("[%s]: failed to parse pattern %q: %s", item.Name, patt, err.Error())
 		}
 
-		item.XFilesFactor, err = strconv.ParseFloat(s.ValueOf("xFilesFactor"), 64)
-		if err != nil {
-			return Aggregations{}, fmt.Errorf("[%s]: failed to parse xFilesFactor %q: %s", item.Name, s.ValueOf("xFilesFactor"), err.Error())
-		}
-
-		aggregationMethodStr := s.ValueOf("aggregationMethod")
-		methodStrs := strings.Split(aggregationMethodStr, ",")
-		for _, methodStr := range methodStrs {
-			agg, err := NewMethod(methodStr)
+		if s.Exists("xFilesFactor") {
+			xff := s.ValueOfWithoutComments("xFilesFactor")
+			item.XFilesFactor, err = strconv.ParseFloat(xff, 64)
 			if err != nil {
-				return result, fmt.Errorf("[%s]: %s", item.Name, err.Error())
+				return Aggregations{}, fmt.Errorf("[%s]: failed to parse xFilesFactor %q: %s", item.Name, xff, err.Error())
 			}
-			item.AggregationMethod = append(item.AggregationMethod, agg)
+		}
+
+		if s.Exists("aggregationMethod") {
+			aggregationMethodStr := s.ValueOfWithoutComments("aggregationMethod")
+			methodStrs := strings.Split(aggregationMethodStr, ",")
+			item.AggregationMethod = []Method{}
+			for _, methodStr := range methodStrs {
+				agg, err := NewMethod(methodStr)
+				if err != nil {
+					return result, fmt.Errorf("[%s]: %s", item.Name, err.Error())
+				}
+				item.AggregationMethod = append(item.AggregationMethod, agg)
+			}
 		}
 
 		result.Data = append(result.Data, item)
@@ -100,4 +118,41 @@ func (a Aggregations) Get(i uint16) Aggregation {
 		return a.DefaultAggregation
 	}
 	return a.Data[i]
+}
+
+func (a Aggregations) Equal(b Aggregations) bool {
+	if !a.DefaultAggregation.Equal(b.DefaultAggregation) {
+		return false
+	}
+
+	if len(a.Data) != len(b.Data) {
+		return false
+	}
+
+	for i := range a.Data {
+		if !a.Data[i].Equal(b.Data[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (a Aggregation) Equal(b Aggregation) bool {
+	if a.Name != b.Name || a.Pattern.String() != b.Pattern.String() {
+		return false
+	}
+	diff := a.XFilesFactor - b.XFilesFactor
+	if diff > 0.001 || diff < -0.001 {
+		return false
+	}
+	if len(a.AggregationMethod) != len(b.AggregationMethod) {
+		return false
+	}
+	for i := range a.AggregationMethod {
+		if a.AggregationMethod[i] != b.AggregationMethod[i] {
+			return false
+		}
+	}
+	return true
+
 }

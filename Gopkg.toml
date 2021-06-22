@@ -46,6 +46,10 @@ unused-packages = true
   branch = "master"
 
 [[constraint]]
+  name = "github.com/grafana/configparser"
+  revision = "7fdb7669f3ec55c350a5b35e35c5f7c559de0060"
+
+[[constraint]]
   name = "github.com/davecgh/go-spew"
   version = "1.1.0"
 
