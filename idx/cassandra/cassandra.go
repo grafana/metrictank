@@ -50,7 +50,13 @@ var (
 	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.delete")
 	// metric idx.cassandra.save.skipped is how many saves have been skipped due to the writeQueue being full
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
-	errmetrics      = cassandra.NewErrMetrics("idx.cassandra")
+
+	// metric idx.cassandra.control.add is the duration of adad control messages processed
+	statControlRestoreDuration = stats.NewLatencyHistogram15s32("idx.cassandra.control.add")
+	// metric idx.cassandra.control.delete is the duration of delete control messages processed
+	statControlDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.control.delete")
+
+	errmetrics = cassandra.NewErrMetrics("idx.cassandra")
 )
 
 type writeReq struct {
@@ -718,6 +724,8 @@ func (c *CasIdx) prune() {
 
 // AddDefs add defs to the index.
 func (c *CasIdx) AddDefs(defs []schema.MetricDefinition) {
+	pre := time.Now()
+
 	c.MemoryIndex.AddDefs(defs)
 
 	if c.Config.updateCassIdx {
@@ -726,10 +734,14 @@ func (c *CasIdx) AddDefs(defs []schema.MetricDefinition) {
 			c.writeQueue <- writeReq{recvTime: time.Now(), def: &def}
 		}
 	}
+
+	statControlRestoreDuration.Value(time.Since(pre))
 }
 
 // DeleteDefs delete the matching defs, conditionally writing an archive record.
 func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
+	pre := time.Now()
+
 	c.MemoryIndex.DeleteDefs(defs, archive)
 
 	if c.Config.updateCassIdx {
@@ -745,4 +757,6 @@ func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 			}()
 		}
 	}
+
+	statControlDeleteDuration.Value(time.Since(pre))
 }

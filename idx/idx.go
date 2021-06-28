@@ -152,9 +152,6 @@ type MetricIndex interface {
 	// and also the DefById index.
 	DeleteTagged(orgId uint32, query tagquery.Query) ([]Archive, error)
 
-	// SEAN TODO - consider cleaning up this interface a bit
-	// SEAN TODO - Do we need bool return?
-
 	// AddDefs adds defs to the index.
 	AddDefs(defs []schema.MetricDefinition)
 
