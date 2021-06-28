@@ -441,8 +441,8 @@ func (c *CasIdx) ArchiveDefs(defs []schema.MetricDefinition) (int, error) {
 					err := c.addDefToArchive(*def)
 					if err != nil {
 						// If we failed to add the def to the archive table then just continue on to the next def.
-						// As we haven't yet removed the this def from the metric index table yet, the next time archiving
-						// is performed the this def will be processed again. As no action is needed by an operator, we
+						// As we haven't yet removed  this def from the metric index table yet, the next time archiving
+						// is performed this def will be processed again. As no action is needed by an operator, we
 						// just log this as a warning.
 						log.Warnf("cassandra-idx: Failed add def to archive table. error=%s. def=%+v", err, *def)
 						continue
@@ -712,6 +712,37 @@ func (c *CasIdx) prune() {
 			c.Prune(now)
 		case <-c.shutdown:
 			return
+		}
+	}
+}
+
+// AddDefs add defs to the index.
+func (c *CasIdx) AddDefs(defs []schema.MetricDefinition) {
+	c.MemoryIndex.AddDefs(defs)
+
+	if c.Config.updateCassIdx {
+		// Blocking write to make sure all get enqueued
+		for _, def := range defs {
+			c.writeQueue <- writeReq{recvTime: time.Now(), def: &def}
+		}
+	}
+}
+
+// DeleteDefs delete the matching defs, conditionally writing an archive record.
+func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
+	c.MemoryIndex.DeleteDefs(defs, archive)
+
+	if c.Config.updateCassIdx {
+		// TODO - this could create a lot of go routines if many deletes come in at the same time
+		// Maybe better to enhance the write queue to process these?
+		if archive {
+			c.ArchiveDefs(defs)
+		} else {
+			go func() {
+				for _, def := range defs {
+					c.deleteDef(def.Id, def.Partition)
+				}
+			}()
 		}
 	}
 }

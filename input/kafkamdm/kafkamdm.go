@@ -366,6 +366,17 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 		return
 	}
 
+	isControlMsg := msg.IsIndexControlMsg(data)
+	if isControlMsg {
+		cm, err := msg.ReadIndexControlMsg(data)
+		if err != nil {
+			log.Errorf("kafkamdm: decode error, skipping control message. %s", err)
+			return
+		}
+		k.Handler.ProcessIndexControlMsg(cm, partition)
+		return
+	}
+
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {

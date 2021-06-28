@@ -533,3 +533,13 @@ func (b *BigtableIdx) prune() {
 		}
 	}
 }
+
+// AddDef adds def to the index.
+func (b *BigtableIdx) AddDefs(defs []schema.MetricDefinition) {
+	// TODO
+}
+
+// DeleteDefs deletes the matching key.
+func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
+	// TODO
+}
