@@ -6,6 +6,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/kafka"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -13,14 +14,16 @@ var kafkaVersionStr string
 var brokerStr string
 var brokers []string
 var topic string
+var kafkaNet *kafka.KafkaNet
 
-var FlagSet *flag.FlagSet
-
-func init() {
-	FlagSet = flag.NewFlagSet("kafka", flag.ExitOnError)
+func ConfigKafka() {
+	FlagSet := flag.NewFlagSet("kafka", flag.ExitOnError)
 	FlagSet.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	FlagSet.StringVar(&kafkaVersionStr, "kafka-version", "2.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
 	FlagSet.StringVar(&topic, "topic", "metrictank", "kafka topic")
+
+	kafkaNet = kafka.ConfigNet(FlagSet)
+
 	globalconf.Register("kafka", FlagSet, flag.ExitOnError)
 }
 
@@ -41,6 +44,8 @@ func producerConfig() *sarama.Config {
 	config.Producer.Compression = sarama.CompressionSnappy
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = sarama.NewManualPartitioner
+
+	kafkaNet.Configure(config)
 
 	err = config.Validate()
 	if err != nil {

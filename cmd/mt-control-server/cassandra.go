@@ -37,7 +37,7 @@ type IdxConfig struct {
 // NewIdxConfig returns IdxConfig with default values set.
 func NewIdxConfig() *IdxConfig {
 	return &IdxConfig{
-		Hosts:                    "cassandra:9042",
+		Hosts:                    "localhost:9042",
 		Keyspace:                 "metrictank",
 		ArchiveTable:             "metric_idx_archive",
 		Consistency:              "one",
@@ -56,7 +56,7 @@ func NewIdxConfig() *IdxConfig {
 	}
 }
 
-func init() {
+func ConfigCassandra() {
 	casIdx := flag.NewFlagSet("cassandra", flag.ExitOnError)
 
 	casIdx.StringVar(&CliConfig.Hosts, "hosts", CliConfig.Hosts, "comma separated list of cassandra addresses in host:port form")

@@ -39,7 +39,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 		return
 	}
 	// send to query address
-	resp, err := http.Post(*cluster+"/tags/findSeries", "application/json", bytes.NewBuffer(reqBody))
+	resp, err := http.Post(metrictankUrl+"/tags/findSeries", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		response.Write(ctx, response.WrapError(err))
 		return
@@ -97,7 +97,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 			return err
 		}
 
-		// TODO - configurable?
+		// SEAN TODO - configurable?
 		MAX_DEFS_PER_MSG := 1000
 
 		// Create message per partition
@@ -134,7 +134,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 }
 
 func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
-	// crawl archive for matches
+	log.Infof("Received tagsRestore: %v", request)
 
 	// Pre-process expressions
 	var nameMatch string
@@ -211,7 +211,7 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 			return
 		}
 
-		// TODO - max batch size?
+		// SEAN TODO - max batch size?
 		cm := &schema.ControlMsg{
 			Defs: defs,
 			Op:   schema.OpRestore,
@@ -241,9 +241,9 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 	}
 
 	// For large archives, this could take quite a long time. Process asynchronously and return response to know the job wsa kicked off.
-	// TODO - provide an identifier and log progress?
+	// SEAN TODO - provide an identifier and log progress?
 	go func() {
-		// TODO - make concurrent (configurable concurrency)
+		// SEAN TODO - make concurrent (configurable concurrency)
 		for p := 0; p < numPartitions; p++ {
 			scanPartition(p)
 		}
