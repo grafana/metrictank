@@ -14,7 +14,7 @@ var (
 )
 
 func main() {
-	path := "" // TODO - load config file
+	path := "" // SEAN TODO - load config file
 	config, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename:  path,
 		EnvPrefix: "MT_",
@@ -27,6 +27,7 @@ func main() {
 	ConfigServer()
 	ConfigKafka()
 	ConfigCassandra()
+	ConfigHandlers()
 
 	config.ParseAll()
 
@@ -42,5 +43,5 @@ func main() {
 	}
 
 	apiServer.Run()
-	// TODO - handle shutdown somehow
+	// SEAN TODO - handle shutdown somehow
 }

@@ -14,6 +14,7 @@ var kafkaVersionStr string
 var brokerStr string
 var brokers []string
 var topic string
+var fallbackNumPartitions int
 var kafkaNet *kafka.KafkaNet
 
 func ConfigKafka() {
@@ -21,6 +22,7 @@ func ConfigKafka() {
 	FlagSet.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	FlagSet.StringVar(&kafkaVersionStr, "kafka-version", "2.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
 	FlagSet.StringVar(&topic, "topic", "metrictank", "kafka topic")
+	FlagSet.IntVar(&fallbackNumPartitions, "fallback-num-partitions", 10000, "Number of partitions for kafka topic. Only used if it cannot be resolved from kafka")
 
 	kafkaNet = kafka.ConfigNet(FlagSet)
 
@@ -78,10 +80,8 @@ func NewProducer() *Producer {
 func (p *Producer) numPartitions() int {
 	partitions, err := p.client.Partitions(topic)
 	if err != nil {
-		// TODO - fallback to configurable default? For now just make it a *lot*
-		DEFAULT_PARTS := 10000
-		log.Warnf("Failed to get partitions for topic %s, defaulting to %d: err = %s", topic, DEFAULT_PARTS, err)
-		return DEFAULT_PARTS
+		log.Warnf("Failed to get partitions for topic %s, defaulting to %d: err = %s", topic, fallbackNumPartitions, err)
+		return fallbackNumPartitions
 	}
 	return len(partitions)
 }

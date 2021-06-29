@@ -15,13 +15,11 @@ import (
 )
 
 var addr string
-var metrictankUrl string
 
 func ConfigServer() {
 	FlagSet := flag.NewFlagSet("server", flag.ExitOnError)
 
 	FlagSet.StringVar(&addr, "addr", ":6060", "Address to listen on")
-	FlagSet.StringVar(&metrictankUrl, "metrictank-url", "http://metrictank-query:6060", "URL for MT cluster")
 
 	globalconf.Register("server", FlagSet, flag.ExitOnError)
 }

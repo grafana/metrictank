@@ -18,4 +18,5 @@ type IndexRestoreReq struct {
 }
 
 type IndexRestoreResp struct {
+	LogId string
 }

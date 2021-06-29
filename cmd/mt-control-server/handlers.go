@@ -3,13 +3,17 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/Shopify/sarama"
+	"github.com/gocql/gocql"
+	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cmd/mt-control-server/controlmodels"
@@ -21,6 +25,20 @@ import (
 	"github.com/tinylib/msgp/msgp"
 	"gopkg.in/macaron.v1"
 )
+
+var metrictankUrl string
+var maxDefsPerMsg int
+var indexConcurrency int
+
+func ConfigHandlers() {
+	FlagSet := flag.NewFlagSet("handlers", flag.ExitOnError)
+
+	FlagSet.StringVar(&metrictankUrl, "metrictank-url", "http://metrictank:6060", "URL for MT cluster")
+	FlagSet.IntVar(&maxDefsPerMsg, "max-defs-per-msg", 1000, "Maximum defs per control message")
+	FlagSet.IntVar(&indexConcurrency, "index-concurrency", 5, "Concurrent queries to run against cassandra (per request)")
+
+	globalconf.Register("handlers", FlagSet, flag.ExitOnError)
+}
 
 func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryReq) {
 	log.Infof("Received tagsDelByQuery: %v", request)
@@ -97,9 +115,6 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 			return err
 		}
 
-		// SEAN TODO - configurable?
-		MAX_DEFS_PER_MSG := 1000
-
 		// Create message per partition
 		partitionMsgs := make(map[int32]*schema.ControlMsg)
 		for _, s := range findSeriesResult.Series {
@@ -109,7 +124,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 			cm := partitionMsgs[s.Partition]
 			cm.Defs = append(cm.Defs, s)
 
-			if len(cm.Defs) > MAX_DEFS_PER_MSG {
+			if len(cm.Defs) > maxDefsPerMsg {
 				err = flush(s.Partition, cm)
 				if err != nil {
 					log.Warnf("Failed to produce control msg: err = %s", err)
@@ -152,6 +167,14 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 		numPartitions = producer.numPartitions()
 	}
 
+	// For large archives, this could take quite a long time. Process asynchronously and
+	// return response to know the job was kicked off. Provide an identifier to view logs.
+	logId := "uninit"
+	uuid, err := gocql.RandomUUID()
+	if err == nil {
+		logId = uuid.String()
+	}
+
 	scanPartition := func(partition int) {
 		q := fmt.Sprintf("SELECT id, orgid, name, interval, unit, mtype, tags, lastupdate FROM %s WHERE partition = ?", cass.Config.ArchiveTable)
 
@@ -168,7 +191,7 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 		for iter.Scan(&id, &orgId, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
 			mkey, err := schema.MKeyFromString(id)
 			if err != nil {
-				log.Errorf("cassandra: load() could not parse ID %q: %s -> skipping", id, err)
+				log.Errorf("job=%s: load() could not parse ID %q: %s -> skipping", logId, id, err)
 				continue
 			}
 
@@ -204,51 +227,75 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 			})
 		}
 		if err := iter.Close(); err != nil {
-			log.Errorf("cassandra: could not close iterator for partition = %d: %s", partition, err.Error())
+			log.Errorf("job=%s: could not close iterator for partition = %d: %s", logId, partition, err.Error())
 		}
+
+		log.Infof("job=%s: Restoring %d series from partition %d", logId, len(defs), partition)
 
 		if len(defs) == 0 {
 			return
 		}
 
-		// SEAN TODO - max batch size?
-		cm := &schema.ControlMsg{
-			Defs: defs,
-			Op:   schema.OpRestore,
+		// Chunk into batches
+		var defBatches [][]schema.MetricDefinition
+		for i := 0; i < len(defs); i += maxDefsPerMsg {
+			end := i + maxDefsPerMsg
+
+			if end > len(defs) {
+				end = len(defs)
+			}
+
+			defBatches = append(defBatches, defs[i:end])
 		}
 
-		var b bytes.Buffer
-		b.WriteByte(byte(msg.FormatIndexControlMessage))
-		w := msgp.NewWriterSize(&b, 300)
-		err := cm.EncodeMsg(w)
-		if err != nil {
-			log.Warnf("Failed to encode ControlMsg from partition = %d, err = %s", partition, err)
-			return
-		}
-		w.Flush()
+		for _, batch := range defBatches {
+			cm := &schema.ControlMsg{
+				Defs: batch,
+				Op:   schema.OpRestore,
+			}
 
-		log.Infof("Restoring %d series from partition %d", len(defs), partition)
+			var b bytes.Buffer
+			b.WriteByte(byte(msg.FormatIndexControlMessage))
+			w := msgp.NewWriterSize(&b, 300)
+			err := cm.EncodeMsg(w)
+			if err != nil {
+				log.Warnf("job=%s: Failed to encode ControlMsg from partition = %d, err = %s", logId, partition, err)
+				continue
+			}
+			w.Flush()
 
-		_, _, err = producer.producer.SendMessage(&sarama.ProducerMessage{
-			Topic:     topic,
-			Value:     sarama.ByteEncoder(b.Bytes()),
-			Partition: int32(partition),
-		})
-		if err != nil {
-			log.Warnf("Failed to send ControlMsg for partition = %d, err = %s", partition, err)
-			return
+			_, _, err = producer.producer.SendMessage(&sarama.ProducerMessage{
+				Topic:     topic,
+				Value:     sarama.ByteEncoder(b.Bytes()),
+				Partition: int32(partition),
+			})
+			if err != nil {
+				log.Warnf("job=%s: Failed to send ControlMsg for partition = %d, err = %s", logId, partition, err)
+				continue
+			}
 		}
 	}
 
-	// For large archives, this could take quite a long time. Process asynchronously and return response to know the job wsa kicked off.
-	// SEAN TODO - provide an identifier and log progress?
 	go func() {
-		// SEAN TODO - make concurrent (configurable concurrency)
-		for p := 0; p < numPartitions; p++ {
-			scanPartition(p)
+		partitions := make(chan int, indexConcurrency)
+		var wg sync.WaitGroup
+		for i := 0; i < indexConcurrency; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for partition := range partitions {
+					scanPartition(partition)
+				}
+			}()
 		}
+
+		for p := 0; p < numPartitions; p++ {
+			partitions <- p
+		}
+
+		wg.Wait()
 	}()
 
-	retval := controlmodels.IndexRestoreResp{}
+	retval := controlmodels.IndexRestoreResp{LogId: logId}
 	response.Write(ctx, response.NewJson(200, retval, ""))
 }
