@@ -20,7 +20,6 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 	"gopkg.in/macaron.v1"
@@ -68,7 +67,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 	if resp.StatusCode != 200 {
 		// Read in body so that the connection can be reused
 		io.Copy(ioutil.Discard, resp.Body)
-		response.Write(ctx, response.WrapError(errors.Errorf("Request to cluster failed with status = %d", resp.StatusCode)))
+		response.Write(ctx, response.WrapError(fmt.Errorf("Request to cluster failed with status = %d", resp.StatusCode)))
 		return
 	}
 
