@@ -27,6 +27,13 @@ Flags:
 ```
 
 
+## mt-control-server
+
+```
+Usage of ./mt-control-server:
+```
+
+
 ## mt-explain
 
 ```
@@ -362,16 +369,6 @@ reads rowkeys from stdin and deletes them from the index. only BigTable is suppo
 ```
 
 
-## mt-indexdump-rules-analyzer
-
-```
-Usage of ./mt-indexdump-rules-analyzer:
-reads metric names from stdin and reports the number of metrics that match each index-rules.conf rule
-  -index-rules-file string
-    	name of file which defines the max-stale times (default "/etc/metrictank/index-rules.conf")
-```
-
-
 ## mt-index-migrate
 
 ```
@@ -490,6 +487,16 @@ cass config flags:
 
 EXAMPLES:
 mt-index-prune --verbose --partition-from 0 --partition-to 8 cass -hosts cassandra:9042
+```
+
+
+## mt-indexdump-rules-analyzer
+
+```
+Usage of ./mt-indexdump-rules-analyzer:
+reads metric names from stdin and reports the number of metrics that match each index-rules.conf rule
+  -index-rules-file string
+    	name of file which defines the max-stale times (default "/etc/metrictank/index-rules.conf")
 ```
 
 

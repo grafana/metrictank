@@ -47,7 +47,7 @@ var (
 	// metric idx.bigtable.delete is the duration of a delete of one or more metrics from the bigtable idx, including the delete from the in-memory index and the delete query
 	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.bigtable.delete")
 
-	// metric idx.bigtable.control.add is the duration of adad control messages processed
+	// metric idx.bigtable.control.add is the duration of add control messages processed
 	statControlRestoreDuration = stats.NewLatencyHistogram15s32("idx.bigtable.control.add")
 	// metric idx.bigtable.control.delete is the duration of delete control messages processed
 	statControlDeleteDuration = stats.NewLatencyHistogram15s32("idx.bigtable.control.delete")

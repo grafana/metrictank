@@ -51,7 +51,7 @@ var (
 	// metric idx.cassandra.save.skipped is how many saves have been skipped due to the writeQueue being full
 	statSaveSkipped = stats.NewCounter32("idx.cassandra.save.skipped")
 
-	// metric idx.cassandra.control.add is the duration of adad control messages processed
+	// metric idx.cassandra.control.add is the duration of add control messages processed
 	statControlRestoreDuration = stats.NewLatencyHistogram15s32("idx.cassandra.control.add")
 	// metric idx.cassandra.control.delete is the duration of delete control messages processed
 	statControlDeleteDuration = stats.NewLatencyHistogram15s32("idx.cassandra.control.delete")
