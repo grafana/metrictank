@@ -483,7 +483,7 @@ TEST_CASES:
 }
 
 func TestGetByTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(testGetByTag)(t)
+	withAndWithoutPartitionedIndex(testGetByTag)(t)
 }
 
 func testGetByTag(t *testing.T) {

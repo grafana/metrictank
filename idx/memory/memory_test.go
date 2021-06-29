@@ -187,10 +187,10 @@ func withAndWithoutTagSupport(f func(*testing.T)) func(*testing.T) {
 	}
 }
 
-// withAndWithoutPartitonedIndex calls a test with the Partitioned setting
+// withAndWithoutPartitionedIndex calls a test with the Partitioned setting
 // turned on and off. This is to verify that something works as expected
 // no for both the partitioned and non-partitioned index versions.
-func withAndWithoutPartitonedIndex(f func(*testing.T)) func(*testing.T) {
+func withAndWithoutPartitionedIndex(f func(*testing.T)) func(*testing.T) {
 	return func(t *testing.T) {
 		t.Helper()
 		_partitioned := Partitioned
@@ -219,7 +219,7 @@ func withAndWithoutMetaTagSupport(f func(*testing.T)) func(*testing.T) {
 }
 
 func TestGetAddKey(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(withAndWithoutTagSupport(testGetAddKey)))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(withAndWithoutTagSupport(testGetAddKey)))(t)
 }
 
 func testGetAddKey(t *testing.T) {
@@ -283,7 +283,7 @@ func testGetAddKey(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testFind))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutTagSupport(testFind))(t)
 }
 
 // note: currently no testing for partitionedIndex
@@ -480,7 +480,7 @@ func testFind(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testDelete))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutTagSupport(testDelete))(t)
 }
 
 func testDelete(t *testing.T) {
@@ -535,7 +535,7 @@ func testDelete(t *testing.T) {
 }
 
 func TestDeleteTagged(t *testing.T) {
-	withAndWithoutPartitonedIndex(testDeleteTagged)(t)
+	withAndWithoutPartitionedIndex(testDeleteTagged)(t)
 }
 
 func testDeleteTagged(t *testing.T) {
@@ -591,7 +591,7 @@ func testDeleteTagged(t *testing.T) {
 }
 
 func TestDeleteNodeWith100kChildren(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testDeleteNodeWith100kChildren))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutTagSupport(testDeleteNodeWith100kChildren))(t)
 }
 
 func testDeleteNodeWith100kChildren(t *testing.T) {
@@ -641,7 +641,7 @@ func testDeleteNodeWith100kChildren(t *testing.T) {
 }
 
 func TestMixedBranchLeaf(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testMixedBranchLeaf))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutTagSupport(testMixedBranchLeaf))(t)
 }
 
 func testMixedBranchLeaf(t *testing.T) {
@@ -703,7 +703,7 @@ func testMixedBranchLeaf(t *testing.T) {
 }
 
 func TestMixedBranchLeafDelete(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testMixedBranchLeafDelete))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutTagSupport(testMixedBranchLeafDelete))(t)
 }
 
 func testMixedBranchLeafDelete(t *testing.T) {
@@ -796,7 +796,7 @@ func testMixedBranchLeafDelete(t *testing.T) {
 }
 
 func TestPruneTaggedSeries(t *testing.T) {
-	withAndWithoutPartitonedIndex(testPruneTaggedSeries)(t)
+	withAndWithoutPartitionedIndex(testPruneTaggedSeries)(t)
 }
 
 func testPruneTaggedSeries(t *testing.T) {
@@ -922,7 +922,7 @@ func testPruneTaggedSeries(t *testing.T) {
 // it does not test matching over different rules or tag matching
 // we have other tests for that
 func TestPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
-	withAndWithoutPartitonedIndex(testPruneTaggedSeriesWithCollidingTagSets)(t)
+	withAndWithoutPartitionedIndex(testPruneTaggedSeriesWithCollidingTagSets)(t)
 }
 
 func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
@@ -1003,7 +1003,7 @@ func testPruneTaggedSeriesWithCollidingTagSets(t *testing.T) {
 }
 
 func TestPrune(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutTagSupport(testPrune))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutTagSupport(testPrune))(t)
 }
 
 func testPrune(t *testing.T) {
@@ -1095,7 +1095,7 @@ func testPrune(t *testing.T) {
 }
 
 func TestSingleNodeMetric(t *testing.T) {
-	withAndWithoutPartitonedIndex(testSingleNodeMetric)(t)
+	withAndWithoutPartitionedIndex(testSingleNodeMetric)(t)
 }
 
 func testSingleNodeMetric(t *testing.T) {
@@ -1195,7 +1195,7 @@ func TestUpsertingMetaRecordsIntoIndex(t *testing.T) {
 }
 
 func TestMetricNameStartingWithTilde(t *testing.T) {
-	withAndWithoutPartitonedIndex(testMetricNameStartingWithTilde)(t)
+	withAndWithoutPartitionedIndex(testMetricNameStartingWithTilde)(t)
 }
 
 func testMetricNameStartingWithTilde(t *testing.T) {
@@ -1472,7 +1472,7 @@ func benchmarkPruneLongSeriesNames(b *testing.B) {
 }
 
 func TestMatchSchemaWithTags(t *testing.T) {
-	withAndWithoutPartitonedIndex(testMatchSchemaWithTags)(t)
+	withAndWithoutPartitionedIndex(testMatchSchemaWithTags)(t)
 }
 
 func testMatchSchemaWithTags(t *testing.T) {

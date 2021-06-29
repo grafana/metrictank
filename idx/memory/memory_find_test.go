@@ -360,7 +360,7 @@ func queryAndCompareTagValues(t *testing.T, key, filter string, expected map[str
 }
 
 func TestTagDetailsWithoutFilter(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagDetailsWithoutFilter)(t)
+	withAndWithoutPartitionedIndex(testTagDetailsWithoutFilter)(t)
 }
 
 func testTagDetailsWithoutFilter(t *testing.T) {
@@ -377,7 +377,7 @@ func testTagDetailsWithoutFilter(t *testing.T) {
 }
 
 func TestTagDetailsWithFilter(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagDetailsWithFilter)(t)
+	withAndWithoutPartitionedIndex(testTagDetailsWithFilter)(t)
 }
 
 func testTagDetailsWithFilter(t *testing.T) {
@@ -395,7 +395,7 @@ func TestTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testTagDetailsWithMetaTagSupportWithoutFilter)(t)
+	withAndWithoutPartitionedIndex(testTagDetailsWithMetaTagSupportWithoutFilter)(t)
 }
 
 func testTagDetailsWithMetaTagSupportWithoutFilter(t *testing.T) {
@@ -428,7 +428,7 @@ func TestTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testTagDetailsWithMetaTagSupportWithFilter)(t)
+	withAndWithoutPartitionedIndex(testTagDetailsWithMetaTagSupportWithFilter)(t)
 }
 
 func testTagDetailsWithMetaTagSupportWithFilter(t *testing.T) {
@@ -477,7 +477,7 @@ func queryAndCompareTagKeys(t testing.TB, filter string, expected []string) {
 }
 
 func TestTagKeysWithoutFilters(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagKeysWithoutFilters)(t)
+	withAndWithoutPartitionedIndex(testTagKeysWithoutFilters)(t)
 }
 
 func testTagKeysWithoutFilters(t *testing.T) {
@@ -489,7 +489,7 @@ func testTagKeysWithoutFilters(t *testing.T) {
 }
 
 func TestTagKeysWithFilter(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagKeysWithFilter)(t)
+	withAndWithoutPartitionedIndex(testTagKeysWithFilter)(t)
 }
 
 func testTagKeysWithFilter(t *testing.T) {
@@ -507,7 +507,7 @@ func TestTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testTagKeysWithMetaTagSupportWithFilter)(t)
+	withAndWithoutPartitionedIndex(testTagKeysWithMetaTagSupportWithFilter)(t)
 }
 
 func testTagKeysWithMetaTagSupportWithFilter(t *testing.T) {
@@ -541,7 +541,7 @@ func TestTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testTagKeysWithMetaTagSupportWithoutFilters)(t)
+	withAndWithoutPartitionedIndex(testTagKeysWithMetaTagSupportWithoutFilters)(t)
 }
 
 func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
@@ -565,7 +565,7 @@ func testTagKeysWithMetaTagSupportWithoutFilters(t *testing.T) {
 }
 
 func TestTagSortingInFindByTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(testTagSortingInFindByTag)(t)
+	withAndWithoutPartitionedIndex(testTagSortingInFindByTag)(t)
 }
 
 func testTagSortingInFindByTag(t *testing.T) {
@@ -632,7 +632,7 @@ func testTagSortingInFindByTag(t *testing.T) {
 }
 
 func TestAutoCompleteTags(t *testing.T) {
-	withAndWithoutPartitonedIndex(testAutoCompleteTags)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTags)(t)
 }
 
 func testAutoCompleteTags(t *testing.T) {
@@ -674,7 +674,7 @@ func TestAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithMetaTagSupport)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagsWithMetaTagSupport)(t)
 }
 
 func testAutoCompleteTagsWithMetaTagSupport(t *testing.T) {
@@ -757,7 +757,7 @@ func autoCompleteTagsAndCompare(t testing.TB, tcIdx int, prefix string, limit ui
 }
 
 func TestAutoCompleteTagsWithQuery(t *testing.T) {
-	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithQuery)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagsWithQuery)(t)
 }
 
 func testAutoCompleteTagsWithQuery(t *testing.T) {
@@ -804,7 +804,7 @@ func TestAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testAutoCompleteTagsWithQueryWithMetaTagSupport)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagsWithQueryWithMetaTagSupport)(t)
 }
 
 func testAutoCompleteTagsWithQueryWithMetaTagSupport(t *testing.T) {
@@ -875,7 +875,7 @@ func autoCompleteTagsWithQueryAndCompare(t testing.TB, tcIdx int, prefix string,
 }
 
 func TestAutoCompleteTagValues(t *testing.T) {
-	withAndWithoutPartitonedIndex(testAutoCompleteTagValues)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagValues)(t)
 }
 
 func testAutoCompleteTagValues(t *testing.T) {
@@ -918,7 +918,7 @@ func TestAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithMetaTagSupport)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagValuesWithMetaTagSupport)(t)
 }
 
 func testAutoCompleteTagValuesWithMetaTagSupport(t *testing.T) {
@@ -1009,7 +1009,7 @@ func autoCompleteTagValuesAndCompare(t testing.TB, tag, prefix string, limit uin
 }
 
 func TestAutoCompleteTagValuesWithQuery(t *testing.T) {
-	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithQuery)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagValuesWithQuery)(t)
 }
 
 func testAutoCompleteTagValuesWithQuery(t *testing.T) {
@@ -1067,7 +1067,7 @@ func TestAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
 	reset := enableMetaTagSupport()
 	defer reset()
 
-	withAndWithoutPartitonedIndex(testAutoCompleteTagValuesWithQueryWithMetaTagSupport)(t)
+	withAndWithoutPartitionedIndex(testAutoCompleteTagValuesWithQueryWithMetaTagSupport)(t)
 }
 
 func testAutoCompleteTagValuesWithQueryWithMetaTagSupport(t *testing.T) {
