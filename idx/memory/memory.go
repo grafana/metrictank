@@ -1857,7 +1857,7 @@ func (m *UnpartitionedMemoryIdx) AddDefs(defs []schema.MetricDefinition) {
 func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	// TODO - finer grained locking
 	bc := m.Lock()
-	defer bc.Unlock("DeleteDefs", nil) // TODO - findCache ?
+	defer bc.Unlock("DeleteDefs", nil)
 
 	taggedIds := make(map[uint32]IdSet)
 	for _, def := range defs {
@@ -1872,8 +1872,9 @@ func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, arch
 				continue
 			}
 
-			// SEAN TODO - This seems like it could overdelete (if multiple defs for this path)
+			// SEAN TODO - This seems like this could overdelete (if multiple defs for this path)
 			m.delete(def.OrgId, n, true, false)
+			m.findCache.InvalidateFor(def.OrgId, n.Path)
 		} else {
 			if _, ok := taggedIds[def.OrgId]; !ok {
 				taggedIds[def.OrgId] = make(IdSet)
