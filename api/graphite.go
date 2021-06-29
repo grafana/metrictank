@@ -1240,8 +1240,14 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 		retval := models.GraphiteTagFindSeriesFullResp{Warnings: warnings}
 		retval.Series = make([]schema.MetricDefinition, 0, len(series))
 		for _, serie := range series {
-			// SEAN TODO - not sure this is the right thing to do. Look into this more
-			retval.Series = append(retval.Series, serie.Series[0].Defs[0].MetricDefinition)
+			for _, node := range serie.Series {
+				for _, ndef := range node.Defs {
+					// This *could* exceed our "limit" with multiple definitions per series.
+					// Logically, they should all be returned if matched. Since they are
+					// grouped together, we can consider them one series.
+					retval.Series = append(retval.Series, ndef.MetricDefinition)
+				}
+			}
 		}
 
 		response.Write(ctx, response.NewJson(200, retval, ""))
