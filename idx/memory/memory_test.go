@@ -1091,7 +1091,65 @@ func testPrune(t *testing.T) {
 			So(nodes, ShouldHaveLength, 1)
 		})
 	})
+}
 
+func TestBasicFind(t *testing.T) {
+	withAndWithoutPartitionedIndex(testBasicFind)(t)
+}
+
+func testBasicFind(t *testing.T) {
+	ix := New()
+	ix.Init()
+	defer ix.Stop()
+
+	// add old series
+	for _, s := range getSeriesNames(2, 5, "metric.bah") {
+		d := &schema.MetricData{
+			Name:     s,
+			OrgId:    1,
+			Interval: 10,
+			Time:     1,
+		}
+		d.SetId()
+		mkey, err := schema.MKeyFromString(d.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, d, getPartition(d))
+	}
+	//new series
+	for _, s := range getSeriesNames(2, 5, "metric.foo") {
+		d := &schema.MetricData{
+			Name:     s,
+			OrgId:    1,
+			Interval: 10,
+			Time:     10,
+		}
+		d.SetId()
+		mkey, err := schema.MKeyFromString(d.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ix.AddOrUpdate(mkey, d, getPartition(d))
+	}
+	Convey("after populating index", t, func() {
+		defs := ix.List(1)
+		So(defs, ShouldHaveLength, 10)
+	})
+	Convey("should have no duplicates", t, func() {
+		nodes, err := ix.Find(1, "metric.bah.*.*", 0, 0)
+		So(err, ShouldBeNil)
+		So(nodes, ShouldHaveLength, 5)
+
+		names := make(map[string]struct{})
+		for _, n := range nodes {
+			for _, def := range n.Defs {
+				names[def.Name] = struct{}{}
+			}
+		}
+
+		So(names, ShouldHaveLength, len(nodes))
+	})
 }
 
 func TestSingleNodeMetric(t *testing.T) {
