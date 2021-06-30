@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/gocql/gocql"
@@ -20,6 +21,7 @@ import (
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
+	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 	"gopkg.in/macaron.v1"
@@ -184,6 +186,8 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 
 		var defs []schema.MetricDefinition
 
+		maxLastUpdate := time.Now().Unix()
+
 		session := cass.Session.CurrentSession()
 		iter := session.Query(q, partition).Iter()
 	ITER:
@@ -222,7 +226,7 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 				Unit:       unit,
 				Mtype:      mtype,
 				Tags:       tags,
-				LastUpdate: lastupdate,
+				LastUpdate: util.MinInt64(maxLastUpdate, lastupdate+request.LastUpdateOffset),
 			})
 		}
 		if err := iter.Close(); err != nil {

@@ -13,8 +13,9 @@ type IndexDelByQueryResp struct {
 }
 
 type IndexRestoreReq struct {
-	Expr          []string `json:"expr" binding:"Required"`
-	NumPartitions int      `json:"partitions" binding:"Default(0)"`
+	Expr             []string `json:"expr" binding:"Required"`
+	LastUpdateOffset int64    `json:"lastUpdateOffset" binding:"Default(0)"`
+	NumPartitions    int      `json:"partitions" binding:"Default(0)"`
 }
 
 type IndexRestoreResp struct {
