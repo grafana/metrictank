@@ -60,6 +60,8 @@ func (s *Server) RegisterRoutes() {
 		ctx.Write(nil)
 	})
 
+	r.Get("/", appStatus)
+
 	// SEAN TODO
 	// - tag vs untagged versions?
 	// - prefix '/index'?

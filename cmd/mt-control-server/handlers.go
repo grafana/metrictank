@@ -41,6 +41,10 @@ func ConfigHandlers() {
 	globalconf.Register("handlers", FlagSet, flag.ExitOnError)
 }
 
+func appStatus(ctx *macaron.Context) {
+	ctx.PlainText(200, []byte("OK"))
+}
+
 func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryReq) {
 	log.Infof("Received tagsDelByQuery: %v", request)
 
