@@ -192,6 +192,8 @@ type GraphiteTagDelByQueryResp struct {
 type GraphiteTagTerms struct {
 	Tags []string `json:"tags"`
 	Expr []string `json:"expressions"`
+	From int64    `json:"from" form:"from"`
+	To   int64    `json:"to" form:"to"`
 }
 
 type GraphiteTagTermsResp struct {

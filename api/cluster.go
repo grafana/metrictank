@@ -351,7 +351,7 @@ func (s *Server) IndexTagTerms(ctx *middleware.Context, req models.IndexTagTerms
 		return
 	}
 
-	query, err := tagquery.NewQueryFromStrings(req.Expr, 0, 0)
+	query, err := tagquery.NewQueryFromStrings(req.Expr, req.From, req.To)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
