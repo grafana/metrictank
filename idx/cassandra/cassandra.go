@@ -335,7 +335,11 @@ func (c *CasIdx) rebuildIndex() {
 func (c *CasIdx) Load(defs []schema.MetricDefinition, now time.Time) []schema.MetricDefinition {
 	session := c.Session.CurrentSession()
 	iter := session.Query(fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s", c.Config.Table)).Iter()
-	return c.load(defs, iter, now)
+	defs, err := c.load(defs, iter, now)
+	if err != nil {
+		log.Fatalf("cassandra-idx: Failed to load: %s", err)
+	}
+	return defs
 }
 
 // LoadPartitions appends MetricDefinitions from the given partitions to defs and returns the modified defs, honoring pruning settings relative to now
@@ -346,13 +350,22 @@ func (c *CasIdx) LoadPartitions(partitions []int32, defs []schema.MetricDefiniti
 	}
 	q := fmt.Sprintf("SELECT id, orgid, partition, name, interval, unit, mtype, tags, lastupdate from %s where partition in (%s)", c.Config.Table, strings.Join(placeholders, ","))
 
-	session := c.Session.CurrentSession()
-	iter := session.Query(q).Iter()
-	return c.load(defs, iter, now)
+	// Retry a few times on error
+	var err error
+	for i := 0; i < c.Config.InitLoadRetries; i++ {
+		session := c.Session.CurrentSession()
+		iter := session.Query(q).Iter()
+		defs, err = c.load(defs, iter, now)
+		if err == nil {
+			return defs
+		}
+	}
+	log.Fatalf("cassandra-idx: Failed to load partitions %v after %d retries: %s", partitions, c.Config.InitLoadRetries, err)
+	return nil
 }
 
 // load appends MetricDefinitions from the iterator to defs and returns the modified defs, honoring pruning settings relative to now
-func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time.Time) []schema.MetricDefinition {
+func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time.Time) ([]schema.MetricDefinition, error) {
 	defsByNames := make(map[string][]*schema.MetricDefinition)
 	var id, name, unit, mtype string
 	var orgId, interval int
@@ -401,7 +414,8 @@ func (c *CasIdx) load(defs []schema.MetricDefinition, iter cqlIterator, now time
 		defsByNames[nameWithTags] = append(defsByNames[nameWithTags], mdef)
 	}
 	if err := iter.Close(); err != nil {
-		log.Fatalf("cassandra-idx: could not close iterator: %s", err.Error())
+		log.Errorf("cassandra-idx: could not close iterator: %s", err.Error())
+		return nil, err
 	}
 
 	// getting all cutoffs once saves having to recompute everytime we have a match
@@ -423,7 +437,7 @@ NAMES:
 		}
 	}
 
-	return defs
+	return defs, nil
 }
 
 // ArchiveDefs writes each of the provided defs to the archive table and
