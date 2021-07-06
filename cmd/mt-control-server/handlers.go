@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/cmd/mt-control-server/controlmodels"
+	"github.com/grafana/metrictank/expr/tagquery"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/schema/msg"
@@ -41,12 +42,41 @@ func ConfigHandlers() {
 	globalconf.Register("handlers", FlagSet, flag.ExitOnError)
 }
 
+func makeLogId() string {
+	logId := "uninit"
+	uuid, err := gocql.RandomUUID()
+	if err == nil {
+		logId = uuid.String()
+	}
+	return logId
+}
+
+func makeMessage(partition int32, op schema.Operation, cm *schema.ControlMsg) (*sarama.ProducerMessage, error) {
+	cm.Op = op
+	var b bytes.Buffer
+	b.WriteByte(byte(msg.FormatIndexControlMessage))
+	w := msgp.NewWriterSize(&b, 300)
+	err := cm.EncodeMsg(w)
+	if err != nil {
+		return nil, err
+	}
+	w.Flush()
+
+	return &sarama.ProducerMessage{
+		Topic:     topic,
+		Value:     sarama.ByteEncoder(b.Bytes()),
+		Partition: partition,
+	}, nil
+}
+
 func appStatus(ctx *macaron.Context) {
 	ctx.PlainText(200, []byte("OK"))
 }
 
 func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryReq) {
-	log.Infof("Received tagsDelByQuery: %v", request)
+	logId := makeLogId()
+
+	log.Infof("Received tagsDelByQuery: logId = %s, req = %v", logId, request)
 
 	// Translate to FindSeries
 	findSeries := models.GraphiteTagFindSeries{
@@ -84,6 +114,8 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 		return
 	}
 
+	log.Infof("job %s: Pulled %d series matching filters", logId, len(findSeriesResult.Series))
+
 	retval := controlmodels.IndexDelByQueryResp{}
 	retval.Count = len(findSeriesResult.Series)
 	retval.Partitions = make(map[int]int)
@@ -98,27 +130,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 			op = schema.OpArchive
 		}
 
-		flush := func(partition int32, cm *schema.ControlMsg) error {
-			if len(cm.Defs) == 0 {
-				return nil
-			}
-			cm.Op = op
-			var b bytes.Buffer
-			b.WriteByte(byte(msg.FormatIndexControlMessage))
-			w := msgp.NewWriterSize(&b, 300)
-			err := cm.EncodeMsg(w)
-			if err != nil {
-				return err
-			}
-			w.Flush()
-
-			_, _, err = producer.producer.SendMessage(&sarama.ProducerMessage{
-				Topic:     topic,
-				Value:     sarama.ByteEncoder(b.Bytes()),
-				Partition: partition,
-			})
-			return err
-		}
+		var msgs []*sarama.ProducerMessage
 
 		// Create message per partition
 		partitionMsgs := make(map[int32]*schema.ControlMsg)
@@ -129,20 +141,31 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 			cm := partitionMsgs[s.Partition]
 			cm.Defs = append(cm.Defs, s)
 
-			if len(cm.Defs) > maxDefsPerMsg {
-				err = flush(s.Partition, cm)
-				if err != nil {
-					log.Warnf("Failed to produce control msg: err = %s", err)
+			if len(cm.Defs) >= maxDefsPerMsg {
+				msg, err := makeMessage(s.Partition, op, cm)
+				if err == nil {
+					msgs = append(msgs, msg)
 				}
 				partitionMsgs[s.Partition] = &schema.ControlMsg{}
 			}
 		}
 
 		for partition, cm := range partitionMsgs {
-			err = flush(partition, cm)
-			if err != nil {
-				log.Warnf("Failed to produce control msg: err = %s", err)
+			if len(cm.Defs) == 0 {
+				continue
 			}
+			msg, err := makeMessage(partition, op, cm)
+			if err == nil {
+				msgs = append(msgs, msg)
+			}
+		}
+
+		if len(msgs) > 0 {
+			go func() {
+				pre := time.Now()
+				err = producer.producer.SendMessages(msgs)
+				log.Infof("job %s: Sending %d batches took %v", logId, len(msgs), time.Since(pre))
+			}()
 		}
 	}
 
@@ -154,17 +177,21 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 }
 
 func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
-	log.Infof("Received tagsRestore: %v", request)
+	// For large archives, this could take quite a long time. Process asynchronously and
+	// return response to know the job was kicked off. Provide an identifier to view logs.
+	logId := makeLogId()
+
+	log.Infof("Received tagsRestore: logId = %s, req = %v", logId, request)
 
 	// Pre-process expressions
-	var nameMatch string
-	var tagMatches []string
-	for _, expr := range request.Expr {
-		if strings.HasPrefix(expr, "name=") {
-			nameMatch = strings.SplitN(expr, "=", 2)[1]
-		} else {
-			tagMatches = append(tagMatches, expr)
-		}
+	filter, err := tagquery.NewQueryFromStrings(request.Expr, request.From, request.To)
+	if err != nil {
+		response.Write(ctx, response.WrapError(err))
+		return
+	}
+	filtersByTag := make(map[string][]tagquery.Expression)
+	for _, expr := range filter.Expressions {
+		filtersByTag[expr.GetKey()] = append(filtersByTag[expr.GetKey()], expr)
 	}
 
 	numPartitions := request.NumPartitions
@@ -172,15 +199,7 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 		numPartitions = producer.numPartitions()
 	}
 
-	// For large archives, this could take quite a long time. Process asynchronously and
-	// return response to know the job was kicked off. Provide an identifier to view logs.
-	logId := "uninit"
-	uuid, err := gocql.RandomUUID()
-	if err == nil {
-		logId = uuid.String()
-	}
-
-	scanPartition := func(partition int) {
+	scanPartition := func(partition int32) {
 		q := fmt.Sprintf("SELECT id, orgid, name, interval, unit, mtype, tags, lastupdate FROM %s WHERE partition = ?", cass.Config.ArchiveTable)
 
 		var id, name, unit, mtype string
@@ -194,44 +213,64 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 
 		session := cass.Session.CurrentSession()
 		iter := session.Query(q, partition).Iter()
+
 	ITER:
 		for iter.Scan(&id, &orgId, &name, &interval, &unit, &mtype, &tags, &lastupdate) {
+
+			// Quick filter on lastupdate
+			if filter.From > 0 && lastupdate < filter.From {
+				continue ITER
+			}
+
+			if filter.To > 0 && lastupdate > filter.To {
+				continue ITER
+			}
+
+			// Tags to map
+			tagMap := make(map[string]string)
+			for _, tag := range tags {
+				tagParts := strings.SplitN(tag, "=", 2)
+				if len(tagParts) != 2 {
+					continue
+				}
+				tagMap[tagParts[0]] = tagParts[1]
+			}
+
+			idTagLookup := func(_ schema.MKey, tag, value string) bool {
+				return tagMap[tag] == value
+			}
+
 			mkey, err := schema.MKeyFromString(id)
 			if err != nil {
 				log.Errorf("job=%s: load() could not parse ID %q: %s -> skipping", logId, id, err)
 				continue
 			}
 
-			// Check if we care about this def
-			if nameMatch != "" && name != nameMatch {
-				continue
-			}
-
-		MATCH:
-			for _, expr := range tagMatches {
-				for _, tag := range tags {
-					if tag == expr {
-						continue MATCH
-					}
+			for _, expr := range filter.Expressions {
+				matchFunc := expr.GetMetricDefinitionFilter(idTagLookup)
+				if matchFunc(mkey, name, tags) == tagquery.Fail {
+					continue ITER
 				}
-				continue ITER
 			}
 
 			if orgId < 0 {
 				orgId = int(idx.OrgIdPublic)
 			}
 
-			defs = append(defs, schema.MetricDefinition{
+			def := schema.MetricDefinition{
 				Id:         mkey,
 				OrgId:      uint32(orgId),
-				Partition:  int32(partition),
+				Partition:  partition,
 				Name:       name,
 				Interval:   interval,
 				Unit:       unit,
 				Mtype:      mtype,
 				Tags:       tags,
 				LastUpdate: util.MinInt64(maxLastUpdate, lastupdate+request.LastUpdateOffset),
-			})
+			}
+
+			defs = append(defs, def)
+
 		}
 		if err := iter.Close(); err != nil {
 			log.Errorf("job=%s: could not close iterator for partition = %d: %s", logId, partition, err.Error())
@@ -261,21 +300,13 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 				Op:   schema.OpRestore,
 			}
 
-			var b bytes.Buffer
-			b.WriteByte(byte(msg.FormatIndexControlMessage))
-			w := msgp.NewWriterSize(&b, 300)
-			err := cm.EncodeMsg(w)
+			msg, err := makeMessage(partition, schema.OpRestore, cm)
 			if err != nil {
 				log.Warnf("job=%s: Failed to encode ControlMsg from partition = %d, err = %s", logId, partition, err)
 				continue
 			}
-			w.Flush()
 
-			_, _, err = producer.producer.SendMessage(&sarama.ProducerMessage{
-				Topic:     topic,
-				Value:     sarama.ByteEncoder(b.Bytes()),
-				Partition: int32(partition),
-			})
+			_, _, err = producer.producer.SendMessage(msg)
 			if err != nil {
 				log.Warnf("job=%s: Failed to send ControlMsg for partition = %d, err = %s", logId, partition, err)
 				continue
@@ -291,7 +322,7 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 			go func() {
 				defer wg.Done()
 				for partition := range partitions {
-					scanPartition(partition)
+					scanPartition(int32(partition))
 				}
 			}()
 		}
