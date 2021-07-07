@@ -47,7 +47,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/grafana/configparser"
-  branch = "fix-mt-1990"
+  revision = "2593eb86a3ee3caf043cc07bca23ee7d8df15091"
 
 [[constraint]]
   name = "github.com/davecgh/go-spew"
