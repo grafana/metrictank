@@ -1450,7 +1450,7 @@ func (s *Server) clusterAutoCompleteTagValues(ctx context.Context, orgId uint32,
 }
 
 func (s *Server) graphiteTagTerms(ctx *middleware.Context, request models.GraphiteTagTerms) {
-	data := models.IndexTagTerms{OrgId: ctx.OrgId, Tags: request.Tags, Expr: request.Expr}
+	data := models.IndexTagTerms{OrgId: ctx.OrgId, Tags: request.Tags, Expr: request.Expr, From: request.From, To: request.To}
 	responses, err := s.queryAllShards(ctx.Req.Context(), "graphiteTagTerms", fetchFuncPost(data, "graphiteTagTerms", "/index/tags/terms"))
 	if err != nil {
 		response.Write(ctx, response.WrapErrorForTagDB(err))

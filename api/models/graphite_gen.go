@@ -1036,6 +1036,18 @@ func (z *GraphiteTagTerms) DecodeMsg(dc *msgp.Reader) (err error) {
 					return
 				}
 			}
+		case "From":
+			z.From, err = dc.ReadInt64()
+			if err != nil {
+				err = msgp.WrapError(err, "From")
+				return
+			}
+		case "To":
+			z.To, err = dc.ReadInt64()
+			if err != nil {
+				err = msgp.WrapError(err, "To")
+				return
+			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -1049,9 +1061,9 @@ func (z *GraphiteTagTerms) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z *GraphiteTagTerms) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 2
+	// map header, size 4
 	// write "Tags"
-	err = en.Append(0x82, 0xa4, 0x54, 0x61, 0x67, 0x73)
+	err = en.Append(0x84, 0xa4, 0x54, 0x61, 0x67, 0x73)
 	if err != nil {
 		return
 	}
@@ -1084,15 +1096,35 @@ func (z *GraphiteTagTerms) EncodeMsg(en *msgp.Writer) (err error) {
 			return
 		}
 	}
+	// write "From"
+	err = en.Append(0xa4, 0x46, 0x72, 0x6f, 0x6d)
+	if err != nil {
+		return
+	}
+	err = en.WriteInt64(z.From)
+	if err != nil {
+		err = msgp.WrapError(err, "From")
+		return
+	}
+	// write "To"
+	err = en.Append(0xa2, 0x54, 0x6f)
+	if err != nil {
+		return
+	}
+	err = en.WriteInt64(z.To)
+	if err != nil {
+		err = msgp.WrapError(err, "To")
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z *GraphiteTagTerms) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 2
+	// map header, size 4
 	// string "Tags"
-	o = append(o, 0x82, 0xa4, 0x54, 0x61, 0x67, 0x73)
+	o = append(o, 0x84, 0xa4, 0x54, 0x61, 0x67, 0x73)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.Tags)))
 	for za0001 := range z.Tags {
 		o = msgp.AppendString(o, z.Tags[za0001])
@@ -1103,6 +1135,12 @@ func (z *GraphiteTagTerms) MarshalMsg(b []byte) (o []byte, err error) {
 	for za0002 := range z.Expr {
 		o = msgp.AppendString(o, z.Expr[za0002])
 	}
+	// string "From"
+	o = append(o, 0xa4, 0x46, 0x72, 0x6f, 0x6d)
+	o = msgp.AppendInt64(o, z.From)
+	// string "To"
+	o = append(o, 0xa2, 0x54, 0x6f)
+	o = msgp.AppendInt64(o, z.To)
 	return
 }
 
@@ -1162,6 +1200,18 @@ func (z *GraphiteTagTerms) UnmarshalMsg(bts []byte) (o []byte, err error) {
 					return
 				}
 			}
+		case "From":
+			z.From, bts, err = msgp.ReadInt64Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "From")
+				return
+			}
+		case "To":
+			z.To, bts, err = msgp.ReadInt64Bytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "To")
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -1184,6 +1234,7 @@ func (z *GraphiteTagTerms) Msgsize() (s int) {
 	for za0002 := range z.Expr {
 		s += msgp.StringPrefixSize + len(z.Expr[za0002])
 	}
+	s += 5 + msgp.Int64Size + 3 + msgp.Int64Size
 	return
 }
 

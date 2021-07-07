@@ -132,6 +132,8 @@ type IndexTagTerms struct {
 	OrgId uint32   `json:"orgId" binding:"Required"`
 	Tags  []string `json:"tags"`
 	Expr  []string `json:"expressions"`
+	From  int64    `json:"from" form:"from"`
+	To    int64    `json:"to" form:"to"`
 }
 
 func (t IndexTagTerms) Trace(span opentracing.Span) {
@@ -139,6 +141,8 @@ func (t IndexTagTerms) Trace(span opentracing.Span) {
 	span.LogFields(
 		traceLog.String("tags", fmt.Sprintf("%q", t.Expr)),
 		traceLog.String("expressions", fmt.Sprintf("%q", t.Expr)),
+		traceLog.String("from", fmt.Sprintf("%d", t.From)),
+		traceLog.String("to", fmt.Sprintf("%d", t.To)),
 	)
 }
 
