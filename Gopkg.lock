@@ -318,11 +318,11 @@
   version = "v0.0.4"
 
 [[projects]]
-  digest = "1:01379e9ffd4d4756068566b7ee3834165301dde52dd41ad3f3addf4e4cf3417c"
+  digest = "1:51d3a77f55c39b5489b4a2eaee34d49e73bd4a82d750df9d0e7ec17c9053c91d"
   name = "github.com/grafana/configparser"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "7fdb7669f3ec55c350a5b35e35c5f7c559de0060"
+  revision = "2593eb86a3ee3caf043cc07bca23ee7d8df15091"
 
 [[projects]]
   branch = "master"

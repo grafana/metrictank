@@ -10,8 +10,8 @@
 //  - Options without values (ex: can be used to group a set of hostnames)
 //  - Options without a named section (ex: a simple option=value file)
 //  - Find sections with regexp pattern matching on section names, ex: dc1.east.webservers where regex is '.webservers'
-//  - # or ; as comment delimiter
-//  - = or : as value delimiter
+//  - # as comment delimiter
+//  - = as value delimiter
 //
 package configparser
 
@@ -66,6 +66,31 @@ func ReadFile(filePath string) (*Configuration, error) {
 	return Read(file, filePath)
 }
 
+// findEarliestPos returns the index of substr1 or substr2 whichever is found first, or -1 if neither is found
+func findEarliestPos(s, substr1, substr2 string) int {
+	pos1 := strings.Index(s, substr1)
+	pos2 := strings.Index(s, substr2)
+
+	if pos1 == -1 && pos2 == -1 {
+		// neither is found
+		return pos1
+	}
+
+	if pos1 != -1 && pos2 != -1 {
+		// both are found. pick the earliest one
+		if pos2 < pos1 {
+			return pos2
+		}
+		return pos1
+	}
+
+	if pos2 != -1 {
+		// only one is found. pick whichever one is valid
+		return pos2
+	}
+	return pos1
+}
+
 // Read reads the given reader into a new Configuration
 // filePath is set for any future persistency but is not used for reading
 func Read(fd io.Reader, filePath string) (*Configuration, error) {
@@ -91,12 +116,23 @@ func Read(fd io.Reader, filePath string) (*Configuration, error) {
 			continue
 		}
 
-		// [ and ] may not appear after other content (we already checked if it's a prefix above) unless it's a comment
-		if strings.Contains(line, "[") || strings.Contains(line, "]") {
-			if !strings.HasPrefix(line, "#") && !strings.HasPrefix(line, ";") {
-				return nil, fmt.Errorf("invalid line %q: [ and ] are reserved for section headers and this contains additional non-section header data", line)
+		// [ and ] may not appear after other content (we already checked if it's a prefix above) unless it's in a comment or an option's value
+		posBrack := findEarliestPos(line, "[", "]")
+		if posBrack != -1 {
+			posComment := strings.Index(line, "#")
+			if posComment != -1 && posComment < posBrack {
+				// it's in a comment!
+				goto Valid
 			}
+			posVal := strings.Index(line, "=")
+			if posVal != -1 && posVal < posBrack {
+				// it's in a value!
+				goto Valid
+			}
+
+			return nil, fmt.Errorf("invalid line %q: [ and ] are only allowed in section headers, comments or option values", line)
 		}
+	Valid:
 		// save options and comments
 		addOption(activeSection, line)
 	}
@@ -338,21 +374,17 @@ func (s *Section) ValueOf(option string) string {
 	return s.options[option]
 }
 
-// ValueOf returns the value of specified option without any trailing comments (denoted by ' #' or ' ;')
+// ValueOf returns the value of specified option without any trailing comments (denoted by ' #')
 func (s *Section) ValueOfWithoutComments(option string) string {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	val := s.options[option]
-	pos := strings.Index(val, " #")
+	pos := strings.Index(val, "#")
 	if pos != -1 {
 		val = val[:pos]
 	}
-	pos = strings.Index(val, " ;")
-	if pos != -1 {
-		val = val[:pos]
-	}
-	return val
+	return strings.TrimSpace(val)
 }
 
 // SetValueFor sets the value for the specified option and returns the old value.
@@ -475,8 +507,6 @@ func parseOption(option string) (opt, value string) {
 
 	if i := strings.Index(option, "="); i != -1 {
 		opt, value = split(i, "=")
-	} else if i := strings.Index(option, ":"); i != -1 {
-		opt, value = split(i, ":")
 	} else {
 		opt = option
 	}
