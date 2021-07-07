@@ -84,7 +84,7 @@ func TestSelectByMetricTag(t *testing.T) {
 	_tagSupport := TagSupport
 	TagSupport = true
 	defer func() { TagSupport = _tagSupport }()
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testSelectByMetricTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testSelectByMetricTag))(t)
 }
 
 func testSelectByMetricTag(t *testing.T) {
@@ -104,7 +104,7 @@ func TestSelectByMetaTag(t *testing.T) {
 	_tagSupport := TagSupport
 	TagSupport = true
 	defer func() { TagSupport = _tagSupport }()
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testSelectByMetaTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testSelectByMetaTag))(t)
 }
 
 func testSelectByMetaTag(t *testing.T) {

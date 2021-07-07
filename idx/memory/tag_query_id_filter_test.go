@@ -96,7 +96,7 @@ func TestSliceContainsElements(t *testing.T) {
 }
 
 func TestFilterByMetricTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetricTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetricTag))(t)
 }
 
 func testFilterByMetricTag(t *testing.T) {
@@ -114,7 +114,7 @@ func testFilterByMetricTag(t *testing.T) {
 }
 
 func TestFilterByMetaTagWithEqual(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithEqual))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithEqual))(t)
 }
 
 func testFilterByMetaTagWithEqual(t *testing.T) {
@@ -155,7 +155,7 @@ func testFilterByMetaTagWithEqual(t *testing.T) {
 }
 
 func TestFilterByMetaTagWithNotEqualAndWithNotHasTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithNotEqualAndWithNotHasTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithNotEqualAndWithNotHasTag))(t)
 }
 
 func testFilterByMetaTagWithNotEqualAndWithNotHasTag(t *testing.T) {
@@ -205,7 +205,7 @@ func testFilterByMetaTagWithNotEqualAndWithNotHasTag(t *testing.T) {
 }
 
 func TestFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag))(t)
 }
 
 func testFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag(t *testing.T) {
@@ -275,7 +275,7 @@ func testFilterByMetaTagOfMultipleExpressionsWithNotEqualAndWithNotHasTag(t *tes
 }
 
 func TestFilterByMetaTagWithEqualAndWithHasTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithEqualAndWithHasTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithEqualAndWithHasTag))(t)
 }
 
 func testFilterByMetaTagWithEqualAndWithHasTag(t *testing.T) {
@@ -325,7 +325,7 @@ func testFilterByMetaTagWithEqualAndWithHasTag(t *testing.T) {
 }
 
 func TestFilterByMetaTagWithSingleUnderlyingEqualExpression(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithSingleUnderlyingEqualExpression))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithSingleUnderlyingEqualExpression))(t)
 }
 
 func testFilterByMetaTagWithSingleUnderlyingEqualExpression(t *testing.T) {
@@ -362,7 +362,7 @@ func testFilterByMetaTagWithSingleUnderlyingEqualExpression(t *testing.T) {
 }
 
 func TestFilterByMetaTagWithMultipleUnderlyingEqualExpression(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithMultipleUnderlyingEqualExpression))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithMultipleUnderlyingEqualExpression))(t)
 }
 
 func testFilterByMetaTagWithMultipleUnderlyingEqualExpression(t *testing.T) {
@@ -399,7 +399,7 @@ func testFilterByMetaTagWithMultipleUnderlyingEqualExpression(t *testing.T) {
 }
 
 func TestFilterByMetaTagWithPatternMatching(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithPatternMatching))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithPatternMatching))(t)
 }
 
 func testFilterByMetaTagWithPatternMatching(t *testing.T) {
@@ -474,7 +474,7 @@ func testFilterByMetaTagWithPatternMatching(t *testing.T) {
 }
 
 func TestFilterByMetaTagWithTagOperators(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithTagOperators))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMetaTagWithTagOperators))(t)
 }
 
 func testFilterByMetaTagWithTagOperators(t *testing.T) {
@@ -536,7 +536,7 @@ func testFilterByMetaTagWithTagOperators(t *testing.T) {
 }
 
 func TestFilterByMultipleOfManyMetaTagValues(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMultipleOfManyMetaTagValues))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMultipleOfManyMetaTagValues))(t)
 }
 
 func testFilterByMultipleOfManyMetaTagValues(t *testing.T) {
@@ -619,7 +619,7 @@ func testFilterByMultipleOfManyMetaTagValues(t *testing.T) {
 }
 
 func TestFilterByMultipleOfManyMetaTags(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByMultipleOfManyMetaTags))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByMultipleOfManyMetaTags))(t)
 }
 
 func testFilterByMultipleOfManyMetaTags(t *testing.T) {
@@ -703,7 +703,7 @@ func testFilterByMultipleOfManyMetaTags(t *testing.T) {
 }
 
 func TestFilterByOverlappingMetaTags(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterByOverlappingMetaTags))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterByOverlappingMetaTags))(t)
 }
 
 func testFilterByOverlappingMetaTags(t *testing.T) {
@@ -768,7 +768,7 @@ func testFilterByOverlappingMetaTags(t *testing.T) {
 }
 
 func TestFilterSubtractingMetricTagsFromMetaTag(t *testing.T) {
-	withAndWithoutPartitonedIndex(withAndWithoutMetaTagSupport(testFilterSubtractingMetricTagsFromMetaTag))(t)
+	withAndWithoutPartitionedIndex(withAndWithoutMetaTagSupport(testFilterSubtractingMetricTagsFromMetaTag))(t)
 }
 
 func testFilterSubtractingMetricTagsFromMetaTag(t *testing.T) {

@@ -193,10 +193,10 @@ func (p *PartitionedMemoryIdx) Find(orgId uint32, pattern string, from, limit in
 	done := make(chan struct{})
 	go func() {
 		for found := range resultChan {
-			for _, node := range found {
+			for i, node := range found {
 				n, ok := byPath[node.Path]
 				if !ok {
-					byPath[node.Path] = &node
+					byPath[node.Path] = &found[i]
 				} else {
 					if node.HasChildren {
 						n.HasChildren = true
