@@ -583,7 +583,7 @@ Flags:
   -sasl-enabled
     	Whether to enable SASL
   -sasl-mechanism string
-    	The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)
+    	The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512, PLAINTEXT)
   -sasl-password string
     	Password for client authentication (use with -sasl-enabled and -sasl-user)
   -sasl-username string

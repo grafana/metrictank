@@ -61,7 +61,7 @@ func init() {
 	FlagSet.StringVar(&tlsClientCert, "tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
 	FlagSet.StringVar(&tlsClientKey, "tls-client-key", "", "Client key for client authentication (use with -tls-enabled and -tls-client-cert)")
 	FlagSet.BoolVar(&saslEnabled, "sasl-enabled", false, "Whether to enable SASL")
-	FlagSet.StringVar(&saslMechanism, "sasl-mechanism", "", "The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512)")
+	FlagSet.StringVar(&saslMechanism, "sasl-mechanism", "", "The SASL mechanism configuration (possible values: SCRAM-SHA-256, SCRAM-SHA-512, PLAINTEXT)")
 	FlagSet.StringVar(&saslUsername, "sasl-username", "", "Username for client authentication (use with -sasl-enabled and -sasl-password)")
 	FlagSet.StringVar(&saslPassword, "sasl-password", "", "Password for client authentication (use with -sasl-enabled and -sasl-user)")
 	globalconf.Register("kafka-cluster", FlagSet, flag.ExitOnError)
@@ -115,6 +115,8 @@ func ConfigProcess(instance string) {
 		} else if saslMechanism == "SCRAM-SHA-512" {
 			config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA512
 			config.Net.SASL.SCRAMClientGeneratorFunc = func() sarama.SCRAMClient { return &XDGSCRAMClient{HashGeneratorFcn: SHA512} }
+		} else if saslMechanism == "PLAINTEXT" {
+			config.Net.SASL.Mechanism = sarama.SASLTypePlaintext
 		} else {
 			log.Fatalf("Failed to reconize saslMechanism: '%s'", saslMechanism)
 		}
