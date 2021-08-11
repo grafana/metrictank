@@ -206,8 +206,12 @@ func (s *Server) proxyToGraphite(ctx *middleware.Context) {
 }
 
 func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteRender) {
-	// retrieve te span that was created by the api Middleware handler.  The handler will
+	// retrieve the span that was created by the api Middleware handler.  The handler will
 	// call span.Finish()
+	traceID, _ := tracing.ExtractTraceID(ctx.Req.Context())
+
+	log.Infof("renderMetrics: Starting traceID=%s targets=%q", traceID, request.Targets)
+
 	span := opentracing.SpanFromContext(ctx.Req.Context())
 
 	span.SetTag("orgid", ctx.OrgId)
@@ -316,6 +320,15 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	execCtx, execSpan := tracing.NewSpan(ctx.Req.Context(), s.Tracer, "executePlan")
 	defer execSpan.Finish()
 	out, meta, err := s.executePlan(execCtx, ctx.OrgId, &plan)
+
+	// Log finished stats
+	prettyMeta, _ := meta.MarshalJSONFast(nil)
+	prettyMetaStr := string(prettyMeta)
+	log.Infof("renderMetrics: Completed traceID=%s meta=%s err=%v", traceID, prettyMetaStr, err)
+	execSpan.LogFields(
+		traceLog.String("meta", prettyMetaStr),
+	)
+
 	defer plan.CheckedClean(request.Targets)
 	if err != nil {
 		err := response.WrapError(err)
@@ -833,10 +846,6 @@ type consolidatorTuple struct {
 // we will collect all the individual series from the peer, and then sum here. that could be optimized
 func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan) ([]models.Series, models.RenderMeta, error) {
 	var meta models.RenderMeta
-	traceID, _ := tracing.ExtractTraceID(ctx)
-
-	log.Infof("executePlan: Starting traceID=%s req %v", traceID, plan.Reqs)
-
 	reqs := NewReqMap()
 	metaTagEnrichmentData := make(map[string]tagquery.Tags)
 
@@ -1045,12 +1054,6 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	meta.RenderStats.PlanRunDuration = time.Since(preRun)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
 	span.LogFields(traceLog.Float64("PlanRunMillis", durToMillis(meta.RenderStats.PlanRunDuration)))
-
-	// Log finished stats
-	// TODO - reusable buffer
-	prettyMeta, _ := meta.MarshalJSONFast(nil)
-	log.Infof("executePlan: Completed traceID=%s meta=%s err=%v", traceID, string(prettyMeta), err)
-
 	return out, meta, err
 }
 
