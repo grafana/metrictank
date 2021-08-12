@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/schema"
+	"github.com/tinylib/msgp/msgp"
 )
 
 var errTooSmall = errors.New("too small")
@@ -148,6 +149,18 @@ func IsIndexControlMsg(data []byte) bool {
 	}
 	version := Format(data[0])
 	return version == FormatIndexControlMessage
+}
+
+func WriteIndexControlMsg(cm *schema.ControlMsg) ([]byte, error) {
+	var b bytes.Buffer
+	b.WriteByte(byte(FormatIndexControlMessage))
+	w := msgp.NewWriterSize(&b, 300)
+	err := cm.EncodeMsg(w)
+	if err != nil {
+		return nil, err
+	}
+	w.Flush()
+	return b.Bytes(), nil
 }
 
 func ReadIndexControlMsg(data []byte) (schema.ControlMsg, error) {

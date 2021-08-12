@@ -24,7 +24,6 @@ import (
 	"github.com/grafana/metrictank/schema/msg"
 	"github.com/grafana/metrictank/util"
 	log "github.com/sirupsen/logrus"
-	"github.com/tinylib/msgp/msgp"
 	"gopkg.in/macaron.v1"
 )
 
@@ -53,18 +52,14 @@ func makeLogId() string {
 
 func makeMessage(partition int32, op schema.Operation, cm *schema.ControlMsg) (*sarama.ProducerMessage, error) {
 	cm.Op = op
-	var b bytes.Buffer
-	b.WriteByte(byte(msg.FormatIndexControlMessage))
-	w := msgp.NewWriterSize(&b, 300)
-	err := cm.EncodeMsg(w)
+	payload, err := msg.WriteIndexControlMsg(cm)
 	if err != nil {
 		return nil, err
 	}
-	w.Flush()
 
 	return &sarama.ProducerMessage{
 		Topic:     topic,
-		Value:     sarama.ByteEncoder(b.Bytes()),
+		Value:     sarama.ByteEncoder(payload),
 		Partition: partition,
 	}, nil
 }
