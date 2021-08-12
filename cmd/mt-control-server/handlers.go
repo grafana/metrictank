@@ -79,7 +79,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 		Limit:  request.Limit,
 		To:     request.OlderThan,
 		Meta:   true,
-		Format: "full-json",
+		Format: "defs-json",
 	}
 	reqBody, err := json.Marshal(findSeries)
 	if err != nil {

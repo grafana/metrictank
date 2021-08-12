@@ -1236,7 +1236,7 @@ func (s *Server) graphiteTagFindSeries(ctx *middleware.Context, request models.G
 		} else {
 			response.Write(ctx, response.NewJson(200, seriesNames, ""))
 		}
-	case "full-json":
+	case "defs-json":
 		retval := models.GraphiteTagFindSeriesFullResp{Warnings: warnings}
 		retval.Series = make([]schema.MetricDefinition, 0, len(series))
 		for _, serie := range series {

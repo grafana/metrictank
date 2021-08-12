@@ -126,7 +126,7 @@ type GraphiteTagFindSeries struct {
 	Expr   []string `json:"expr" form:"expr"`
 	From   int64    `json:"from" form:"from"`
 	To     int64    `json:"to" form:"to"`
-	Format string   `json:"format" form:"format" binding:"In(,series-json,lastts-json,full-json);Default(series-json)"`
+	Format string   `json:"format" form:"format" binding:"In(,series-json,lastts-json,defs-json);Default(series-json)"`
 	Limit  int      `json:"limit" binding:"Default(0)"`
 	Meta   bool     `json:"meta" binding:"Default(false)"`
 }
