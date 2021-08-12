@@ -560,6 +560,10 @@ func (b *BigtableIdx) AddDefs(defs []schema.MetricDefinition) {
 func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	pre := time.Now()
 
+	if archive {
+		log.Warnf("bigtable-idx: Received unsupported archive request for %d defs, falling back to delete", len(defs))
+	}
+
 	b.MemoryIndex.DeleteDefs(defs, archive)
 
 	if b.cfg.UpdateBigtableIdx {
