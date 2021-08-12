@@ -98,7 +98,7 @@ func tagsDelByQuery(ctx *macaron.Context, request controlmodels.IndexDelByQueryR
 	if resp.StatusCode != 200 {
 		// Read in body so that the connection can be reused
 		io.Copy(ioutil.Discard, resp.Body)
-		response.Write(ctx, response.WrapError(fmt.Errorf("Request to cluster failed with status = %d", resp.StatusCode)))
+		response.Write(ctx, response.WrapError(fmt.Errorf("Request to cluster failed with status = %d", 502)))
 		return
 	}
 
