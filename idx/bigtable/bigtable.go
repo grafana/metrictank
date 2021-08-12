@@ -567,7 +567,9 @@ func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 		// Maybe better to enhance the write queue to process these?
 		go func() {
 			for _, def := range defs {
-				b.deleteDef(&def)
+				if err := b.deleteDef(&def); err != nil {
+					log.Warnf("bigtable-idx: Failed to delete def %s: %s", def.Id, err.Error())
+				}
 			}
 		}()
 	}

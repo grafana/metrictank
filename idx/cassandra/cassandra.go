@@ -691,7 +691,7 @@ func (c *CasIdx) deleteDef(key schema.MKey, part int32) error {
 func (c *CasIdx) deleteDefAsync(key schema.MKey, part int32) {
 	go func() {
 		if err := c.deleteDef(key, part); err != nil {
-			log.Errorf("cassandra-idx: %s", err.Error())
+			log.Warn(err.Error())
 		}
 	}()
 }
@@ -752,7 +752,9 @@ func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 		} else {
 			go func() {
 				for _, def := range defs {
-					c.deleteDef(def.Id, def.Partition)
+					if err := c.deleteDef(def.Id, def.Partition); err != nil {
+						log.Errorf("cassandra-idx: %s", err.Error())
+					}
 				}
 			}()
 		}
