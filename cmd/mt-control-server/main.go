@@ -14,7 +14,7 @@ var (
 )
 
 func main() {
-	path := "" // SEAN TODO - load config file
+	path := "" // TODO - load config file if needed
 	config, err := globalconf.NewWithOptions(&globalconf.Options{
 		Filename:  path,
 		EnvPrefix: "MT_",

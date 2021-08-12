@@ -39,7 +39,7 @@ func producerConfig() *sarama.Config {
 	brokers = strings.Split(brokerStr, ",")
 
 	config := sarama.NewConfig()
-	config.ClientID = "control-cluster"
+	config.ClientID = "mt-control-server"
 	config.Version = kafkaVersion
 	config.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack the message
 	config.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
