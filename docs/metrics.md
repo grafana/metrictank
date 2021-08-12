@@ -244,6 +244,8 @@ the count of metricpoint_no_org datapoints received by input plugin
 a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
 * `input.carbon.metrics_per_message`:  
 how many metrics per message were seen. in carbon's case this is always 1.
+* `input.kafka-mdm.controlmsg_decode_err`:  
+a count of times a control message failed to parse
 * `input.kafka-mdm.metrics_decode_err`:  
 a count of times an input message failed to parse
 * `input.kafka-mdm.metrics_per_message`:  

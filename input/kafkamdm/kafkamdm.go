@@ -26,6 +26,9 @@ var metricsPerMessage = stats.NewMeter32("input.kafka-mdm.metrics_per_message", 
 // metric input.kafka-mdm.metrics_decode_err is a count of times an input message failed to parse
 var metricsDecodeErr = stats.NewCounterRate32("input.kafka-mdm.metrics_decode_err")
 
+// metric input.kafka-mdm.controlmsg_decode_err is a count of times a control message failed to parse
+var controlMsgDecodeErr = stats.NewCounterRate32("input.kafka-mdm.controlmsg_decode_err")
+
 type KafkaMdm struct {
 	input.Handler
 	consumer   sarama.Consumer
@@ -331,6 +334,7 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 	if isControlMsg {
 		cm, err := msg.ReadIndexControlMsg(data)
 		if err != nil {
+			controlMsgDecodeErr.Inc()
 			log.Errorf("kafkamdm: decode error, skipping control message. %s", err)
 			return
 		}
