@@ -62,9 +62,6 @@ func (s *Server) RegisterRoutes() {
 
 	r.Get("/", appStatus)
 
-	// SEAN TODO
-	// - tag vs untagged versions?
-	// - prefix '/index'?
 	r.Combo("/tags/delByQuery", bind(controlmodels.IndexDelByQueryReq{})).Post(tagsDelByQuery).Get(tagsDelByQuery)
 	r.Combo("/tags/restore", bind(controlmodels.IndexRestoreReq{})).Post(tagsRestore).Get(tagsRestore)
 }

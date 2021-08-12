@@ -21,7 +21,7 @@ func ConfigKafka() {
 	FlagSet := flag.NewFlagSet("kafka", flag.ExitOnError)
 	FlagSet.StringVar(&brokerStr, "brokers", "kafka:9092", "tcp address for kafka (may be given multiple times as comma separated list)")
 	FlagSet.StringVar(&kafkaVersionStr, "kafka-version", "2.0.0", "Kafka version in semver format. All brokers must be this version or newer.")
-	FlagSet.StringVar(&topic, "topic", "metrictank", "kafka topic")
+	FlagSet.StringVar(&topic, "topic", "mdm", "kafka topic")
 	FlagSet.IntVar(&fallbackNumPartitions, "fallback-num-partitions", 10000, "Number of partitions for kafka topic. Only used if it cannot be resolved from kafka")
 
 	kafkaNet = kafka.ConfigNet(FlagSet)
