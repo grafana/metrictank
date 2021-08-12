@@ -297,13 +297,13 @@ func tagsRestore(ctx *macaron.Context, request controlmodels.IndexRestoreReq) {
 
 			msg, err := makeMessage(partition, schema.OpRestore, cm)
 			if err != nil {
-				log.Warnf("job=%s: Failed to encode ControlMsg from partition = %d, err = %s", logId, partition, err)
+				log.Errorf("job=%s: Failed to encode ControlMsg from partition = %d, err = %s", logId, partition, err)
 				continue
 			}
 
 			_, _, err = producer.producer.SendMessage(msg)
 			if err != nil {
-				log.Warnf("job=%s: Failed to send ControlMsg for partition = %d, err = %s", logId, partition, err)
+				log.Errorf("job=%s: Failed to send ControlMsg for partition = %d, err = %s", logId, partition, err)
 				continue
 			}
 		}
