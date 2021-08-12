@@ -745,8 +745,8 @@ func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	c.MemoryIndex.DeleteDefs(defs, archive)
 
 	if c.Config.updateCassIdx {
-		// TODO - this could create a lot of go routines if many deletes come in at the same time
-		// Maybe better to enhance the write queue to process these?
+		// TODO - Deleting in a goroutine "escapes" the defined WriteConcurrency and could
+		// overload Cassandra. Maybe better to enhance the write queue to process these deletes
 		if archive {
 			c.ArchiveDefs(defs)
 		} else {

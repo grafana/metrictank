@@ -563,8 +563,8 @@ func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	b.MemoryIndex.DeleteDefs(defs, archive)
 
 	if b.cfg.UpdateBigtableIdx {
-		// TODO - this could create a lot of go routines if many deletes come in at the same time
-		// Maybe better to enhance the write queue to process these?
+		// TODO - Deleting in a goroutine "escapes" the defined WriteConcurrency and could
+		// overload BigTable. Maybe better to enhance the write queue to process these deletes
 		go func() {
 			for _, def := range defs {
 				if err := b.deleteDef(&def); err != nil {
