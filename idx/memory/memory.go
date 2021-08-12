@@ -1872,8 +1872,9 @@ func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, arch
 				continue
 			}
 
-			// SEAN TODO - This seems like this could overdelete (if multiple defs for this path)
+			// TODO - This seems like this could overdelete (if multiple defs for this path)
 			m.delete(def.OrgId, n, true, false)
+			// TODO - If there are a lot of defs to invalidate for a given org, we should call Purge
 			m.findCache.InvalidateFor(def.OrgId, n.Path)
 		} else {
 			if _, ok := taggedIds[def.OrgId]; !ok {
