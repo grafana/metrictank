@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
@@ -11,12 +12,22 @@ import (
 var (
 	producer *Producer
 	cass     *Cassandra
+
+	confFile = flag.String("config", "", "configuration file path (optional)")
 )
 
 func main() {
-	path := "" // TODO - load config file if needed
+	flag.Usage = func() {
+		fmt.Println("mt-control-server")
+		fmt.Println()
+		fmt.Println("Run a control server that can be used to issue control messages to a metrictank cluster.")
+		fmt.Println("Flags:")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
 	config, err := globalconf.NewWithOptions(&globalconf.Options{
-		Filename:  path,
+		Filename:  *confFile,
 		EnvPrefix: "MT_",
 	})
 	if err != nil {
