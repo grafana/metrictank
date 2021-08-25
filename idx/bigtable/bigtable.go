@@ -561,7 +561,8 @@ func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	pre := time.Now()
 
 	if archive {
-		log.Warnf("bigtable-idx: Received unsupported archive request for %d defs, falling back to delete", len(defs))
+		log.Errorf("bigtable-idx: Received unsupported archive request for %d defs, consider doing a delete instead", len(defs))
+		return
 	}
 
 	b.MemoryIndex.DeleteDefs(defs, archive)
@@ -569,6 +570,7 @@ func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	if b.cfg.UpdateBigtableIdx {
 		// TODO - Deleting in a goroutine "escapes" the defined WriteConcurrency and could
 		// overload BigTable. Maybe better to enhance the write queue to process these deletes
+		// Also deletes should be executed within kafka's retention interval. While not guaranteed, in practice this should be true
 		go func() {
 			for _, def := range defs {
 				if err := b.deleteDef(&def); err != nil {

@@ -747,6 +747,7 @@ func (c *CasIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
 	if c.Config.updateCassIdx {
 		// TODO - Deleting in a goroutine "escapes" the defined WriteConcurrency and could
 		// overload Cassandra. Maybe better to enhance the write queue to process these deletes
+		// Also deletes should be executed within kafka's retention interval. While not guaranteed, in practice this should be true
 		if archive {
 			c.ArchiveDefs(defs)
 		} else {
