@@ -549,7 +549,9 @@ func (b *BigtableIdx) AddDefs(defs []schema.MetricDefinition) {
 	if b.cfg.UpdateBigtableIdx {
 		// Blocking write to make sure all get enqueued
 		for _, def := range defs {
-			b.writeQueue <- writeReq{recvTime: time.Now(), def: &def}
+			now := time.Now()
+			b.writeQueue <- writeReq{recvTime: now, def: &def}
+			b.MemoryIndex.UpdateArchiveLastSave(def.Id, def.Partition, uint32(now.Unix()))
 		}
 	}
 

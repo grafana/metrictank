@@ -731,7 +731,9 @@ func (c *CasIdx) AddDefs(defs []schema.MetricDefinition) {
 	if c.Config.updateCassIdx {
 		// Blocking write to make sure all get enqueued
 		for _, def := range defs {
-			c.writeQueue <- writeReq{recvTime: time.Now(), def: &def}
+			now := time.Now()
+			c.writeQueue <- writeReq{recvTime: now, def: &def}
+			c.MemoryIndex.UpdateArchiveLastSave(def.Id, def.Partition, uint32(now.Unix()))
 		}
 	}
 
