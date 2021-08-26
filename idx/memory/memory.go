@@ -1892,10 +1892,11 @@ func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, arch
 				continue
 			}
 
-			// TODO - This seems like this could overdelete (if multiple defs for this path)
+			// TODO - m.delete could overdelete (if multiple defs for this path)
 			// Currently the control server doesn't support untagged, but this should be
 			// addressed before support can be added.
 			m.delete(def.OrgId, n, true, false)
+
 			if !purgeAll {
 				m.findCache.InvalidateFor(def.OrgId, n.Path)
 			}
