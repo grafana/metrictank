@@ -338,7 +338,9 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 			log.Errorf("kafkamdm: decode error, skipping control message. %s", err)
 			return
 		}
-		k.Handler.ProcessIndexControlMsg(cm, partition)
+		// Processing index control message can be done asynchronously to
+		// avoid blocking ingest thread with potentially blocking operations
+		go k.Handler.ProcessIndexControlMsg(cm, partition)
 		return
 	}
 
