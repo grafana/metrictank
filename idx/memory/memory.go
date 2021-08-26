@@ -1855,13 +1855,33 @@ func (m *UnpartitionedMemoryIdx) AddDefs(defs []schema.MetricDefinition) {
 
 // DeleteDefs deletes the matching defs.
 func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
-	// TODO - finer grained locking
+	untaggedDefs := make(map[uint32][]schema.MetricDefinition)
+	taggedIds := make(map[uint32]IdSet)
+
+	for _, def := range defs {
+		if len(def.Tags) == 0 {
+			if _, ok := untaggedDefs[def.OrgId]; !ok {
+				untaggedDefs[def.OrgId] = make([]schema.MetricDefinition, 0, 1)
+			}
+			untaggedDefs[def.OrgId] = append(untaggedDefs[def.OrgId], def)
+		} else {
+			if _, ok := taggedIds[def.OrgId]; !ok {
+				taggedIds[def.OrgId] = make(IdSet)
+			}
+			taggedIds[def.OrgId][def.Id] = struct{}{}
+		}
+	}
+
 	bc := m.Lock()
 	defer bc.Unlock("DeleteDefs", nil)
 
-	taggedIds := make(map[uint32]IdSet)
-	for _, def := range defs {
-		if len(def.Tags) == 0 {
+	for org, defs := range untaggedDefs {
+		purgeAll := len(defs) > findCacheInvalidateQueueSize
+		if purgeAll {
+			m.findCache.Purge(org)
+		}
+
+		for _, def := range defs {
 			tree, ok := m.tree[def.OrgId]
 			if !ok {
 				continue
@@ -1873,14 +1893,12 @@ func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, arch
 			}
 
 			// TODO - This seems like this could overdelete (if multiple defs for this path)
+			// Currently the control server doesn't support untagged, but this should be
+			// addressed before support can be added.
 			m.delete(def.OrgId, n, true, false)
-			// TODO - If there are a lot of defs to invalidate for a given org, we should call Purge
-			m.findCache.InvalidateFor(def.OrgId, n.Path)
-		} else {
-			if _, ok := taggedIds[def.OrgId]; !ok {
-				taggedIds[def.OrgId] = make(IdSet)
+			if !purgeAll {
+				m.findCache.InvalidateFor(def.OrgId, n.Path)
 			}
-			taggedIds[def.OrgId][def.Id] = struct{}{}
 		}
 	}
 
