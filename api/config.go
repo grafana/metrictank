@@ -32,6 +32,7 @@ var (
 	tagdbDefaultLimit     uint
 	speculationThreshold  float64
 	optimizations         expr.Optimizations
+	minSliceSize          uint
 
 	graphiteProxy *httputil.ReverseProxy
 	timeZone      *time.Location
@@ -57,6 +58,7 @@ func ConfigSetup() {
 	apiCfg.BoolVar(&optimizations.PreNormalization, "pre-normalization", true, "enable pre-normalization optimization")
 	apiCfg.BoolVar(&optimizations.MDP, "mdp-optimization", false, "enable MaxDataPoints optimization (experimental)")
 	apiCfg.BoolVar(&middleware.LogHeaders, "log-headers", false, "output query headers in logs")
+	apiCfg.UintVar(&minSliceSize, "min-slice-pool-size", 2000, "Minimum (and default) length of slice to allocate from pool")
 	globalconf.Register("http", apiCfg, flag.ExitOnError)
 }
 
