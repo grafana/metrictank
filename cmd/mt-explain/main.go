@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -82,7 +83,7 @@ func main() {
 
 	plan, err := expr.NewPlan(exps, fromUnix, toUnix, uint32(*mdp), *stable, optimizations)
 	if err != nil {
-		if fun, ok := err.(expr.ErrUnknownFunction); ok {
+		if fun := expr.ErrUnknownFunction(""); errors.As(err, &fun) {
 			fmt.Printf("Unsupported function %q: must defer query to graphite\n", string(fun))
 			plan.Dump(os.Stdout)
 			return

@@ -1,6 +1,63 @@
 package api
 
-import "testing"
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/grafana/metrictank/cluster"
+
+	"github.com/grafana/metrictank/api/models"
+)
+
+func TestServer_renderMetrics_unknownFunctionError(t *testing.T) {
+	initReadyCluster()
+
+	req := models.GraphiteRender{
+		FromTo: models.FromTo{
+			From: "100",
+			To:   "200",
+			Tz:   "Europe/Madrid",
+		},
+		Targets: []string{"undefinedFunction(1)"},
+		Format:  "json",
+		NoProxy: true,
+	}
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	httpReq := httptest.NewRequest(http.MethodPost, "/render", bytes.NewReader(data))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	server, err := NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.RegisterRoutes()
+	server.Macaron.ServeHTTP(resp, httpReq)
+
+	// check the response
+	expectedCode := http.StatusBadRequest
+	if resp.Code != expectedCode {
+		t.Errorf("Status code should be %d, got %d", expectedCode, resp.Code)
+	}
+	expectedBody := `unknown function "undefinedFunction"`
+	if resp.Body.String() != expectedBody {
+		t.Errorf("Body should be %q, got %q", expectedBody, resp.Body.String())
+	}
+
+	// check that function was logged
+	if counter := proxyStats.funcMiss["undefinedFunction"]; counter == nil || counter.Peek() == 0 {
+		t.Errorf("Should have accounted the funcMiss, but didn't")
+	}
+}
 
 func TestClusterFindLimit(t *testing.T) {
 	tests := []struct {
@@ -29,5 +86,12 @@ func TestClusterFindLimit(t *testing.T) {
 			}
 		})
 	}
+}
 
+func initReadyCluster() {
+	cluster.Mode = cluster.ModeDev
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+	cluster.Manager.SetReady()
+	cluster.Manager.SetState(cluster.NodeReady)
+	cluster.Manager.SetPriority(0)
 }

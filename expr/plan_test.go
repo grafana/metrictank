@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"errors"
 	"math"
 	"reflect"
 	"testing"
@@ -23,7 +24,8 @@ func TestArgs(t *testing.T) {
 		args      []*expr
 		namedArgs map[string]*expr
 		expReq    []Req
-		expErr    error
+		expErrMsg string
+		expErrIs  error
 	}{
 		{
 			"2 args normal, 0 optional",
@@ -35,6 +37,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -49,6 +52,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -63,6 +67,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -78,6 +83,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -93,6 +99,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -108,6 +115,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -122,6 +130,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			nil,
+			`can't plan function "smartSummarize": keyword argument "alignToFrom" specified twice`,
 			ErrKwargSpecifiedTwice{"alignToFrom"},
 		},
 		{
@@ -136,6 +145,7 @@ func TestArgs(t *testing.T) {
 				"alignToFrom": {etype: etBool, bool: true},
 			},
 			nil,
+			`can't plan function "smartSummarize": keyword argument "func" specified twice`,
 			ErrKwargSpecifiedTwice{"func"},
 		},
 		{
@@ -150,6 +160,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -164,6 +175,7 @@ func TestArgs(t *testing.T) {
 			[]Req{
 				NewReq("foo.bar.*", from, to, 0, 0, 0),
 			},
+			"",
 			nil,
 		},
 		{
@@ -173,6 +185,7 @@ func TestArgs(t *testing.T) {
 			},
 			nil,
 			nil,
+			`can't plan function "smartSummarize": argument missing`,
 			ErrMissingArg,
 		},
 		{
@@ -186,6 +199,7 @@ func TestArgs(t *testing.T) {
 				"unknownArg": {etype: etBool, bool: true},
 			},
 			nil,
+			`can't plan function "smartSummarize", kwarg "unknownArg": unknown keyword argument "unknownArg"`,
 			ErrUnknownKwarg{"unknownArg"},
 		},
 	}
@@ -199,8 +213,13 @@ func TestArgs(t *testing.T) {
 			namedArgs: c.namedArgs,
 		}
 		req, err := newplanFunc(e, fn, Context{from: from, to: to}, stable, nil)
-		if !reflect.DeepEqual(err, c.expErr) {
-			t.Errorf("case %d: %q, expected error %v - got %v", i, c.name, c.expErr, err)
+		if c.expErrMsg != "" {
+			if !errors.Is(err, c.expErrIs) {
+				t.Errorf("case %d: %q, expected error %v in wrapped error chain", i, c.name, c.expErrIs)
+			}
+			if c.expErrMsg != err.Error() {
+				t.Errorf("case %d: %q, expected error message '%v' - got '%v'", i, c.name, c.expErrMsg, err.Error())
+			}
 		}
 		if !reflect.DeepEqual(req, c.expReq) {
 			t.Errorf("case %d: %q, expected req %v - got %v", i, c.name, c.expReq, req)
@@ -972,8 +991,8 @@ func TestTargetErrors(t *testing.T) {
 			t.Fatalf("case %q: expected parse error %q but got %q", c.testDescription, c.expectedParseError, err)
 		}
 		_, err = NewPlan(exprs, from, to, 800, stable, Optimizations{})
-		if err != c.expectedPlanError {
-			t.Fatalf("case %q: expected plan error %q but got %q", c.testDescription, c.expectedPlanError, err)
+		if !errors.Is(err, c.expectedPlanError) {
+			t.Fatalf("case %q: expected plan error %q to be in the error chain but %q does not contain it", c.testDescription, c.expectedPlanError, err)
 		}
 	}
 }

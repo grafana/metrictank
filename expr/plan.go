@@ -246,18 +246,23 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	// first validate the mandatory args
 	pos := 0    // e.args[pos]     : next given arg to process
 	cutoff := 0 // argsExp[cutoff] : will be first optional arg (if any)
-	var argExp Arg
+	var (
+		argExp  Arg
+		nextPos int
+	)
 	for cutoff, argExp = range argsExp {
 		if argExp.Optional() {
 			break
 		}
 		if len(e.args) <= pos {
-			return nil, ErrMissingArg
+			return nil, fmt.Errorf("can't plan function %q: %w", e.str, ErrMissingArg)
 		}
-		pos, err = e.consumeBasicArg(pos, argExp)
+
+		nextPos, err = e.consumeBasicArg(pos, argExp)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't plan function %q, arg %d: %w", e.str, pos, err)
 		}
+		pos = nextPos
 	}
 	if !argExp.Optional() {
 		cutoff++
@@ -273,10 +278,11 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 		if len(e.args) <= pos {
 			break // no more args specified. we're done.
 		}
-		pos, err = e.consumeBasicArg(pos, argOpt)
+		nextPos, err = e.consumeBasicArg(pos, argOpt)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't plan function %q, optional arg %d: %w", e.str, pos, err)
 		}
+		pos = nextPos
 		seenKwargs[argOpt.Key()] = struct{}{}
 	}
 	if len(e.args) > pos {
@@ -288,11 +294,11 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 	for key := range e.namedArgs {
 		_, ok := seenKwargs[key]
 		if ok {
-			return nil, ErrKwargSpecifiedTwice{key}
+			return nil, fmt.Errorf("can't plan function %q: %w", e.str, ErrKwargSpecifiedTwice{key})
 		}
 		err = e.consumeKwarg(key, argsExp[cutoff:])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't plan function %q, kwarg %q: %w", e.str, key, err)
 		}
 		seenKwargs[key] = struct{}{}
 	}
@@ -310,10 +316,11 @@ func newplanFunc(e *expr, fn GraphiteFunc, context Context, stable bool, reqs []
 		}
 		switch argExp.(type) {
 		case ArgSeries, ArgSeriesList, ArgSeriesLists, ArgIn:
-			pos, reqs, err = e.consumeSeriesArg(pos, argExp, context, stable, reqs)
+			nextPos, reqs, err = e.consumeSeriesArg(pos, argExp, context, stable, reqs)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("can't plan function %q, series arg %d: %w", e.str, pos, err)
 			}
+			pos = nextPos
 		default:
 			pos++
 		}
