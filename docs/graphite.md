@@ -137,7 +137,7 @@ See also:
 | nonNegatievDerivative(seriesList, maxValue) seriesList         |              | Stable     |
 | nPercentile                                                    |              | No         |
 | offset                                                         |              | No         |
-| offsetToZero                                                   |              | No         |
+| offsetToZero                                                   |              | Stable     |
 | percentileOfSeries                                             |              | No         |
 | perSecond(seriesLists) seriesList                              |              | Stable     |
 | pieAverage                                                     |              | No         |

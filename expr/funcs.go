@@ -114,6 +114,7 @@ func init() {
 		"movingWindow":                 {NewMovingWindowGeneric, true},
 		"nonNegativeDerivative":        {NewNonNegativeDerivative, true},
 		"offset":                       {NewOffset, true},
+		"offsetToZero":                 {NewOffsetToZero, true},
 		"perSecond":                    {NewPerSecond, true},
 		"rangeOfSeries":                {NewAggregateConstructor("rangeOf"), true},
 		"removeAbovePercentile":        {NewRemoveAboveBelowPercentileConstructor(true), true},
