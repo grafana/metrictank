@@ -2,10 +2,10 @@ package expr
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/schema"
 	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/schema"
 )
 
 type FuncOffsetToZero struct {
