@@ -51,9 +51,9 @@ func (p *PointSlicePool) PutMaybeNil(s []schema.Point) {
 }
 
 func (p *PointSlicePool) Put(s []schema.Point) {
-	if cap(s) >= p.defaultSize {
+	if cap(s) > p.defaultSize {
 		p.putLarge.Inc()
-	} else {
+	} else if cap(s) < p.defaultSize {
 		p.putSmall.Inc()
 	}
 	p.p.Put(s[:0])
@@ -76,13 +76,15 @@ func (p *PointSlicePool) GetMin(minCap int) []schema.Point {
 	} else {
 		p.getCandMiss.Inc()
 	}
-	if minCap >= p.defaultSize {
+	if minCap > p.defaultSize {
 		p.getMakeLarge.Inc()
 		return make([]schema.Point, 0, minCap)
 	}
 	// even if our caller needs a smaller cap now, we expect they will put it back in the pool
 	// so it can later be reused.
 	// may as well allocate a size now that we expect will be more useful down the road.
-	p.getMakeSmall.Inc()
+	if minCap < p.defaultSize {
+		p.getMakeSmall.Inc()
+	}
 	return make([]schema.Point, 0, p.defaultSize)
 }
