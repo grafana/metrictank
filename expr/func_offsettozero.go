@@ -38,7 +38,7 @@ func (s *FuncOffsetToZero) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.Target = fmt.Sprintf("offsetToZero(%s)", serie.Target)
 		serie.Tags = serie.CopyTagsWith("offsetToZero", "1")
 		serie.QueryPatt = fmt.Sprintf("offsetToZero(%s)", serie.QueryPatt)
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 
 		min := batch.Min(serie.Datapoints)
 		for _, p := range serie.Datapoints {
