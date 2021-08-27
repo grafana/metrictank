@@ -10,106 +10,165 @@ import (
 	"github.com/grafana/metrictank/test"
 )
 
-func TestOffsetToZeroNoInput(t *testing.T) {
-	testOffsetToZero("no_input", []models.Series{}, []models.Series{}, t)
-}
-
-func TestOffsetToZeroSingle(t *testing.T) {
-	const offset = 10
-	in := []schema.Point{
-		{Val: 0 + offset, Ts: 10},
-		{Val: 0 + offset, Ts: 20},
-		{Val: 5.5 + offset, Ts: 30},
-		{Val: math.NaN(), Ts: 40},
-		{Val: math.NaN(), Ts: 50},
-		{Val: 1234567890 + offset, Ts: 60},
-	}
-	out := []schema.Point{
-		{Val: 0, Ts: 10},
-		{Val: 0, Ts: 20},
-		{Val: 5.5, Ts: 30},
-		{Val: math.NaN(), Ts: 40},
-		{Val: math.NaN(), Ts: 50},
-		{Val: 1234567890, Ts: 60},
-	}
-
-	testOffsetToZero(
-		"single",
-		[]models.Series{
-			getSeriesNamed("a", in),
-		},
-		[]models.Series{
-			getSeriesNamed("offsetToZero(a)", out),
-		},
-		t,
+func TestOffsetToZero(t *testing.T) {
+	const (
+		positiveOffset = 10
+		negativeOffset = -10
 	)
-}
-
-func TestOffsetToZeroMultiple(t *testing.T) {
-	const offset = 10
-	in := []schema.Point{
-		{Val: 0 + offset, Ts: 10},
-		{Val: 0 + offset, Ts: 20},
-		{Val: 5.5 + offset, Ts: 30},
-		{Val: math.NaN(), Ts: 40},
-		{Val: math.NaN(), Ts: 50},
-		{Val: 1234567890 + offset, Ts: 60},
-	}
-	out := []schema.Point{
-		{Val: 0, Ts: 10},
-		{Val: 0, Ts: 20},
-		{Val: 5.5, Ts: 30},
-		{Val: math.NaN(), Ts: 40},
-		{Val: math.NaN(), Ts: 50},
-		{Val: 1234567890, Ts: 60},
-	}
-
-	testOffsetToZero(
-		"single",
-		[]models.Series{
-			getSeriesNamed("a", in),
-			getSeriesNamed("a2", in),
+	for _, tc := range []struct {
+		name   string
+		input  []models.Series
+		output []models.Series
+	}{
+		{
+			name:   "no input",
+			input:  []models.Series{},
+			output: []models.Series{},
 		},
-		[]models.Series{
-			getSeriesNamed("offsetToZero(a)", out),
-			getSeriesNamed("offsetToZero(a2)", out),
+		{
+			name: "single positive offset",
+			input: []models.Series{
+				getSeriesNamed("a", []schema.Point{
+					{Val: 0 + positiveOffset, Ts: 10},
+					{Val: 0 + positiveOffset, Ts: 20},
+					{Val: 5.5 + positiveOffset, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.Inf(1), Ts: 50},
+					{Val: 1234567890 + positiveOffset, Ts: 60},
+				}),
+			},
+			output: []models.Series{
+				getSeriesNamed("offsetToZero(a)", []schema.Point{
+					{Val: 0, Ts: 10},
+					{Val: 0, Ts: 20},
+					{Val: 5.5, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.Inf(1), Ts: 50},
+					{Val: 1234567890, Ts: 60},
+				}),
+			},
 		},
-		t,
-	)
-}
+		{
+			name: "single negative offset",
+			input: []models.Series{
+				getSeriesNamed("a", []schema.Point{
+					{Val: 0 + negativeOffset, Ts: 10},
+					{Val: 0 + negativeOffset, Ts: 20},
+					{Val: 5.5 + negativeOffset, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.Inf(1), Ts: 50},
+					{Val: 1234567890 + negativeOffset, Ts: 60},
+				}),
+			},
+			output: []models.Series{
+				getSeriesNamed("offsetToZero(a)", []schema.Point{
+					{Val: 0, Ts: 10},
+					{Val: 0, Ts: 20},
+					{Val: 5.5, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.Inf(1), Ts: 50},
+					{Val: 1234567890, Ts: 60},
+				}),
+			},
+		},
+		{
+			name: "negative infinity",
+			input: []models.Series{
+				getSeriesNamed("a", []schema.Point{
+					{Val: 0, Ts: 10},
+					{Val: 0, Ts: 20},
+					{Val: 5.5, Ts: 30},
+					{Val: math.Inf(-1), Ts: 40},
+					{Val: math.Inf(1), Ts: 50},
+					{Val: 1234567890, Ts: 60},
+				}),
+			},
+			output: []models.Series{
+				getSeriesNamed("offsetToZero(a)", []schema.Point{
+					{Val: math.Inf(1), Ts: 10},
+					{Val: math.Inf(1), Ts: 20},
+					{Val: math.Inf(1), Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.Inf(1), Ts: 50},
+					{Val: math.Inf(1), Ts: 60},
+				}),
+			},
+		},
+		{
+			name: "multiple",
+			input: []models.Series{
+				getSeriesNamed("a", []schema.Point{
+					{Val: 0 + positiveOffset, Ts: 10},
+					{Val: 0 + positiveOffset, Ts: 20},
+					{Val: 5.5 + positiveOffset, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.NaN(), Ts: 50},
+					{Val: 1234567890 + positiveOffset, Ts: 60},
+				}),
+				getSeriesNamed("b", []schema.Point{
+					{Val: 0 + positiveOffset, Ts: 10},
+					{Val: 0 + positiveOffset, Ts: 20},
+					{Val: 5.5 + positiveOffset, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.NaN(), Ts: 50},
+					{Val: 1234567890 + positiveOffset, Ts: 60},
+				}),
+			},
+			output: []models.Series{
+				getSeriesNamed("offsetToZero(a)", []schema.Point{
+					{Val: 0, Ts: 10},
+					{Val: 0, Ts: 20},
+					{Val: 5.5, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.NaN(), Ts: 50},
+					{Val: 1234567890, Ts: 60},
+				}),
+				getSeriesNamed("offsetToZero(b)", []schema.Point{
+					{Val: 0, Ts: 10},
+					{Val: 0, Ts: 20},
+					{Val: 5.5, Ts: 30},
+					{Val: math.NaN(), Ts: 40},
+					{Val: math.NaN(), Ts: 50},
+					{Val: 1234567890, Ts: 60},
+				}),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewOffsetToZero()
+			f.(*FuncOffsetToZero).in = NewMock(tc.input)
 
-func testOffsetToZero(name string, in []models.Series, out []models.Series, t *testing.T) {
-	f := NewOffsetToZero()
-	f.(*FuncOffsetToZero).in = NewMock(in)
+			inputCopy := models.SeriesCopy(tc.input) // to later verify that it is unchanged
 
-	inputCopy := models.SeriesCopy(in) // to later verify that it is unchanged
+			dataMap := initDataMap(tc.input)
 
-	dataMap := initDataMap(in)
-
-	got, err := f.Exec(dataMap)
-	if err := equalOutput(out, got, nil, err); err != nil {
-		t.Fatalf("Case %s: %s", name, err)
-	}
-
-	t.Run("DidNotModifyInput", func(t *testing.T) {
-		if err := equalOutput(inputCopy, in, nil, nil); err != nil {
-			t.Fatalf("Case %s: Input was modified, err = %s", name, err)
-		}
-	})
-
-	t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
-		if err := dataMap.CheckForOverlappingPoints(); err != nil {
-			t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", name, err)
-		}
-	})
-
-	t.Run("OutputIsCanonical", func(t *testing.T) {
-		for i, s := range got {
-			if !s.IsCanonical() {
-				t.Fatalf("Case %s: output series %d is not canonical: %v", name, i, s)
+			got, err := f.Exec(dataMap)
+			if err := equalOutput(tc.output, got, nil, err); err != nil {
+				t.Fatalf("Case %s: %s", tc.name, err)
 			}
-		}
-	})
+
+			t.Run("DidNotModifyInput", func(t *testing.T) {
+				if err := equalOutput(inputCopy, tc.input, nil, nil); err != nil {
+					t.Fatalf("Case %s: Input was modified, err = %s", tc.name, err)
+				}
+			})
+
+			t.Run("DoesNotDoubleReturnPoints", func(t *testing.T) {
+				if err := dataMap.CheckForOverlappingPoints(); err != nil {
+					t.Fatalf("Case %s: Point slices in datamap overlap, err = %s", tc.name, err)
+				}
+			})
+
+			t.Run("OutputIsCanonical", func(t *testing.T) {
+				for i, s := range got {
+					if !s.IsCanonical() {
+						t.Fatalf("Case %s: output series %d is not canonical: %v", tc.name, i, s)
+					}
+				}
+			})
+
+		})
+	}
 }
 
 func BenchmarkOffsetToZero10k_1NoNulls(b *testing.B) {
