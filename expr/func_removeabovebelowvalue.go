@@ -46,7 +46,7 @@ func (s *FuncRemoveAboveBelowValue) Exec(dataMap DataMap) ([]models.Series, erro
 		}
 		serie.QueryPatt = serie.Target
 
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for _, p := range serie.Datapoints {
 			if s.above {
 				if p.Val > s.n {

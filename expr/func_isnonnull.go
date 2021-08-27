@@ -36,7 +36,7 @@ func (s *FuncIsNonNull) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.QueryPatt = fmt.Sprintf("isNonNull(%s)", serie.QueryPatt)
 		serie.Tags = serie.CopyTagsWith("isNonNull", "1")
 
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for _, p := range serie.Datapoints {
 			if math.IsNaN(p.Val) {
 				p.Val = 0

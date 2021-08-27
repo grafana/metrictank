@@ -37,7 +37,7 @@ func (s *FuncScale) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	output := make([]models.Series, 0, len(series))
 	for _, serie := range series {
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: v.Val * s.factor, Ts: v.Ts})
 		}

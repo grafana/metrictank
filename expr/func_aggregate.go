@@ -68,7 +68,7 @@ func aggregate(dataMap DataMap, series []models.Series, queryPatts []string, agg
 		series[0].QueryPatt = name
 		return series, nil
 	}
-	out := pointSlicePool.Get()
+	out := pointSlicePool.GetMin(len(series[0].Datapoints))
 
 	agg.function(series, &out)
 

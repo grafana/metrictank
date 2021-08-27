@@ -66,7 +66,6 @@ func (s *FuncDivideSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 	divisorsByRes := make(map[uint32]models.Series)
 	divisorsByRes[divisors[0].Interval] = divisors[0]
 	for _, dividend := range dividends {
-		out := pointSlicePool.Get()
 		divisor := divisors[0]
 		if dividend.Interval != divisors[0].Interval {
 			lcm := util.Lcm([]uint32{dividend.Interval, divisor.Interval})
@@ -89,6 +88,8 @@ func (s *FuncDivideSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 			}
 			divisor.Datapoints = divisor.Datapoints[:len(dividend.Datapoints)]
 		}
+
+		out := pointSlicePool.GetMin(len(dividend.Datapoints))
 
 		for i := 0; i < len(dividend.Datapoints); i++ {
 			p := schema.Point{

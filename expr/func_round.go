@@ -41,7 +41,7 @@ func (s *FuncRound) Exec(dataMap DataMap) ([]models.Series, error) {
 	outputs := make([]models.Series, 0, len(series))
 	precisionMult := float64(math.Pow10(int(s.precision)))
 	for _, serie := range series {
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 
 		for _, v := range serie.Datapoints {
 			out = append(out, schema.Point{Val: roundToPrecision(v.Val, precisionMult, int(s.precision)), Ts: v.Ts})

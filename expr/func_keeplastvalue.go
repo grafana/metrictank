@@ -49,7 +49,7 @@ func (s *FuncKeepLastValue) Exec(dataMap DataMap) ([]models.Series, error) {
 	for _, serie := range series {
 		serie.Target = fmt.Sprintf("keepLastValue(%s)", serie.Target)
 		serie.QueryPatt = serie.Target
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 
 		var consecutiveNaNs int
 		lastVal := math.NaN()

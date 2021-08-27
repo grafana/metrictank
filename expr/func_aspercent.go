@@ -122,7 +122,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMa
 			nonesSerie.Tags = map[string]string{"name": nonesSerie.Target}
 
 			if nones == nil {
-				nones = pointSlicePool.Get()
+				nones = pointSlicePool.GetMin(len(totalSerieByKey[key].Datapoints))
 				for _, p := range totalSerieByKey[key].Datapoints {
 					p.Val = math.NaN()
 					nones = append(nones, p)
@@ -145,7 +145,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMa
 				nonesSerie.Meta = serie1.Meta.Copy()
 
 				if nones == nil {
-					nones = pointSlicePool.Get()
+					nones = pointSlicePool.GetMin(len(serie1.Datapoints))
 					for _, p := range serie1.Datapoints {
 						p.Val = math.NaN()
 						nones = append(nones, p)
@@ -158,7 +158,7 @@ func (s *FuncAsPercent) execWithNodes(in, totals []models.Series, dataMap DataMa
 			} else {
 				// key found in both inByKey and totalSerieByKey
 				serie1, serie2 := NormalizeTwo(serie1, totalSerieByKey[key], NewCOWCycler(dataMap))
-				serie1 = serie1.Copy(pointSlicePool.Get())
+				serie1 = serie1.Copy(pointSlicePool.GetMin(len(serie1.Datapoints)))
 
 				// this should not happen
 				if len(serie1.Datapoints) != len(serie2.Datapoints) {
@@ -227,7 +227,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 		}
 		if len(totalsSerie.Datapoints) > 0 {
 			serie, totalsSerie = NormalizeTwo(serie, totalsSerie, NewCOWCycler(dataMap))
-			serie = serie.Copy(pointSlicePool.Get())
+			serie = serie.Copy(pointSlicePool.GetMin(len(serie.Datapoints)))
 
 			// this should not happen
 			if len(serie.Datapoints) != len(totalsSerie.Datapoints) {
@@ -242,7 +242,7 @@ func (s *FuncAsPercent) execWithoutNodes(in, totals []models.Series, dataMap Dat
 				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, totalsSerie.Datapoints[i].Val)
 			}
 		} else {
-			serie = serie.Copy(pointSlicePool.Get())
+			serie = serie.Copy(pointSlicePool.GetMin(len(serie.Datapoints)))
 			for i := range serie.Datapoints {
 				serie.Datapoints[i].Val = computeAsPercent(serie.Datapoints[i].Val, s.totalFloat)
 			}
@@ -305,7 +305,7 @@ func sumSeries(in []models.Series, dataMap DataMap) models.Series {
 	if len(in) == 1 {
 		return in[0]
 	}
-	out := pointSlicePool.Get()
+	out := pointSlicePool.GetMin(len(in[0].Datapoints))
 	crossSeriesSum(in, &out)
 	var queryPatts []string
 	var meta models.SeriesMeta

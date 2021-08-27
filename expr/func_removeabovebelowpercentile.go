@@ -62,7 +62,7 @@ func (s *FuncRemoveAboveBelowPercentile) Exec(dataMap DataMap) ([]models.Series,
 			continue
 		}
 
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for _, p := range serie.Datapoints {
 			if s.above {
 				if p.Val > percentile {

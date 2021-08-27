@@ -64,7 +64,7 @@ func (s *FuncDivideSeriesLists) Exec(dataMap DataMap) ([]models.Series, error) {
 			divisor.Datapoints = divisor.Datapoints[:len(dividend.Datapoints)]
 		}
 
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(dividend.Datapoints))
 		for i := 0; i < len(dividend.Datapoints); i++ {
 			p := schema.Point{
 				Ts: dividend.Datapoints[i].Ts,
