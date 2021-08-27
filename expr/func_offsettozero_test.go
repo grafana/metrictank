@@ -23,8 +23,6 @@ func TestOffsetToZeroSingle(t *testing.T) {
 		{Val: math.NaN(), Ts: 40},
 		{Val: math.NaN(), Ts: 50},
 		{Val: 1234567890 + offset, Ts: 60},
-		{Val: math.Inf(-1), Ts: 70},
-		{Val: math.Inf(1), Ts: 80},
 	}
 	out := []schema.Point{
 		{Val: 0, Ts: 10},
@@ -33,8 +31,6 @@ func TestOffsetToZeroSingle(t *testing.T) {
 		{Val: math.NaN(), Ts: 40},
 		{Val: math.NaN(), Ts: 50},
 		{Val: 1234567890, Ts: 60},
-		{Val: math.Inf(-1), Ts: 70},
-		{Val: math.Inf(1), Ts: 80},
 	}
 
 	testOffsetToZero(
@@ -58,8 +54,6 @@ func TestOffsetToZeroMultiple(t *testing.T) {
 		{Val: math.NaN(), Ts: 40},
 		{Val: math.NaN(), Ts: 50},
 		{Val: 1234567890 + offset, Ts: 60},
-		{Val: math.Inf(-1), Ts: 70},
-		{Val: math.Inf(1), Ts: 80},
 	}
 	out := []schema.Point{
 		{Val: 0, Ts: 10},
@@ -68,8 +62,6 @@ func TestOffsetToZeroMultiple(t *testing.T) {
 		{Val: math.NaN(), Ts: 40},
 		{Val: math.NaN(), Ts: 50},
 		{Val: 1234567890, Ts: 60},
-		{Val: math.Inf(-1), Ts: 70},
-		{Val: math.Inf(1), Ts: 80},
 	}
 
 	testOffsetToZero(

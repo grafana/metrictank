@@ -2,9 +2,9 @@ package expr
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/batch"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -39,14 +39,8 @@ func (s *FuncOffsetToZero) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.Tags = serie.CopyTagsWith("offsetToZero", "1")
 		serie.QueryPatt = fmt.Sprintf("offsetToZero(%s)", serie.QueryPatt)
 		out := pointSlicePool.Get()
-		var min = math.Inf(1)
 
-		for _, p := range serie.Datapoints {
-			if math.IsInf(p.Val, 0) || math.IsNaN(p.Val) {
-				continue
-			}
-			min = math.Min(min, p.Val)
-		}
+		min := batch.Min(serie.Datapoints)
 		for _, p := range serie.Datapoints {
 			out = append(out, schema.Point{Val: p.Val - min, Ts: p.Ts})
 		}
