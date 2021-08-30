@@ -213,7 +213,11 @@ func TestArgs(t *testing.T) {
 			namedArgs: c.namedArgs,
 		}
 		req, err := newplanFunc(e, fn, Context{from: from, to: to}, stable, nil)
-		if c.expErrMsg != "" {
+		if c.expErrMsg == "" {
+			if err != nil {
+				t.Errorf("case %d: %q, expected no error, but got '%s'", i, c.name, err.Error())
+			}
+		} else {
 			if !errors.Is(err, c.expErrIs) {
 				t.Errorf("case %d: %q, expected error %v in wrapped error chain", i, c.name, c.expErrIs)
 			}
