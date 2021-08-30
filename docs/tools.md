@@ -27,6 +27,18 @@ Flags:
 ```
 
 
+## mt-control-server
+
+```
+mt-control-server
+
+Run a control server that can be used to issue control messages to a metrictank cluster.
+Flags:
+  -config string
+    	configuration file path (optional)
+```
+
+
 ## mt-explain
 
 ```

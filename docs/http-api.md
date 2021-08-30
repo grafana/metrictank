@@ -104,8 +104,9 @@ that duplicate entries will be returned.
 ##### Parameters
 
 * expr (required): a list of [tag expressions](#tag-expressions)
-* from: Graphite [from time specification](#fromto) (optional. defaults to now-24hours)
-* format: series-json, lastts-json. (defaults to series-json)
+* from: epoch time, only return results last seen after this (optional. defaults to 0 meaning no limit)
+* to: epoch time, only return results last seen before this (optional. defaults to 0 meaning no limit)
+* format: series-json, lastts-json, defs-json. (defaults to series-json)
 * limit: max number to return. (default: 0)
   Note: the resultset is also subjected to the `http.max-series-per-req` config setting.
   if the result set is larger than `http.max-series-per-req`, an error is returned. If it breaches the provided limit, the result is truncated.

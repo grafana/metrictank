@@ -115,6 +115,10 @@ the number of nodes we know to be secondary and not ready
 the number of nodes we know to be secondary and ready
 * `idx.bigtable.add`:  
 the duration of an add of one metric to the bigtable idx, including the add to the in-memory index, excluding the insert query
+* `idx.bigtable.control.add`:  
+the duration of add control messages processed
+* `idx.bigtable.control.delete`:  
+the duration of delete control messages processed
 * `idx.bigtable.delete`:  
 the duration of a delete of one or more metrics from the bigtable idx, including the delete from the in-memory index and the delete query
 * `idx.bigtable.prune`:  
@@ -145,6 +149,10 @@ how many delete queries for a metric completed successfully (triggered by an upd
 how many insert queries for a metric completed successfully (triggered by an add or an update)
 * `idx.cassandra.add`:  
 the duration of an add of one metric to the cassandra idx, including the add to the in-memory index, excluding the insert query
+* `idx.cassandra.control.add`:  
+the duration of add control messages processed
+* `idx.cassandra.control.delete`:  
+the duration of delete control messages processed
 * `idx.cassandra.delete`:  
 the duration of a delete of one or more metrics from the cassandra idx, including the delete from the in-memory index and the delete query
 * `idx.cassandra.error.cannot-achieve-consistency`:  
@@ -236,6 +244,8 @@ the count of metricpoint_no_org datapoints received by input plugin
 a count of times an input message (MetricData, MetricDataArray or carbon line) failed to parse
 * `input.carbon.metrics_per_message`:  
 how many metrics per message were seen. in carbon's case this is always 1.
+* `input.kafka-mdm.controlmsg_decode_err`:  
+a count of times a control message failed to parse
 * `input.kafka-mdm.metrics_decode_err`:  
 a count of times an input message failed to parse
 * `input.kafka-mdm.metrics_per_message`:  

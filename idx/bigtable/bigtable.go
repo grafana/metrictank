@@ -46,6 +46,12 @@ var (
 	statPruneDuration = stats.NewLatencyHistogram15s32("idx.bigtable.prune")
 	// metric idx.bigtable.delete is the duration of a delete of one or more metrics from the bigtable idx, including the delete from the in-memory index and the delete query
 	statDeleteDuration = stats.NewLatencyHistogram15s32("idx.bigtable.delete")
+
+	// metric idx.bigtable.control.add is the duration of add control messages processed
+	statControlRestoreDuration = stats.NewLatencyHistogram15s32("idx.bigtable.control.add")
+	// metric idx.bigtable.control.delete is the duration of delete control messages processed
+	statControlDeleteDuration = stats.NewLatencyHistogram15s32("idx.bigtable.control.delete")
+
 	// metric idx.bigtable.save.skipped is how many saves have been skipped due to the writeQueue being full
 	statSaveSkipped = stats.NewCounter32("idx.bigtable.save.skipped")
 	// metric idx.bigtable.save.bytes-per-request is the number of bytes written to bigtable in each request.
@@ -532,4 +538,49 @@ func (b *BigtableIdx) prune() {
 			return
 		}
 	}
+}
+
+// AddDefs adds defs to the index.
+func (b *BigtableIdx) AddDefs(defs []schema.MetricDefinition) {
+	pre := time.Now()
+
+	b.MemoryIndex.AddDefs(defs)
+
+	if b.cfg.UpdateBigtableIdx {
+		// Blocking write to make sure all get enqueued
+		for _, def := range defs {
+			now := time.Now()
+			b.writeQueue <- writeReq{recvTime: now, def: &def}
+			b.MemoryIndex.UpdateArchiveLastSave(def.Id, def.Partition, uint32(now.Unix()))
+		}
+	}
+
+	statControlRestoreDuration.Value(time.Since(pre))
+}
+
+// DeleteDefs deletes the matching key.
+func (b *BigtableIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
+	pre := time.Now()
+
+	if archive {
+		log.Errorf("bigtable-idx: Received unsupported archive request for %d defs, consider doing a delete instead", len(defs))
+		return
+	}
+
+	b.MemoryIndex.DeleteDefs(defs, archive)
+
+	if b.cfg.UpdateBigtableIdx {
+		// TODO - Deleting in a goroutine "escapes" the defined WriteConcurrency and could
+		// overload BigTable. Maybe better to enhance the write queue to process these deletes
+		// Also deletes should be executed within kafka's retention interval. While not guaranteed, in practice this should be true
+		go func() {
+			for _, def := range defs {
+				if err := b.deleteDef(&def); err != nil {
+					log.Warnf("bigtable-idx: Failed to delete def %s: %s", def.Id, err.Error())
+				}
+			}
+		}()
+	}
+
+	statControlDeleteDuration.Value(time.Since(pre))
 }

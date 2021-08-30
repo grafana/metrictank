@@ -1826,6 +1826,88 @@ ORGS:
 	return pruned, nil
 }
 
+// AddDef adds def to the index.
+func (m *UnpartitionedMemoryIdx) AddDefs(defs []schema.MetricDefinition) {
+	// TODO - refactor from AddOrUpdate
+	for _, def := range defs {
+		pre := time.Now()
+		m.RLockHigh()
+		existing, ok := m.defById[def.Id]
+		m.RUnlockHigh()
+		if ok {
+			updateExisting(existing, def.Partition, def.LastUpdate, pre)
+			continue
+		}
+		archive := createArchive(&def)
+		if m.writeQueue == nil {
+			// writeQueue not enabled, so acquire a wlock and immediately add to the index.
+			bc := m.Lock()
+			m.add(archive)
+			bc.Unlock("AddDefs", nil)
+			statAddDuration.Value(time.Since(pre))
+		} else {
+			// push the new archive into the writeQueue. If there is already an archive in the
+			// writeQueue with the same mkey, it will be replaced.
+			m.writeQueue.Queue(archive)
+		}
+	}
+}
+
+// DeleteDefs deletes the matching defs.
+func (m *UnpartitionedMemoryIdx) DeleteDefs(defs []schema.MetricDefinition, archive bool) {
+	untaggedDefs := make(map[uint32][]schema.MetricDefinition)
+	taggedIds := make(map[uint32]IdSet)
+
+	for _, def := range defs {
+		if len(def.Tags) == 0 {
+			if _, ok := untaggedDefs[def.OrgId]; !ok {
+				untaggedDefs[def.OrgId] = make([]schema.MetricDefinition, 0, 1)
+			}
+			untaggedDefs[def.OrgId] = append(untaggedDefs[def.OrgId], def)
+		} else {
+			if _, ok := taggedIds[def.OrgId]; !ok {
+				taggedIds[def.OrgId] = make(IdSet)
+			}
+			taggedIds[def.OrgId][def.Id] = struct{}{}
+		}
+	}
+
+	bc := m.Lock()
+	defer bc.Unlock("DeleteDefs", nil)
+
+	for org, defs := range untaggedDefs {
+		purgeAll := len(defs) > findCacheInvalidateQueueSize
+		if purgeAll {
+			m.findCache.Purge(org)
+		}
+
+		for _, def := range defs {
+			tree, ok := m.tree[def.OrgId]
+			if !ok {
+				continue
+			}
+
+			n, ok := tree.Items[def.Name]
+			if !ok || !n.Leaf() {
+				continue
+			}
+
+			// TODO - m.delete could overdelete (if multiple defs for this path)
+			// Currently the control server doesn't support untagged, but this should be
+			// addressed before support can be added.
+			m.delete(def.OrgId, n, true, false)
+
+			if !purgeAll {
+				m.findCache.InvalidateFor(def.OrgId, n.Path)
+			}
+		}
+	}
+
+	for org, ids := range taggedIds {
+		m.deleteTaggedByIdSet(org, ids)
+	}
+}
+
 func getMatcher(path string) (func([]string) []string, error) {
 	// Matches everything
 	if path == "*" {

@@ -73,3 +73,28 @@ func TestWriteReadPointMsgWithoutOrg(t *testing.T) {
 		t.Fatalf("expected point %v, got %v", exp, outPoint)
 	}
 }
+
+func TestWriteReadIndexControlMsg(t *testing.T) {
+	mp := schema.ControlMsg{
+		Op:   schema.OpArchive,
+		Defs: make([]schema.MetricDefinition, 1),
+	}
+	out, err := WriteIndexControlMsg(&mp)
+	if err != nil {
+		t.Fatalf("%s", err.Error())
+	}
+
+	ok := IsIndexControlMsg(out)
+	if !ok {
+		t.Fatal("IsPointMsg: exp true, got false")
+	}
+
+	outMsg, err := ReadIndexControlMsg(out)
+	if err != nil {
+		t.Fatalf("%s", err.Error())
+	}
+
+	if !reflect.DeepEqual(mp, outMsg) {
+		t.Fatalf("expected point %v, got %v", mp, outMsg)
+	}
+}
