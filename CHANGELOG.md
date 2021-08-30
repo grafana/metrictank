@@ -5,6 +5,7 @@
   not as a count of points. If a number of points is specified, the query will be considered invalid.
   Note that http.proxy-bad-requests (which defaults to true), when enabled will seamlessly proxy to graphite in this case.
   See #1941
+* add offsetToZero function #1995
 * add some error checking in ccache metric search. #1961
 * track non-primary rollup reads #1968
 * Return 403 instead of 413 when limit exceeded #1970
