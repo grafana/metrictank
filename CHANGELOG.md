@@ -9,6 +9,8 @@
 * add some error checking in ccache metric search. #1961
 * track non-primary rollup reads #1968
 * Return 403 instead of 413 when limit exceeded #1970
+* errors returned by expr.NewPlan() now wrap the expr.Err* errors with detailed message about where the error happened,
+  so they have to be checked with errors.As()/errors.Is() #1996
 
 # 1.1 Jan 14, 2021.
 
