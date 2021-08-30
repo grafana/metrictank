@@ -26,19 +26,21 @@ type Option func(c *Options)
 
 // Options control behavior of the client.
 type Options struct {
-	metrics             metrics.Factory
-	logger              jaeger.Logger
-	reporter            jaeger.Reporter
-	sampler             jaeger.Sampler
-	contribObservers    []jaeger.ContribObserver
-	observers           []jaeger.Observer
-	gen128Bit           bool
-	poolSpans           bool
-	zipkinSharedRPCSpan bool
-	maxTagValueLength   int
-	tags                []opentracing.Tag
-	injectors           map[interface{}]jaeger.Injector
-	extractors          map[interface{}]jaeger.Extractor
+	metrics                     metrics.Factory
+	logger                      jaeger.Logger
+	reporter                    jaeger.Reporter
+	sampler                     jaeger.Sampler
+	contribObservers            []jaeger.ContribObserver
+	observers                   []jaeger.Observer
+	gen128Bit                   bool
+	poolSpans                   bool
+	zipkinSharedRPCSpan         bool
+	maxTagValueLength           int
+	noDebugFlagOnForcedSampling bool
+	tags                        []opentracing.Tag
+	injectors                   map[interface{}]jaeger.Injector
+	extractors                  map[interface{}]jaeger.Extractor
+	randomNumber                func() uint64
 }
 
 // Metrics creates an Option that initializes Metrics in the tracer,
@@ -117,6 +119,14 @@ func MaxTagValueLength(maxTagValueLength int) Option {
 	}
 }
 
+// NoDebugFlagOnForcedSampling can be used to decide whether debug flag will be set or not
+// when calling span.setSamplingPriority to force sample a span.
+func NoDebugFlagOnForcedSampling(noDebugFlagOnForcedSampling bool) Option {
+	return func(c *Options) {
+		c.noDebugFlagOnForcedSampling = noDebugFlagOnForcedSampling
+	}
+}
+
 // Tag creates an option that adds a tracer-level tag.
 func Tag(key string, value interface{}) Option {
 	return func(c *Options) {
@@ -135,6 +145,13 @@ func Injector(format interface{}, injector jaeger.Injector) Option {
 func Extractor(format interface{}, extractor jaeger.Extractor) Option {
 	return func(c *Options) {
 		c.extractors[format] = extractor
+	}
+}
+
+// WithRandomNumber supplies a random number generator function to the Tracer used to generate trace and span IDs.
+func WithRandomNumber(f func() uint64) Option {
+	return func(c *Options) {
+		c.randomNumber = f
 	}
 }
 

@@ -3,14 +3,23 @@
 
 package bigtable
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	math "math"
+
+	proto "github.com/golang/protobuf/proto"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+// A compilation error at this line likely means your copy of the
+// proto package needs to be updated.
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 // Specifies the complete (requested) contents of a single row of a table.
 // Rows which exceed 256MiB in size cannot be read in full.
@@ -21,13 +30,36 @@ type Row struct {
 	Key []byte `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	// May be empty, but only if the entire row is empty.
 	// The mutual ordering of column families is not specified.
-	Families []*Family `protobuf:"bytes,2,rep,name=families" json:"families,omitempty"`
+	Families             []*Family `protobuf:"bytes,2,rep,name=families,proto3" json:"families,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
 }
 
-func (m *Row) Reset()                    { *m = Row{} }
-func (m *Row) String() string            { return proto.CompactTextString(m) }
-func (*Row) ProtoMessage()               {}
-func (*Row) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
+func (m *Row) Reset()         { *m = Row{} }
+func (m *Row) String() string { return proto.CompactTextString(m) }
+func (*Row) ProtoMessage()    {}
+func (*Row) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{0}
+}
+
+func (m *Row) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Row.Unmarshal(m, b)
+}
+func (m *Row) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Row.Marshal(b, m, deterministic)
+}
+func (m *Row) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Row.Merge(m, src)
+}
+func (m *Row) XXX_Size() int {
+	return xxx_messageInfo_Row.Size(m)
+}
+func (m *Row) XXX_DiscardUnknown() {
+	xxx_messageInfo_Row.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Row proto.InternalMessageInfo
 
 func (m *Row) GetKey() []byte {
 	if m != nil {
@@ -52,15 +84,38 @@ type Family struct {
 	// Must match `[-_.a-zA-Z0-9]+`, except that AggregatingRowProcessors may
 	// produce cells in a sentinel family with an empty name.
 	// Must be no greater than 64 characters in length.
-	Name string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Must not be empty. Sorted in order of increasing "qualifier".
-	Columns []*Column `protobuf:"bytes,2,rep,name=columns" json:"columns,omitempty"`
+	Columns              []*Column `protobuf:"bytes,2,rep,name=columns,proto3" json:"columns,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
 }
 
-func (m *Family) Reset()                    { *m = Family{} }
-func (m *Family) String() string            { return proto.CompactTextString(m) }
-func (*Family) ProtoMessage()               {}
-func (*Family) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{1} }
+func (m *Family) Reset()         { *m = Family{} }
+func (m *Family) String() string { return proto.CompactTextString(m) }
+func (*Family) ProtoMessage()    {}
+func (*Family) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{1}
+}
+
+func (m *Family) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Family.Unmarshal(m, b)
+}
+func (m *Family) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Family.Marshal(b, m, deterministic)
+}
+func (m *Family) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Family.Merge(m, src)
+}
+func (m *Family) XXX_Size() int {
+	return xxx_messageInfo_Family.Size(m)
+}
+func (m *Family) XXX_DiscardUnknown() {
+	xxx_messageInfo_Family.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Family proto.InternalMessageInfo
 
 func (m *Family) GetName() string {
 	if m != nil {
@@ -86,13 +141,36 @@ type Column struct {
 	// length.
 	Qualifier []byte `protobuf:"bytes,1,opt,name=qualifier,proto3" json:"qualifier,omitempty"`
 	// Must not be empty. Sorted in order of decreasing "timestamp_micros".
-	Cells []*Cell `protobuf:"bytes,2,rep,name=cells" json:"cells,omitempty"`
+	Cells                []*Cell  `protobuf:"bytes,2,rep,name=cells,proto3" json:"cells,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Column) Reset()                    { *m = Column{} }
-func (m *Column) String() string            { return proto.CompactTextString(m) }
-func (*Column) ProtoMessage()               {}
-func (*Column) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{2} }
+func (m *Column) Reset()         { *m = Column{} }
+func (m *Column) String() string { return proto.CompactTextString(m) }
+func (*Column) ProtoMessage()    {}
+func (*Column) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{2}
+}
+
+func (m *Column) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Column.Unmarshal(m, b)
+}
+func (m *Column) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Column.Marshal(b, m, deterministic)
+}
+func (m *Column) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Column.Merge(m, src)
+}
+func (m *Column) XXX_Size() int {
+	return xxx_messageInfo_Column.Size(m)
+}
+func (m *Column) XXX_DiscardUnknown() {
+	xxx_messageInfo_Column.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Column proto.InternalMessageInfo
 
 func (m *Column) GetQualifier() []byte {
 	if m != nil {
@@ -116,19 +194,42 @@ type Cell struct {
 	// a coarser granularity to further restrict the allowed values. For
 	// example, a table which specifies millisecond granularity will only allow
 	// values of `timestamp_micros` which are multiples of 1000.
-	TimestampMicros int64 `protobuf:"varint,1,opt,name=timestamp_micros,json=timestampMicros" json:"timestamp_micros,omitempty"`
+	TimestampMicros int64 `protobuf:"varint,1,opt,name=timestamp_micros,json=timestampMicros,proto3" json:"timestamp_micros,omitempty"`
 	// The value stored in the cell.
 	// May contain any byte string, including the empty string, up to 100MiB in
 	// length.
 	Value []byte `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	// Labels applied to the cell by a [RowFilter][google.bigtable.v2.RowFilter].
-	Labels []string `protobuf:"bytes,3,rep,name=labels" json:"labels,omitempty"`
+	Labels               []string `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Cell) Reset()                    { *m = Cell{} }
-func (m *Cell) String() string            { return proto.CompactTextString(m) }
-func (*Cell) ProtoMessage()               {}
-func (*Cell) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{3} }
+func (m *Cell) Reset()         { *m = Cell{} }
+func (m *Cell) String() string { return proto.CompactTextString(m) }
+func (*Cell) ProtoMessage()    {}
+func (*Cell) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{3}
+}
+
+func (m *Cell) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Cell.Unmarshal(m, b)
+}
+func (m *Cell) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Cell.Marshal(b, m, deterministic)
+}
+func (m *Cell) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Cell.Merge(m, src)
+}
+func (m *Cell) XXX_Size() int {
+	return xxx_messageInfo_Cell.Size(m)
+}
+func (m *Cell) XXX_DiscardUnknown() {
+	xxx_messageInfo_Cell.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Cell proto.InternalMessageInfo
 
 func (m *Cell) GetTimestampMicros() int64 {
 	if m != nil {
@@ -166,48 +267,56 @@ type RowRange struct {
 	// Types that are valid to be assigned to EndKey:
 	//	*RowRange_EndKeyOpen
 	//	*RowRange_EndKeyClosed
-	EndKey isRowRange_EndKey `protobuf_oneof:"end_key"`
+	EndKey               isRowRange_EndKey `protobuf_oneof:"end_key"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
 }
 
-func (m *RowRange) Reset()                    { *m = RowRange{} }
-func (m *RowRange) String() string            { return proto.CompactTextString(m) }
-func (*RowRange) ProtoMessage()               {}
-func (*RowRange) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{4} }
+func (m *RowRange) Reset()         { *m = RowRange{} }
+func (m *RowRange) String() string { return proto.CompactTextString(m) }
+func (*RowRange) ProtoMessage()    {}
+func (*RowRange) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{4}
+}
+
+func (m *RowRange) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RowRange.Unmarshal(m, b)
+}
+func (m *RowRange) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RowRange.Marshal(b, m, deterministic)
+}
+func (m *RowRange) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RowRange.Merge(m, src)
+}
+func (m *RowRange) XXX_Size() int {
+	return xxx_messageInfo_RowRange.Size(m)
+}
+func (m *RowRange) XXX_DiscardUnknown() {
+	xxx_messageInfo_RowRange.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RowRange proto.InternalMessageInfo
 
 type isRowRange_StartKey interface {
 	isRowRange_StartKey()
-}
-type isRowRange_EndKey interface {
-	isRowRange_EndKey()
 }
 
 type RowRange_StartKeyClosed struct {
 	StartKeyClosed []byte `protobuf:"bytes,1,opt,name=start_key_closed,json=startKeyClosed,proto3,oneof"`
 }
+
 type RowRange_StartKeyOpen struct {
 	StartKeyOpen []byte `protobuf:"bytes,2,opt,name=start_key_open,json=startKeyOpen,proto3,oneof"`
 }
-type RowRange_EndKeyOpen struct {
-	EndKeyOpen []byte `protobuf:"bytes,3,opt,name=end_key_open,json=endKeyOpen,proto3,oneof"`
-}
-type RowRange_EndKeyClosed struct {
-	EndKeyClosed []byte `protobuf:"bytes,4,opt,name=end_key_closed,json=endKeyClosed,proto3,oneof"`
-}
 
 func (*RowRange_StartKeyClosed) isRowRange_StartKey() {}
-func (*RowRange_StartKeyOpen) isRowRange_StartKey()   {}
-func (*RowRange_EndKeyOpen) isRowRange_EndKey()       {}
-func (*RowRange_EndKeyClosed) isRowRange_EndKey()     {}
+
+func (*RowRange_StartKeyOpen) isRowRange_StartKey() {}
 
 func (m *RowRange) GetStartKey() isRowRange_StartKey {
 	if m != nil {
 		return m.StartKey
-	}
-	return nil
-}
-func (m *RowRange) GetEndKey() isRowRange_EndKey {
-	if m != nil {
-		return m.EndKey
 	}
 	return nil
 }
@@ -226,6 +335,29 @@ func (m *RowRange) GetStartKeyOpen() []byte {
 	return nil
 }
 
+type isRowRange_EndKey interface {
+	isRowRange_EndKey()
+}
+
+type RowRange_EndKeyOpen struct {
+	EndKeyOpen []byte `protobuf:"bytes,3,opt,name=end_key_open,json=endKeyOpen,proto3,oneof"`
+}
+
+type RowRange_EndKeyClosed struct {
+	EndKeyClosed []byte `protobuf:"bytes,4,opt,name=end_key_closed,json=endKeyClosed,proto3,oneof"`
+}
+
+func (*RowRange_EndKeyOpen) isRowRange_EndKey() {}
+
+func (*RowRange_EndKeyClosed) isRowRange_EndKey() {}
+
+func (m *RowRange) GetEndKey() isRowRange_EndKey {
+	if m != nil {
+		return m.EndKey
+	}
+	return nil
+}
+
 func (m *RowRange) GetEndKeyOpen() []byte {
 	if x, ok := m.GetEndKey().(*RowRange_EndKeyOpen); ok {
 		return x.EndKeyOpen
@@ -240,9 +372,9 @@ func (m *RowRange) GetEndKeyClosed() []byte {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*RowRange) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _RowRange_OneofMarshaler, _RowRange_OneofUnmarshaler, _RowRange_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*RowRange) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*RowRange_StartKeyClosed)(nil),
 		(*RowRange_StartKeyOpen)(nil),
 		(*RowRange_EndKeyOpen)(nil),
@@ -250,116 +382,41 @@ func (*RowRange) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) erro
 	}
 }
 
-func _RowRange_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*RowRange)
-	// start_key
-	switch x := m.StartKey.(type) {
-	case *RowRange_StartKeyClosed:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.StartKeyClosed)
-	case *RowRange_StartKeyOpen:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.StartKeyOpen)
-	case nil:
-	default:
-		return fmt.Errorf("RowRange.StartKey has unexpected type %T", x)
-	}
-	// end_key
-	switch x := m.EndKey.(type) {
-	case *RowRange_EndKeyOpen:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.EndKeyOpen)
-	case *RowRange_EndKeyClosed:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.EndKeyClosed)
-	case nil:
-	default:
-		return fmt.Errorf("RowRange.EndKey has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _RowRange_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*RowRange)
-	switch tag {
-	case 1: // start_key.start_key_closed
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.StartKey = &RowRange_StartKeyClosed{x}
-		return true, err
-	case 2: // start_key.start_key_open
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.StartKey = &RowRange_StartKeyOpen{x}
-		return true, err
-	case 3: // end_key.end_key_open
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.EndKey = &RowRange_EndKeyOpen{x}
-		return true, err
-	case 4: // end_key.end_key_closed
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.EndKey = &RowRange_EndKeyClosed{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _RowRange_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*RowRange)
-	// start_key
-	switch x := m.StartKey.(type) {
-	case *RowRange_StartKeyClosed:
-		n += proto.SizeVarint(1<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.StartKeyClosed)))
-		n += len(x.StartKeyClosed)
-	case *RowRange_StartKeyOpen:
-		n += proto.SizeVarint(2<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.StartKeyOpen)))
-		n += len(x.StartKeyOpen)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	// end_key
-	switch x := m.EndKey.(type) {
-	case *RowRange_EndKeyOpen:
-		n += proto.SizeVarint(3<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.EndKeyOpen)))
-		n += len(x.EndKeyOpen)
-	case *RowRange_EndKeyClosed:
-		n += proto.SizeVarint(4<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.EndKeyClosed)))
-		n += len(x.EndKeyClosed)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
-}
-
 // Specifies a non-contiguous set of rows.
 type RowSet struct {
 	// Single rows included in the set.
 	RowKeys [][]byte `protobuf:"bytes,1,rep,name=row_keys,json=rowKeys,proto3" json:"row_keys,omitempty"`
 	// Contiguous row ranges included in the set.
-	RowRanges []*RowRange `protobuf:"bytes,2,rep,name=row_ranges,json=rowRanges" json:"row_ranges,omitempty"`
+	RowRanges            []*RowRange `protobuf:"bytes,2,rep,name=row_ranges,json=rowRanges,proto3" json:"row_ranges,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
+	XXX_unrecognized     []byte      `json:"-"`
+	XXX_sizecache        int32       `json:"-"`
 }
 
-func (m *RowSet) Reset()                    { *m = RowSet{} }
-func (m *RowSet) String() string            { return proto.CompactTextString(m) }
-func (*RowSet) ProtoMessage()               {}
-func (*RowSet) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{5} }
+func (m *RowSet) Reset()         { *m = RowSet{} }
+func (m *RowSet) String() string { return proto.CompactTextString(m) }
+func (*RowSet) ProtoMessage()    {}
+func (*RowSet) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{5}
+}
+
+func (m *RowSet) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RowSet.Unmarshal(m, b)
+}
+func (m *RowSet) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RowSet.Marshal(b, m, deterministic)
+}
+func (m *RowSet) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RowSet.Merge(m, src)
+}
+func (m *RowSet) XXX_Size() int {
+	return xxx_messageInfo_RowSet.Size(m)
+}
+func (m *RowSet) XXX_DiscardUnknown() {
+	xxx_messageInfo_RowSet.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RowSet proto.InternalMessageInfo
 
 func (m *RowSet) GetRowKeys() [][]byte {
 	if m != nil {
@@ -381,7 +438,7 @@ func (m *RowSet) GetRowRanges() []*RowRange {
 // inclusive or exclusive.
 type ColumnRange struct {
 	// The name of the column family within which this range falls.
-	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName" json:"family_name,omitempty"`
+	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName,proto3" json:"family_name,omitempty"`
 	// The column qualifier at which to start the range (within `column_family`).
 	// If neither field is set, interpreted as the empty string, inclusive.
 	//
@@ -395,57 +452,65 @@ type ColumnRange struct {
 	// Types that are valid to be assigned to EndQualifier:
 	//	*ColumnRange_EndQualifierClosed
 	//	*ColumnRange_EndQualifierOpen
-	EndQualifier isColumnRange_EndQualifier `protobuf_oneof:"end_qualifier"`
+	EndQualifier         isColumnRange_EndQualifier `protobuf_oneof:"end_qualifier"`
+	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
+	XXX_unrecognized     []byte                     `json:"-"`
+	XXX_sizecache        int32                      `json:"-"`
 }
 
-func (m *ColumnRange) Reset()                    { *m = ColumnRange{} }
-func (m *ColumnRange) String() string            { return proto.CompactTextString(m) }
-func (*ColumnRange) ProtoMessage()               {}
-func (*ColumnRange) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{6} }
-
-type isColumnRange_StartQualifier interface {
-	isColumnRange_StartQualifier()
-}
-type isColumnRange_EndQualifier interface {
-	isColumnRange_EndQualifier()
+func (m *ColumnRange) Reset()         { *m = ColumnRange{} }
+func (m *ColumnRange) String() string { return proto.CompactTextString(m) }
+func (*ColumnRange) ProtoMessage()    {}
+func (*ColumnRange) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{6}
 }
 
-type ColumnRange_StartQualifierClosed struct {
-	StartQualifierClosed []byte `protobuf:"bytes,2,opt,name=start_qualifier_closed,json=startQualifierClosed,proto3,oneof"`
+func (m *ColumnRange) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ColumnRange.Unmarshal(m, b)
 }
-type ColumnRange_StartQualifierOpen struct {
-	StartQualifierOpen []byte `protobuf:"bytes,3,opt,name=start_qualifier_open,json=startQualifierOpen,proto3,oneof"`
+func (m *ColumnRange) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ColumnRange.Marshal(b, m, deterministic)
 }
-type ColumnRange_EndQualifierClosed struct {
-	EndQualifierClosed []byte `protobuf:"bytes,4,opt,name=end_qualifier_closed,json=endQualifierClosed,proto3,oneof"`
+func (m *ColumnRange) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ColumnRange.Merge(m, src)
 }
-type ColumnRange_EndQualifierOpen struct {
-	EndQualifierOpen []byte `protobuf:"bytes,5,opt,name=end_qualifier_open,json=endQualifierOpen,proto3,oneof"`
+func (m *ColumnRange) XXX_Size() int {
+	return xxx_messageInfo_ColumnRange.Size(m)
+}
+func (m *ColumnRange) XXX_DiscardUnknown() {
+	xxx_messageInfo_ColumnRange.DiscardUnknown(m)
 }
 
-func (*ColumnRange_StartQualifierClosed) isColumnRange_StartQualifier() {}
-func (*ColumnRange_StartQualifierOpen) isColumnRange_StartQualifier()   {}
-func (*ColumnRange_EndQualifierClosed) isColumnRange_EndQualifier()     {}
-func (*ColumnRange_EndQualifierOpen) isColumnRange_EndQualifier()       {}
-
-func (m *ColumnRange) GetStartQualifier() isColumnRange_StartQualifier {
-	if m != nil {
-		return m.StartQualifier
-	}
-	return nil
-}
-func (m *ColumnRange) GetEndQualifier() isColumnRange_EndQualifier {
-	if m != nil {
-		return m.EndQualifier
-	}
-	return nil
-}
+var xxx_messageInfo_ColumnRange proto.InternalMessageInfo
 
 func (m *ColumnRange) GetFamilyName() string {
 	if m != nil {
 		return m.FamilyName
 	}
 	return ""
+}
+
+type isColumnRange_StartQualifier interface {
+	isColumnRange_StartQualifier()
+}
+
+type ColumnRange_StartQualifierClosed struct {
+	StartQualifierClosed []byte `protobuf:"bytes,2,opt,name=start_qualifier_closed,json=startQualifierClosed,proto3,oneof"`
+}
+
+type ColumnRange_StartQualifierOpen struct {
+	StartQualifierOpen []byte `protobuf:"bytes,3,opt,name=start_qualifier_open,json=startQualifierOpen,proto3,oneof"`
+}
+
+func (*ColumnRange_StartQualifierClosed) isColumnRange_StartQualifier() {}
+
+func (*ColumnRange_StartQualifierOpen) isColumnRange_StartQualifier() {}
+
+func (m *ColumnRange) GetStartQualifier() isColumnRange_StartQualifier {
+	if m != nil {
+		return m.StartQualifier
+	}
+	return nil
 }
 
 func (m *ColumnRange) GetStartQualifierClosed() []byte {
@@ -458,6 +523,29 @@ func (m *ColumnRange) GetStartQualifierClosed() []byte {
 func (m *ColumnRange) GetStartQualifierOpen() []byte {
 	if x, ok := m.GetStartQualifier().(*ColumnRange_StartQualifierOpen); ok {
 		return x.StartQualifierOpen
+	}
+	return nil
+}
+
+type isColumnRange_EndQualifier interface {
+	isColumnRange_EndQualifier()
+}
+
+type ColumnRange_EndQualifierClosed struct {
+	EndQualifierClosed []byte `protobuf:"bytes,4,opt,name=end_qualifier_closed,json=endQualifierClosed,proto3,oneof"`
+}
+
+type ColumnRange_EndQualifierOpen struct {
+	EndQualifierOpen []byte `protobuf:"bytes,5,opt,name=end_qualifier_open,json=endQualifierOpen,proto3,oneof"`
+}
+
+func (*ColumnRange_EndQualifierClosed) isColumnRange_EndQualifier() {}
+
+func (*ColumnRange_EndQualifierOpen) isColumnRange_EndQualifier() {}
+
+func (m *ColumnRange) GetEndQualifier() isColumnRange_EndQualifier {
+	if m != nil {
+		return m.EndQualifier
 	}
 	return nil
 }
@@ -476,9 +564,9 @@ func (m *ColumnRange) GetEndQualifierOpen() []byte {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*ColumnRange) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _ColumnRange_OneofMarshaler, _ColumnRange_OneofUnmarshaler, _ColumnRange_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*ColumnRange) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*ColumnRange_StartQualifierClosed)(nil),
 		(*ColumnRange_StartQualifierOpen)(nil),
 		(*ColumnRange_EndQualifierClosed)(nil),
@@ -486,116 +574,41 @@ func (*ColumnRange) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) e
 	}
 }
 
-func _ColumnRange_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*ColumnRange)
-	// start_qualifier
-	switch x := m.StartQualifier.(type) {
-	case *ColumnRange_StartQualifierClosed:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.StartQualifierClosed)
-	case *ColumnRange_StartQualifierOpen:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.StartQualifierOpen)
-	case nil:
-	default:
-		return fmt.Errorf("ColumnRange.StartQualifier has unexpected type %T", x)
-	}
-	// end_qualifier
-	switch x := m.EndQualifier.(type) {
-	case *ColumnRange_EndQualifierClosed:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.EndQualifierClosed)
-	case *ColumnRange_EndQualifierOpen:
-		b.EncodeVarint(5<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.EndQualifierOpen)
-	case nil:
-	default:
-		return fmt.Errorf("ColumnRange.EndQualifier has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _ColumnRange_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*ColumnRange)
-	switch tag {
-	case 2: // start_qualifier.start_qualifier_closed
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.StartQualifier = &ColumnRange_StartQualifierClosed{x}
-		return true, err
-	case 3: // start_qualifier.start_qualifier_open
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.StartQualifier = &ColumnRange_StartQualifierOpen{x}
-		return true, err
-	case 4: // end_qualifier.end_qualifier_closed
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.EndQualifier = &ColumnRange_EndQualifierClosed{x}
-		return true, err
-	case 5: // end_qualifier.end_qualifier_open
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.EndQualifier = &ColumnRange_EndQualifierOpen{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _ColumnRange_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*ColumnRange)
-	// start_qualifier
-	switch x := m.StartQualifier.(type) {
-	case *ColumnRange_StartQualifierClosed:
-		n += proto.SizeVarint(2<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.StartQualifierClosed)))
-		n += len(x.StartQualifierClosed)
-	case *ColumnRange_StartQualifierOpen:
-		n += proto.SizeVarint(3<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.StartQualifierOpen)))
-		n += len(x.StartQualifierOpen)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	// end_qualifier
-	switch x := m.EndQualifier.(type) {
-	case *ColumnRange_EndQualifierClosed:
-		n += proto.SizeVarint(4<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.EndQualifierClosed)))
-		n += len(x.EndQualifierClosed)
-	case *ColumnRange_EndQualifierOpen:
-		n += proto.SizeVarint(5<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.EndQualifierOpen)))
-		n += len(x.EndQualifierOpen)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
-}
-
 // Specified a contiguous range of microsecond timestamps.
 type TimestampRange struct {
 	// Inclusive lower bound. If left empty, interpreted as 0.
-	StartTimestampMicros int64 `protobuf:"varint,1,opt,name=start_timestamp_micros,json=startTimestampMicros" json:"start_timestamp_micros,omitempty"`
+	StartTimestampMicros int64 `protobuf:"varint,1,opt,name=start_timestamp_micros,json=startTimestampMicros,proto3" json:"start_timestamp_micros,omitempty"`
 	// Exclusive upper bound. If left empty, interpreted as infinity.
-	EndTimestampMicros int64 `protobuf:"varint,2,opt,name=end_timestamp_micros,json=endTimestampMicros" json:"end_timestamp_micros,omitempty"`
+	EndTimestampMicros   int64    `protobuf:"varint,2,opt,name=end_timestamp_micros,json=endTimestampMicros,proto3" json:"end_timestamp_micros,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *TimestampRange) Reset()                    { *m = TimestampRange{} }
-func (m *TimestampRange) String() string            { return proto.CompactTextString(m) }
-func (*TimestampRange) ProtoMessage()               {}
-func (*TimestampRange) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{7} }
+func (m *TimestampRange) Reset()         { *m = TimestampRange{} }
+func (m *TimestampRange) String() string { return proto.CompactTextString(m) }
+func (*TimestampRange) ProtoMessage()    {}
+func (*TimestampRange) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{7}
+}
+
+func (m *TimestampRange) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_TimestampRange.Unmarshal(m, b)
+}
+func (m *TimestampRange) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_TimestampRange.Marshal(b, m, deterministic)
+}
+func (m *TimestampRange) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TimestampRange.Merge(m, src)
+}
+func (m *TimestampRange) XXX_Size() int {
+	return xxx_messageInfo_TimestampRange.Size(m)
+}
+func (m *TimestampRange) XXX_DiscardUnknown() {
+	xxx_messageInfo_TimestampRange.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TimestampRange proto.InternalMessageInfo
 
 func (m *TimestampRange) GetStartTimestampMicros() int64 {
 	if m != nil {
@@ -626,48 +639,56 @@ type ValueRange struct {
 	// Types that are valid to be assigned to EndValue:
 	//	*ValueRange_EndValueClosed
 	//	*ValueRange_EndValueOpen
-	EndValue isValueRange_EndValue `protobuf_oneof:"end_value"`
+	EndValue             isValueRange_EndValue `protobuf_oneof:"end_value"`
+	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
+	XXX_unrecognized     []byte                `json:"-"`
+	XXX_sizecache        int32                 `json:"-"`
 }
 
-func (m *ValueRange) Reset()                    { *m = ValueRange{} }
-func (m *ValueRange) String() string            { return proto.CompactTextString(m) }
-func (*ValueRange) ProtoMessage()               {}
-func (*ValueRange) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{8} }
+func (m *ValueRange) Reset()         { *m = ValueRange{} }
+func (m *ValueRange) String() string { return proto.CompactTextString(m) }
+func (*ValueRange) ProtoMessage()    {}
+func (*ValueRange) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{8}
+}
+
+func (m *ValueRange) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ValueRange.Unmarshal(m, b)
+}
+func (m *ValueRange) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ValueRange.Marshal(b, m, deterministic)
+}
+func (m *ValueRange) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ValueRange.Merge(m, src)
+}
+func (m *ValueRange) XXX_Size() int {
+	return xxx_messageInfo_ValueRange.Size(m)
+}
+func (m *ValueRange) XXX_DiscardUnknown() {
+	xxx_messageInfo_ValueRange.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ValueRange proto.InternalMessageInfo
 
 type isValueRange_StartValue interface {
 	isValueRange_StartValue()
-}
-type isValueRange_EndValue interface {
-	isValueRange_EndValue()
 }
 
 type ValueRange_StartValueClosed struct {
 	StartValueClosed []byte `protobuf:"bytes,1,opt,name=start_value_closed,json=startValueClosed,proto3,oneof"`
 }
+
 type ValueRange_StartValueOpen struct {
 	StartValueOpen []byte `protobuf:"bytes,2,opt,name=start_value_open,json=startValueOpen,proto3,oneof"`
 }
-type ValueRange_EndValueClosed struct {
-	EndValueClosed []byte `protobuf:"bytes,3,opt,name=end_value_closed,json=endValueClosed,proto3,oneof"`
-}
-type ValueRange_EndValueOpen struct {
-	EndValueOpen []byte `protobuf:"bytes,4,opt,name=end_value_open,json=endValueOpen,proto3,oneof"`
-}
 
 func (*ValueRange_StartValueClosed) isValueRange_StartValue() {}
-func (*ValueRange_StartValueOpen) isValueRange_StartValue()   {}
-func (*ValueRange_EndValueClosed) isValueRange_EndValue()     {}
-func (*ValueRange_EndValueOpen) isValueRange_EndValue()       {}
+
+func (*ValueRange_StartValueOpen) isValueRange_StartValue() {}
 
 func (m *ValueRange) GetStartValue() isValueRange_StartValue {
 	if m != nil {
 		return m.StartValue
-	}
-	return nil
-}
-func (m *ValueRange) GetEndValue() isValueRange_EndValue {
-	if m != nil {
-		return m.EndValue
 	}
 	return nil
 }
@@ -686,6 +707,29 @@ func (m *ValueRange) GetStartValueOpen() []byte {
 	return nil
 }
 
+type isValueRange_EndValue interface {
+	isValueRange_EndValue()
+}
+
+type ValueRange_EndValueClosed struct {
+	EndValueClosed []byte `protobuf:"bytes,3,opt,name=end_value_closed,json=endValueClosed,proto3,oneof"`
+}
+
+type ValueRange_EndValueOpen struct {
+	EndValueOpen []byte `protobuf:"bytes,4,opt,name=end_value_open,json=endValueOpen,proto3,oneof"`
+}
+
+func (*ValueRange_EndValueClosed) isValueRange_EndValue() {}
+
+func (*ValueRange_EndValueOpen) isValueRange_EndValue() {}
+
+func (m *ValueRange) GetEndValue() isValueRange_EndValue {
+	if m != nil {
+		return m.EndValue
+	}
+	return nil
+}
+
 func (m *ValueRange) GetEndValueClosed() []byte {
 	if x, ok := m.GetEndValue().(*ValueRange_EndValueClosed); ok {
 		return x.EndValueClosed
@@ -700,112 +744,14 @@ func (m *ValueRange) GetEndValueOpen() []byte {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*ValueRange) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _ValueRange_OneofMarshaler, _ValueRange_OneofUnmarshaler, _ValueRange_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*ValueRange) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*ValueRange_StartValueClosed)(nil),
 		(*ValueRange_StartValueOpen)(nil),
 		(*ValueRange_EndValueClosed)(nil),
 		(*ValueRange_EndValueOpen)(nil),
 	}
-}
-
-func _ValueRange_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*ValueRange)
-	// start_value
-	switch x := m.StartValue.(type) {
-	case *ValueRange_StartValueClosed:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.StartValueClosed)
-	case *ValueRange_StartValueOpen:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.StartValueOpen)
-	case nil:
-	default:
-		return fmt.Errorf("ValueRange.StartValue has unexpected type %T", x)
-	}
-	// end_value
-	switch x := m.EndValue.(type) {
-	case *ValueRange_EndValueClosed:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.EndValueClosed)
-	case *ValueRange_EndValueOpen:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.EndValueOpen)
-	case nil:
-	default:
-		return fmt.Errorf("ValueRange.EndValue has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _ValueRange_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*ValueRange)
-	switch tag {
-	case 1: // start_value.start_value_closed
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.StartValue = &ValueRange_StartValueClosed{x}
-		return true, err
-	case 2: // start_value.start_value_open
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.StartValue = &ValueRange_StartValueOpen{x}
-		return true, err
-	case 3: // end_value.end_value_closed
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.EndValue = &ValueRange_EndValueClosed{x}
-		return true, err
-	case 4: // end_value.end_value_open
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.EndValue = &ValueRange_EndValueOpen{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _ValueRange_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*ValueRange)
-	// start_value
-	switch x := m.StartValue.(type) {
-	case *ValueRange_StartValueClosed:
-		n += proto.SizeVarint(1<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.StartValueClosed)))
-		n += len(x.StartValueClosed)
-	case *ValueRange_StartValueOpen:
-		n += proto.SizeVarint(2<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.StartValueOpen)))
-		n += len(x.StartValueOpen)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	// end_value
-	switch x := m.EndValue.(type) {
-	case *ValueRange_EndValueClosed:
-		n += proto.SizeVarint(3<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.EndValueClosed)))
-		n += len(x.EndValueClosed)
-	case *ValueRange_EndValueOpen:
-		n += proto.SizeVarint(4<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.EndValueOpen)))
-		n += len(x.EndValueOpen)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 // Takes a row as input and produces an alternate view of the row based on
@@ -865,95 +811,154 @@ type RowFilter struct {
 	//	*RowFilter_CellsPerColumnLimitFilter
 	//	*RowFilter_StripValueTransformer
 	//	*RowFilter_ApplyLabelTransformer
-	Filter isRowFilter_Filter `protobuf_oneof:"filter"`
+	Filter               isRowFilter_Filter `protobuf_oneof:"filter"`
+	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
+	XXX_unrecognized     []byte             `json:"-"`
+	XXX_sizecache        int32              `json:"-"`
 }
 
-func (m *RowFilter) Reset()                    { *m = RowFilter{} }
-func (m *RowFilter) String() string            { return proto.CompactTextString(m) }
-func (*RowFilter) ProtoMessage()               {}
-func (*RowFilter) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9} }
+func (m *RowFilter) Reset()         { *m = RowFilter{} }
+func (m *RowFilter) String() string { return proto.CompactTextString(m) }
+func (*RowFilter) ProtoMessage()    {}
+func (*RowFilter) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{9}
+}
+
+func (m *RowFilter) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RowFilter.Unmarshal(m, b)
+}
+func (m *RowFilter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RowFilter.Marshal(b, m, deterministic)
+}
+func (m *RowFilter) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RowFilter.Merge(m, src)
+}
+func (m *RowFilter) XXX_Size() int {
+	return xxx_messageInfo_RowFilter.Size(m)
+}
+func (m *RowFilter) XXX_DiscardUnknown() {
+	xxx_messageInfo_RowFilter.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RowFilter proto.InternalMessageInfo
 
 type isRowFilter_Filter interface {
 	isRowFilter_Filter()
 }
 
 type RowFilter_Chain_ struct {
-	Chain *RowFilter_Chain `protobuf:"bytes,1,opt,name=chain,oneof"`
+	Chain *RowFilter_Chain `protobuf:"bytes,1,opt,name=chain,proto3,oneof"`
 }
+
 type RowFilter_Interleave_ struct {
-	Interleave *RowFilter_Interleave `protobuf:"bytes,2,opt,name=interleave,oneof"`
+	Interleave *RowFilter_Interleave `protobuf:"bytes,2,opt,name=interleave,proto3,oneof"`
 }
+
 type RowFilter_Condition_ struct {
-	Condition *RowFilter_Condition `protobuf:"bytes,3,opt,name=condition,oneof"`
+	Condition *RowFilter_Condition `protobuf:"bytes,3,opt,name=condition,proto3,oneof"`
 }
+
 type RowFilter_Sink struct {
-	Sink bool `protobuf:"varint,16,opt,name=sink,oneof"`
+	Sink bool `protobuf:"varint,16,opt,name=sink,proto3,oneof"`
 }
+
 type RowFilter_PassAllFilter struct {
-	PassAllFilter bool `protobuf:"varint,17,opt,name=pass_all_filter,json=passAllFilter,oneof"`
+	PassAllFilter bool `protobuf:"varint,17,opt,name=pass_all_filter,json=passAllFilter,proto3,oneof"`
 }
+
 type RowFilter_BlockAllFilter struct {
-	BlockAllFilter bool `protobuf:"varint,18,opt,name=block_all_filter,json=blockAllFilter,oneof"`
+	BlockAllFilter bool `protobuf:"varint,18,opt,name=block_all_filter,json=blockAllFilter,proto3,oneof"`
 }
+
 type RowFilter_RowKeyRegexFilter struct {
 	RowKeyRegexFilter []byte `protobuf:"bytes,4,opt,name=row_key_regex_filter,json=rowKeyRegexFilter,proto3,oneof"`
 }
+
 type RowFilter_RowSampleFilter struct {
-	RowSampleFilter float64 `protobuf:"fixed64,14,opt,name=row_sample_filter,json=rowSampleFilter,oneof"`
+	RowSampleFilter float64 `protobuf:"fixed64,14,opt,name=row_sample_filter,json=rowSampleFilter,proto3,oneof"`
 }
+
 type RowFilter_FamilyNameRegexFilter struct {
-	FamilyNameRegexFilter string `protobuf:"bytes,5,opt,name=family_name_regex_filter,json=familyNameRegexFilter,oneof"`
+	FamilyNameRegexFilter string `protobuf:"bytes,5,opt,name=family_name_regex_filter,json=familyNameRegexFilter,proto3,oneof"`
 }
+
 type RowFilter_ColumnQualifierRegexFilter struct {
 	ColumnQualifierRegexFilter []byte `protobuf:"bytes,6,opt,name=column_qualifier_regex_filter,json=columnQualifierRegexFilter,proto3,oneof"`
 }
+
 type RowFilter_ColumnRangeFilter struct {
-	ColumnRangeFilter *ColumnRange `protobuf:"bytes,7,opt,name=column_range_filter,json=columnRangeFilter,oneof"`
+	ColumnRangeFilter *ColumnRange `protobuf:"bytes,7,opt,name=column_range_filter,json=columnRangeFilter,proto3,oneof"`
 }
+
 type RowFilter_TimestampRangeFilter struct {
-	TimestampRangeFilter *TimestampRange `protobuf:"bytes,8,opt,name=timestamp_range_filter,json=timestampRangeFilter,oneof"`
+	TimestampRangeFilter *TimestampRange `protobuf:"bytes,8,opt,name=timestamp_range_filter,json=timestampRangeFilter,proto3,oneof"`
 }
+
 type RowFilter_ValueRegexFilter struct {
 	ValueRegexFilter []byte `protobuf:"bytes,9,opt,name=value_regex_filter,json=valueRegexFilter,proto3,oneof"`
 }
+
 type RowFilter_ValueRangeFilter struct {
-	ValueRangeFilter *ValueRange `protobuf:"bytes,15,opt,name=value_range_filter,json=valueRangeFilter,oneof"`
-}
-type RowFilter_CellsPerRowOffsetFilter struct {
-	CellsPerRowOffsetFilter int32 `protobuf:"varint,10,opt,name=cells_per_row_offset_filter,json=cellsPerRowOffsetFilter,oneof"`
-}
-type RowFilter_CellsPerRowLimitFilter struct {
-	CellsPerRowLimitFilter int32 `protobuf:"varint,11,opt,name=cells_per_row_limit_filter,json=cellsPerRowLimitFilter,oneof"`
-}
-type RowFilter_CellsPerColumnLimitFilter struct {
-	CellsPerColumnLimitFilter int32 `protobuf:"varint,12,opt,name=cells_per_column_limit_filter,json=cellsPerColumnLimitFilter,oneof"`
-}
-type RowFilter_StripValueTransformer struct {
-	StripValueTransformer bool `protobuf:"varint,13,opt,name=strip_value_transformer,json=stripValueTransformer,oneof"`
-}
-type RowFilter_ApplyLabelTransformer struct {
-	ApplyLabelTransformer string `protobuf:"bytes,19,opt,name=apply_label_transformer,json=applyLabelTransformer,oneof"`
+	ValueRangeFilter *ValueRange `protobuf:"bytes,15,opt,name=value_range_filter,json=valueRangeFilter,proto3,oneof"`
 }
 
-func (*RowFilter_Chain_) isRowFilter_Filter()                     {}
-func (*RowFilter_Interleave_) isRowFilter_Filter()                {}
-func (*RowFilter_Condition_) isRowFilter_Filter()                 {}
-func (*RowFilter_Sink) isRowFilter_Filter()                       {}
-func (*RowFilter_PassAllFilter) isRowFilter_Filter()              {}
-func (*RowFilter_BlockAllFilter) isRowFilter_Filter()             {}
-func (*RowFilter_RowKeyRegexFilter) isRowFilter_Filter()          {}
-func (*RowFilter_RowSampleFilter) isRowFilter_Filter()            {}
-func (*RowFilter_FamilyNameRegexFilter) isRowFilter_Filter()      {}
+type RowFilter_CellsPerRowOffsetFilter struct {
+	CellsPerRowOffsetFilter int32 `protobuf:"varint,10,opt,name=cells_per_row_offset_filter,json=cellsPerRowOffsetFilter,proto3,oneof"`
+}
+
+type RowFilter_CellsPerRowLimitFilter struct {
+	CellsPerRowLimitFilter int32 `protobuf:"varint,11,opt,name=cells_per_row_limit_filter,json=cellsPerRowLimitFilter,proto3,oneof"`
+}
+
+type RowFilter_CellsPerColumnLimitFilter struct {
+	CellsPerColumnLimitFilter int32 `protobuf:"varint,12,opt,name=cells_per_column_limit_filter,json=cellsPerColumnLimitFilter,proto3,oneof"`
+}
+
+type RowFilter_StripValueTransformer struct {
+	StripValueTransformer bool `protobuf:"varint,13,opt,name=strip_value_transformer,json=stripValueTransformer,proto3,oneof"`
+}
+
+type RowFilter_ApplyLabelTransformer struct {
+	ApplyLabelTransformer string `protobuf:"bytes,19,opt,name=apply_label_transformer,json=applyLabelTransformer,proto3,oneof"`
+}
+
+func (*RowFilter_Chain_) isRowFilter_Filter() {}
+
+func (*RowFilter_Interleave_) isRowFilter_Filter() {}
+
+func (*RowFilter_Condition_) isRowFilter_Filter() {}
+
+func (*RowFilter_Sink) isRowFilter_Filter() {}
+
+func (*RowFilter_PassAllFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_BlockAllFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_RowKeyRegexFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_RowSampleFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_FamilyNameRegexFilter) isRowFilter_Filter() {}
+
 func (*RowFilter_ColumnQualifierRegexFilter) isRowFilter_Filter() {}
-func (*RowFilter_ColumnRangeFilter) isRowFilter_Filter()          {}
-func (*RowFilter_TimestampRangeFilter) isRowFilter_Filter()       {}
-func (*RowFilter_ValueRegexFilter) isRowFilter_Filter()           {}
-func (*RowFilter_ValueRangeFilter) isRowFilter_Filter()           {}
-func (*RowFilter_CellsPerRowOffsetFilter) isRowFilter_Filter()    {}
-func (*RowFilter_CellsPerRowLimitFilter) isRowFilter_Filter()     {}
-func (*RowFilter_CellsPerColumnLimitFilter) isRowFilter_Filter()  {}
-func (*RowFilter_StripValueTransformer) isRowFilter_Filter()      {}
-func (*RowFilter_ApplyLabelTransformer) isRowFilter_Filter()      {}
+
+func (*RowFilter_ColumnRangeFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_TimestampRangeFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_ValueRegexFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_ValueRangeFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_CellsPerRowOffsetFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_CellsPerRowLimitFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_CellsPerColumnLimitFilter) isRowFilter_Filter() {}
+
+func (*RowFilter_StripValueTransformer) isRowFilter_Filter() {}
+
+func (*RowFilter_ApplyLabelTransformer) isRowFilter_Filter() {}
 
 func (m *RowFilter) GetFilter() isRowFilter_Filter {
 	if m != nil {
@@ -1095,9 +1100,9 @@ func (m *RowFilter) GetApplyLabelTransformer() string {
 	return ""
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*RowFilter) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _RowFilter_OneofMarshaler, _RowFilter_OneofUnmarshaler, _RowFilter_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*RowFilter) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*RowFilter_Chain_)(nil),
 		(*RowFilter_Interleave_)(nil),
 		(*RowFilter_Condition_)(nil),
@@ -1120,346 +1125,41 @@ func (*RowFilter) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) err
 	}
 }
 
-func _RowFilter_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*RowFilter)
-	// filter
-	switch x := m.Filter.(type) {
-	case *RowFilter_Chain_:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Chain); err != nil {
-			return err
-		}
-	case *RowFilter_Interleave_:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Interleave); err != nil {
-			return err
-		}
-	case *RowFilter_Condition_:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.Condition); err != nil {
-			return err
-		}
-	case *RowFilter_Sink:
-		t := uint64(0)
-		if x.Sink {
-			t = 1
-		}
-		b.EncodeVarint(16<<3 | proto.WireVarint)
-		b.EncodeVarint(t)
-	case *RowFilter_PassAllFilter:
-		t := uint64(0)
-		if x.PassAllFilter {
-			t = 1
-		}
-		b.EncodeVarint(17<<3 | proto.WireVarint)
-		b.EncodeVarint(t)
-	case *RowFilter_BlockAllFilter:
-		t := uint64(0)
-		if x.BlockAllFilter {
-			t = 1
-		}
-		b.EncodeVarint(18<<3 | proto.WireVarint)
-		b.EncodeVarint(t)
-	case *RowFilter_RowKeyRegexFilter:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.RowKeyRegexFilter)
-	case *RowFilter_RowSampleFilter:
-		b.EncodeVarint(14<<3 | proto.WireFixed64)
-		b.EncodeFixed64(math.Float64bits(x.RowSampleFilter))
-	case *RowFilter_FamilyNameRegexFilter:
-		b.EncodeVarint(5<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.FamilyNameRegexFilter)
-	case *RowFilter_ColumnQualifierRegexFilter:
-		b.EncodeVarint(6<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.ColumnQualifierRegexFilter)
-	case *RowFilter_ColumnRangeFilter:
-		b.EncodeVarint(7<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.ColumnRangeFilter); err != nil {
-			return err
-		}
-	case *RowFilter_TimestampRangeFilter:
-		b.EncodeVarint(8<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.TimestampRangeFilter); err != nil {
-			return err
-		}
-	case *RowFilter_ValueRegexFilter:
-		b.EncodeVarint(9<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.ValueRegexFilter)
-	case *RowFilter_ValueRangeFilter:
-		b.EncodeVarint(15<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.ValueRangeFilter); err != nil {
-			return err
-		}
-	case *RowFilter_CellsPerRowOffsetFilter:
-		b.EncodeVarint(10<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.CellsPerRowOffsetFilter))
-	case *RowFilter_CellsPerRowLimitFilter:
-		b.EncodeVarint(11<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.CellsPerRowLimitFilter))
-	case *RowFilter_CellsPerColumnLimitFilter:
-		b.EncodeVarint(12<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.CellsPerColumnLimitFilter))
-	case *RowFilter_StripValueTransformer:
-		t := uint64(0)
-		if x.StripValueTransformer {
-			t = 1
-		}
-		b.EncodeVarint(13<<3 | proto.WireVarint)
-		b.EncodeVarint(t)
-	case *RowFilter_ApplyLabelTransformer:
-		b.EncodeVarint(19<<3 | proto.WireBytes)
-		b.EncodeStringBytes(x.ApplyLabelTransformer)
-	case nil:
-	default:
-		return fmt.Errorf("RowFilter.Filter has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _RowFilter_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*RowFilter)
-	switch tag {
-	case 1: // filter.chain
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(RowFilter_Chain)
-		err := b.DecodeMessage(msg)
-		m.Filter = &RowFilter_Chain_{msg}
-		return true, err
-	case 2: // filter.interleave
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(RowFilter_Interleave)
-		err := b.DecodeMessage(msg)
-		m.Filter = &RowFilter_Interleave_{msg}
-		return true, err
-	case 3: // filter.condition
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(RowFilter_Condition)
-		err := b.DecodeMessage(msg)
-		m.Filter = &RowFilter_Condition_{msg}
-		return true, err
-	case 16: // filter.sink
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_Sink{x != 0}
-		return true, err
-	case 17: // filter.pass_all_filter
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_PassAllFilter{x != 0}
-		return true, err
-	case 18: // filter.block_all_filter
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_BlockAllFilter{x != 0}
-		return true, err
-	case 4: // filter.row_key_regex_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Filter = &RowFilter_RowKeyRegexFilter{x}
-		return true, err
-	case 14: // filter.row_sample_filter
-		if wire != proto.WireFixed64 {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeFixed64()
-		m.Filter = &RowFilter_RowSampleFilter{math.Float64frombits(x)}
-		return true, err
-	case 5: // filter.family_name_regex_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Filter = &RowFilter_FamilyNameRegexFilter{x}
-		return true, err
-	case 6: // filter.column_qualifier_regex_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Filter = &RowFilter_ColumnQualifierRegexFilter{x}
-		return true, err
-	case 7: // filter.column_range_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(ColumnRange)
-		err := b.DecodeMessage(msg)
-		m.Filter = &RowFilter_ColumnRangeFilter{msg}
-		return true, err
-	case 8: // filter.timestamp_range_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(TimestampRange)
-		err := b.DecodeMessage(msg)
-		m.Filter = &RowFilter_TimestampRangeFilter{msg}
-		return true, err
-	case 9: // filter.value_regex_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Filter = &RowFilter_ValueRegexFilter{x}
-		return true, err
-	case 15: // filter.value_range_filter
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(ValueRange)
-		err := b.DecodeMessage(msg)
-		m.Filter = &RowFilter_ValueRangeFilter{msg}
-		return true, err
-	case 10: // filter.cells_per_row_offset_filter
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_CellsPerRowOffsetFilter{int32(x)}
-		return true, err
-	case 11: // filter.cells_per_row_limit_filter
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_CellsPerRowLimitFilter{int32(x)}
-		return true, err
-	case 12: // filter.cells_per_column_limit_filter
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_CellsPerColumnLimitFilter{int32(x)}
-		return true, err
-	case 13: // filter.strip_value_transformer
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Filter = &RowFilter_StripValueTransformer{x != 0}
-		return true, err
-	case 19: // filter.apply_label_transformer
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeStringBytes()
-		m.Filter = &RowFilter_ApplyLabelTransformer{x}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _RowFilter_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*RowFilter)
-	// filter
-	switch x := m.Filter.(type) {
-	case *RowFilter_Chain_:
-		s := proto.Size(x.Chain)
-		n += proto.SizeVarint(1<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *RowFilter_Interleave_:
-		s := proto.Size(x.Interleave)
-		n += proto.SizeVarint(2<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *RowFilter_Condition_:
-		s := proto.Size(x.Condition)
-		n += proto.SizeVarint(3<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *RowFilter_Sink:
-		n += proto.SizeVarint(16<<3 | proto.WireVarint)
-		n += 1
-	case *RowFilter_PassAllFilter:
-		n += proto.SizeVarint(17<<3 | proto.WireVarint)
-		n += 1
-	case *RowFilter_BlockAllFilter:
-		n += proto.SizeVarint(18<<3 | proto.WireVarint)
-		n += 1
-	case *RowFilter_RowKeyRegexFilter:
-		n += proto.SizeVarint(4<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.RowKeyRegexFilter)))
-		n += len(x.RowKeyRegexFilter)
-	case *RowFilter_RowSampleFilter:
-		n += proto.SizeVarint(14<<3 | proto.WireFixed64)
-		n += 8
-	case *RowFilter_FamilyNameRegexFilter:
-		n += proto.SizeVarint(5<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.FamilyNameRegexFilter)))
-		n += len(x.FamilyNameRegexFilter)
-	case *RowFilter_ColumnQualifierRegexFilter:
-		n += proto.SizeVarint(6<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.ColumnQualifierRegexFilter)))
-		n += len(x.ColumnQualifierRegexFilter)
-	case *RowFilter_ColumnRangeFilter:
-		s := proto.Size(x.ColumnRangeFilter)
-		n += proto.SizeVarint(7<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *RowFilter_TimestampRangeFilter:
-		s := proto.Size(x.TimestampRangeFilter)
-		n += proto.SizeVarint(8<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *RowFilter_ValueRegexFilter:
-		n += proto.SizeVarint(9<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.ValueRegexFilter)))
-		n += len(x.ValueRegexFilter)
-	case *RowFilter_ValueRangeFilter:
-		s := proto.Size(x.ValueRangeFilter)
-		n += proto.SizeVarint(15<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *RowFilter_CellsPerRowOffsetFilter:
-		n += proto.SizeVarint(10<<3 | proto.WireVarint)
-		n += proto.SizeVarint(uint64(x.CellsPerRowOffsetFilter))
-	case *RowFilter_CellsPerRowLimitFilter:
-		n += proto.SizeVarint(11<<3 | proto.WireVarint)
-		n += proto.SizeVarint(uint64(x.CellsPerRowLimitFilter))
-	case *RowFilter_CellsPerColumnLimitFilter:
-		n += proto.SizeVarint(12<<3 | proto.WireVarint)
-		n += proto.SizeVarint(uint64(x.CellsPerColumnLimitFilter))
-	case *RowFilter_StripValueTransformer:
-		n += proto.SizeVarint(13<<3 | proto.WireVarint)
-		n += 1
-	case *RowFilter_ApplyLabelTransformer:
-		n += proto.SizeVarint(19<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.ApplyLabelTransformer)))
-		n += len(x.ApplyLabelTransformer)
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
-}
-
 // A RowFilter which sends rows through several RowFilters in sequence.
 type RowFilter_Chain struct {
 	// The elements of "filters" are chained together to process the input row:
 	// in row -> f(0) -> intermediate row -> f(1) -> ... -> f(N) -> out row
 	// The full chain is executed atomically.
-	Filters []*RowFilter `protobuf:"bytes,1,rep,name=filters" json:"filters,omitempty"`
+	Filters              []*RowFilter `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
 }
 
-func (m *RowFilter_Chain) Reset()                    { *m = RowFilter_Chain{} }
-func (m *RowFilter_Chain) String() string            { return proto.CompactTextString(m) }
-func (*RowFilter_Chain) ProtoMessage()               {}
-func (*RowFilter_Chain) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9, 0} }
+func (m *RowFilter_Chain) Reset()         { *m = RowFilter_Chain{} }
+func (m *RowFilter_Chain) String() string { return proto.CompactTextString(m) }
+func (*RowFilter_Chain) ProtoMessage()    {}
+func (*RowFilter_Chain) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{9, 0}
+}
+
+func (m *RowFilter_Chain) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RowFilter_Chain.Unmarshal(m, b)
+}
+func (m *RowFilter_Chain) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RowFilter_Chain.Marshal(b, m, deterministic)
+}
+func (m *RowFilter_Chain) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RowFilter_Chain.Merge(m, src)
+}
+func (m *RowFilter_Chain) XXX_Size() int {
+	return xxx_messageInfo_RowFilter_Chain.Size(m)
+}
+func (m *RowFilter_Chain) XXX_DiscardUnknown() {
+	xxx_messageInfo_RowFilter_Chain.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RowFilter_Chain proto.InternalMessageInfo
 
 func (m *RowFilter_Chain) GetFilters() []*RowFilter {
 	if m != nil {
@@ -1496,13 +1196,36 @@ type RowFilter_Interleave struct {
 	//     6:                      far,blah,5,x   // identical to #5
 	//
 	// All interleaved filters are executed atomically.
-	Filters []*RowFilter `protobuf:"bytes,1,rep,name=filters" json:"filters,omitempty"`
+	Filters              []*RowFilter `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
+	XXX_unrecognized     []byte       `json:"-"`
+	XXX_sizecache        int32        `json:"-"`
 }
 
-func (m *RowFilter_Interleave) Reset()                    { *m = RowFilter_Interleave{} }
-func (m *RowFilter_Interleave) String() string            { return proto.CompactTextString(m) }
-func (*RowFilter_Interleave) ProtoMessage()               {}
-func (*RowFilter_Interleave) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9, 1} }
+func (m *RowFilter_Interleave) Reset()         { *m = RowFilter_Interleave{} }
+func (m *RowFilter_Interleave) String() string { return proto.CompactTextString(m) }
+func (*RowFilter_Interleave) ProtoMessage()    {}
+func (*RowFilter_Interleave) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{9, 1}
+}
+
+func (m *RowFilter_Interleave) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RowFilter_Interleave.Unmarshal(m, b)
+}
+func (m *RowFilter_Interleave) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RowFilter_Interleave.Marshal(b, m, deterministic)
+}
+func (m *RowFilter_Interleave) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RowFilter_Interleave.Merge(m, src)
+}
+func (m *RowFilter_Interleave) XXX_Size() int {
+	return xxx_messageInfo_RowFilter_Interleave.Size(m)
+}
+func (m *RowFilter_Interleave) XXX_DiscardUnknown() {
+	xxx_messageInfo_RowFilter_Interleave.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RowFilter_Interleave proto.InternalMessageInfo
 
 func (m *RowFilter_Interleave) GetFilters() []*RowFilter {
 	if m != nil {
@@ -1521,20 +1244,43 @@ func (m *RowFilter_Interleave) GetFilters() []*RowFilter {
 type RowFilter_Condition struct {
 	// If `predicate_filter` outputs any cells, then `true_filter` will be
 	// evaluated on the input row. Otherwise, `false_filter` will be evaluated.
-	PredicateFilter *RowFilter `protobuf:"bytes,1,opt,name=predicate_filter,json=predicateFilter" json:"predicate_filter,omitempty"`
+	PredicateFilter *RowFilter `protobuf:"bytes,1,opt,name=predicate_filter,json=predicateFilter,proto3" json:"predicate_filter,omitempty"`
 	// The filter to apply to the input row if `predicate_filter` returns any
 	// results. If not provided, no results will be returned in the true case.
-	TrueFilter *RowFilter `protobuf:"bytes,2,opt,name=true_filter,json=trueFilter" json:"true_filter,omitempty"`
+	TrueFilter *RowFilter `protobuf:"bytes,2,opt,name=true_filter,json=trueFilter,proto3" json:"true_filter,omitempty"`
 	// The filter to apply to the input row if `predicate_filter` does not
 	// return any results. If not provided, no results will be returned in the
 	// false case.
-	FalseFilter *RowFilter `protobuf:"bytes,3,opt,name=false_filter,json=falseFilter" json:"false_filter,omitempty"`
+	FalseFilter          *RowFilter `protobuf:"bytes,3,opt,name=false_filter,json=falseFilter,proto3" json:"false_filter,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
+	XXX_unrecognized     []byte     `json:"-"`
+	XXX_sizecache        int32      `json:"-"`
 }
 
-func (m *RowFilter_Condition) Reset()                    { *m = RowFilter_Condition{} }
-func (m *RowFilter_Condition) String() string            { return proto.CompactTextString(m) }
-func (*RowFilter_Condition) ProtoMessage()               {}
-func (*RowFilter_Condition) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9, 2} }
+func (m *RowFilter_Condition) Reset()         { *m = RowFilter_Condition{} }
+func (m *RowFilter_Condition) String() string { return proto.CompactTextString(m) }
+func (*RowFilter_Condition) ProtoMessage()    {}
+func (*RowFilter_Condition) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{9, 2}
+}
+
+func (m *RowFilter_Condition) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_RowFilter_Condition.Unmarshal(m, b)
+}
+func (m *RowFilter_Condition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_RowFilter_Condition.Marshal(b, m, deterministic)
+}
+func (m *RowFilter_Condition) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RowFilter_Condition.Merge(m, src)
+}
+func (m *RowFilter_Condition) XXX_Size() int {
+	return xxx_messageInfo_RowFilter_Condition.Size(m)
+}
+func (m *RowFilter_Condition) XXX_DiscardUnknown() {
+	xxx_messageInfo_RowFilter_Condition.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RowFilter_Condition proto.InternalMessageInfo
 
 func (m *RowFilter_Condition) GetPredicateFilter() *RowFilter {
 	if m != nil {
@@ -1566,35 +1312,64 @@ type Mutation struct {
 	//	*Mutation_DeleteFromColumn_
 	//	*Mutation_DeleteFromFamily_
 	//	*Mutation_DeleteFromRow_
-	Mutation isMutation_Mutation `protobuf_oneof:"mutation"`
+	Mutation             isMutation_Mutation `protobuf_oneof:"mutation"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_unrecognized     []byte              `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
 }
 
-func (m *Mutation) Reset()                    { *m = Mutation{} }
-func (m *Mutation) String() string            { return proto.CompactTextString(m) }
-func (*Mutation) ProtoMessage()               {}
-func (*Mutation) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{10} }
+func (m *Mutation) Reset()         { *m = Mutation{} }
+func (m *Mutation) String() string { return proto.CompactTextString(m) }
+func (*Mutation) ProtoMessage()    {}
+func (*Mutation) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{10}
+}
+
+func (m *Mutation) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Mutation.Unmarshal(m, b)
+}
+func (m *Mutation) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Mutation.Marshal(b, m, deterministic)
+}
+func (m *Mutation) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Mutation.Merge(m, src)
+}
+func (m *Mutation) XXX_Size() int {
+	return xxx_messageInfo_Mutation.Size(m)
+}
+func (m *Mutation) XXX_DiscardUnknown() {
+	xxx_messageInfo_Mutation.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Mutation proto.InternalMessageInfo
 
 type isMutation_Mutation interface {
 	isMutation_Mutation()
 }
 
 type Mutation_SetCell_ struct {
-	SetCell *Mutation_SetCell `protobuf:"bytes,1,opt,name=set_cell,json=setCell,oneof"`
-}
-type Mutation_DeleteFromColumn_ struct {
-	DeleteFromColumn *Mutation_DeleteFromColumn `protobuf:"bytes,2,opt,name=delete_from_column,json=deleteFromColumn,oneof"`
-}
-type Mutation_DeleteFromFamily_ struct {
-	DeleteFromFamily *Mutation_DeleteFromFamily `protobuf:"bytes,3,opt,name=delete_from_family,json=deleteFromFamily,oneof"`
-}
-type Mutation_DeleteFromRow_ struct {
-	DeleteFromRow *Mutation_DeleteFromRow `protobuf:"bytes,4,opt,name=delete_from_row,json=deleteFromRow,oneof"`
+	SetCell *Mutation_SetCell `protobuf:"bytes,1,opt,name=set_cell,json=setCell,proto3,oneof"`
 }
 
-func (*Mutation_SetCell_) isMutation_Mutation()          {}
+type Mutation_DeleteFromColumn_ struct {
+	DeleteFromColumn *Mutation_DeleteFromColumn `protobuf:"bytes,2,opt,name=delete_from_column,json=deleteFromColumn,proto3,oneof"`
+}
+
+type Mutation_DeleteFromFamily_ struct {
+	DeleteFromFamily *Mutation_DeleteFromFamily `protobuf:"bytes,3,opt,name=delete_from_family,json=deleteFromFamily,proto3,oneof"`
+}
+
+type Mutation_DeleteFromRow_ struct {
+	DeleteFromRow *Mutation_DeleteFromRow `protobuf:"bytes,4,opt,name=delete_from_row,json=deleteFromRow,proto3,oneof"`
+}
+
+func (*Mutation_SetCell_) isMutation_Mutation() {}
+
 func (*Mutation_DeleteFromColumn_) isMutation_Mutation() {}
+
 func (*Mutation_DeleteFromFamily_) isMutation_Mutation() {}
-func (*Mutation_DeleteFromRow_) isMutation_Mutation()    {}
+
+func (*Mutation_DeleteFromRow_) isMutation_Mutation() {}
 
 func (m *Mutation) GetMutation() isMutation_Mutation {
 	if m != nil {
@@ -1631,9 +1406,9 @@ func (m *Mutation) GetDeleteFromRow() *Mutation_DeleteFromRow {
 	return nil
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*Mutation) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _Mutation_OneofMarshaler, _Mutation_OneofUnmarshaler, _Mutation_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Mutation) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*Mutation_SetCell_)(nil),
 		(*Mutation_DeleteFromColumn_)(nil),
 		(*Mutation_DeleteFromFamily_)(nil),
@@ -1641,113 +1416,11 @@ func (*Mutation) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) erro
 	}
 }
 
-func _Mutation_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*Mutation)
-	// mutation
-	switch x := m.Mutation.(type) {
-	case *Mutation_SetCell_:
-		b.EncodeVarint(1<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.SetCell); err != nil {
-			return err
-		}
-	case *Mutation_DeleteFromColumn_:
-		b.EncodeVarint(2<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.DeleteFromColumn); err != nil {
-			return err
-		}
-	case *Mutation_DeleteFromFamily_:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.DeleteFromFamily); err != nil {
-			return err
-		}
-	case *Mutation_DeleteFromRow_:
-		b.EncodeVarint(4<<3 | proto.WireBytes)
-		if err := b.EncodeMessage(x.DeleteFromRow); err != nil {
-			return err
-		}
-	case nil:
-	default:
-		return fmt.Errorf("Mutation.Mutation has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _Mutation_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*Mutation)
-	switch tag {
-	case 1: // mutation.set_cell
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Mutation_SetCell)
-		err := b.DecodeMessage(msg)
-		m.Mutation = &Mutation_SetCell_{msg}
-		return true, err
-	case 2: // mutation.delete_from_column
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Mutation_DeleteFromColumn)
-		err := b.DecodeMessage(msg)
-		m.Mutation = &Mutation_DeleteFromColumn_{msg}
-		return true, err
-	case 3: // mutation.delete_from_family
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Mutation_DeleteFromFamily)
-		err := b.DecodeMessage(msg)
-		m.Mutation = &Mutation_DeleteFromFamily_{msg}
-		return true, err
-	case 4: // mutation.delete_from_row
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		msg := new(Mutation_DeleteFromRow)
-		err := b.DecodeMessage(msg)
-		m.Mutation = &Mutation_DeleteFromRow_{msg}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _Mutation_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*Mutation)
-	// mutation
-	switch x := m.Mutation.(type) {
-	case *Mutation_SetCell_:
-		s := proto.Size(x.SetCell)
-		n += proto.SizeVarint(1<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Mutation_DeleteFromColumn_:
-		s := proto.Size(x.DeleteFromColumn)
-		n += proto.SizeVarint(2<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Mutation_DeleteFromFamily_:
-		s := proto.Size(x.DeleteFromFamily)
-		n += proto.SizeVarint(3<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case *Mutation_DeleteFromRow_:
-		s := proto.Size(x.DeleteFromRow)
-		n += proto.SizeVarint(4<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(s))
-		n += s
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
-}
-
 // A Mutation which sets the value of the specified cell.
 type Mutation_SetCell struct {
 	// The name of the family into which new data should be written.
 	// Must match `[-_.a-zA-Z0-9]+`
-	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName" json:"family_name,omitempty"`
+	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName,proto3" json:"family_name,omitempty"`
 	// The qualifier of the column into which new data should be written.
 	// Can be any byte string, including the empty string.
 	ColumnQualifier []byte `protobuf:"bytes,2,opt,name=column_qualifier,json=columnQualifier,proto3" json:"column_qualifier,omitempty"`
@@ -1756,15 +1429,38 @@ type Mutation_SetCell struct {
 	// Otherwise, the client should set this value itself, noting that the
 	// default value is a timestamp of zero if the field is left unspecified.
 	// Values must match the granularity of the table (e.g. micros, millis).
-	TimestampMicros int64 `protobuf:"varint,3,opt,name=timestamp_micros,json=timestampMicros" json:"timestamp_micros,omitempty"`
+	TimestampMicros int64 `protobuf:"varint,3,opt,name=timestamp_micros,json=timestampMicros,proto3" json:"timestamp_micros,omitempty"`
 	// The value to be written into the specified cell.
-	Value []byte `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	Value                []byte   `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Mutation_SetCell) Reset()                    { *m = Mutation_SetCell{} }
-func (m *Mutation_SetCell) String() string            { return proto.CompactTextString(m) }
-func (*Mutation_SetCell) ProtoMessage()               {}
-func (*Mutation_SetCell) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{10, 0} }
+func (m *Mutation_SetCell) Reset()         { *m = Mutation_SetCell{} }
+func (m *Mutation_SetCell) String() string { return proto.CompactTextString(m) }
+func (*Mutation_SetCell) ProtoMessage()    {}
+func (*Mutation_SetCell) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{10, 0}
+}
+
+func (m *Mutation_SetCell) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Mutation_SetCell.Unmarshal(m, b)
+}
+func (m *Mutation_SetCell) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Mutation_SetCell.Marshal(b, m, deterministic)
+}
+func (m *Mutation_SetCell) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Mutation_SetCell.Merge(m, src)
+}
+func (m *Mutation_SetCell) XXX_Size() int {
+	return xxx_messageInfo_Mutation_SetCell.Size(m)
+}
+func (m *Mutation_SetCell) XXX_DiscardUnknown() {
+	xxx_messageInfo_Mutation_SetCell.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Mutation_SetCell proto.InternalMessageInfo
 
 func (m *Mutation_SetCell) GetFamilyName() string {
 	if m != nil {
@@ -1799,18 +1495,41 @@ func (m *Mutation_SetCell) GetValue() []byte {
 type Mutation_DeleteFromColumn struct {
 	// The name of the family from which cells should be deleted.
 	// Must match `[-_.a-zA-Z0-9]+`
-	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName" json:"family_name,omitempty"`
+	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName,proto3" json:"family_name,omitempty"`
 	// The qualifier of the column from which cells should be deleted.
 	// Can be any byte string, including the empty string.
 	ColumnQualifier []byte `protobuf:"bytes,2,opt,name=column_qualifier,json=columnQualifier,proto3" json:"column_qualifier,omitempty"`
 	// The range of timestamps within which cells should be deleted.
-	TimeRange *TimestampRange `protobuf:"bytes,3,opt,name=time_range,json=timeRange" json:"time_range,omitempty"`
+	TimeRange            *TimestampRange `protobuf:"bytes,3,opt,name=time_range,json=timeRange,proto3" json:"time_range,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
 }
 
-func (m *Mutation_DeleteFromColumn) Reset()                    { *m = Mutation_DeleteFromColumn{} }
-func (m *Mutation_DeleteFromColumn) String() string            { return proto.CompactTextString(m) }
-func (*Mutation_DeleteFromColumn) ProtoMessage()               {}
-func (*Mutation_DeleteFromColumn) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{10, 1} }
+func (m *Mutation_DeleteFromColumn) Reset()         { *m = Mutation_DeleteFromColumn{} }
+func (m *Mutation_DeleteFromColumn) String() string { return proto.CompactTextString(m) }
+func (*Mutation_DeleteFromColumn) ProtoMessage()    {}
+func (*Mutation_DeleteFromColumn) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{10, 1}
+}
+
+func (m *Mutation_DeleteFromColumn) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Mutation_DeleteFromColumn.Unmarshal(m, b)
+}
+func (m *Mutation_DeleteFromColumn) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Mutation_DeleteFromColumn.Marshal(b, m, deterministic)
+}
+func (m *Mutation_DeleteFromColumn) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Mutation_DeleteFromColumn.Merge(m, src)
+}
+func (m *Mutation_DeleteFromColumn) XXX_Size() int {
+	return xxx_messageInfo_Mutation_DeleteFromColumn.Size(m)
+}
+func (m *Mutation_DeleteFromColumn) XXX_DiscardUnknown() {
+	xxx_messageInfo_Mutation_DeleteFromColumn.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Mutation_DeleteFromColumn proto.InternalMessageInfo
 
 func (m *Mutation_DeleteFromColumn) GetFamilyName() string {
 	if m != nil {
@@ -1837,13 +1556,36 @@ func (m *Mutation_DeleteFromColumn) GetTimeRange() *TimestampRange {
 type Mutation_DeleteFromFamily struct {
 	// The name of the family from which cells should be deleted.
 	// Must match `[-_.a-zA-Z0-9]+`
-	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName" json:"family_name,omitempty"`
+	FamilyName           string   `protobuf:"bytes,1,opt,name=family_name,json=familyName,proto3" json:"family_name,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Mutation_DeleteFromFamily) Reset()                    { *m = Mutation_DeleteFromFamily{} }
-func (m *Mutation_DeleteFromFamily) String() string            { return proto.CompactTextString(m) }
-func (*Mutation_DeleteFromFamily) ProtoMessage()               {}
-func (*Mutation_DeleteFromFamily) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{10, 2} }
+func (m *Mutation_DeleteFromFamily) Reset()         { *m = Mutation_DeleteFromFamily{} }
+func (m *Mutation_DeleteFromFamily) String() string { return proto.CompactTextString(m) }
+func (*Mutation_DeleteFromFamily) ProtoMessage()    {}
+func (*Mutation_DeleteFromFamily) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{10, 2}
+}
+
+func (m *Mutation_DeleteFromFamily) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Mutation_DeleteFromFamily.Unmarshal(m, b)
+}
+func (m *Mutation_DeleteFromFamily) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Mutation_DeleteFromFamily.Marshal(b, m, deterministic)
+}
+func (m *Mutation_DeleteFromFamily) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Mutation_DeleteFromFamily.Merge(m, src)
+}
+func (m *Mutation_DeleteFromFamily) XXX_Size() int {
+	return xxx_messageInfo_Mutation_DeleteFromFamily.Size(m)
+}
+func (m *Mutation_DeleteFromFamily) XXX_DiscardUnknown() {
+	xxx_messageInfo_Mutation_DeleteFromFamily.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Mutation_DeleteFromFamily proto.InternalMessageInfo
 
 func (m *Mutation_DeleteFromFamily) GetFamilyName() string {
 	if m != nil {
@@ -1854,19 +1596,42 @@ func (m *Mutation_DeleteFromFamily) GetFamilyName() string {
 
 // A Mutation which deletes all cells from the containing row.
 type Mutation_DeleteFromRow struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Mutation_DeleteFromRow) Reset()                    { *m = Mutation_DeleteFromRow{} }
-func (m *Mutation_DeleteFromRow) String() string            { return proto.CompactTextString(m) }
-func (*Mutation_DeleteFromRow) ProtoMessage()               {}
-func (*Mutation_DeleteFromRow) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{10, 3} }
+func (m *Mutation_DeleteFromRow) Reset()         { *m = Mutation_DeleteFromRow{} }
+func (m *Mutation_DeleteFromRow) String() string { return proto.CompactTextString(m) }
+func (*Mutation_DeleteFromRow) ProtoMessage()    {}
+func (*Mutation_DeleteFromRow) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{10, 3}
+}
+
+func (m *Mutation_DeleteFromRow) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Mutation_DeleteFromRow.Unmarshal(m, b)
+}
+func (m *Mutation_DeleteFromRow) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Mutation_DeleteFromRow.Marshal(b, m, deterministic)
+}
+func (m *Mutation_DeleteFromRow) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Mutation_DeleteFromRow.Merge(m, src)
+}
+func (m *Mutation_DeleteFromRow) XXX_Size() int {
+	return xxx_messageInfo_Mutation_DeleteFromRow.Size(m)
+}
+func (m *Mutation_DeleteFromRow) XXX_DiscardUnknown() {
+	xxx_messageInfo_Mutation_DeleteFromRow.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Mutation_DeleteFromRow proto.InternalMessageInfo
 
 // Specifies an atomic read/modify/write operation on the latest value of the
 // specified column.
 type ReadModifyWriteRule struct {
 	// The name of the family to which the read/modify/write should be applied.
 	// Must match `[-_.a-zA-Z0-9]+`
-	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName" json:"family_name,omitempty"`
+	FamilyName string `protobuf:"bytes,1,opt,name=family_name,json=familyName,proto3" json:"family_name,omitempty"`
 	// The qualifier of the column to which the read/modify/write should be
 	// applied.
 	// Can be any byte string, including the empty string.
@@ -1877,34 +1642,36 @@ type ReadModifyWriteRule struct {
 	// Types that are valid to be assigned to Rule:
 	//	*ReadModifyWriteRule_AppendValue
 	//	*ReadModifyWriteRule_IncrementAmount
-	Rule isReadModifyWriteRule_Rule `protobuf_oneof:"rule"`
+	Rule                 isReadModifyWriteRule_Rule `protobuf_oneof:"rule"`
+	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
+	XXX_unrecognized     []byte                     `json:"-"`
+	XXX_sizecache        int32                      `json:"-"`
 }
 
-func (m *ReadModifyWriteRule) Reset()                    { *m = ReadModifyWriteRule{} }
-func (m *ReadModifyWriteRule) String() string            { return proto.CompactTextString(m) }
-func (*ReadModifyWriteRule) ProtoMessage()               {}
-func (*ReadModifyWriteRule) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{11} }
-
-type isReadModifyWriteRule_Rule interface {
-	isReadModifyWriteRule_Rule()
+func (m *ReadModifyWriteRule) Reset()         { *m = ReadModifyWriteRule{} }
+func (m *ReadModifyWriteRule) String() string { return proto.CompactTextString(m) }
+func (*ReadModifyWriteRule) ProtoMessage()    {}
+func (*ReadModifyWriteRule) Descriptor() ([]byte, []int) {
+	return fileDescriptor_343df51a8f7aa933, []int{11}
 }
 
-type ReadModifyWriteRule_AppendValue struct {
-	AppendValue []byte `protobuf:"bytes,3,opt,name=append_value,json=appendValue,proto3,oneof"`
+func (m *ReadModifyWriteRule) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ReadModifyWriteRule.Unmarshal(m, b)
 }
-type ReadModifyWriteRule_IncrementAmount struct {
-	IncrementAmount int64 `protobuf:"varint,4,opt,name=increment_amount,json=incrementAmount,oneof"`
+func (m *ReadModifyWriteRule) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ReadModifyWriteRule.Marshal(b, m, deterministic)
+}
+func (m *ReadModifyWriteRule) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ReadModifyWriteRule.Merge(m, src)
+}
+func (m *ReadModifyWriteRule) XXX_Size() int {
+	return xxx_messageInfo_ReadModifyWriteRule.Size(m)
+}
+func (m *ReadModifyWriteRule) XXX_DiscardUnknown() {
+	xxx_messageInfo_ReadModifyWriteRule.DiscardUnknown(m)
 }
 
-func (*ReadModifyWriteRule_AppendValue) isReadModifyWriteRule_Rule()     {}
-func (*ReadModifyWriteRule_IncrementAmount) isReadModifyWriteRule_Rule() {}
-
-func (m *ReadModifyWriteRule) GetRule() isReadModifyWriteRule_Rule {
-	if m != nil {
-		return m.Rule
-	}
-	return nil
-}
+var xxx_messageInfo_ReadModifyWriteRule proto.InternalMessageInfo
 
 func (m *ReadModifyWriteRule) GetFamilyName() string {
 	if m != nil {
@@ -1916,6 +1683,29 @@ func (m *ReadModifyWriteRule) GetFamilyName() string {
 func (m *ReadModifyWriteRule) GetColumnQualifier() []byte {
 	if m != nil {
 		return m.ColumnQualifier
+	}
+	return nil
+}
+
+type isReadModifyWriteRule_Rule interface {
+	isReadModifyWriteRule_Rule()
+}
+
+type ReadModifyWriteRule_AppendValue struct {
+	AppendValue []byte `protobuf:"bytes,3,opt,name=append_value,json=appendValue,proto3,oneof"`
+}
+
+type ReadModifyWriteRule_IncrementAmount struct {
+	IncrementAmount int64 `protobuf:"varint,4,opt,name=increment_amount,json=incrementAmount,proto3,oneof"`
+}
+
+func (*ReadModifyWriteRule_AppendValue) isReadModifyWriteRule_Rule() {}
+
+func (*ReadModifyWriteRule_IncrementAmount) isReadModifyWriteRule_Rule() {}
+
+func (m *ReadModifyWriteRule) GetRule() isReadModifyWriteRule_Rule {
+	if m != nil {
+		return m.Rule
 	}
 	return nil
 }
@@ -1934,69 +1724,12 @@ func (m *ReadModifyWriteRule) GetIncrementAmount() int64 {
 	return 0
 }
 
-// XXX_OneofFuncs is for the internal use of the proto package.
-func (*ReadModifyWriteRule) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
-	return _ReadModifyWriteRule_OneofMarshaler, _ReadModifyWriteRule_OneofUnmarshaler, _ReadModifyWriteRule_OneofSizer, []interface{}{
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*ReadModifyWriteRule) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
 		(*ReadModifyWriteRule_AppendValue)(nil),
 		(*ReadModifyWriteRule_IncrementAmount)(nil),
 	}
-}
-
-func _ReadModifyWriteRule_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
-	m := msg.(*ReadModifyWriteRule)
-	// rule
-	switch x := m.Rule.(type) {
-	case *ReadModifyWriteRule_AppendValue:
-		b.EncodeVarint(3<<3 | proto.WireBytes)
-		b.EncodeRawBytes(x.AppendValue)
-	case *ReadModifyWriteRule_IncrementAmount:
-		b.EncodeVarint(4<<3 | proto.WireVarint)
-		b.EncodeVarint(uint64(x.IncrementAmount))
-	case nil:
-	default:
-		return fmt.Errorf("ReadModifyWriteRule.Rule has unexpected type %T", x)
-	}
-	return nil
-}
-
-func _ReadModifyWriteRule_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
-	m := msg.(*ReadModifyWriteRule)
-	switch tag {
-	case 3: // rule.append_value
-		if wire != proto.WireBytes {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeRawBytes(true)
-		m.Rule = &ReadModifyWriteRule_AppendValue{x}
-		return true, err
-	case 4: // rule.increment_amount
-		if wire != proto.WireVarint {
-			return true, proto.ErrInternalBadWireType
-		}
-		x, err := b.DecodeVarint()
-		m.Rule = &ReadModifyWriteRule_IncrementAmount{int64(x)}
-		return true, err
-	default:
-		return false, nil
-	}
-}
-
-func _ReadModifyWriteRule_OneofSizer(msg proto.Message) (n int) {
-	m := msg.(*ReadModifyWriteRule)
-	// rule
-	switch x := m.Rule.(type) {
-	case *ReadModifyWriteRule_AppendValue:
-		n += proto.SizeVarint(3<<3 | proto.WireBytes)
-		n += proto.SizeVarint(uint64(len(x.AppendValue)))
-		n += len(x.AppendValue)
-	case *ReadModifyWriteRule_IncrementAmount:
-		n += proto.SizeVarint(4<<3 | proto.WireVarint)
-		n += proto.SizeVarint(uint64(x.IncrementAmount))
-	case nil:
-	default:
-		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
-	}
-	return n
 }
 
 func init() {
@@ -2021,9 +1754,9 @@ func init() {
 	proto.RegisterType((*ReadModifyWriteRule)(nil), "google.bigtable.v2.ReadModifyWriteRule")
 }
 
-func init() { proto.RegisterFile("google/bigtable/v2/data.proto", fileDescriptor1) }
+func init() { proto.RegisterFile("google/bigtable/v2/data.proto", fileDescriptor_343df51a8f7aa933) }
 
-var fileDescriptor1 = []byte{
+var fileDescriptor_343df51a8f7aa933 = []byte{
 	// 1444 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x57, 0xdb, 0x72, 0x1b, 0x45,
 	0x13, 0xd6, 0x5a, 0xb6, 0x2c, 0xf5, 0xca, 0x96, 0x32, 0x71, 0x1c, 0x45, 0x7f, 0xfc, 0xc7, 0xa5,

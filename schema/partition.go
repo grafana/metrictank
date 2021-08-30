@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	"github.com/cespare/xxhash"
+	"github.com/cespare/xxhash/v2"
 	jump "github.com/dgryski/go-jump"
 	"github.com/grafana/metrictank/util"
 )
