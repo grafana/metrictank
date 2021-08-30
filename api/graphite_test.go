@@ -15,6 +15,7 @@ import (
 
 func TestServer_renderMetrics_unknownFunctionError(t *testing.T) {
 	initReadyCluster()
+	defer initProxyStats()
 
 	req := models.GraphiteRender{
 		FromTo: models.FromTo{
@@ -53,9 +54,56 @@ func TestServer_renderMetrics_unknownFunctionError(t *testing.T) {
 		t.Errorf("Body should be %q, got %q", expectedBody, resp.Body.String())
 	}
 
-	// check that function was logged
+	// check that unknown function stats was incremented
 	if counter := proxyStats.funcMiss["undefinedFunction"]; counter == nil || counter.Peek() == 0 {
 		t.Errorf("Should have accounted the funcMiss, but didn't")
+	}
+}
+
+func TestServer_renderMetrics_wrongArgumentError(t *testing.T) {
+	initReadyCluster()
+	defer initProxyStats()
+
+	req := models.GraphiteRender{
+		FromTo: models.FromTo{
+			From: "100",
+			To:   "200",
+			Tz:   "Europe/Madrid",
+		},
+		Targets: []string{"absolute('hello')"},
+		Format:  "json",
+		NoProxy: true,
+	}
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	httpReq := httptest.NewRequest(http.MethodPost, "/render", bytes.NewReader(data))
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	server, err := NewServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.RegisterRoutes()
+	server.Macaron.ServeHTTP(resp, httpReq)
+
+	// check the response
+	expectedCode := http.StatusBadRequest
+	if resp.Code != expectedCode {
+		t.Errorf("Status code should be %d, got %d", expectedCode, resp.Code)
+	}
+	expectedBody := `can't plan function "absolute", arg 0: argument bad type. expected func or name - got etString`
+	if resp.Body.String() != expectedBody {
+		t.Errorf("Body should be %q, got %q", expectedBody, resp.Body.String())
+	}
+
+	// check that unknown function stats was NOT incremented
+	if counter := proxyStats.funcMiss["undefinedFunction"]; counter != nil && counter.Peek() > 0 {
+		t.Errorf("Should not account the funcMiss, but did")
 	}
 }
 

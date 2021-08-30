@@ -17,10 +17,13 @@ import (
 var proxyStats graphiteProxyStats
 
 func init() {
+	initProxyStats()
+}
+
+func initProxyStats() {
 	proxyStats = graphiteProxyStats{
 		funcMiss: make(map[string]*stats.Counter32),
 	}
-
 }
 
 type graphiteProxyStats struct {
