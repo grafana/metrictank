@@ -47,6 +47,12 @@ func New(defaultSize int) *PointSlicePool {
 	}
 }
 
+// SetDefaultSize - Change the default size for the point slice pool.
+// This function is not thread-safe and should only be called when pool is not being actively used.
+func (p *PointSlicePool) SetDefaultSize(size int) {
+	p.defaultSize = size
+}
+
 func (p *PointSlicePool) PutMaybeNil(s []schema.Point) {
 	if s != nil {
 		p.Put(s)

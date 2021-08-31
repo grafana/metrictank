@@ -83,4 +83,5 @@ func ConfigProcess() {
 			log.Fatalf("API Cannot load timezone %q: %s", timeZoneStr, err.Error())
 		}
 	}
+	pointSlicePool.SetDefaultSize(int(minSliceSize))
 }

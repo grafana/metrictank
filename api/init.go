@@ -9,7 +9,7 @@ import (
 var pointSlicePool *pointslicepool.PointSlicePool
 
 func init() {
-	pointSlicePool = pointslicepool.New(int(minSliceSize))
+	pointSlicePool = pointslicepool.New(0)
 	expr.Pool(pointSlicePool)
 	models.Pool(pointSlicePool)
 }
