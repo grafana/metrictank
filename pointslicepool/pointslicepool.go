@@ -5,18 +5,21 @@ import (
 
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/util"
 )
 
 type PointSlicePool struct {
-	getCandHit   *stats.CounterRate32
-	getCandMiss  *stats.CounterRate32
-	getCandUnfit *stats.CounterRate32
-	putLarge     *stats.CounterRate32
-	putSmall     *stats.CounterRate32
-	getMakeLarge *stats.CounterRate32
-	getMakeSmall *stats.CounterRate32
-	defaultSize  int
-	p            sync.Pool
+	getCandHit     *stats.CounterRate32
+	getCandMiss    *stats.CounterRate32
+	getCandUnfit   *stats.CounterRate32
+	putLarge       *stats.CounterRate32
+	putDefault     *stats.CounterRate32
+	putSmall       *stats.CounterRate32
+	getMakeLarge   *stats.CounterRate32
+	getMakeDefault *stats.CounterRate32
+	getMakeSmall   *stats.CounterRate32
+	defaultSize    int
+	p              sync.Pool
 }
 
 func New(defaultSize int) *PointSlicePool {
@@ -29,10 +32,14 @@ func New(defaultSize int) *PointSlicePool {
 		getCandUnfit: stats.NewCounterRate32("pointslicepool.ops.get-candidate.unfit"),
 		// metric pointslicepool.ops.put.large is how many times a pointslice is added to the pool that is the same size or larger than the default
 		putLarge: stats.NewCounterRate32("pointslicepool.ops.put.large"),
+		// metric pointslicepool.ops.put.small is how many times a pointslice is added to the pool that is equal to the default
+		putDefault: stats.NewCounterRate32("pointslicepool.ops.put.default"),
 		// metric pointslicepool.ops.put.small is how many times a pointslice is added to the pool that is smaller than the default
 		putSmall: stats.NewCounterRate32("pointslicepool.ops.put.small"),
 		// metric pointslicepool.ops.get-make.large is how many times a pointslice is allocated that is larger or equal to the default size
 		getMakeLarge: stats.NewCounterRate32("pointslicepool.ops.get-make.large"),
+		// metric pointslicepool.ops.get-make.small is how many times a pointslice is allocated that is equal to the default size
+		getMakeDefault: stats.NewCounterRate32("pointslicepool.ops.get-make.default"),
 		// metric pointslicepool.ops.get-make.small is how many times a pointslice is allocated that is smaller than the default size
 		getMakeSmall: stats.NewCounterRate32("pointslicepool.ops.get-make.small"),
 		defaultSize:  defaultSize,
@@ -47,11 +54,7 @@ func (p *PointSlicePool) PutMaybeNil(s []schema.Point) {
 }
 
 func (p *PointSlicePool) Put(s []schema.Point) {
-	if cap(s) > p.defaultSize {
-		p.putLarge.Inc()
-	} else if cap(s) < p.defaultSize {
-		p.putSmall.Inc()
-	}
+	p.incrementCounter(cap(s), p.putLarge, p.putDefault, p.putSmall)
 	p.p.Put(s[:0])
 }
 
@@ -72,15 +75,22 @@ func (p *PointSlicePool) GetMin(minCap int) []schema.Point {
 	} else {
 		p.getCandMiss.Inc()
 	}
-	if minCap > p.defaultSize {
-		p.getMakeLarge.Inc()
-		return make([]schema.Point, 0, minCap)
-	}
+
+	p.incrementCounter(minCap, p.getMakeLarge, p.getMakeDefault, p.getMakeSmall)
+
 	// even if our caller needs a smaller cap now, we expect they will put it back in the pool
 	// so it can later be reused.
 	// may as well allocate a size now that we expect will be more useful down the road.
-	if minCap < p.defaultSize {
-		p.getMakeSmall.Inc()
+	allocCap := util.MaxInt(minCap, p.defaultSize)
+	return make([]schema.Point, 0, allocCap)
+}
+
+func (p *PointSlicePool) incrementCounter(size int, large, deflt, small *stats.CounterRate32) {
+	if size > p.defaultSize {
+		large.Inc()
+	} else if size == p.defaultSize {
+		deflt.Inc()
+	} else {
+		small.Inc()
 	}
-	return make([]schema.Point, 0, p.defaultSize)
 }
