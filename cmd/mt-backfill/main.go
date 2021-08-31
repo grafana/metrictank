@@ -94,6 +94,21 @@ func (ih inputHandler) ProcessMetricPoint(point schema.MetricPoint, format msg.F
 }
 
 func main() {
+
+	flag.Usage = func() {
+		fmt.Println("mt-backfill")
+		fmt.Println("Consumes data from Kafka and backfills chunks to Cassandra (only supports cassandra).")
+		fmt.Println("Does not update the index table. Useful when existing series in Metrictank need historical data.")
+		fmt.Println()
+		fmt.Printf("Parameters:\n\n")
+		flag.PrintDefaults()
+		fmt.Println()
+		fmt.Println("Config file supports same elements as `metrictank` command, but only supports Kafka in and Cassandra out.")
+		fmt.Println()
+		fmt.Printf("Example:\n\n")
+		fmt.Printf("  mt-backfill -config /etc/metrictank/backfill.ini -timeout 600\n\n")
+	}
+
 	flag.Parse()
 
 	// logger
