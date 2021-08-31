@@ -30,15 +30,15 @@ func New(defaultSize int) *PointSlicePool {
 		getCandMiss: stats.NewCounterRate32("pointslicepool.ops.get-candidate.miss"),
 		// metric pointslicepool.ops.get-candidate.unfit is how many times a pointslice from the pool was not large enough to satisfy a get
 		getCandUnfit: stats.NewCounterRate32("pointslicepool.ops.get-candidate.unfit"),
-		// metric pointslicepool.ops.put.large is how many times a pointslice is added to the pool that is the same size or larger than the default
+		// metric pointslicepool.ops.put.large is how many times a pointslice is added to the pool that is larger than the default
 		putLarge: stats.NewCounterRate32("pointslicepool.ops.put.large"),
-		// metric pointslicepool.ops.put.small is how many times a pointslice is added to the pool that is equal to the default
+		// metric pointslicepool.ops.put.default is how many times a pointslice is added to the pool that is equal to the default
 		putDefault: stats.NewCounterRate32("pointslicepool.ops.put.default"),
 		// metric pointslicepool.ops.put.small is how many times a pointslice is added to the pool that is smaller than the default
 		putSmall: stats.NewCounterRate32("pointslicepool.ops.put.small"),
-		// metric pointslicepool.ops.get-make.large is how many times a pointslice is allocated that is larger or equal to the default size
+		// metric pointslicepool.ops.get-make.large is how many times a pointslice is allocated that is larger than the default size
 		getMakeLarge: stats.NewCounterRate32("pointslicepool.ops.get-make.large"),
-		// metric pointslicepool.ops.get-make.small is how many times a pointslice is allocated that is equal to the default size
+		// metric pointslicepool.ops.get-make.default is how many times a pointslice is allocated that is equal to the default size
 		getMakeDefault: stats.NewCounterRate32("pointslicepool.ops.get-make.default"),
 		// metric pointslicepool.ops.get-make.small is how many times a pointslice is allocated that is smaller than the default size
 		getMakeSmall: stats.NewCounterRate32("pointslicepool.ops.get-make.small"),

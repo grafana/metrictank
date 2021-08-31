@@ -272,12 +272,16 @@ how many times we could satisfy a get with a pointslice from the pool
 how many times there was nothing in the pool to satisfy a get
 * `pointslicepool.ops.get-candidate.unfit`:  
 how many times a pointslice from the pool was not large enough to satisfy a get
+* `pointslicepool.ops.get-make.default`:  
+how many times a pointslice is allocated that is equal to the default size
 * `pointslicepool.ops.get-make.large`:  
-how many times a pointslice is allocated that is larger or equal to the default size
+how many times a pointslice is allocated that is larger than the default size
 * `pointslicepool.ops.get-make.small`:  
 how many times a pointslice is allocated that is smaller than the default size
+* `pointslicepool.ops.put.default`:  
+how many times a pointslice is added to the pool that is equal to the default
 * `pointslicepool.ops.put.large`:  
-how many times a pointslice is added to the pool that is the same size or larger than the default
+how many times a pointslice is added to the pool that is larger than the default
 * `pointslicepool.ops.put.small`:  
 how many times a pointslice is added to the pool that is smaller than the default
 * `process.major_page_faults.counter64`:  
