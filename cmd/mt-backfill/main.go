@@ -93,6 +93,11 @@ func (ih inputHandler) ProcessMetricPoint(point schema.MetricPoint, format msg.F
 	}
 }
 
+// input.Handler interface
+func (ih inputHandler) ProcessIndexControlMsg(msg schema.ControlMsg, partition int32) {
+	// Ignore index messages
+}
+
 func main() {
 
 	flag.Usage = func() {
