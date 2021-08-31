@@ -7,10 +7,6 @@ import (
 	"github.com/grafana/metrictank/stats"
 )
 
-// default size is probably bigger than what most responses need, but it saves [re]allocations
-// also it's possible that occasionally more size is needed, causing a realloc of underlying array, and that extra space will stick around until next GC run.
-const DefaultPointSliceSize = 2000
-
 type PointSlicePool struct {
 	getCandHit   *stats.CounterRate32
 	getCandMiss  *stats.CounterRate32
