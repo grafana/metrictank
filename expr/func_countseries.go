@@ -37,7 +37,7 @@ func (s *FuncCountSeries) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	cons, queryCons := summarizeCons(series)
 	name := fmt.Sprintf("countSeries(%s)", strings.Join(queryPatts, ","))
-	out := pointSlicePool.Get()
+	out := pointSlicePool.GetMin(len(series[0].Datapoints))
 
 	// note: if series have different intervals, we could try to be clever and pick the one with highest resolution
 	// as it's more likely to be useful when combined with other functions, but that's too much hassle

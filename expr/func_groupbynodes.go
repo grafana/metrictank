@@ -95,7 +95,7 @@ func (s *FuncGroupByNodes) Exec(dataMap DataMap) ([]models.Series, error) {
 		group.s = Normalize(group.s, NewCOWCycler(dataMap))
 		outSeries.Interval = group.s[0].Interval
 		outSeries.SetTags()
-		outSeries.Datapoints = pointSlicePool.Get()
+		outSeries.Datapoints = pointSlicePool.GetMin(len(group.s[0].Datapoints))
 		aggFunc(group.s, &outSeries.Datapoints)
 		output = append(output, outSeries)
 	}

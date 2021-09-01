@@ -44,7 +44,7 @@ func (s *FuncPerSecond) Exec(dataMap DataMap) ([]models.Series, error) {
 
 	outSeries := make([]models.Series, 0, len(series))
 	for _, serie := range series {
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for i, v := range serie.Datapoints {
 			out = append(out, schema.Point{Ts: v.Ts})
 			if i == 0 || math.IsNaN(v.Val) || math.IsNaN(serie.Datapoints[i-1].Val) {

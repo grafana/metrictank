@@ -41,7 +41,7 @@ func (s *FuncIntegral) Exec(dataMap DataMap) ([]models.Series, error) {
 
 		current := 0.0
 
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for _, p := range serie.Datapoints {
 			if !math.IsNaN(p.Val) {
 				current += p.Val

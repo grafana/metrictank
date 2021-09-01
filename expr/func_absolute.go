@@ -35,7 +35,7 @@ func (s *FuncAbsolute) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.Target = fmt.Sprintf("absolute(%s)", serie.Target)
 		serie.Tags = serie.CopyTagsWith("absolute", "1")
 		serie.QueryPatt = fmt.Sprintf("absolute(%s)", serie.QueryPatt)
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 		for _, p := range serie.Datapoints {
 			p.Val = math.Abs(p.Val)
 			out = append(out, p)

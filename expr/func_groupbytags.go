@@ -130,7 +130,7 @@ func (s *FuncGroupByTags) Exec(dataMap DataMap) ([]models.Series, error) {
 		}
 		newSeries.SetTags()
 
-		newSeries.Datapoints = pointSlicePool.Get()
+		newSeries.Datapoints = pointSlicePool.GetMin(len(series[0].Datapoints))
 		group.s = Normalize(group.s, NewCOWCycler(dataMap))
 		aggFunc(group.s, &newSeries.Datapoints)
 		dataMap.Add(Req{}, newSeries)

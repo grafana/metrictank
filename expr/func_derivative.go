@@ -38,7 +38,7 @@ func (s *FuncDerivative) Exec(dataMap DataMap) ([]models.Series, error) {
 		serie.QueryPatt = fmt.Sprintf("derivative(%s)", serie.QueryPatt)
 		serie.Consolidator = consolidation.None
 		serie.QueryCons = consolidation.None
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {

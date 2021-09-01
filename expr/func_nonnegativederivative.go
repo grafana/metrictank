@@ -39,7 +39,7 @@ func (s *FuncNonNegativeDerivative) Exec(dataMap DataMap) ([]models.Series, erro
 	outSeries := make([]models.Series, 0, len(series))
 
 	for _, serie := range series {
-		out := pointSlicePool.Get()
+		out := pointSlicePool.GetMin(len(serie.Datapoints))
 
 		prev := math.NaN()
 		for _, p := range serie.Datapoints {
