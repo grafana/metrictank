@@ -6,6 +6,10 @@ import (
 
 var pointSlicePool *pointslicepool.PointSlicePool
 
+func init() {
+	pointSlicePool = pointslicepool.New(0)
+}
+
 // Pool tells the expr library which pool to use for temporary []schema.Point
 // this lets the expr package effectively create and drop point slices as needed
 // it is recommended you use the same pool in your application, e.g. to get slices

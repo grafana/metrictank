@@ -151,7 +151,8 @@ For now we assume that multi-steps in a row is not that common, and COW seems mo
 
 
 This leaves the problem of effectively managing allocations and using a sync.Pool.
-Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this library to be easily embeddable in other programs.
+Note that the expr library can be called by different clients. At this point only Metrictank uses it, but we intend this library to be easily embeddable in other programs. 
+In order to avoid unexpected panics, a default package-global pool is initialized when package is imported, however in order to maximize efficiency, clients SHOULD instantiate and set a pool calling the `expr.Pool(...)` function.
 It's up to the client to instantiate the pool, and set up the default allocation to return point slices of desired point capacity.
 The client can then of course use this pool to store series, which it then feeds to expr.
 expr library does the rest.  It manages the series/pointslices and gets new ones as a basis for the COW.
