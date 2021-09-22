@@ -106,11 +106,24 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 			leading = 31
 		}
 
-		// TODO(dgryski): check if it's 'cheaper' to reset the leading/trailing bits instead
-		if s.leading != ^uint8(0) && leading >= s.leading && trailing >= s.trailing {
+		sigbits := 64 - leading - trailing
+		currbits := 64 - s.leading - s.trailing
+
+		// We have 2 cases here:
+		// 1. We have at least as many leading and trailing zeroes than we previously did
+		// 2. We have fewer leding or trailing zeroes that previously
+		// In the case of number 2, we need to re-encode the leading/trailing zeroes count to be able to handle the number
+		// of significant bits we need to write.
+		// In the case of number 1, we have more options. If we have significantly more leading/trailing zeroes, then we
+		// might be wasting a lot of bits by constantly writing more significant bits than we need. In this case we *could*
+		// choose to "reset" by writing out the count of significant bits. It costs 11 bits to reset, so ideally we would only
+		// reset when we know we will waste more bits than it would cost to reset.
+		if s.leading != ^uint8(0) && leading >= s.leading && trailing >= s.trailing && currbits-sigbits < 11 {
+			// Case 1: Keep the previous leading/trailing zeroes
 			s.bw.writeBit(zero)
-			s.bw.writeBits(vDelta>>s.trailing, 64-int(s.leading)-int(s.trailing))
+			s.bw.writeBits(vDelta>>s.trailing, int(currbits))
 		} else {
+			// Case 1: Keep the previous leading/trailing zeroes
 			s.leading, s.trailing = leading, trailing
 
 			s.bw.writeBit(one)
@@ -119,7 +132,6 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 			// Note that if leading == trailing == 0, then sigbits == 64.  But that value doesn't actually fit into the 6 bits we have.
 			// Luckily, we never need to encode 0 significant bits, since that would put us in the other case (vdelta == 0).
 			// So instead we write out a 0 and adjust it back to 64 on unpacking.
-			sigbits := 64 - leading - trailing
 			s.bw.writeBits(uint64(sigbits), 6)
 			s.bw.writeBits(vDelta>>trailing, int(sigbits))
 		}
