@@ -30,15 +30,16 @@ func NewReorderBuffer(reorderWindow, interval uint32, allowUpdate bool) *Reorder
 
 // Add adds the point if it falls within the window.
 // it returns points that have been purged out of the buffer, as well as whether the add succeeded.
-func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
+func (rob *ReorderBuffer) Add(ts uint32, val float64) (schema.Point, []schema.Point, error) {
 	ts = AggBoundary(ts, rob.interval)
 
 	newestTs := rob.buf[rob.newest].Ts
 	// out of order and too old
 	if newestTs != 0 && ts < newestTs && ts <= newestTs-(uint32(cap(rob.buf))*rob.interval) {
-		return nil, errors.ErrMetricTooOld
+		return schema.Point{}, nil, errors.ErrMetricTooOld
 	}
 
+	var firstPoint schema.Point
 	var res []schema.Point
 	oldest := (rob.newest + 1) % uint32(cap(rob.buf))
 	index := (ts / rob.interval) % uint32(cap(rob.buf))
@@ -47,7 +48,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 			rob.buf[index].Ts = ts
 			rob.buf[index].Val = val
 		} else {
-			return nil, errors.ErrMetricNewValueForTimestamp
+			return schema.Point{}, nil, errors.ErrMetricNewValueForTimestamp
 		}
 	} else if ts > newestTs {
 		flushCount := (ts - newestTs) / rob.interval
@@ -55,9 +56,16 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 			flushCount = uint32(cap(rob.buf))
 		}
 
+		if flushCount > 1 {
+			res = make([]schema.Point, 0, flushCount-1)
+		}
 		for i := uint32(0); i < flushCount; i++ {
 			if rob.buf[oldest].Ts != 0 {
-				res = append(res, rob.buf[oldest])
+				if firstPoint.Ts == 0 {
+					firstPoint = rob.buf[oldest]
+				} else {
+					res = append(res, rob.buf[oldest])
+				}
 				rob.buf[oldest].Ts = 0
 			}
 			oldest = (oldest + 1) % uint32(cap(rob.buf))
@@ -71,7 +79,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 		rob.buf[index].Val = val
 	}
 
-	return res, nil
+	return firstPoint, res, nil
 }
 
 // Get returns the points in the buffer
