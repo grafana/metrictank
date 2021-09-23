@@ -348,6 +348,31 @@ func TestROBFlushUnsortedData2(t *testing.T) {
 	}
 }
 
+func TestROBAvoidUnderflow(t *testing.T) {
+	var results []schema.Point
+	windowSize := 10
+	buf := NewReorderBuffer(uint32(windowSize), 1, false)
+	data := make([]schema.Point, 1000)
+	for i := 0; i < 1000; i++ {
+		data[i] = schema.Point{Ts: uint32(i + 1), Val: float64(i + 1000)}
+	}
+	for i := 0; i < len(data); i++ {
+		flushed, _ := buf.Add(data[i].Ts, data[i].Val)
+		results = append(results, flushed...)
+	}
+
+	expectedLen := len(data) - windowSize
+	if len(results) != expectedLen {
+		t.Fatalf("Expected %d results, got %d", len(results), expectedLen)
+	}
+
+	for i := 0; i < len(results); i++ {
+		if results[i].Ts != uint32(i+1) || results[i].Val != float64(i+1000) {
+			t.Fatalf("Unexpected results starting at %d %+v", i, results)
+		}
+	}
+}
+
 func TestROBFlushAndIsEmpty(t *testing.T) {
 	buf := NewReorderBuffer(10, 1, false)
 
