@@ -33,8 +33,9 @@ func NewReorderBuffer(reorderWindow, interval uint32, allowUpdate bool) *Reorder
 func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 	ts = AggBoundary(ts, rob.interval)
 
+	newestTs := rob.buf[rob.newest].Ts
 	// out of order and too old
-	if rob.buf[rob.newest].Ts != 0 && ts <= rob.buf[rob.newest].Ts-(uint32(cap(rob.buf))*rob.interval) {
+	if newestTs != 0 && ts < newestTs && ts <= newestTs-(uint32(cap(rob.buf))*rob.interval) {
 		return nil, errors.ErrMetricTooOld
 	}
 
@@ -48,8 +49,8 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) ([]schema.Point, error) {
 		} else {
 			return nil, errors.ErrMetricNewValueForTimestamp
 		}
-	} else if ts > rob.buf[rob.newest].Ts {
-		flushCount := (ts - rob.buf[rob.newest].Ts) / rob.interval
+	} else if ts > newestTs {
+		flushCount := (ts - newestTs) / rob.interval
 		if flushCount > uint32(cap(rob.buf)) {
 			flushCount = uint32(cap(rob.buf))
 		}
