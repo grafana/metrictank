@@ -78,8 +78,8 @@ func TestAggMetricsGetOrCreate(t *testing.T) {
 		t.Fatalf("Expected metric chunk span to be %d, but it was %d", 24*3600, metric.chunkSpan)
 	}
 
-	if metric.numChunks != 2 {
-		t.Fatalf("Expected metric num chunks to be 2, but it was %d", metric.numChunks)
+	if cap(metric.chunks) != 2 {
+		t.Fatalf("Expected metric num chunks to be 2, but it was %d", cap(metric.chunks))
 	}
 
 	if metric.ttl != 3600*24*365 {
