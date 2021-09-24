@@ -29,6 +29,11 @@ func (b *bstream) bytes() []byte {
 	return b.stream
 }
 
+func (b *bstream) reset(stream []byte) {
+	b.stream = stream
+	b.count = 0
+}
+
 type bit bool
 
 const (
@@ -69,8 +74,42 @@ func (b *bstream) writeByte(byt byte) {
 	b.stream[i] = byt << b.count
 }
 
+func (b *bstream) writeHighBits(in byte, nbits uint8) {
+	if b.count == 0 {
+		b.stream = append(b.stream, 0)
+		b.count = 8
+	}
+
+	shiftBits := 8 - b.count
+	partialByte := in >> shiftBits
+	//fmt.Printf("Before: b.count = %d, nbits = %d, input = %064b, partialByte = %08b (dec=%d), lastByte = %08b (dec=%d)\n", b.count, nbits, u, partialByte, partialByte, b.stream[len(b.stream)-1], b.stream[len(b.stream)-1])
+	b.stream[len(b.stream)-1] |= partialByte
+	b.count -= nbits
+}
+
+// Writes as many bits as needed to finish a partial byte.
+// This aligns further writes on byte boundaries, which is a little cheaper
+func (b *bstream) alignByte(u uint64, nbits int) (uint64, int) {
+	if b.count == 0 || b.count == 8 {
+		// already aligned
+		return u, nbits
+	}
+
+	writeBits := b.count
+	if nbits < int(b.count) {
+		writeBits = uint8(nbits)
+	}
+	b.writeHighBits(byte(u>>56), writeBits)
+
+	return u << writeBits, nbits - int(writeBits)
+}
+
 func (b *bstream) writeBits(u uint64, nbits int) {
 	u <<= (64 - uint(nbits))
+
+	// For efficient byte at a time writing, first finish off any partial bytes we have
+	u, nbits = b.alignByte(u, nbits)
+
 	for nbits >= 8 {
 		byt := byte(u >> 56)
 		b.writeByte(byt)
@@ -78,10 +117,8 @@ func (b *bstream) writeBits(u uint64, nbits int) {
 		nbits -= 8
 	}
 
-	for nbits > 0 {
-		b.writeBit((u >> 63) == 1)
-		u <<= 1
-		nbits--
+	if nbits > 0 {
+		b.writeHighBits(byte(u>>(56)), uint8(nbits))
 	}
 }
 
