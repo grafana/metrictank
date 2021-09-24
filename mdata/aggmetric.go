@@ -31,23 +31,22 @@ var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less th
 // in addition, keep in mind that the last chunk is always a work in progress and not useable for aggregation
 // AggMetric is concurrency-safe
 type AggMetric struct {
-	store       Store
-	cachePusher cache.CachePusher
 	sync.RWMutex
+	store           Store
+	cachePusher     cache.CachePusher
 	key             schema.AMKey
 	rob             *ReorderBuffer
-	currentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
-	numChunks       uint32 // max size of the circular buffer
-	chunkSpan       uint32 // span of individual chunks in seconds
 	chunks          []*chunk.Chunk
 	aggregators     []*Aggregator
-	dropFirstChunk  bool
+	currentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
+	chunkSpan       uint32 // span of individual chunks in seconds
 	ingestFromT0    uint32
 	futureTolerance uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
 	lastWrite       uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
 	firstTs         uint32 // timestamp of first point seen
+	dropFirstChunk  bool
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
@@ -65,15 +64,14 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 		cachePusher:     cachePusher,
 		store:           store,
 		key:             key,
-		chunkSpan:       ret.ChunkSpan,
-		numChunks:       ret.NumChunks,
 		chunks:          make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk:  dropFirstChunk,
+		chunkSpan:       ret.ChunkSpan,
 		futureTolerance: uint32(ret.MaxRetention()) * uint32(futureToleranceRatio) / 100,
 		ttl:             uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
-		lastWrite: uint32(time.Now().Unix()),
+		lastWrite:      uint32(time.Now().Unix()),
+		dropFirstChunk: dropFirstChunk,
 	}
 	if ingestFrom > 0 {
 		// we only want to ingest data that will go into chunks with a t0 >= 'ingestFrom'.
@@ -567,12 +565,12 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		}
 
 		a.currentChunkPos++
-		if a.currentChunkPos >= int(a.numChunks) {
+		if a.currentChunkPos >= cap(a.chunks) {
 			a.currentChunkPos = 0
 		}
 
 		chunkCreate.Inc()
-		if len(a.chunks) < int(a.numChunks) {
+		if len(a.chunks) < cap(a.chunks) {
 			a.chunks = append(a.chunks, chunk.New(t0))
 			if err := a.chunks[a.currentChunkPos].Push(ts, val); err != nil {
 				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.currentChunkPos, err))
