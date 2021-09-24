@@ -13,7 +13,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
 	mdataerrors "github.com/grafana/metrictank/mdata/errors"
 	"github.com/grafana/metrictank/schema"
@@ -22,6 +21,12 @@ import (
 )
 
 var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less than to")
+
+// Flusher is used to determine what should happen when chunks are ready to flushed from AggMetrics
+type Flusher interface {
+	Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
+	Store(cwr *ChunkWriteRequest)
+}
 
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
 // it uses a circular buffer of chunks
@@ -32,8 +37,7 @@ var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less th
 // AggMetric is concurrency-safe
 type AggMetric struct {
 	sync.RWMutex
-	store           Store
-	cachePusher     cache.CachePusher
+	flusher         Flusher
 	key             schema.AMKey
 	rob             *ReorderBuffer
 	chunks          []*chunk.Chunk
@@ -61,14 +65,13 @@ type AggMetric struct {
 // it's the callers responsibility to make sure agg is not nil in that case!
 // If reorderWindow is greater than 0, a reorder buffer is enabled. In that case data points with duplicate timestamps
 // the behavior is defined by reorderAllowUpdate
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
+func NewAggMetric(flusher Flusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions.Rets[0]
 
 	m := AggMetric{
-		cachePusher:     cachePusher,
-		store:           store,
+		flusher:         flusher,
 		key:             key,
 		chunks:          make([]*chunk.Chunk, 0, ret.NumChunks),
 		chunkSpan:       ret.ChunkSpan,
@@ -90,7 +93,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 	origSplits := strings.Split(retentions.Orig, ":")
 	for i, ret := range retentions.Rets[1:] {
 		retOrig := origSplits[i+1]
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, retOrig, ret, *agg, dropFirstChunk, ingestFrom))
+		m.aggregators = append(m.aggregators, NewAggregator(flusher, key, retOrig, ret, *agg, dropFirstChunk, ingestFrom))
 	}
 
 	return &m
@@ -371,17 +374,13 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 // pushToCache adds the chunk into the cache if it is hot
 // caller must hold lock
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
-	if a.cachePusher == nil {
-		return
-	}
-	// push into cache
 	intervalHint := a.key.Archive.Span()
 
 	itergen, err := chunk.NewIterGen(c.Series.T0, intervalHint, c.Encode(a.chunkSpan))
 	if err != nil {
 		log.Errorf("AM: %s failed to generate IterGen. this should never happen: %s", a.key, err)
 	}
-	go a.cachePusher.AddIfHot(a.key, 0, itergen)
+	go a.flusher.Cache(a.key, 0, itergen)
 }
 
 // write a chunk to persistent storage.
@@ -458,7 +457,7 @@ func (a *AggMetric) persist(pos int) {
 	// before newer data.
 	for pendingChunk >= 0 {
 		log.Debugf("AM: persist(): sealing chunk %d/%d (%s:%d) and adding to write queue.", pendingChunk, len(pending), a.key, chunk.Series.T0)
-		a.store.Add(pending[pendingChunk])
+		a.flusher.Store(pending[pendingChunk])
 		pendingChunk--
 	}
 	persistDuration.Value(time.Now().Sub(pre))
