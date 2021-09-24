@@ -3,7 +3,6 @@ package mdata
 import (
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/schema"
 )
 
@@ -30,7 +29,7 @@ type Aggregator struct {
 	lstMetric       *AggMetric
 }
 
-func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey, retOrig string, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool, ingestFrom int64) *Aggregator {
+func NewAggregator(flusher Flusher, key schema.AMKey, retOrig string, ret conf.Retention, agg conf.Aggregation, dropFirstChunk bool, ingestFrom int64) *Aggregator {
 	if len(agg.AggregationMethod) == 0 {
 		panic("NewAggregator called without aggregations. this should never happen")
 	}
@@ -48,31 +47,31 @@ func NewAggregator(store Store, cachePusher cache.CachePusher, key schema.AMKey,
 		case conf.Avg:
 			if aggregator.sumMetric == nil {
 				key.Archive = schema.NewArchive(schema.Sum, span)
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.sumMetric = NewAggMetric(flusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
 			}
 			if aggregator.cntMetric == nil {
 				key.Archive = schema.NewArchive(schema.Cnt, span)
-				aggregator.cntMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.cntMetric = NewAggMetric(flusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
 			}
 		case conf.Sum:
 			if aggregator.sumMetric == nil {
 				key.Archive = schema.NewArchive(schema.Sum, span)
-				aggregator.sumMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.sumMetric = NewAggMetric(flusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
 			}
 		case conf.Lst:
 			if aggregator.lstMetric == nil {
 				key.Archive = schema.NewArchive(schema.Lst, span)
-				aggregator.lstMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.lstMetric = NewAggMetric(flusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
 			}
 		case conf.Max:
 			if aggregator.maxMetric == nil {
 				key.Archive = schema.NewArchive(schema.Max, span)
-				aggregator.maxMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.maxMetric = NewAggMetric(flusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
 			}
 		case conf.Min:
 			if aggregator.minMetric == nil {
 				key.Archive = schema.NewArchive(schema.Min, span)
-				aggregator.minMetric = NewAggMetric(store, cachePusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
+				aggregator.minMetric = NewAggMetric(flusher, key, retentions, 0, span, nil, false, dropFirstChunk, ingestFrom)
 			}
 		}
 	}

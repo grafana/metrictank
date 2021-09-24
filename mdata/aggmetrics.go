@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/schema"
 	log "github.com/sirupsen/logrus"
 )
@@ -171,11 +172,19 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 		return m
 	}
 	ingestFrom := ms.ingestFrom[key.Org]
-	m = NewAggMetric(ms.store, ms.cachePusher, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, confSchema.ReorderAllowUpdate, ms.dropFirstChunk, ingestFrom)
+	m = NewAggMetric(ms, k, confSchema.Retentions, confSchema.ReorderWindow, interval, &agg, confSchema.ReorderAllowUpdate, ms.dropFirstChunk, ingestFrom)
 	ms.Metrics[key.Org][key.Key] = m
 	active := len(ms.Metrics[key.Org])
 	ms.Unlock()
 	metricsActive.Inc()
 	promActiveMetrics.WithLabelValues(strconv.Itoa(int(key.Org))).Set(float64(active))
 	return m
+}
+
+func (ms *AggMetrics) Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+	ms.cachePusher.AddIfHot(metric, prev, itergen)
+}
+
+func (ms *AggMetrics) Store(cwr *ChunkWriteRequest) {
+	ms.store.Add(cwr)
 }
