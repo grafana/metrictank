@@ -29,11 +29,6 @@ func (b *bstream) bytes() []byte {
 	return b.stream
 }
 
-func (b *bstream) reset(stream []byte) {
-	b.stream = stream
-	b.count = 0
-}
-
 type bit bool
 
 const (
@@ -82,7 +77,6 @@ func (b *bstream) writeHighBits(in byte, nbits uint8) {
 
 	shiftBits := 8 - b.count
 	partialByte := in >> shiftBits
-	//fmt.Printf("Before: b.count = %d, nbits = %d, input = %064b, partialByte = %08b (dec=%d), lastByte = %08b (dec=%d)\n", b.count, nbits, u, partialByte, partialByte, b.stream[len(b.stream)-1], b.stream[len(b.stream)-1])
 	b.stream[len(b.stream)-1] |= partialByte
 	b.count -= nbits
 }
