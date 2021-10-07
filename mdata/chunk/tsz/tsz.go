@@ -10,18 +10,14 @@ import (
 	"io"
 	"math"
 	"math/bits"
-	"sync"
 )
 
-// Series4h is the basic series primitive
-// you can concurrently put values, finish the stream, and create iterators
+// Series4h is the basic series primitive. it is not concurrency safe.
 // you shouldn't use it for chunks longer than 4.5 hours, due to overflow
 // of the first delta (14 bits), though in some cases, the corresponding iterator
 // can reconstruct the data. Only works for <=9h deltas/chunks though.
 // See https://github.com/grafana/metrictank/pull/1126
 type Series4h struct {
-	sync.Mutex
-
 	// TODO(dgryski): timestamps in the paper are uint64
 	T0  uint32
 	t   uint32
@@ -51,26 +47,19 @@ func NewSeries4h(t0 uint32) *Series4h {
 
 // Bytes value of the series stream
 func (s *Series4h) Bytes() []byte {
-	s.Lock()
-	defer s.Unlock()
 	return s.bw.bytes()
 }
 
 // Finish the series by writing an end-of-stream record
 func (s *Series4h) Finish() {
-	s.Lock()
 	if !s.finished {
 		finishV1(&s.bw)
 		s.finished = true
 	}
-	s.Unlock()
 }
 
 // Push a timestamp and value to the series
 func (s *Series4h) Push(t uint32, v float64) {
-	s.Lock()
-	defer s.Unlock()
-
 	if s.t == 0 {
 		// first point
 		s.t = t
@@ -143,9 +132,7 @@ func (s *Series4h) Push(t uint32, v float64) {
 
 // Iter4h lets you iterate over a series.  It is not concurrency-safe.
 func (s *Series4h) Iter(intervalHint uint32) *Iter4h {
-	s.Lock()
 	w := s.bw.clone()
-	s.Unlock()
 
 	finishV1(w)
 	iter, _ := bstreamIterator4h(w, intervalHint)

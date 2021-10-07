@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"math"
 	"math/bits"
-	"sync"
 )
 
 // SeriesLong similar to Series4h, except:
@@ -17,8 +16,6 @@ import (
 //   encoding from the get-go.
 // * it uses a more compact way to mark end-of-stream
 type SeriesLong struct {
-	sync.Mutex
-
 	// TODO(dgryski): timestamps in the paper are uint64
 	T0  uint32 // exposed for caller convenience. do NOT set directly. set via constructor
 	T   uint32 // exposed for caller convenience. do NOT set directly. may only be set via Push()
@@ -45,26 +42,19 @@ func NewSeriesLong(t0 uint32) *SeriesLong {
 
 // Bytes value of the series stream
 func (s *SeriesLong) Bytes() []byte {
-	s.Lock()
-	defer s.Unlock()
 	return s.bw.bytes()
 }
 
 // Finish the series by writing an end-of-stream record
 func (s *SeriesLong) Finish() {
-	s.Lock()
 	if !s.Finished {
 		finishV2(&s.bw)
 		s.Finished = true
 	}
-	s.Unlock()
 }
 
 // Push a timestamp and value to the series
 func (s *SeriesLong) Push(t uint32, v float64) {
-	s.Lock()
-	defer s.Unlock()
-
 	var first bool
 
 	tDelta := t - s.T
@@ -141,9 +131,7 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 
 // IterLong lets you iterate over a series.  It is not concurrency-safe.
 func (s *SeriesLong) Iter() *IterLong {
-	s.Lock()
 	w := s.bw.clone()
-	s.Unlock()
 
 	finishV2(w)
 	iter, _ := bstreamIteratorLong(s.T0, w)
