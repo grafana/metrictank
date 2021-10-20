@@ -2,6 +2,7 @@ package mdata
 
 import (
 	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/schema"
 )
@@ -97,6 +98,38 @@ func (agg *Aggregator) flush() {
 	}
 	//msg := fmt.Sprintf("flushed cnt %v sum %f min %f max %f, reset the block", agg.agg.cnt, agg.agg.sum, agg.agg.min, agg.agg.max)
 	agg.agg.Reset()
+}
+
+// Foresee duplicates the underlying Aggregation,
+// consumes points in the future, and return the newly aggregated points.
+// Foresee won't actually add those points to AggMetric.
+func (agg *Aggregator) Foresee(consolidator consolidation.Consolidator, from, to uint32, futurePoints []schema.Point) []schema.Point {
+	aggregationPreview := *(agg.agg)
+	var aggregatedPoints []schema.Point
+	currentBoundary := agg.currentBoundary
+	for _, point := range futurePoints {
+		boundary := AggBoundary(point.Ts, agg.span)
+		if boundary < currentBoundary {
+			// ignore the point it was for a previous bucket. we can't process it
+			continue
+		} else if boundary > currentBoundary {
+			// point is for a more recent bucket
+			// store current aggregates as a new point in their series and start the new bucket
+			// if the cnt is still 0, the numbers are invalid, not to be flushed and we can simply reuse the aggregation
+			if aggregationPreview.Cnt != 0 {
+				value, _ := aggregationPreview.GetValueFor(consolidator)
+				aggregatedPoints = append(aggregatedPoints, schema.Point{Val: value, Ts: currentBoundary})
+				aggregationPreview.Reset()
+			}
+			currentBoundary = boundary
+		}
+		aggregationPreview.Add(point.Val)
+	}
+	if aggregationPreview.Cnt != 0 && currentBoundary <= to {
+		value, _ := aggregationPreview.GetValueFor(consolidator)
+		aggregatedPoints = append(aggregatedPoints, schema.Point{Val: value, Ts: currentBoundary})
+	}
+	return aggregatedPoints
 }
 
 // Add adds the point to the in-progress aggregation, and flushes it if we reached the boundary
