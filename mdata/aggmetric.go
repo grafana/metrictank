@@ -188,11 +188,11 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			futurePoints := []schema.Point{}
 			if a.rob != nil {
 				futurePoints = a.rob.Get()
+				if result.Oldest > futurePoints[0].Ts {
+					result.Oldest = futurePoints[0].Ts
+				}
 			}
 			result.Points = aggregator.Foresee(consolidator, from, to, futurePoints)
-			if result.Oldest > result.Points[0].Ts {
-				result.Oldest = result.Points[0].Ts
-			}
 
 			return result, nil
 		}
