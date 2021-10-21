@@ -486,14 +486,13 @@ func TestGetAggregated(t *testing.T) {
 	m.Add(30, 30)
 	m.Add(31, 31)
 	m.Add(32, 32)
-	m.Add(40, 40)
 
 	result, err := m.GetAggregated(consolidation.Sum, aggSpan, 0, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got := itersToPoints(result.Iters)
+	got := append(itersToPoints(result.Iters), result.Points...)
 
 	expected := []schema.Point{
 		{Val: 10, Ts: 10},
@@ -502,7 +501,6 @@ func TestGetAggregated(t *testing.T) {
 		{Val: 21 + 22, Ts: 25},
 		{Val: 30, Ts: 30},
 		{Val: 31 + 32, Ts: 35},
-		{Val: 40, Ts: 40},
 	}
 	assertPointsEqual(t, got, expected)
 }
