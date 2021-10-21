@@ -1,6 +1,8 @@
 package expr
 
 import (
+	"math"
+
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/errors"
 	"github.com/raintank/dur"
@@ -11,6 +13,7 @@ var ErrIntZeroOrPositive = errors.NewBadRequest("integer must be zero or positiv
 var ErrInvalidAggFunc = errors.NewBadRequest("Invalid aggregation func")
 var ErrNonNegativePercent = errors.NewBadRequest("The requested percent is required to be greater than 0")
 var ErrWithinZeroOneInclusiveInterval = errors.NewBadRequest("value must lie within interval [0,1]")
+var ErrFloatPositiveNotOne = errors.NewBadRequest("value must be positive and does not equals to one")
 
 // Validator is a function to validate an input
 type Validator func(e *expr) error
@@ -75,6 +78,13 @@ func NonNegativePercent(e *expr) error {
 func WithinZeroOneInclusiveInterval(e *expr) error {
 	if e.float < 0 || e.float > 1 {
 		return ErrWithinZeroOneInclusiveInterval
+	}
+	return nil
+}
+
+func FloatPositiveNotOne(e *expr) error {
+	if e.float <= 0 || math.Abs(e.float-1) < 1e-10 {
+		return ErrFloatPositiveNotOne
 	}
 	return nil
 }
