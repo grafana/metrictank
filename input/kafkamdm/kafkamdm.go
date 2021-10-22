@@ -319,6 +319,19 @@ func (k *KafkaMdm) consumePartition(topic string, partition int32, currentOffset
 
 func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 	format, isPointMsg := msg.IsPointMsg(data)
+	if isPointMsg && format == msg.FormatMetricPointArray {
+		iter := msg.NewMetricPointIter(data, uint32(orgId))
+		for iter.Next() {
+			k.Handler.ProcessMetricPoint(iter.Value(), iter.Format(), partition)
+		}
+		err := iter.Err()
+		if err != nil {
+			metricsDecodeErr.Inc()
+			log.Errorf("kafkamdm: decode metricpoint array error, skipping message. %s", err)
+		}
+		return
+	}
+
 	if isPointMsg {
 		_, point, err := msg.ReadPointMsg(data, uint32(orgId))
 		if err != nil {
