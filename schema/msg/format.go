@@ -11,4 +11,5 @@ const (
 	FormatMetricPoint
 	FormatMetricPointWithoutOrg
 	FormatIndexControlMessage
+	FormatMetricPointArray
 )
