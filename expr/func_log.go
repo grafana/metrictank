@@ -20,7 +20,7 @@ func NewLog() GraphiteFunc {
 func (s *FuncLog) Signature() ([]Arg, []Arg) {
 	return []Arg{
 			ArgSeriesList{val: &s.in},
-			ArgFloat{key: "base", opt: true, validator: []Validator{FloatPositiveNotOne}, val: &s.base},
+			ArgFloat{key: "base", opt: true, validator: []Validator{PositiveButNotOne}, val: &s.base},
 		}, []Arg{
 			ArgSeriesList{},
 		}
@@ -37,16 +37,21 @@ func (s *FuncLog) Exec(dataMap DataMap) ([]models.Series, error) {
 	}
 
 	outputs := make([]models.Series, 0, len(series))
+	baseLog := math.Log(s.base)
 	for _, serie := range series {
 		out := pointSlicePool.GetMin(len(serie.Datapoints))
-
 		for _, v := range serie.Datapoints {
-			// math.Log returns NaN for negative value and -Inf() for 0 value.
-			out = append(out, schema.Point{Val: math.Log(v.Val) / math.Log(s.base), Ts: v.Ts})
+			// returns NaN for non-positive value.
+			val := math.NaN()
+			if v.Val > 0 {
+				val = math.Log(v.Val) / baseLog
+			}
+			out = append(out, schema.Point{Val: val, Ts: v.Ts})
 		}
 
 		serie.Target = fmt.Sprintf("log(%s,%g)", serie.Target, s.base)
 		serie.QueryPatt = fmt.Sprintf("log(%s,%g)", serie.QueryPatt, s.base)
+		serie.Tags = serie.CopyTagsWith("log", fmt.Sprintf("%g", s.base))
 		serie.Datapoints = out
 
 		outputs = append(outputs, serie)

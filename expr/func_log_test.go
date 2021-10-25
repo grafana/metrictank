@@ -17,7 +17,7 @@ func TestLogNoInput(t *testing.T) {
 
 func TestLogSingle(t *testing.T) {
 	outBased10 := []schema.Point{
-		{Val: math.Inf(-1), Ts: 10},
+		{Val: math.NaN(), Ts: 10},
 		{Val: 1.5185139398778875, Ts: 20},
 		{Val: 2.298853076409707, Ts: 30},
 		{Val: 1.462397997898956, Ts: 40},
@@ -26,7 +26,7 @@ func TestLogSingle(t *testing.T) {
 	}
 
 	outBasedE := []schema.Point{
-		{Val: math.Inf(-1), Ts: 10},
+		{Val: math.NaN(), Ts: 10},
 		{Val: 3.4965075614664802, Ts: 20},
 		{Val: 5.293304824724492, Ts: 30},
 		{Val: 3.367295829986474, Ts: 40},
@@ -61,7 +61,7 @@ func TestLogSingle(t *testing.T) {
 
 func TestLogMultiple(t *testing.T) {
 	outBased10 := []schema.Point{
-		{Val: math.Inf(-1), Ts: 10},
+		{Val: math.NaN(), Ts: 10},
 		{Val: 1.5185139398778875, Ts: 20},
 		{Val: 2.298853076409707, Ts: 30},
 		{Val: 1.462397997898956, Ts: 40},
@@ -95,7 +95,7 @@ func TestLogSpecialValues(t *testing.T) {
 		{Val: 1024, Ts: 70},
 	}
 	out := []schema.Point{
-		{Val: math.Inf(1), Ts: 10},
+		{Val: math.NaN(), Ts: 10},
 		{Val: 0, Ts: 20},
 		{Val: math.NaN(), Ts: 30},
 		{Val: -1024, Ts: 40},
