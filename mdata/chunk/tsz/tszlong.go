@@ -111,19 +111,20 @@ func (s *SeriesLong) Push(t uint32, v float64) {
 
 		// We have 2 cases here:
 		// 1. We have at least as many leading and trailing zeroes than we previously did
-		// 2. We have fewer leding or trailing zeroes that previously
+		// 2. We have fewer leading or trailing zeroes than previously
 		// In the case of number 2, we need to re-encode the leading/trailing zeroes count to be able to handle the number
 		// of significant bits we need to write.
 		// In the case of number 1, we have more options. If we have significantly more leading/trailing zeroes, then we
-		// might be wasting a lot of bits by constantly writing more significant bits than we need. In this case we *could*
-		// choose to "reset" by writing out the count of significant bits. It costs 11 bits to reset, so ideally we would only
-		// reset when we know we will waste more bits than it would cost to reset.
-		if s.leading != ^uint8(0) && leading >= s.leading && trailing >= s.trailing && currbits-sigbits < 11 {
+		// might be wasting a lot of bits by writing more significant bits than we need. In this case we *could* choose
+		// to "reset" by writing out the count of significant bits. It costs 11 bits to reset, so ideally we would only
+		// reset when we know we will waste more bits than it would cost to reset. Add another 11 bits in case this was
+		// an outlier and we need to 'reset' back to more significant bits.
+		if s.leading != ^uint8(0) && leading >= s.leading && trailing >= s.trailing && currbits-sigbits < 22 {
 			// Case 1: Keep the previous leading/trailing zeroes
 			s.bw.writeBit(zero)
 			s.bw.writeBits(vDelta>>s.trailing, int(currbits))
 		} else {
-			// Case 1: Keep the previous leading/trailing zeroes
+			// Case 2: Reset leading/trailing zeroes
 			s.leading, s.trailing = leading, trailing
 
 			s.bw.writeBit(one)
