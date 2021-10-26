@@ -98,7 +98,7 @@ func TestWriteReadPointMsgArray(t *testing.T) {
 			Value: 12,
 		},
 	}
-	buf := make([]byte, 0, 2+32*3)
+	buf := make([]byte, 0, 2+32*len(mp))
 	out, err := WritePointMsgArray(mp, buf, FormatMetricPoint)
 	if err != nil {
 		t.Fatalf("%s", err.Error())
@@ -142,7 +142,7 @@ func TestWriteReadPointMsgArrayWithoutOrg(t *testing.T) {
 			Value: 12,
 		},
 	}
-	buf := make([]byte, 0, 2+28*3)
+	buf := make([]byte, 0, 2+28*len(mp))
 	out, err := WritePointMsgArray(mp, buf, FormatMetricPointWithoutOrg)
 	if err != nil {
 		t.Fatalf("%s", err.Error())

@@ -324,8 +324,7 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 		for iter.Next() {
 			k.Handler.ProcessMetricPoint(iter.Value(), iter.Format(), partition)
 		}
-		err := iter.Err()
-		if err != nil {
+		if err := iter.Err(); err != nil {
 			metricsDecodeErr.Inc()
 			log.Errorf("kafkamdm: decode metricpoint array error, skipping message. %s", err)
 		}
