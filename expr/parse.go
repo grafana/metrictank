@@ -197,7 +197,7 @@ func Parse(e string, pCtx ParseContext) (*expr, string, error) {
 	var exp *expr
 	var err error
 
-	if e != "" && e[0] == '(' {
+	if e != "" && e[0] == '(' && isFnStartChar(name[0]) {
 		// in this case, our parsed name is a function
 		for i := range name {
 			if !isFnChar(name[i]) {
@@ -383,6 +383,11 @@ var nameChar = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!#
 
 func isNameChar(r byte) bool {
 	return strings.IndexByte(nameChar, r) >= 0
+}
+
+func isFnStartChar(r byte) bool {
+	return 'a' <= r && r <= 'z' ||
+		'A' <= r && r <= 'Z'
 }
 
 func isFnChar(r byte) bool {

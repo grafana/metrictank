@@ -933,6 +933,12 @@ func TestParse(t *testing.T) {
 			nil,
 			"",
 		},
+		{
+			"3func()",
+			&expr{str: "3func"},
+			nil,
+			"()",
+		},
 	}
 
 	for _, tt := range tests {
