@@ -151,7 +151,14 @@ func Parse(e string, piped bool) (*expr, string, error) {
 	}
 
 	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
-		return parseConst(e)
+		constExpr, leftover, err := parseConst(e)
+		if err != nil {
+			return nil, "", err
+		}
+		leftover = skipWhitespace(leftover)
+		if leftover == "" || leftover[0] == ',' || leftover[0] == ')' {
+			return constExpr, leftover, nil
+		}
 	}
 
 	if val, ok := strToBool(e); ok {
