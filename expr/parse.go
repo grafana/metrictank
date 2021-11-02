@@ -115,12 +115,27 @@ type MetricRequest struct {
 	Until  int32
 }
 
+// ParseContext includes contextual information that affects how the current
+// expression is parsed.
+// This should only be set by internal calls.
+type ParseContext struct {
+	// Piped means the expression to be parsed is known to receive a piped
+	// input.
+	Piped bool
+	// IsFullArg means the expression to be parsed is a full argument to a
+	// function.
+	// This is used to work out whether we should attempt to parse the
+	// expression as a numerical constant - we should only do so if it's an
+	// full argument.
+	IsFullArg bool
+}
+
 // ParseMany parses a slice of strings into a slice of expressions (recursively)
 // not included: validation that requested functions exist, correct args are passed, etc.
 func ParseMany(targets []string) ([]*expr, error) {
 	var out []*expr
 	for _, target := range targets {
-		e, leftover, err := Parse(target, false)
+		e, leftover, err := Parse(target, ParseContext{false, false})
 		if err != nil {
 			return nil, err
 		}
@@ -141,16 +156,14 @@ func skipWhitespace(s string) string {
 
 // Parses an expression string and turns it into an expression
 // also returns any leftover data that could not be parsed
-// piped means: the expression to be parsed is known to receive a piped input
-// (should only be set by internal calls)
-func Parse(e string, piped bool) (*expr, string, error) {
+func Parse(e string, pCtx ParseContext) (*expr, string, error) {
 	e = skipWhitespace(e)
 
 	if len(e) == 0 {
 		return nil, "", ErrMissingExpr
 	}
 
-	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
+	if pCtx.IsFullArg && ('0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+') {
 		constExpr, leftover, err := parseConst(e)
 		if err != nil {
 			return nil, "", err
@@ -194,7 +207,7 @@ func Parse(e string, piped bool) (*expr, string, error) {
 
 		exp = &expr{str: name, etype: etFunc}
 
-		exp.argsStr, exp.args, exp.namedArgs, e, err = parseArgList(e, piped)
+		exp.argsStr, exp.args, exp.namedArgs, e, err = parseArgList(e, pCtx.Piped)
 
 		if err != nil {
 			return exp, e, err
@@ -216,14 +229,14 @@ func Parse(e string, piped bool) (*expr, string, error) {
 	// if we are in a sub-call to Parse (such as the Parse() called in step 2/3/4) we should not try to read upcoming
 	// pipes, but rather have the top-level consume them all.
 
-	for !piped && e != "" {
+	for !pCtx.Piped && e != "" {
 		e = skipWhitespace(e)
 		if e == "" || e[0] != '|' {
 			break
 		}
 		e = e[1:]
 		var nextExp *expr
-		nextExp, e, err = Parse(e, true)
+		nextExp, e, err = Parse(e, ParseContext{Piped: true, IsFullArg: false})
 		if err != nil {
 			return exp, e, err
 		}
@@ -314,7 +327,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 
 		var arg *expr
 		var err error
-		arg, e, err = Parse(e, false)
+		arg, e, err = Parse(e, ParseContext{ Piped: false, IsFullArg: true} )
 		if err != nil {
 			return "", nil, nil, e, err
 		}
@@ -328,7 +341,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
-			argCont, eCont, errCont := Parse(e, false)
+			argCont, eCont, errCont := Parse(e, ParseContext{ Piped: false, IsFullArg: true})
 			if errCont != nil {
 				return "", nil, nil, eCont, errCont
 			}

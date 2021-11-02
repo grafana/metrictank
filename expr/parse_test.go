@@ -165,19 +165,19 @@ func TestParse(t *testing.T) {
 		},
 		{
 			"3",
-			&expr{int: 3, str: "3", etype: etInt},
+			&expr{str: "3"},
 			nil,
 			"",
 		},
 		{
 			"3.1",
-			&expr{float: 3.1, str: "3.1", etype: etFloat},
+			&expr{str: "3.1"},
 			nil,
 			"",
 		},
 		{
 			"3  ",
-			&expr{int: 3, str: "3", etype: etInt},
+			&expr{str: "3"},
 			nil,
 			"",
 		},
@@ -230,6 +230,29 @@ func TestParse(t *testing.T) {
 					{str: "2b"},
 				},
 				argsStr: "1, 10a , 2b",
+			},
+			nil,
+			"",
+		},
+		{
+			"func1(1, func2(10a , 15), 2b) ",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{int: 1, str: "1", etype: etInt},
+					{
+						str: "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "10a"},
+							{int: 15, str: "15", etype: etInt},
+						},
+						argsStr: "10a , 15",
+					},
+					{str: "2b"},
+				},
+				argsStr: "1, func2(10a , 15), 2b",
 			},
 			nil,
 			"",
@@ -767,6 +790,27 @@ func TestParse(t *testing.T) {
 			"",
 		},
 		{
+			"func1(1 | func2(), 3)",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{
+						str:   "func2",
+						etype: etFunc,
+						args: []*expr{
+							{str: "1"},
+						},
+						argsStr: "",
+					},
+					{etype: etInt, str: "3", int: 3},
+				},
+				argsStr: "1 | func2(), 3",
+			},
+			nil,
+			"",
+		},
+		{
 			"metric1 | func1(func2(func3(func4(metricA,'foo'))))",
 			&expr{
 				str:   "func1",
@@ -893,7 +937,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.s, func(t *testing.T) {
-			e, leftover, err := Parse(tt.s, false)
+			e, leftover, err := Parse(tt.s, ParseContext{Piped: false, IsFullArg: false})
 			if err != tt.err {
 				t.Errorf("case %+v expected err %v, got %v (leftover: %q)", tt.s, tt.err, err, leftover)
 				t.FailNow()
