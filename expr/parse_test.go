@@ -14,26 +14,49 @@ func TestParse(t *testing.T) {
 		s   string
 		e   *expr
 		err error
+		leftover string
 	}{
 		{
 			"metric",
 			&expr{str: "metric"},
 			nil,
+			"",
 		},
 		{
 			"metric.foo",
 			&expr{str: "metric.foo"},
 			nil,
+			"",
 		},
 		{
 			"metric.*.foo",
 			&expr{str: "metric.*.foo"},
 			nil,
+			"",
+		},
+		{
+			"metric.*.foo ",
+			&expr{str: "metric.*.foo"},
+			nil,
+			"",
+		},
+		{
+			"metric.*.foo  ",
+			&expr{str: "metric.*.foo"},
+			nil,
+			"",
 		},
 		{
 			"a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2",
 			&expr{str: "a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2"},
 			nil,
+			"",
+		},
+		{
+			"a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2  ",
+			&expr{str: "a.b.c;tagkey1=tagvalue1;tagkey2=tagvalue2"},
+			nil,
+			"",
 		},
 		{
 			"func(metric;tag1=value1, key='value')",
@@ -47,6 +70,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric)",
@@ -57,6 +81,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric",
@@ -65,6 +90,7 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 			},
 			ErrIncompleteCall,
+			"",
 		},
 		{
 			"func(metric,)",
@@ -73,6 +99,7 @@ func TestParse(t *testing.T) {
 				etype: etFunc,
 			},
 			ErrMissingArg,
+			"",
 		},
 		{
 			"func(metric1,metric2,metric3)",
@@ -86,6 +113,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1,metric2,metric3",
 			},
 			nil,
+			"",
 		},
 		{
 			"func1(metric1,func2(func3(func4(metricA,'foo'))))",
@@ -115,6 +143,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1,func2(func3(func4(metricA,'foo')))",
 			},
 			nil,
+			"",
 		},
 		{
 			"func1(metric1,func2(metricA, metricB),metric3)",
@@ -132,16 +161,78 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1,func2(metricA, metricB),metric3",
 			},
 			nil,
+			"",
 		},
 		{
 			"3",
 			&expr{int: 3, str: "3", etype: etInt},
 			nil,
+			"",
 		},
 		{
 			"3.1",
 			&expr{float: 3.1, str: "3.1", etype: etFloat},
 			nil,
+			"",
+		},
+		{
+			"3  ",
+			&expr{int: 3, str: "3", etype: etInt},
+			nil,
+			"",
+		},
+		{
+			"3a",
+			&expr{str: "3a"},
+			nil,
+			"",
+		},
+		{
+			"3a ",
+			&expr{str: "3a"},
+			nil,
+			"",
+		},
+		{
+			"3.0a.b.c",
+			&expr{str: "3.0a.b.c"},
+			nil,
+			"",
+		},
+		{
+			"a3",
+			&expr{str: "a3"},
+			nil,
+			"",
+		},
+		{
+			"func1(1  , a)",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{int: 1, str: "1", etype: etInt},
+					{str: "a"},
+				},
+				argsStr: "1  , a",
+			},
+			nil,
+			"",
+		},
+		{
+			"func1(1, 10a , 2b) ",
+			&expr{
+				str:   "func1",
+				etype: etFunc,
+				args: []*expr{
+					{int: 1, str: "1", etype: etInt},
+					{str: "10a"},
+					{str: "2b"},
+				},
+				argsStr: "1, 10a , 2b",
+			},
+			nil,
+			"",
 		},
 		{
 			"func1(metric1, 3, 1e2, 2e-3)",
@@ -157,6 +248,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1, 3, 1e2, 2e-3",
 			},
 			nil,
+			"",
 		},
 		{
 			"func1(metric1, 'stringconst')",
@@ -170,6 +262,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1, 'stringconst'",
 			},
 			nil,
+			"",
 		},
 		{
 			`func1(metric1, "stringconst")`,
@@ -183,6 +276,7 @@ func TestParse(t *testing.T) {
 				argsStr: `metric1, "stringconst"`,
 			},
 			nil,
+			"",
 		},
 		{
 			"func1(metric1, -3)",
@@ -196,6 +290,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1, -3",
 			},
 			nil,
+			"",
 		},
 		{
 			"func1(metric1, -3 , 'foo' )",
@@ -210,6 +305,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1, -3 , 'foo' ",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key='value')",
@@ -225,6 +321,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key='value'",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key=true)",
@@ -240,6 +337,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key=true",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, False)",
@@ -253,6 +351,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, False",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key=1)",
@@ -268,6 +367,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key=1",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key=0.1)",
@@ -283,6 +383,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key=0.1",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, 1, key='value')",
@@ -299,6 +400,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, 1, key='value'",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key='value', 1)",
@@ -315,6 +417,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key='value', 1",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key1='value1', key2='value two is here')",
@@ -331,6 +434,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key1='value1', key2='value two is here'",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key2='value2', key1='value1')",
@@ -347,6 +451,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key2='value2', key1='value1'",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric1;tag1=val1, key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4)",
@@ -367,6 +472,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1;tag1=val1, key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4",
 			},
 			nil,
+			"",
 		},
 		{
 			"func(metric, key2='true', key1='false')",
@@ -383,6 +489,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric, key2='true', key1='false'",
 			},
 			nil,
+			"",
 		},
 		{
 			`foo.{bar,baz}.qux`,
@@ -391,6 +498,7 @@ func TestParse(t *testing.T) {
 				etype: etName,
 			},
 			nil,
+			"",
 		},
 		{
 			`foo.b[0-9].qux`,
@@ -399,6 +507,7 @@ func TestParse(t *testing.T) {
 				etype: etName,
 			},
 			nil,
+			"",
 		},
 		{
 			`virt.v1.*.text-match:<foo.bar.qux>`,
@@ -407,21 +516,25 @@ func TestParse(t *testing.T) {
 				etype: etName,
 			},
 			nil,
+			"",
 		},
 		{
 			`foo.()`,
 			nil,
 			ErrIllegalCharacter,
+			"",
 		},
 		{
 			`foo.*()`,
 			nil,
 			ErrIllegalCharacter,
+			"",
 		},
 		{
 			`foo.{bar,baz}.qux()`,
 			nil,
 			ErrIllegalCharacter,
+			"",
 		},
 		// PIPE SYNTAX TESTS
 		{
@@ -433,21 +546,25 @@ func TestParse(t *testing.T) {
 				argsStr: "",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric | abc",
 			&expr{str: "metric"},
 			ErrExpectingPipeFunc,
+			"",
 		},
 		{
 			"metric | true",
 			&expr{str: "metric"},
 			ErrExpectingPipeFunc,
+			"",
 		},
 		{
 			"metric | 3",
 			&expr{str: "metric"},
 			ErrExpectingPipeFunc,
+			"",
 		},
 		{
 			"metric | func(metric",
@@ -456,6 +573,7 @@ func TestParse(t *testing.T) {
 				etype: etName,
 			},
 			ErrIncompleteCall,
+			"",
 		},
 		{
 			"metric | func(metric,)",
@@ -463,6 +581,7 @@ func TestParse(t *testing.T) {
 				str: "metric",
 			},
 			ErrMissingArg,
+			"",
 		},
 		{
 			"metric | func(",
@@ -470,6 +589,7 @@ func TestParse(t *testing.T) {
 				str: "metric",
 			},
 			ErrIncompleteCall,
+			"",
 		},
 		{
 			"metric;tag1=value1 | func(key='value')",
@@ -483,6 +603,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1|func(metric2,metric3)",
@@ -496,6 +617,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric2,metric3",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1 |  func(metric2,'stringconst',metric3)",
@@ -510,6 +632,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric2,'stringconst',metric3",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1|func1('stringconst')",
@@ -523,6 +646,7 @@ func TestParse(t *testing.T) {
 				argsStr: "'stringconst'",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1|func1(-3)",
@@ -536,6 +660,7 @@ func TestParse(t *testing.T) {
 				argsStr: "-3",
 			},
 			nil,
+			"",
 		},
 		{
 			" metric|func(key2='true', key1='false')",
@@ -552,6 +677,7 @@ func TestParse(t *testing.T) {
 				argsStr: "key2='true', key1='false'",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric|func(key1='value1', key2='value two is here')",
@@ -568,6 +694,7 @@ func TestParse(t *testing.T) {
 				argsStr: "key1='value1', key2='value two is here'",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1;tag1=val1 | func(key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4)",
@@ -588,6 +715,7 @@ func TestParse(t *testing.T) {
 				argsStr: "key1='value1', metric2;tag2=val2, key2=true, metric3;tag3=val3, key3=None, metric4;tag4=val4",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1 | func1() | func2() | func3(3)",
@@ -615,6 +743,7 @@ func TestParse(t *testing.T) {
 				argsStr: "3",
 			},
 			nil,
+			"",
 		},
 		{
 			"func1(metric1 | func2(), 3)",
@@ -635,6 +764,7 @@ func TestParse(t *testing.T) {
 				argsStr: "metric1 | func2(), 3",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1 | func1(func2(func3(func4(metricA,'foo'))))",
@@ -664,6 +794,7 @@ func TestParse(t *testing.T) {
 				argsStr: "func2(func3(func4(metricA,'foo')))",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1 | func1(func3(func4(metricA,'foo')) | func2())",
@@ -696,6 +827,7 @@ func TestParse(t *testing.T) {
 				argsStr: "func3(func4(metricA,'foo')) | func2()",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1 | func1(func4(metricA,'foo') | func3() | func2())",
@@ -725,6 +857,7 @@ func TestParse(t *testing.T) {
 				argsStr: "func4(metricA,'foo') | func3() | func2()",
 			},
 			nil,
+			"",
 		},
 		{
 			"metric1 | func1(metricA | func4('foo') | func3() | func2())",
@@ -754,23 +887,29 @@ func TestParse(t *testing.T) {
 				argsStr: "metricA | func4('foo') | func3() | func2()",
 			},
 			nil,
+			"",
 		},
 	}
 
 	for _, tt := range tests {
-		e, leftover, err := Parse(tt.s, false)
-		if err != tt.err {
-			t.Errorf("case %+v expected err %v, got %v (leftover: %q)", tt.s, tt.err, err, leftover)
-			continue
-		}
-		if !reflect.DeepEqual(e, tt.e) {
-			spew.Config.DisablePointerAddresses = true
-			exp := spew.Sdump(tt.e)
-			got := spew.Sdump(e)
-			spew.Config.DisablePointerAddresses = false
-			dmp := diffmatchpatch.New()
-			diffs := dmp.DiffMain(exp, got, false)
-			format := `##### case %+v #####
+		t.Run(tt.s, func(t *testing.T) {
+			e, leftover, err := Parse(tt.s, false)
+			if err != tt.err {
+				t.Errorf("case %+v expected err %v, got %v (leftover: %q)", tt.s, tt.err, err, leftover)
+				t.FailNow()
+			}
+			if (tt.err == nil) && (leftover != tt.leftover) {
+				t.Errorf("case %+v expected leftover %q, got %q", tt.s, tt.leftover, leftover)
+				t.FailNow()
+			}
+			if !reflect.DeepEqual(e, tt.e) {
+				spew.Config.DisablePointerAddresses = true
+				exp := spew.Sdump(tt.e)
+				got := spew.Sdump(e)
+				spew.Config.DisablePointerAddresses = false
+				dmp := diffmatchpatch.New()
+				diffs := dmp.DiffMain(exp, got, false)
+				format := `##### case %+v #####
 ### expected ###
 %+v
 
@@ -782,8 +921,11 @@ func TestParse(t *testing.T) {
 
 ### leftover ###
 %q`
-			t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs), leftover)
-		}
+				t.Errorf(format, tt.s, exp, got, dmp.DiffPrettyText(diffs), leftover)
+				t.FailNow()
+			}
+		})
+
 	}
 
 }
