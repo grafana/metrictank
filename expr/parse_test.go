@@ -11,9 +11,9 @@ import (
 func TestParse(t *testing.T) {
 
 	tests := []struct {
-		s   string
-		e   *expr
-		err error
+		s        string
+		e        *expr
+		err      error
 		leftover string
 	}{
 		{
@@ -242,7 +242,7 @@ func TestParse(t *testing.T) {
 				args: []*expr{
 					{int: 1, str: "1", etype: etInt},
 					{
-						str: "func2",
+						str:   "func2",
 						etype: etFunc,
 						args: []*expr{
 							{str: "10a"},

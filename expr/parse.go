@@ -327,7 +327,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 
 		var arg *expr
 		var err error
-		arg, e, err = Parse(e, ParseContext{ Piped: false, IsFullArg: true} )
+		arg, e, err = Parse(e, ParseContext{Piped: false, IsFullArg: true})
 		if err != nil {
 			return "", nil, nil, e, err
 		}
@@ -341,7 +341,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
-			argCont, eCont, errCont := Parse(e, ParseContext{ Piped: false, IsFullArg: true})
+			argCont, eCont, errCont := Parse(e, ParseContext{Piped: false, IsFullArg: true})
 			if errCont != nil {
 				return "", nil, nil, eCont, errCont
 			}
