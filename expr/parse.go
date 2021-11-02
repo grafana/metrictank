@@ -133,7 +133,7 @@ func ParseMany(targets []string) ([]*expr, error) {
 }
 
 func skipWhitespace(s string) string {
-	for len(s) > 1 && s[0] == ' ' {
+	for len(s) >= 1 && s[0] == ' ' {
 		s = s[1:]
 	}
 	return s
