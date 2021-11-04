@@ -85,12 +85,14 @@ func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) bin
 }
 
 type GraphiteTags struct {
+	FromTo
 	Filter string `json:"filter" form:"filter"`
 }
 
 type GraphiteTagsResp []GraphiteTagResp
 
 type GraphiteAutoCompleteTags struct {
+	FromTo
 	Prefix string   `json:"tagPrefix" form:"tagPrefix"`
 	Expr   []string `json:"expr" form:"expr"`
 	Limit  uint     `json:"limit" form:"limit"`
