@@ -115,12 +115,34 @@ type MetricRequest struct {
 	Until  int32
 }
 
+// ParseContext includes contextual information that affects how the current
+// expression is parsed.
+// This should only be set by internal calls.
+type ParseContext struct {
+	// Piped means the expression to be parsed is known to receive a piped
+	// input.
+	Piped bool
+	// CanParseAsNumber means the expression returned from Parse() can be a
+	// number. Only a full, non-piped argument for a function call can be
+	// parsed as a number.
+	// For example, given the string "funcA(1 | funcB(2), 3)":
+	// "1" should not be parsed as a number. While it is in the first funcA
+	// argument, it is not the entire argument (there are additional
+	// characters "| funcB(2)" before the comma indicating the end of one
+	// argument). While "1" could also be seen as an argument to funcB, a
+	// number cannot be the input to a pipe. It should instead be parsed as a
+	// metric named "1".
+	// "2" is a full argument for funcB, so it should be parsed as a number.
+	// "3" is a full argument for funcA, so it should be parsed as a number.
+	CanParseAsNumber bool
+}
+
 // ParseMany parses a slice of strings into a slice of expressions (recursively)
 // not included: validation that requested functions exist, correct args are passed, etc.
 func ParseMany(targets []string) ([]*expr, error) {
 	var out []*expr
 	for _, target := range targets {
-		e, leftover, err := Parse(target, false)
+		e, leftover, err := Parse(target, ParseContext{false, false})
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +155,7 @@ func ParseMany(targets []string) ([]*expr, error) {
 }
 
 func skipWhitespace(s string) string {
-	for len(s) > 1 && s[0] == ' ' {
+	for len(s) >= 1 && s[0] == ' ' {
 		s = s[1:]
 	}
 	return s
@@ -141,17 +163,22 @@ func skipWhitespace(s string) string {
 
 // Parses an expression string and turns it into an expression
 // also returns any leftover data that could not be parsed
-// piped means: the expression to be parsed is known to receive a piped input
-// (should only be set by internal calls)
-func Parse(e string, piped bool) (*expr, string, error) {
+func Parse(e string, pCtx ParseContext) (*expr, string, error) {
 	e = skipWhitespace(e)
 
 	if len(e) == 0 {
 		return nil, "", ErrMissingExpr
 	}
 
-	if '0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+' {
-		return parseConst(e)
+	if pCtx.CanParseAsNumber && isNumStartChar(e[0]) {
+		constExpr, leftover, err := parseNumber(e)
+		if err != nil {
+			return nil, "", err
+		}
+		leftover = skipWhitespace(leftover)
+		if leftover == "" || leftover[0] == ',' || leftover[0] == ')' {
+			return constExpr, leftover, nil
+		}
 	}
 
 	if val, ok := strToBool(e); ok {
@@ -177,7 +204,7 @@ func Parse(e string, piped bool) (*expr, string, error) {
 	var exp *expr
 	var err error
 
-	if e != "" && e[0] == '(' {
+	if e != "" && e[0] == '(' && isFnStartChar(name[0]) {
 		// in this case, our parsed name is a function
 		for i := range name {
 			if !isFnChar(name[i]) {
@@ -187,7 +214,7 @@ func Parse(e string, piped bool) (*expr, string, error) {
 
 		exp = &expr{str: name, etype: etFunc}
 
-		exp.argsStr, exp.args, exp.namedArgs, e, err = parseArgList(e, piped)
+		exp.argsStr, exp.args, exp.namedArgs, e, err = parseArgList(e, pCtx.Piped)
 
 		if err != nil {
 			return exp, e, err
@@ -209,14 +236,14 @@ func Parse(e string, piped bool) (*expr, string, error) {
 	// if we are in a sub-call to Parse (such as the Parse() called in step 2/3/4) we should not try to read upcoming
 	// pipes, but rather have the top-level consume them all.
 
-	for !piped && e != "" {
+	for !pCtx.Piped && e != "" {
 		e = skipWhitespace(e)
 		if e == "" || e[0] != '|' {
 			break
 		}
 		e = e[1:]
 		var nextExp *expr
-		nextExp, e, err = Parse(e, true)
+		nextExp, e, err = Parse(e, ParseContext{Piped: true, CanParseAsNumber: false})
 		if err != nil {
 			return exp, e, err
 		}
@@ -307,7 +334,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 
 		var arg *expr
 		var err error
-		arg, e, err = Parse(e, false)
+		arg, e, err = Parse(e, ParseContext{Piped: false, CanParseAsNumber: true})
 		if err != nil {
 			return "", nil, nil, e, err
 		}
@@ -321,7 +348,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
-			argCont, eCont, errCont := Parse(e, false)
+			argCont, eCont, errCont := Parse(e, ParseContext{Piped: false, CanParseAsNumber: true})
 			if errCont != nil {
 				return "", nil, nil, eCont, errCont
 			}
@@ -365,6 +392,11 @@ func isNameChar(r byte) bool {
 	return strings.IndexByte(nameChar, r) >= 0
 }
 
+func isFnStartChar(r byte) bool {
+	return 'a' <= r && r <= 'z' ||
+		'A' <= r && r <= 'Z'
+}
+
 func isFnChar(r byte) bool {
 	return false ||
 		'a' <= r && r <= 'z' ||
@@ -372,7 +404,11 @@ func isFnChar(r byte) bool {
 		'0' <= r && r <= '9'
 }
 
-func parseConst(s string) (*expr, string, error) {
+func isNumStartChar(r byte) bool {
+	return '0' <= r && r <= '9' || r == '-' || r == '+'
+}
+
+func parseNumber(s string) (*expr, string, error) {
 
 	var i int
 	var float bool
