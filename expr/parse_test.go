@@ -943,7 +943,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.s, func(t *testing.T) {
-			e, leftover, err := Parse(tt.s, ParseContext{Piped: false, IsFullArg: false})
+			e, leftover, err := Parse(tt.s, ParseContext{Piped: false, CanParseAsNumber: false})
 			if err != tt.err {
 				t.Errorf("case %+v expected err %v, got %v (leftover: %q)", tt.s, tt.err, err, leftover)
 				t.FailNow()

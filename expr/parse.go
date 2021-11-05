@@ -122,12 +122,19 @@ type ParseContext struct {
 	// Piped means the expression to be parsed is known to receive a piped
 	// input.
 	Piped bool
-	// IsFullArg means the expression to be parsed is a full argument to a
-	// function.
-	// This is used to work out whether we should attempt to parse the
-	// expression as a numerical constant - we should only do so if it's an
-	// full argument.
-	IsFullArg bool
+	// CanParseAsNumber means the expression returned from Parse() can be a
+	// number. Only a full, non-piped argument for a function call can be
+	// parsed as a number.
+	// For example, given the string "funcA(1 | funcB(2), 3)":
+	// "1" should not be parsed as a number. While it is in the first funcA
+	// argument, it is not the entire argument (there are additional
+	// characters "| funcB(2)" before the comma indicating the end of one
+	// argument). While "1" could also be seen as an argument to funcB, a
+	// number cannot be the input to a pipe. It should instead be parsed as a
+	// metric named "1".
+	// "2" is a full argument for funcB, so it should be parsed as a number.
+	// "3" is a full argument for funcA, so it should be parsed as a number.
+	CanParseAsNumber bool
 }
 
 // ParseMany parses a slice of strings into a slice of expressions (recursively)
@@ -163,7 +170,7 @@ func Parse(e string, pCtx ParseContext) (*expr, string, error) {
 		return nil, "", ErrMissingExpr
 	}
 
-	if pCtx.IsFullArg && isNumStartChar(e[0]) {
+	if pCtx.CanParseAsNumber && isNumStartChar(e[0]) {
 		constExpr, leftover, err := parseNumber(e)
 		if err != nil {
 			return nil, "", err
@@ -236,7 +243,7 @@ func Parse(e string, pCtx ParseContext) (*expr, string, error) {
 		}
 		e = e[1:]
 		var nextExp *expr
-		nextExp, e, err = Parse(e, ParseContext{Piped: true, IsFullArg: false})
+		nextExp, e, err = Parse(e, ParseContext{Piped: true, CanParseAsNumber: false})
 		if err != nil {
 			return exp, e, err
 		}
@@ -327,7 +334,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 
 		var arg *expr
 		var err error
-		arg, e, err = Parse(e, ParseContext{Piped: false, IsFullArg: true})
+		arg, e, err = Parse(e, ParseContext{Piped: false, CanParseAsNumber: true})
 		if err != nil {
 			return "", nil, nil, e, err
 		}
@@ -341,7 +348,7 @@ func parseArgList(e string, piped bool) (string, []*expr, map[string]*expr, stri
 		// can't contain otherwise-valid-name chars like {, }, etc
 		if arg.etype == etName && e[0] == '=' {
 			e = e[1:]
-			argCont, eCont, errCont := Parse(e, ParseContext{Piped: false, IsFullArg: true})
+			argCont, eCont, errCont := Parse(e, ParseContext{Piped: false, CanParseAsNumber: true})
 			if errCont != nil {
 				return "", nil, nil, eCont, errCont
 			}
