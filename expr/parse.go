@@ -163,8 +163,8 @@ func Parse(e string, pCtx ParseContext) (*expr, string, error) {
 		return nil, "", ErrMissingExpr
 	}
 
-	if pCtx.IsFullArg && ('0' <= e[0] && e[0] <= '9' || e[0] == '-' || e[0] == '+') {
-		constExpr, leftover, err := parseConst(e)
+	if pCtx.IsFullArg && isNumStartChar(e[0]) {
+		constExpr, leftover, err := parseNumber(e)
 		if err != nil {
 			return nil, "", err
 		}
@@ -397,7 +397,11 @@ func isFnChar(r byte) bool {
 		'0' <= r && r <= '9'
 }
 
-func parseConst(s string) (*expr, string, error) {
+func isNumStartChar(r byte) bool {
+	return '0' <= r && r <= '9' || r == '-' || r == '+'
+}
+
+func parseNumber(s string) (*expr, string, error) {
 
 	var i int
 	var float bool
