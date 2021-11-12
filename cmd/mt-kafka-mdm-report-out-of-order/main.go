@@ -15,6 +15,40 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func main() {
+	configureLogging()
+
+	flags := ParseFlags()
+
+	inKafkaMdm.ConfigProcess("mt-kafka-mdm-report-out-of-order" + strconv.Itoa(rand.Int()))
+	kafkaMdm := inKafkaMdm.New()
+
+	inputOOOFinder := newInputOOOFinder(
+		flags.PartitionFrom,
+		flags.PartitionTo,
+		uint32(flags.ReorderWindow),
+	)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	kafkaMdm.Start(inputOOOFinder, cancel)
+	select {
+	case sig := <-sigChan:
+		log.Infof("Received signal %q. Shutting down", sig)
+	case <-ctx.Done():
+		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
+	case <-time.After(flags.RunDuration):
+		log.Infof("Finished scanning")
+	}
+	kafkaMdm.Stop()
+
+	tracker := inputOOOFinder.Tracker()
+	filter(tracker, flags.Prefix, flags.Substr)
+	aggregateAndLog(tracker, flags.GroupByName, flags.GroupByTag)
+}
+
 func configureLogging() {
 	formatter := &logger.TextFormatter{}
 	formatter.TimestampFormat = "2006-01-02 15:04:05.000"
@@ -31,10 +65,6 @@ func filter(tracker Tracker, prefix string, substr string) {
 			delete(tracker, key)
 		}
 	}
-}
-
-func asPercent(numerator int, denominator int) float32 {
-	return float32(numerator) / float32(denominator) * 100
 }
 
 func aggregateAndLog(tracker Tracker, groupByName bool, groupByTag string) {
@@ -96,36 +126,6 @@ func aggregateAndLog(tracker Tracker, groupByName bool, groupByTag string) {
 	}
 }
 
-func main() {
-	configureLogging()
-
-	flags := ParseFlags()
-
-	inKafkaMdm.ConfigProcess("mt-kafka-mdm-report-out-of-order" + strconv.Itoa(rand.Int()))
-	kafkaMdm := inKafkaMdm.New()
-
-	inputOOOFinder := newInputOOOFinder(
-		flags.PartitionFrom,
-		flags.PartitionTo,
-		uint32(flags.ReorderWindow),
-	)
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	kafkaMdm.Start(inputOOOFinder, cancel)
-	select {
-	case sig := <-sigChan:
-		log.Infof("Received signal %q. Shutting down", sig)
-	case <-ctx.Done():
-		log.Info("Mdm input plugin signalled a fatal error. Shutting down")
-	case <-time.After(flags.RunDuration):
-		log.Infof("Finished scanning")
-	}
-	kafkaMdm.Stop()
-
-	tracker := inputOOOFinder.Tracker()
-	filter(tracker, flags.Prefix, flags.Substr)
-	aggregateAndLog(tracker, flags.GroupByName, flags.GroupByTag)
+func asPercent(numerator int, denominator int) float32 {
+	return float32(numerator) / float32(denominator) * 100
 }

@@ -12,6 +12,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func ParseFlags() Flags {
+	flags := NewFlags()
+
+	flag.Usage = flags.Usage
+
+	flags.Parse(os.Args[1:])
+
+	return *flags
+}
+
 type Flags struct {
 	flagSet *flag.FlagSet
 
@@ -133,14 +143,4 @@ func (flags *Flags) Usage() {
 	fmt.Fprintln(os.Stderr, "EXAMPLES:")
 	fmt.Fprintln(os.Stderr, "  mt-kafka-mdm-report-out-of-order -group-by-name -config metrictank.ini -partition-from 0")
 	fmt.Fprintln(os.Stderr, "  mt-kafka-mdm-report-out-of-order -group-by-name -group-by-tag namespace -config metrictank.ini -partition-from 0 -partition-to 3 -reorder-window 5 -run-duration 5m")
-}
-
-func ParseFlags() Flags {
-	flags := NewFlags()
-
-	flag.Usage = flags.Usage
-
-	flags.Parse(os.Args[1:])
-
-	return *flags
 }

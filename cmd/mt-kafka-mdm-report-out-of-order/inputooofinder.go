@@ -13,29 +13,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type Track struct {
-	Name string
-	Tags []string
-
-	reorderBuffer *mdata.ReorderBuffer
-
-	Count           int
-	OutOfOrderCount int
-	DuplicateCount  int
-}
-
-type Tracker map[schema.MKey]Track
-
 // find out-of-order and duplicate metrics
 type inputOOOFinder struct {
 	reorderWindow uint32
 	tracker       Tracker
 
 	lock sync.Mutex
-}
-
-func (ip inputOOOFinder) Tracker() Tracker {
-	return ip.tracker
 }
 
 func newInputOOOFinder(partitionFrom int, partitionTo int, reorderWindow uint32) *inputOOOFinder {
@@ -69,22 +52,6 @@ func newInputOOOFinder(partitionFrom int, partitionTo int, reorderWindow uint32)
 
 		lock: sync.Mutex{},
 	}
-}
-
-func (ip *inputOOOFinder) incrementCounts(metricKey schema.MKey, metricTime int64, track Track, partition int32) {
-	track.Count++
-
-	_, err := track.reorderBuffer.Add(uint32(metricTime), 0) // ignore value
-	if err == errors.ErrMetricTooOld {
-		track.OutOfOrderCount++
-	} else if err == errors.ErrMetricNewValueForTimestamp {
-		track.DuplicateCount++
-	} else if err != nil {
-		log.Errorf("failed to add metric with Name=%q and timestamp=%d from partition=%d to reorder buffer: %s", track.Name, metricTime, partition, err)
-		return
-	}
-
-	ip.tracker[metricKey] = track
 }
 
 func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition int32) {
@@ -127,4 +94,37 @@ func (ip *inputOOOFinder) ProcessMetricPoint(mp schema.MetricPoint, format msg.F
 
 func (ip *inputOOOFinder) ProcessIndexControlMsg(msg schema.ControlMsg, partition int32) {
 
+}
+
+func (ip *inputOOOFinder) incrementCounts(metricKey schema.MKey, metricTime int64, track Track, partition int32) {
+	track.Count++
+
+	_, err := track.reorderBuffer.Add(uint32(metricTime), 0) // ignore value
+	if err == errors.ErrMetricTooOld {
+		track.OutOfOrderCount++
+	} else if err == errors.ErrMetricNewValueForTimestamp {
+		track.DuplicateCount++
+	} else if err != nil {
+		log.Errorf("failed to add metric with Name=%q and timestamp=%d from partition=%d to reorder buffer: %s", track.Name, metricTime, partition, err)
+		return
+	}
+
+	ip.tracker[metricKey] = track
+}
+
+func (ip inputOOOFinder) Tracker() Tracker {
+	return ip.tracker
+}
+
+type Tracker map[schema.MKey]Track
+
+type Track struct {
+	Name string
+	Tags []string
+
+	reorderBuffer *mdata.ReorderBuffer
+
+	Count           int
+	OutOfOrderCount int
+	DuplicateCount  int
 }
