@@ -16,12 +16,12 @@
 /cmd/mt-index-migrate/mt-index-migrate
 /cmd/mt-index-prune/mt-index-prune
 /cmd/mt-indexdump-rules-analyzer/mt-indexdump-rules-analyzer
+/cmd/mt-kafka-mdm-report-out-of-order/mt-kafka-mdm-report-out-of-order
 /cmd/mt-kafka-mdm-sniff-out-of-order/mt-kafka-mdm-sniff-out-of-order
 /cmd/mt-kafka-mdm-sniff/mt-kafka-mdm-sniff
 /cmd/mt-kafka-persist-sniff/mt-kafka-persist-sniff
 /cmd/mt-keygen/mt-keygen
 /cmd/mt-parrot/mt-parrot
-/cmd/mt-kafka-mdm-report-out-of-order/mt-kafka-mdm-report-out-of-order
 /cmd/mt-schemas-explain/mt-schemas-explain
 /cmd/mt-split-metrics-by-ttl/mt-split-metrics-by-ttl
 /cmd/mt-store-cat/mt-store-cat
