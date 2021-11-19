@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.17
+      - image: circleci/golang:1.17.3
     steps:
       - checkout
       - run: scripts/build.sh
@@ -22,7 +22,7 @@ jobs:
   test:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.17
+      - image: circleci/golang:1.17.3
     steps:
       - checkout
       - run: GO111MODULE=off go test -v -race --short ./...
@@ -30,7 +30,7 @@ jobs:
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
     docker:
-      - image: circleci/golang:1.17
+      - image: circleci/golang:1.17.3
     steps:
       - checkout
       - run: scripts/qa/gofmt.sh

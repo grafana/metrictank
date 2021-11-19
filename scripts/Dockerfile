@@ -1,7 +1,7 @@
 #############################
 # unpublished builder image #
 #############################
-FROM golang:1.17-alpine AS gobase
+FROM golang:1.17.3-alpine AS gobase
 RUN apk add --no-cache git bash
 
 # Compile metrictank
