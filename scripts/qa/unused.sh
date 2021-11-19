@@ -7,13 +7,15 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir
 cd ${DIR}/../..
-go get -u honnef.co/go/tools/cmd/staticcheck
-go get -u github.com/opennota/check/cmd/varcheck
-go get -u github.com/opennota/check/cmd/structcheck
+go install honnef.co/go/tools/cmd/staticcheck@latest
+go install github.com/opennota/check/cmd/varcheck@latest
+go install github.com/opennota/check/cmd/structcheck@latest
 # for https://github.com/remyoudompheng/go-misc/pull/14
-go get -u github.com/Dieterbe/go-misc/deadcode
+go install github.com/Dieterbe/go-misc/deadcode@latest
 
 ret=0
+
+export GO111MODULE=off
 
 echo "## running staticcheck"
 staticcheck -checks U1000 ./...

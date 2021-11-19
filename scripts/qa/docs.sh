@@ -32,7 +32,7 @@ if ! diff docs/config.md $tmp; then
 fi
 
 echo "checking metrics.md"
-go get github.com/Dieterbe/metrics2docs
+go install github.com/Dieterbe/metrics2docs@latest
 metrics2docs . > $tmp
 diff docs/metrics.md $tmp
 ret=$?

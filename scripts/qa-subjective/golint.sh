@@ -7,5 +7,6 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir
 echo $DIR
 cd ${DIR}/../..
-go get -u golang.org/x/lint/golint
+go install golang.org/x/lint/golint@latest
+export GO111MODULE=off
 golint $(go list ./... | grep -v vendor)
