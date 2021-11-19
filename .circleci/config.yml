@@ -25,7 +25,7 @@ jobs:
       - image: circleci/golang:1.17
     steps:
       - checkout
-      - run: GO111MODULE=off go test -v -race $(go list ./... | grep -v github.com/grafana/metrictank/stacktest)
+      - run: GO111MODULE=off go test -v -race --short ./...
 
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
