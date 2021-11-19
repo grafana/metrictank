@@ -74,7 +74,7 @@ func TestEncodeDecodeArchive(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeArchive Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := Archive{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeNode(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeNode Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := Node{}
