@@ -113,7 +113,7 @@ func WritePointMsg(point schema.MetricPoint, buf []byte, version Format) (o []by
 }
 
 // WritePointMsgArray is like CreateMsg, except optimized for MetricPoint and buffer re-use.
-// caller must assure a cap-len diff of at least:
+// caller must assure a cap-len diff of exactly:
 // 2 + 32B * len(points) (for FormatMetricPoint)
 // 2 + 28B * len(points) (for FormatMetricPointWithoutOrg)
 // no other formats supported.
