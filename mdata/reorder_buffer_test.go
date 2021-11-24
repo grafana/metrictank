@@ -376,7 +376,7 @@ func TestROBAvoidUnderflow(t *testing.T) {
 
 	expectedLen := len(data) - windowSize
 	if len(results) != expectedLen {
-		t.Fatalf("Expected %d results, got %d", len(results), expectedLen)
+		t.Fatalf("Expected %d results, got %d", expectedLen, len(results))
 	}
 
 	for i := 0; i < len(results); i++ {
