@@ -98,6 +98,8 @@ func TestWriteReadPointMsgArray(t *testing.T) {
 			Value: 12,
 		},
 	}
+	// copy to make sure the function under test doesn't modify input
+	inputCopy := append(make([]schema.MetricPoint, 0, len(mp)), mp...)
 	buf := make([]byte, 0, 2+32*len(mp))
 	out, err := WritePointMsgArray(mp, buf, FormatMetricPoint)
 	if err != nil {
@@ -119,8 +121,8 @@ func TestWriteReadPointMsgArray(t *testing.T) {
 		t.Fatalf("%s", iter.Err().Error())
 	}
 
-	if !reflect.DeepEqual(mp, outPoints) {
-		t.Fatalf("expected point %v, got %v", mp, outPoints)
+	if !reflect.DeepEqual(inputCopy, outPoints) {
+		t.Fatalf("expected point %v, got %v", inputCopy, outPoints)
 	}
 }
 
@@ -142,6 +144,10 @@ func TestWriteReadPointMsgArrayWithoutOrg(t *testing.T) {
 			Value: 12,
 		},
 	}
+
+	// copy to make sure the function under test doesn't modify input
+	inputCopy := append(make([]schema.MetricPoint, 0, len(mp)), mp...)
+
 	buf := make([]byte, 0, 2+28*len(mp))
 	out, err := WritePointMsgArray(mp, buf, FormatMetricPointWithoutOrg)
 	if err != nil {
@@ -154,8 +160,8 @@ func TestWriteReadPointMsgArrayWithoutOrg(t *testing.T) {
 	}
 
 	// iter will have to set the default org and we want to check it
-	for i := range mp {
-		mp[i].MKey.Org = 6
+	for i := range inputCopy {
+		inputCopy[i].MKey.Org = 6
 	}
 
 	var outPoints []schema.MetricPoint
@@ -168,8 +174,8 @@ func TestWriteReadPointMsgArrayWithoutOrg(t *testing.T) {
 		t.Fatalf("%s", iter.Err().Error())
 	}
 
-	if !reflect.DeepEqual(mp, outPoints) {
-		t.Fatalf("expected point %v, got %v", mp, outPoints)
+	if !reflect.DeepEqual(inputCopy, outPoints) {
+		t.Fatalf("expected point %v, got %v", inputCopy, outPoints)
 	}
 }
 
