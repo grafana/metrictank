@@ -361,16 +361,27 @@ func TestROBFlushUnsortedData2(t *testing.T) {
 func TestROBAvoidUnderflow(t *testing.T) {
 	var results []schema.Point
 	windowSize := 10
+	dpWindows := 10
+	numDps := dpWindows * windowSize
 	buf := NewReorderBuffer(uint32(windowSize), 1, false)
-	data := make([]schema.Point, 1000)
-	for i := 0; i < 1000; i++ {
+	data := make([]schema.Point, numDps)
+	for i := 0; i < numDps; i++ {
 		data[i] = schema.Point{Ts: uint32(i + 1), Val: float64(i + 1000)}
 	}
-	for i := 0; i < len(data); i++ {
-		pt, flushed, _ := buf.Add(data[i].Ts, data[i].Val)
-		if pt.Ts != 0 {
-			results = append(results, pt)
-			results = append(results, flushed...)
+
+	// Add datapoints out of order in half window steps
+	for i := 0; i < numDps; i += windowSize / 2 {
+		minIndex := i
+		maxIndex := minIndex + windowSize/2 - 1
+		for i := maxIndex; i >= minIndex; i-- {
+			pt, flushed, err := buf.Add(data[i].Ts, data[i].Val)
+			if err != nil {
+				t.Fatalf("Got unexpected error = %v", err)
+			}
+			if pt.Ts != 0 {
+				results = append(results, pt)
+				results = append(results, flushed...)
+			}
 		}
 	}
 
