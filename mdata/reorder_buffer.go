@@ -35,7 +35,7 @@ func (rob *ReorderBuffer) Add(ts uint32, val float64) (schema.Point, []schema.Po
 
 	newestTs := rob.buf[rob.newest].Ts
 	// out of order and too old
-	if newestTs != 0 && ts < newestTs && ts <= newestTs-(uint32(cap(rob.buf))*rob.interval) {
+	if newestTs != 0 && ts < newestTs && newestTs-ts >= (uint32(cap(rob.buf))*rob.interval) {
 		return schema.Point{}, nil, errors.ErrMetricTooOld
 	}
 
