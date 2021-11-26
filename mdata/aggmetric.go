@@ -468,12 +468,13 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		a.add(ts, val)
 	} else {
 		// write through reorder buffer
-		res, err := a.rob.Add(ts, val)
+		pt, res, err := a.rob.Add(ts, val)
 
 		if err == nil {
-			if len(res) == 0 {
+			if pt.Ts == 0 {
 				a.lastWrite = uint32(time.Now().Unix())
 			} else {
+				a.add(pt.Ts, pt.Val)
 				for _, p := range res {
 					a.add(p.Ts, p.Val)
 				}

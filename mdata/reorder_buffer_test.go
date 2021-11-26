@@ -14,8 +14,12 @@ func testAddAndGet(t *testing.T, reorderWindow uint32, testData, expectedData []
 	metricsReordered.SetUint32(0)
 	addedCount := uint32(0)
 	for i, point := range testData {
-		addRes, err := b.Add(point.Ts, point.Val)
-		flushed = append(flushed, addRes...)
+		pt, addRes, err := b.Add(point.Ts, point.Val)
+
+		if pt.Ts != 0 {
+			flushed = append(flushed, pt)
+			flushed = append(flushed, addRes...)
+		}
 		if expectedErrors != nil && err != expectedErrors[i] {
 			t.Fatalf("Data point #%d: expected error '%v', but had '%v'", i, expectedErrors[i], err)
 		}
@@ -223,8 +227,8 @@ func TestROBAddAndGetDuplicateAllowUpdate(t *testing.T) {
 func TestROBOmitFlushIfNotEnoughData(t *testing.T) {
 	b := NewReorderBuffer(9, 1, false)
 	for i := uint32(1); i < 10; i++ {
-		flushed, _ := b.Add(i, float64(i*100))
-		if len(flushed) > 0 {
+		pt, _, _ := b.Add(i, float64(i*100))
+		if pt.Ts != 0 {
 			t.Fatalf("Expected no data to get flushed out")
 		}
 	}
@@ -276,11 +280,13 @@ func TestROBFlushSortedData(t *testing.T) {
 	var results []schema.Point
 	buf := NewReorderBuffer(600, 1, false)
 	for i := 1100; i < 2100; i++ {
-		flushed, err := buf.Add(uint32(i), float64(i))
+		pt, flushed, err := buf.Add(uint32(i), float64(i))
 		if err != nil {
 			t.Fatalf("Adding failed")
+		} else if pt.Ts != 0 {
+			results = append(results, pt)
+			results = append(results, flushed...)
 		}
-		results = append(results, flushed...)
 	}
 
 	for i := 0; i < 400; i++ {
@@ -305,10 +311,11 @@ func TestROBFlushUnsortedData1(t *testing.T) {
 	}
 	failedCount := 0
 	for _, p := range data {
-		flushed, err := buf.Add(p.Ts, p.Val)
+		pt, flushed, err := buf.Add(p.Ts, p.Val)
 		if err != nil {
 			failedCount++
-		} else {
+		} else if pt.Ts != 0 {
+			results = append(results, pt)
 			results = append(results, flushed...)
 		}
 	}
@@ -338,12 +345,54 @@ func TestROBFlushUnsortedData2(t *testing.T) {
 	}
 	unsortedData := unsort(data, 10)
 	for i := 0; i < len(data); i++ {
-		flushed, _ := buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
-		results = append(results, flushed...)
+		pt, flushed, _ := buf.Add(unsortedData[i].Ts, unsortedData[i].Val)
+		if pt.Ts != 0 {
+			results = append(results, pt)
+			results = append(results, flushed...)
+		}
 	}
 	for i := 0; i < 400; i++ {
 		if results[i].Ts != uint32(i+1000) || results[i].Val != float64(i+1000) {
 			t.Fatalf("Unexpected results %+v", results)
+		}
+	}
+}
+
+func TestROBAvoidUnderflow(t *testing.T) {
+	var results []schema.Point
+	windowSize := 10
+	dpWindows := 10
+	numDps := dpWindows * windowSize
+	buf := NewReorderBuffer(uint32(windowSize), 1, false)
+	data := make([]schema.Point, numDps)
+	for i := 0; i < numDps; i++ {
+		data[i] = schema.Point{Ts: uint32(i + 1), Val: float64(i + 1000)}
+	}
+
+	// Add datapoints out of order in half window steps
+	for i := 0; i < numDps; i += windowSize / 2 {
+		minIndex := i
+		maxIndex := minIndex + windowSize/2 - 1
+		for i := maxIndex; i >= minIndex; i-- {
+			pt, flushed, err := buf.Add(data[i].Ts, data[i].Val)
+			if err != nil {
+				t.Fatalf("Got unexpected error = %v", err)
+			}
+			if pt.Ts != 0 {
+				results = append(results, pt)
+				results = append(results, flushed...)
+			}
+		}
+	}
+
+	expectedLen := len(data) - windowSize
+	if len(results) != expectedLen {
+		t.Fatalf("Expected %d results, got %d", expectedLen, len(results))
+	}
+
+	for i := 0; i < len(results); i++ {
+		if results[i].Ts != uint32(i+1) || results[i].Val != float64(i+1000) {
+			t.Fatalf("Unexpected results starting at %d %+v", i, results)
 		}
 	}
 }
@@ -473,7 +522,7 @@ func benchmarkROBAdd(b *testing.B, window, shufgroup int, allowUpdate bool) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		out, _ = rob.Add(data[i].Ts, data[i].Val)
+		_, out, _ = rob.Add(data[i].Ts, data[i].Val)
 	}
 	if len(out) > 1000 {
 		panic("this clause should never fire. only exists for compiler not to optimize away the results")
