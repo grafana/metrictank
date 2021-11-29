@@ -57,7 +57,7 @@ func NewFlags() *Flags {
 func (flags *Flags) Parse(args []string) {
 	err := flags.flagSet.Parse(args)
 	if err != nil {
-		log.Fatalf("failed to parse application flags %v: %s", args, err.Error)
+		log.Fatalf("failed to parse application flags %v: %s", args, err.Error())
 		os.Exit(1)
 	}
 
