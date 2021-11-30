@@ -22,11 +22,8 @@ if [ "$1" != "-f" -a "$1" != "--force" ]; then
 	[ -n "$out" ] && echo "WARNING: working copy dirty. cannot accurately operate. skipping test" && exit 0
 fi
 
-
 go install golang.org/x/tools/cmd/stringer@$stringerVersion
 go install github.com/tinylib/msgp@$msgpVersion
-
-cd -
 
 go generate ./...
 out=$(git status --short)
