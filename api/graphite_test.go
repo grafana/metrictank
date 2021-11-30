@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/metrictank/cluster"
 
 	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/api/tz"
 )
 
 func TestServer_renderMetrics_unknownFunctionError(t *testing.T) {
@@ -18,7 +19,7 @@ func TestServer_renderMetrics_unknownFunctionError(t *testing.T) {
 	defer initProxyStats()
 
 	req := models.GraphiteRender{
-		FromTo: models.FromTo{
+		FromTo: tz.FromTo{
 			From: "100",
 			To:   "200",
 			Tz:   "Europe/Madrid",
@@ -65,7 +66,7 @@ func TestServer_renderMetrics_wrongArgumentError(t *testing.T) {
 	defer initProxyStats()
 
 	req := models.GraphiteRender{
-		FromTo: models.FromTo{
+		FromTo: tz.FromTo{
 			From: "100",
 			To:   "200",
 			Tz:   "Europe/Madrid",

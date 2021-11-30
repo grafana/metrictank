@@ -9,6 +9,7 @@ import (
 
 	"github.com/grafana/globalconf"
 	"github.com/grafana/metrictank/api/middleware"
+	"github.com/grafana/metrictank/api/tz"
 	"github.com/grafana/metrictank/expr"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,7 +36,6 @@ var (
 	minSliceSize          uint
 
 	graphiteProxy *httputil.ReverseProxy
-	timeZone      *time.Location
 )
 
 func ConfigSetup() {
@@ -76,9 +76,9 @@ func ConfigProcess() {
 	graphiteProxy = NewGraphiteProxy(u)
 
 	if timeZoneStr == "local" {
-		timeZone = time.Local
+		tz.TimeZone = time.Local
 	} else {
-		timeZone, err = time.LoadLocation(timeZoneStr)
+		tz.TimeZone, err = time.LoadLocation(timeZoneStr)
 		if err != nil {
 			log.Fatalf("API Cannot load timezone %q: %s", timeZoneStr, err.Error())
 		}
