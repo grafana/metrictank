@@ -99,7 +99,7 @@ func (ip *inputOOOFinder) ProcessIndexControlMsg(msg schema.ControlMsg, partitio
 func (ip *inputOOOFinder) incrementCounts(metricKey schema.MKey, metricTime int64, track Track, partition int32) {
 	track.Count++
 
-	_, err := track.reorderBuffer.Add(uint32(metricTime), 0) // ignore value
+	_, _, err := track.reorderBuffer.Add(uint32(metricTime), 0) // ignore value
 	if err == errors.ErrMetricTooOld {
 		track.OutOfOrderCount++
 	} else if err == errors.ErrMetricNewValueForTimestamp {
