@@ -145,23 +145,23 @@ func BenchmarkDivideSeries10k_1000AllSeriesHalfNulls(b *testing.B) {
 	benchmarkDivideSeries(b, 1000, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
 }
 
-func benchmarkDivideSeries(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+func benchmarkDivideSeries(b *testing.B, numSeries int, fn0, fn1 test.DataFunc) {
 	var dividends []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
 			Target: strconv.Itoa(i),
 		}
 		if i%1 == 0 {
-			series.Datapoints = fn0()
+			series.Datapoints, series.Interval = fn0()
 		} else {
-			series.Datapoints = fn1()
+			series.Datapoints, series.Interval = fn1()
 		}
 		dividends = append(dividends, series)
 	}
 	divisor := models.Series{
-		Target:     "divisor",
-		Datapoints: fn0(),
+		Target: "divisor",
 	}
+	divisor.Datapoints, divisor.Interval = fn0()
 	b.ResetTimer()
 	var err error
 	for i := 0; i < b.N; i++ {

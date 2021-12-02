@@ -312,7 +312,7 @@ func BenchmarkMovingWindow10k_1SomeSeriesHalfNulls(b *testing.B) {
 func BenchmarkMovingWindow10k_1AllSeriesHalfNulls(b *testing.B) {
 	benchmarkMovingWindow(b, 1, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
 }
-func benchmarkMovingWindow(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+func benchmarkMovingWindow(b *testing.B, numSeries int, fn0, fn1 test.DataFunc) {
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
@@ -320,9 +320,9 @@ func benchmarkMovingWindow(b *testing.B, numSeries int, fn0, fn1 func() []schema
 			QueryPatt: strconv.Itoa(i),
 		}
 		if i%2 == 0 {
-			series.Datapoints = fn0()
+			series.Datapoints, series.Interval = fn0()
 		} else {
-			series.Datapoints = fn1()
+			series.Datapoints, series.Interval = fn1()
 		}
 		input = append(input, series)
 	}
