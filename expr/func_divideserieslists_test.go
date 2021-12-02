@@ -163,16 +163,16 @@ func BenchmarkDivideSeriesLists10k_1000AllSeriesHalfNulls(b *testing.B) {
 	benchmarkDivideSeriesLists(b, 1000, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
 }
 
-func benchmarkDivideSeriesLists(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+func benchmarkDivideSeriesLists(b *testing.B, numSeries int, fn0, fn1 test.DataFunc) {
 	var dividends []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
 			Target: strconv.Itoa(i),
 		}
 		if i%1 == 0 {
-			series.Datapoints = fn0()
+			series.Datapoints, series.Interval = fn0()
 		} else {
-			series.Datapoints = fn1()
+			series.Datapoints, series.Interval = fn1()
 		}
 		dividends = append(dividends, series)
 	}
@@ -182,9 +182,9 @@ func benchmarkDivideSeriesLists(b *testing.B, numSeries int, fn0, fn1 func() []s
 			Target: strconv.Itoa(i) + "-divisor",
 		}
 		if i%1 == 0 {
-			series.Datapoints = fn0()
+			series.Datapoints, series.Interval = fn0()
 		} else {
-			series.Datapoints = fn1()
+			series.Datapoints, series.Interval = fn1()
 		}
 		divisors = append(divisors, series)
 	}

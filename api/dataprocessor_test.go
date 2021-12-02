@@ -919,7 +919,7 @@ func BenchmarkFix1M(b *testing.B) {
 	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		in := test.RandFloats1M()
+		in, _ := test.RandFloats1M()
 		l = len(in)
 		b.StartTimer()
 		out := Fix(in, 0, 1000001, 1)
@@ -932,8 +932,8 @@ func BenchmarkDivide1M(b *testing.B) {
 	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		ina := test.RandFloats1M()
-		inb := test.RandFloats1M()
+		ina, _ := test.RandFloats1M()
+		inb, _ := test.RandFloats1M()
 		l = len(ina)
 		b.StartTimer()
 		out := divide(ina, inb)
