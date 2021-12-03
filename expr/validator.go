@@ -1,6 +1,9 @@
 package expr
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/errors"
 	"github.com/raintank/dur"
@@ -76,5 +79,21 @@ func WithinZeroOneInclusiveInterval(e *expr) error {
 	if e.float < 0 || e.float > 1 {
 		return ErrWithinZeroOneInclusiveInterval
 	}
+	return nil
+}
+
+// at(1) format
+func IsRenderTimeFormat(e *expr) error {
+	loc, err := time.LoadLocation("")
+	if err != nil {
+		return fmt.Errorf("failed to load default timezone location: %w", err)
+	}
+
+	now := time.Now()
+	_, err = dur.ParseDateTime(e.str, loc, now, uint32(now.Unix()))
+	if err != nil {
+		return fmt.Errorf("failed to parse date time %q: %w", e.str, err)
+	}
+
 	return nil
 }
