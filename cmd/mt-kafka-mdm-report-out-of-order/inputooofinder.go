@@ -66,7 +66,7 @@ func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition
 
 	track, exists := ip.tracker[metricKey]
 	if !exists {
-		ip.tracker[metricKey] = Track{
+		track = Track{
 			Name:            metric.Name,
 			Tags:            metric.Tags,
 			reorderBuffer:   mdata.NewReorderBuffer(ip.reorderWindow, uint32(metric.Interval), false),
