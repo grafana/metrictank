@@ -8,5 +8,7 @@
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 # and cd into root project dir
 cd ${DIR}/../..
-go get -u github.com/gordonklaus/ineffassign
+go install 'github.com/gordonklaus/ineffassign@master'
+
+export GO111MODULE=off
 ineffassign ./...

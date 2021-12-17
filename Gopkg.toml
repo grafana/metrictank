@@ -123,6 +123,7 @@ unused-packages = true
 
 [[constraint]]
   name = "github.com/tinylib/msgp"
+  # if you update this, please also update scripts/qa/go-generate.sh accordingly
   version = "v1.1.0"
 
 [[constraint]]

@@ -74,7 +74,7 @@ func TestEncodeDecodeGetDataRespV0(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeGetDataRespV0 Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := GetDataRespV0{}
@@ -187,7 +187,7 @@ func TestEncodeDecodeGetDataRespV1(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeGetDataRespV1 Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := GetDataRespV1{}
@@ -300,7 +300,7 @@ func TestEncodeDecodeIndexFindByTagResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeIndexFindByTagResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := IndexFindByTagResp{}
@@ -413,7 +413,7 @@ func TestEncodeDecodeIndexFindResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeIndexFindResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := IndexFindResp{}
@@ -526,7 +526,7 @@ func TestEncodeDecodeIndexTagDelByQueryResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeIndexTagDelByQueryResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := IndexTagDelByQueryResp{}
@@ -639,7 +639,7 @@ func TestEncodeDecodeIndexTagDelSeriesResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeIndexTagDelSeriesResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := IndexTagDelSeriesResp{}
@@ -752,7 +752,7 @@ func TestEncodeDecodeIndexTagDetailsResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeIndexTagDetailsResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := IndexTagDetailsResp{}
@@ -865,7 +865,7 @@ func TestEncodeDecodeIndexTagsResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeIndexTagsResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := IndexTagsResp{}
@@ -978,7 +978,7 @@ func TestEncodeDecodeMetricsDeleteResp(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeMetricsDeleteResp Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := MetricsDeleteResp{}
@@ -1091,7 +1091,7 @@ func TestEncodeDecodeStringList(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeStringList Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := StringList{}

@@ -74,7 +74,7 @@ func TestEncodeDecodeChunkWriteRequest(t *testing.T) {
 
 	m := v.Msgsize()
 	if buf.Len() > m {
-		t.Log("WARNING: TestEncodeDecodeChunkWriteRequest Msgsize() is inaccurate")
+		t.Logf("WARNING: Msgsize() for %v is inaccurate", v)
 	}
 
 	vn := ChunkWriteRequest{}
