@@ -887,6 +887,7 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 		nonPrimaryRollups := make(map[consolidatorTuple]int)
 
 		for _, s := range series {
+			defaultCons := aggMethodByName(s.Pattern)
 			for _, metric := range s.Series {
 				for _, archive := range metric.Defs {
 					for _, rawReq := range rawReqs {
@@ -900,18 +901,16 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 							// * we can't just let the expr library take care of normalization, as we may have to fetch targets
 							//   from cluster peers; it's more efficient to have them normalize the data at the source.
 							// * a pattern may expand to multiple series, each of which can have their own aggregation method.
-							fn := mdata.Aggregations.Get(archive.AggId).AggregationMethod[0]
-							cons = consolidation.Consolidator(fn)
-						} else {
-							// user specified a runtime consolidation function via consolidateBy()
-							// get the consolidation method of the most appropriate rollup based on the consolidation method
-							// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
-							// use 'avg'.
-							confMethods := mdata.Aggregations.Get(archive.AggId).AggregationMethod
-							cons = closestAggMethod(consReq, confMethods)
-							if cons != consolidation.Consolidator(confMethods[0]) {
-								nonPrimaryRollups[consolidatorTuple{confMethods[0], cons}]++
-							}
+							consReq = defaultCons
+						}
+						// user specified a runtime consolidation function via consolidateBy()
+						// get the consolidation method of the most appropriate rollup based on the consolidation method
+						// requested by the user.  e.g. if the user requested 'min' but we only have 'avg' and 'sum' rollups,
+						// use 'avg'.
+						confMethods := mdata.Aggregations.Get(archive.AggId).AggregationMethod
+						cons = closestAggMethod(consReq, confMethods)
+						if cons != consolidation.Consolidator(confMethods[0]) {
+							nonPrimaryRollups[consolidatorTuple{confMethods[0], cons}]++
 						}
 
 						newReq := rawReq.ToModel()
@@ -1047,6 +1046,15 @@ func (s *Server) executePlan(ctx context.Context, orgId uint32, plan *expr.Plan)
 	planRunDuration.Value(meta.RenderStats.PlanRunDuration)
 	span.LogFields(traceLog.Float64("PlanRunMillis", durToMillis(meta.RenderStats.PlanRunDuration)))
 	return out, meta, err
+}
+
+func aggMethodByName(pattern string) consolidation.Consolidator {
+	for _, cons := range []string{"min", "max", "sum", "last", "avg", "average"} {
+		if strings.Contains(pattern, "cons") {
+			return consolidation.FromConsolidateBy(cons)
+		}
+	}
+	return consolidation.FromConsolidateBy("avg")
 }
 
 // find the best consolidation method based on what was requested and what aggregations are available.
