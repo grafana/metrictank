@@ -193,7 +193,7 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			futurePoints := []schema.Point{}
 			if a.rob != nil {
 				futurePoints = a.rob.Get()
-				if result.Oldest > futurePoints[0].Ts {
+				if len(futurePoints) > 0 && result.Oldest > futurePoints[0].Ts {
 					result.Oldest = futurePoints[0].Ts
 				}
 			}
@@ -445,7 +445,6 @@ func (a *AggMetric) persist(pos int) {
 		pendingChunk--
 	}
 	persistDuration.Value(time.Now().Sub(pre))
-
 }
 
 // don't ever call with a ts of 0, cause we use 0 to mean not initialized!
