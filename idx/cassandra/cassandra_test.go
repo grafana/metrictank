@@ -614,7 +614,10 @@ func TestPruneStaleOnLoad(t *testing.T) {
 	})
 
 	idx := &CasIdx{}
-	defs := idx.load(nil, &iter, now)
+	defs, err := idx.load(nil, &iter, now)
+	if err != nil {
+		t.Fatalf("unexpected error when loading: %s", err)
+	}
 
 	exp := []schema.MKey{
 		test.GetMKey(1),
@@ -695,7 +698,11 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 	})
 
 	idx := &CasIdx{}
-	defs := idx.load(nil, &iter, now)
+	defs, err := idx.load(nil, &iter, now)
+	if err != nil {
+		t.Fatalf("unexpected error when loading: %s", err)
+	}
+
 	exp := []schema.MKey{
 		test.GetMKey(1),
 		test.GetMKey(2),
