@@ -7,7 +7,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
 )
@@ -224,7 +223,7 @@ func TestAggregator(t *testing.T) {
 		{Val: 2451.123 + 1451.123 + 978894.445, Ts: 240},
 	})
 
-	agg = NewAggregator(mockstore, &cache.MockCache{}, test.GetAMKey(4), ret.String(), ret, aggs, false, 0)
+	agg = NewAggregator(MockFlusher{mockstore, nil}, test.GetAMKey(4), ret.String(), ret, aggs, false, 0)
 	agg.Add(100, 123.4)
 	agg.Add(110, 5)
 	agg.Add(190, 2451.123)
