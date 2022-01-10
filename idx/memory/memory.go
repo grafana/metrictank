@@ -706,6 +706,9 @@ func (m *UnpartitionedMemoryIdx) Get(id schema.MKey) (idx.Archive, bool) {
 	m.RLockHigh()
 	defer m.RUnlockHigh()
 	def, ok := m.defById[id]
+	if !ok && m.writeQueue != nil {
+		def, ok = m.writeQueue.Get(id)
+	}
 	statGetDuration.Value(time.Since(pre))
 	if ok {
 		return CloneArchive(def), ok
