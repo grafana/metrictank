@@ -53,7 +53,7 @@ func (s *FuncLinearRegression) Context(context Context) Context {
 	s.endTarget = context.to
 
 	now := time.Now()
-	defaultFrom := uint32(now.Add(-24 * time.Hour).Unix())
+	defaultFrom := uint32(now.Add(-5 * time.Minute).Unix())
 	defaultTo := uint32(now.Unix())
 	var err error
 	s.startSource, s.endSource, err = tz.GetFromTo(tz.FromTo{
