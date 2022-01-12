@@ -182,9 +182,13 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 }
 
 func (ms *AggMetrics) Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
-	ms.cachePusher.AddIfHot(metric, prev, itergen)
+	if ms.cachePusher != nil {
+		ms.cachePusher.AddIfHot(metric, prev, itergen)
+	}
 }
 
 func (ms *AggMetrics) Store(cwr *ChunkWriteRequest) {
-	ms.store.Add(cwr)
+	if ms.store != nil {
+		ms.store.Add(cwr)
+	}
 }
