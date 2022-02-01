@@ -34,7 +34,7 @@ func benchmarkSeriesLong(b *testing.B, generator func(uint32) float64) {
 	b.Logf("SeriesLong size: %d points in %dB, avg %.2f bytes/point", N, len(s.Bytes()), float64(len(s.Bytes()))/float64(N))
 }
 
-func BenchmarkPushSeriesLong(b *testing.B) {
+func BenchmarkPushSeriesLongMonotonicIncreaseWithResets(b *testing.B) {
 	benchmarkSeriesLong(b, func(i uint32) float64 {
 		if i%10 == 0 {
 			return 0
