@@ -331,7 +331,7 @@ func benchmarkGroupByNodes(b *testing.B, numIn, numOut int) {
 			for _, tag := range tagValues {
 				series.Target += ";" + tag + "=" + strconv.Itoa(j%numOut)
 			}
-			series.Datapoints = test.RandFloats100()
+			series.Datapoints, series.Interval = test.RandFloats100()
 			input = append(input, series)
 		}
 	}

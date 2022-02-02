@@ -337,7 +337,7 @@ func benchmarkGroupByTags(b *testing.B, numInputSeries, numOutputSeries int) {
 			series.Target += ";" + tag + "=" + strconv.Itoa(i%numOutputSeries)
 		}
 
-		series.Datapoints = test.RandFloats100()
+		series.Datapoints, series.Interval = test.RandFloats100()
 		input = append(input, series)
 	}
 	b.ResetTimer()

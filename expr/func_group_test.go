@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
 	"github.com/grafana/metrictank/test"
 )
 
@@ -108,16 +107,16 @@ func BenchmarkGroup10k_100AllSeriesHalfNulls(b *testing.B) {
 func BenchmarkGroup10k_1000AllSeriesHalfNulls(b *testing.B) {
 	benchmarkGroup(b, 1000, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
 }
-func benchmarkGroup(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+func benchmarkGroup(b *testing.B, numSeries int, fn0, fn1 test.DataFunc) {
 	var input []models.Series
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
 			QueryPatt: strconv.Itoa(i),
 		}
 		if i%2 == 0 {
-			series.Datapoints = fn0()
+			series.Datapoints, series.Interval = fn0()
 		} else {
-			series.Datapoints = fn1()
+			series.Datapoints, series.Interval = fn1()
 		}
 		input = append(input, series)
 	}

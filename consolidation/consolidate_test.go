@@ -495,11 +495,11 @@ func BenchmarkConsolidateSumRandWithNulls1M_100(b *testing.B) {
 
 var dummy []schema.Point
 
-func benchmarkConsolidate(fn func() []schema.Point, aggNum uint32, consolidator Consolidator, b *testing.B) {
+func benchmarkConsolidate(fn test.DataFunc, aggNum uint32, consolidator Consolidator, b *testing.B) {
 	var l int
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		in := fn()
+		in, _ := fn()
 		l = len(in)
 		b.StartTimer()
 		ret := Consolidate(in, 0, aggNum, consolidator)
