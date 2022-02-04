@@ -186,23 +186,34 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 			if agg == nil {
 				return Result{}, fmt.Errorf("consolidator %q not configured", consolidator)
 			}
+
+			// note: only the raw AggMetric potentially has a ROB
+			// these children aggregator AggMetric never do, so result.Points is never set here
 			result, err := agg.Get(from, to)
 			if err != nil {
 				return Result{}, err
 			}
-			futurePoints := []schema.Point{}
 
 			a.RLock()
 			defer a.RUnlock()
 
 			if a.rob != nil {
-				futurePoints = a.rob.Get()
-				// we may need to update result.Oldest if there are no points in result.
-				if len(futurePoints) > 0 && len(result.Iters) == 0 && len(result.Points) == 0 {
-					result.Oldest = futurePoints[0].Ts
+				futurePoints := a.rob.Get()
+				if len(futurePoints) > 0 {
+
+					// There are 2 possibilities here:
+					// A) The AggMetric is new: it may have all its points in the ROB, and no points may have been flushed yet to the chunks (no result.Iters).
+					//    In this case, the oldest point comes from the ROB, so we update the Oldest field here.
+					// B) Points have been flushed by the aggregator into the chunks:
+					//    Because the aggregator (in Foresee but also in general) cannot accept points for boundaries that it has already flushed to the AggMetric's chunks,
+					//    we know that the oldest point will always come from the chunks and the field is already properly set.
+
+					if len(result.Iters) == 0 {
+						result.Oldest = futurePoints[0].Ts
+					}
+					result.Points = aggregator.Foresee(consolidator, from, to, futurePoints)
 				}
 			}
-			result.Points = aggregator.Foresee(consolidator, from, to, futurePoints)
 
 			return result, nil
 		}
