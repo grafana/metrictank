@@ -1,6 +1,12 @@
 package mdata
 
-import "math"
+import (
+	"fmt"
+	"math"
+
+	"github.com/grafana/metrictank/consolidation"
+	log "github.com/sirupsen/logrus"
+)
 
 // Aggregation is a container for all summary statistics / aggregated data for 1 metric, in 1 time frame
 // if the Cnt is 0, the numbers don't necessarily make sense.
@@ -17,6 +23,24 @@ func NewAggregation() *Aggregation {
 		Min: math.MaxFloat64,
 		Max: -math.MaxFloat64,
 	}
+}
+
+func (a *Aggregation) GetValueFor(consolidator consolidation.Consolidator) (float64, error) {
+	switch consolidator {
+	case consolidation.Cnt:
+		return a.Cnt, nil
+	case consolidation.Lst:
+		return a.Lst, nil
+	case consolidation.Min:
+		return a.Min, nil
+	case consolidation.Max:
+		return a.Max, nil
+	case consolidation.Sum:
+		return a.Sum, nil
+	}
+	err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
+	log.Errorf("AM: %s", err.Error())
+	return 0, err
 }
 
 func (a *Aggregation) Add(val float64) {
