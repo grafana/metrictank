@@ -40,6 +40,12 @@ type AggMetric struct {
 	numChunks       uint32 // max size of the circular buffer
 	chunkSpan       uint32 // span of individual chunks in seconds
 	chunks          []*chunk.Chunk
+
+	// After NewAggMetric returns and thus before we start using the AggMetric, the contents of this slice (the pointers themselves)
+	// remains constant. The Aggregators being pointed to, will have a AggMetric pointers. Those pointers will also remain constant
+	// throughout the lifetime, and the AggMetric being pointed to has its own lock protection. However the Aggregator still has other
+	// fields to hold the boundary and the data, and those are unprotected.  For read and write access to them,
+	// you should use this AggMetric's RWMutex.
 	aggregators     []*Aggregator
 	dropFirstChunk  bool
 	ingestFromT0    uint32
@@ -106,7 +112,7 @@ func (a *AggMetric) SyncChunkSaveState(ts uint32, sendPersist bool) ChunkSaveCal
 
 // Sync the saved state of a chunk by its T0.
 func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consolidation.Consolidator, aggSpan uint32) {
-	// no lock needed cause aggregators don't change at runtime
+
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
 			switch consolidator {
@@ -147,7 +153,7 @@ func (a *AggMetric) SyncAggregatedChunkSaveState(ts uint32, consolidator consoli
 }
 
 func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSpan, from, to uint32) (Result, error) {
-	// no lock needed cause aggregators don't change at runtime
+
 	for _, a := range a.aggregators {
 		if a.span == aggSpan {
 			var agg *AggMetric
@@ -440,7 +446,9 @@ func (a *AggMetric) Add(ts uint32, val float64) {
 		// even if a point is too old for our raw data, it may not be too old for aggregated data
 		// for example let's say a chunk starts at t0=3600 but we have 300-secondly aggregates
 		// that mean the aggregators need data from 3301 and onwards, because we aggregate 3301-3600 into a point with ts=3600
+		a.Lock()
 		a.addAggregators(ts, val)
+		a.Unlock()
 		return
 	}
 
@@ -671,6 +679,7 @@ func (a *AggMetric) GC(now, chunkMinTs, metricMinTs uint32) (uint32, bool) {
 }
 
 // gcAggregators returns whether all aggregators are stale and can be removed, and their pointcount if so
+// caller should hold write lock
 func (a *AggMetric) gcAggregators(now, chunkMinTs, metricMinTs uint32) (uint32, bool) {
 	var points uint32
 	stale := true
