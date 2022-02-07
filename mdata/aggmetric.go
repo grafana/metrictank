@@ -211,8 +211,9 @@ func (a *AggMetric) GetAggregated(consolidator consolidation.Consolidator, aggSp
 					if len(result.Iters) == 0 {
 						result.Oldest = futurePoints[0].Ts
 					}
-					result.Points = aggregator.Foresee(consolidator, from, to, futurePoints)
 				}
+
+				result.Points = aggregator.Foresee(consolidator, from, to, futurePoints)
 			}
 
 			return result, nil
