@@ -100,11 +100,16 @@ func (agg *Aggregator) flush() {
 	agg.agg.Reset()
 }
 
-// Foresee duplicates the underlying Aggregation,
-// consumes points in the future, and return the newly aggregated points.
-// Foresee won't actually add those points to AggMetric.
+// Foresee returns aggregated points corresponding to this aggregator that haven't been flushed yet.
+// There are two types:
+// - aggregated points generated from any "future points" we haven't seen yet (e.g. raw points in the ROB)
+// - the current in-progress aggregated point, if any
+// Foresee does not change the state of any AggMetric or aggregators.
 func (agg *Aggregator) Foresee(consolidator consolidation.Consolidator, from, to uint32, futurePoints []schema.Point) []schema.Point {
+
+	// use a copy which we can clobber with our updates without affecting to real aggregation
 	aggregationPreview := *(agg.agg)
+
 	var aggregatedPoints []schema.Point
 	currentBoundary := agg.currentBoundary
 	for _, point := range futurePoints {
@@ -125,11 +130,13 @@ func (agg *Aggregator) Foresee(consolidator consolidation.Consolidator, from, to
 		}
 		aggregationPreview.Add(point.Val)
 	}
+
 	// "flush" the current boundary interval. it may not be complete, but we want to take these points into account as well.
 	if aggregationPreview.Cnt != 0 && currentBoundary < to {
 		value, _ := aggregationPreview.GetValueFor(consolidator)
 		aggregatedPoints = append(aggregatedPoints, schema.Point{Val: value, Ts: currentBoundary})
 	}
+
 	return aggregatedPoints
 }
 
