@@ -9,6 +9,15 @@
 * track non-primary rollup reads #1968
 * Return 403 instead of 413 when limit exceeded #1970
 * errors returned by expr.NewPlan() now wrap the `expr.Err*` errors with detailed message about where the error happened,
+* csv render output. #1975
+* /tags/delByQuery: support for archiving metrics, not just deletion. #1978
+* add mt-index-deleter tool. #1943
+* Add SASL Plaintext support to kafka. #1988
+* Support from/to in tag/terms. #1933
+* sort JSON on metrics/find API endpoint. #1981
+* control server to initiate additions, deletes and archivals of metricdefinitions + findSeries 'full-json' format and 'To' flag. #1992
+* Standalone backfill tool. #1984
+* Set Host header for graphite-proxied requests to graphite host, not incoming host header. #1980
 * querying rollup data now includes the current in-progress aggregation, as well as taking into account points in the ReOrderBuffer (#2022)
   so they have to be checked with errors.As()/errors.Is() #1996
 
