@@ -39,7 +39,7 @@ func (a *Aggregation) GetValueFor(consolidator consolidation.Consolidator) (floa
 		return a.Sum, nil
 	}
 	err := fmt.Errorf("internal error: AggMetric.GetAggregated(): unknown consolidator %q", consolidator)
-	log.Errorf("AM: %s", err.Error())
+	log.Errorf("AGG: %s", err.Error())
 	return 0, err
 }
 
