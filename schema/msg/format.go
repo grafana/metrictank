@@ -22,7 +22,9 @@ type Format uint8
 // though experts writing their own publishers and encoders may have found ways to
 // use bytes 0x85 through 0x89 as first byte, though this seems unlikely and discouraged
 // see https://github.com/grafana/metrictank/issues/2028
+
 // identifier of message format
+// NOTE: None of these constants should be changed as external tasks may be using the absolute values.
 const (
 	FormatMetricDataArrayJson Format = iota
 	FormatMetricDataArrayMsgp
