@@ -3,6 +3,7 @@ package cluster
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -69,10 +70,11 @@ type ClusterManager interface {
 
 type MemberlistManager struct {
 	sync.RWMutex
-	members  map[string]HTTPNode // all members in the cluster, guaranteed to always have this node
-	nodeName string
-	list     *memberlist.Memberlist
-	cfg      *memberlist.Config
+	members    map[string]HTTPNode // all members in the cluster, guaranteed to always have this node
+	nodeName   string
+	list       *memberlist.Memberlist
+	cfg        *memberlist.Config
+	prioOffset int // Used to discourage requests to come to this instance (e.g. during GC)
 }
 
 func NewMemberlistManager(thisNode HTTPNode) *MemberlistManager {
@@ -134,6 +136,29 @@ func (c *MemberlistManager) Start() {
 	}
 	c.setList(list)
 
+	if gcRunInterval > 0 {
+		log.Infof("CLU Start: Scheduling GC to run every %d seconds", gcRunInterval)
+		go func(interval, jitter int64) {
+			// jitter should not be larger than interval, normalize
+			jitter = jitter % interval
+			for {
+				nowUnix := time.Now().Unix()
+				// Align to next interval+jitter
+				sleepSeconds := interval - (nowUnix % interval) + jitter
+				if sleepSeconds > interval {
+					sleepSeconds -= interval
+				}
+				time.Sleep(time.Duration(sleepSeconds) * time.Second)
+				log.Infof("Triggering GC")
+				c.setPrioOffset(1)
+				pre := time.Now()
+				runtime.GC()
+				c.setPrioOffset(0)
+				log.Infof("GC complete, duration = %v", time.Since(pre))
+			}
+		}(int64(gcRunInterval), int64(gcRunJitter))
+	}
+
 	if peersStr == "" {
 		return
 	}
@@ -141,6 +166,7 @@ func (c *MemberlistManager) Start() {
 	if err != nil {
 		log.Fatalf("CLU Start: Failed to join cluster: %s", err.Error())
 	}
+
 	log.Infof("CLU Start: joined to %d nodes in cluster", n)
 }
 
@@ -439,10 +465,19 @@ func (c *MemberlistManager) GetPartitions() []int32 {
 	return c.members[c.nodeName].Partitions
 }
 
+// Returns true if the this node is a set as a primary node that should write data to cassandra.
+func (c *MemberlistManager) setPrioOffset(prio int) {
+	c.Lock()
+	c.prioOffset = prio
+	c.Unlock()
+}
+
 // set the priority of this node.
 // lower values == higher priority
 func (c *MemberlistManager) SetPriority(prio int) {
 	c.Lock()
+	// Apply our universal priority offset
+	prio += c.prioOffset
 	node := c.members[c.nodeName]
 	if !node.SetPriority(prio) {
 		c.Unlock()

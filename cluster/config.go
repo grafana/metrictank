@@ -23,6 +23,8 @@ var (
 	minAvailableShards int
 	gcPercent          int
 	gcPercentNotReady  int
+	gcRunInterval      int
+	gcRunJitter        int
 	GossipSettlePeriod time.Duration // if gossip not enabled, will be 0 regardless of config
 
 	gossipSettlePeriodStr string
@@ -78,6 +80,8 @@ func ConfigSetup() {
 	clusterCfg.IntVar(&maxPrio, "max-priority", 10, "maximum priority before a node should be considered not-ready.")
 	clusterCfg.IntVar(&minAvailableShards, "min-available-shards", 0, "minimum number of shards that must be available for a query to be handled.")
 	clusterCfg.IntVar(&gcPercentNotReady, "gc-percent-not-ready", gcPercent, "GOGC value to use when node is not ready.  Defaults to GOGC")
+	clusterCfg.IntVar(&gcRunInterval, "gc-run-interval", -1, "Interval to force a GC run. Defaults to -1 (off)")
+	clusterCfg.IntVar(&gcRunJitter, "gc-run-jitter", 0, "Jitter for GC run as an offset of interval. Useful for staggering replica peers GC. Defaults to 0 (run on multiples of interval)")
 	clusterCfg.StringVar(&gossipSettlePeriodStr, "gossip-settle-period", "10s", "duration until when the cluster topology can be considered up-to-date and this node to be ready to serve requests (when gossip enabled).")
 	globalconf.Register("cluster", clusterCfg, flag.ExitOnError)
 
