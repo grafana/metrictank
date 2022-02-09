@@ -13,11 +13,12 @@ func _() {
 	_ = x[FormatMetricPoint-2]
 	_ = x[FormatMetricPointWithoutOrg-3]
 	_ = x[FormatIndexControlMessage-4]
+	_ = x[FormatMetricPointArray-5]
 }
 
-const _Format_name = "FormatMetricDataArrayJsonFormatMetricDataArrayMsgpFormatMetricPointFormatMetricPointWithoutOrgFormatIndexControlMessage"
+const _Format_name = "FormatMetricDataArrayJsonFormatMetricDataArrayMsgpFormatMetricPointFormatMetricPointWithoutOrgFormatIndexControlMessageFormatMetricPointArray"
 
-var _Format_index = [...]uint8{0, 25, 50, 67, 94, 119}
+var _Format_index = [...]uint8{0, 25, 50, 67, 94, 119, 141}
 
 func (i Format) String() string {
 	if i >= Format(len(_Format_index)-1) {

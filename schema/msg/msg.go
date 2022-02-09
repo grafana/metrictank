@@ -112,6 +112,41 @@ func WritePointMsg(point schema.MetricPoint, buf []byte, version Format) (o []by
 	return nil, fmt.Errorf(errFmtUnsupportedFormat, version)
 }
 
+// WritePointMsgArray is like CreateMsg, except optimized for MetricPoint and buffer re-use.
+// caller must assure a cap-len diff of exactly:
+// 2 + 32B * len(points) (for FormatMetricPoint)
+// 2 + 28B * len(points) (for FormatMetricPointWithoutOrg)
+// no other formats supported.
+func WritePointMsgArray(points []schema.MetricPoint, buf []byte, version Format) (o []byte, err error) {
+	if len(points) == 0 {
+		return buf, errTooSmall
+	}
+
+	b := buf[:2]
+	b[0] = byte(FormatMetricPointArray)
+	b[1] = byte(version)
+
+	var formatter func(m *schema.MetricPoint, b []byte) (o []byte, err error)
+
+	switch version {
+	case FormatMetricPoint:
+		formatter = (*schema.MetricPoint).Marshal32
+	case FormatMetricPointWithoutOrg:
+		formatter = (*schema.MetricPoint).MarshalWithoutOrg28
+	default:
+		return nil, fmt.Errorf(errFmtUnsupportedFormat, version)
+	}
+
+	for _, p := range points {
+		b, err = formatter(&p, b)
+		if err != nil {
+			return b, err
+		}
+	}
+
+	return b, nil
+}
+
 func IsPointMsg(data []byte) (Format, bool) {
 	l := len(data)
 	if l == 0 {
@@ -124,22 +159,90 @@ func IsPointMsg(data []byte) (Format, bool) {
 	if l == 33 && version == FormatMetricPoint {
 		return FormatMetricPoint, true
 	}
+	if l >= 30 && version == FormatMetricPointArray {
+		subversion := Format(data[1])
+		if subversion == FormatMetricPointWithoutOrg || subversion == FormatMetricPoint {
+			// TODO - check length multiple?
+			return FormatMetricPointArray, true
+		}
+	}
 	return 0, false
 }
 
 func ReadPointMsg(data []byte, defaultOrg uint32) ([]byte, schema.MetricPoint, error) {
-	var point schema.MetricPoint
 	version := Format(data[0])
-	if len(data) == 29 && version == FormatMetricPointWithoutOrg {
-		o, err := point.UnmarshalWithoutOrg(data[1:])
+	return ReadPointMsgFormat(data[1:], defaultOrg, version)
+}
+
+func ReadPointMsgFormat(data []byte, defaultOrg uint32, version Format) ([]byte, schema.MetricPoint, error) {
+	var point schema.MetricPoint
+	if len(data) >= 28 && version == FormatMetricPointWithoutOrg {
+		o, err := point.UnmarshalWithoutOrg(data)
 		point.MKey.Org = defaultOrg
 		return o, point, err
 	}
-	if len(data) == 33 && version == FormatMetricPoint {
-		o, err := point.Unmarshal(data[1:])
+	if len(data) >= 32 && version == FormatMetricPoint {
+		o, err := point.Unmarshal(data)
 		return o, point, err
 	}
 	return data, point, fmt.Errorf(errFmtUnsupportedFormat, version)
+}
+
+type MetricPointIter struct {
+	data       []byte
+	defaultOrg uint32
+	point      schema.MetricPoint
+	format     Format
+	err        error
+}
+
+func NewMetricPointIter(data []byte, defaultOrg uint32) MetricPointIter {
+	var result MetricPointIter
+	if len(data) < 30 {
+		result.err = errTooSmall
+		return result
+	}
+	version := Format(data[0])
+	if version != FormatMetricPointArray {
+		result.err = fmt.Errorf(errFmtUnsupportedFormat, version)
+		return result
+	}
+	subversion := Format(data[1])
+	if subversion != FormatMetricPointWithoutOrg && subversion != FormatMetricPoint {
+		result.err = fmt.Errorf(errFmtUnsupportedFormat, version)
+		return result
+	}
+
+	result.data = data[2:]
+	result.defaultOrg = defaultOrg
+	result.format = subversion
+
+	return result
+}
+
+func (m *MetricPointIter) Next() bool {
+	if len(m.data) == 0 {
+		// All done
+		return false
+	}
+	if len(m.data) < 28 {
+		m.err = errTooSmall
+		return false
+	}
+	m.data, m.point, m.err = ReadPointMsgFormat(m.data, m.defaultOrg, m.format)
+	return m.err == nil
+}
+
+func (m *MetricPointIter) Value() schema.MetricPoint {
+	return m.point
+}
+
+func (m *MetricPointIter) Format() Format {
+	return m.format
+}
+
+func (m *MetricPointIter) Err() error {
+	return m.err
 }
 
 func IsIndexControlMsg(data []byte) bool {
