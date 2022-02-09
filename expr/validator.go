@@ -1,7 +1,9 @@
 package expr
 
 import (
+	"fmt"
 	"math"
+	"time"
 
 	"github.com/grafana/metrictank/consolidation"
 	"github.com/grafana/metrictank/errors"
@@ -90,4 +92,20 @@ func PositiveButNotOne(e *expr) error {
 		return nil
 	}
 	return ErrPositiveNotOne
+}
+
+// at(1) format
+func IsRenderTimeFormat(e *expr) error {
+	loc, err := time.LoadLocation("")
+	if err != nil {
+		return fmt.Errorf("failed to load default timezone location: %w", err)
+	}
+
+	now := time.Now()
+	_, err = dur.ParseDateTime(e.str, loc, now, uint32(now.Unix()))
+	if err != nil {
+		return fmt.Errorf("failed to parse date time %q: %w", e.str, err)
+	}
+
+	return nil
 }

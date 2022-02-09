@@ -109,7 +109,7 @@ See also:
 | keepLastValue(seriesList, limit) seriesList                    |              | Stable     |
 | legendValue                                                    |              | No         |
 | limit                                                          |              | No         |
-| linearRegression                                               |              | No         |
+| linearRegression                                               |              | Stable     |
 | linearRegressionAnalysis                                       |              | No         |
 | lineWidth                                                      |              | No         |
 | logarithm                                                      | log          | Stable     |
