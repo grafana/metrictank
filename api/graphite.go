@@ -20,6 +20,7 @@ import (
 	"github.com/grafana/metrictank/api/models"
 	"github.com/grafana/metrictank/api/response"
 	"github.com/grafana/metrictank/api/seriescycle"
+	"github.com/grafana/metrictank/api/tz"
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
@@ -32,7 +33,6 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	traceLog "github.com/opentracing/opentracing-go/log"
-	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -237,7 +237,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Unix())
-	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	fromUnix, toUnix, err := tz.GetFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -377,7 +377,7 @@ func (s *Server) renderMetrics(ctx *middleware.Context, request models.GraphiteR
 func (s *Server) metricsFind(ctx *middleware.Context, request models.GraphiteFind) {
 	now := time.Now()
 	var defaultFrom, defaultTo uint32
-	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	fromUnix, toUnix, err := tz.GetFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -1074,41 +1074,6 @@ func closestAggMethod(requested consolidation.Consolidator, available []conf.Met
 	return consolidation.Consolidator(available[0])
 }
 
-func getFromTo(ft models.FromTo, now time.Time, defaultFrom, defaultTo uint32) (uint32, uint32, error) {
-	loc, err := getLocation(ft.Tz)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	from := ft.From
-	to := ft.To
-	if to == "" {
-		to = ft.Until
-	}
-
-	fromUnix, err := dur.ParseDateTime(from, loc, now, defaultFrom)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	toUnix, err := dur.ParseDateTime(to, loc, now, defaultTo)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return fromUnix, toUnix, nil
-}
-
-func getLocation(desc string) (*time.Location, error) {
-	switch desc {
-	case "":
-		return timeZone, nil
-	case "local":
-		return time.Local, nil
-	}
-	return time.LoadLocation(desc)
-}
-
 func (s *Server) graphiteTagDetails(ctx *middleware.Context, request models.GraphiteTagDetails) {
 	tag := ctx.Params(":tag")
 	if len(tag) <= 0 {
@@ -1627,7 +1592,7 @@ func (s *Server) showPlan(ctx *middleware.Context, request models.GraphiteRender
 	now := time.Now()
 	defaultFrom := uint32(now.Add(-time.Duration(24) * time.Hour).Unix())
 	defaultTo := uint32(now.Unix())
-	fromUnix, toUnix, err := getFromTo(request.FromTo, now, defaultFrom, defaultTo)
+	fromUnix, toUnix, err := tz.GetFromTo(request.FromTo, now, defaultFrom, defaultTo)
 	if err != nil {
 		response.Write(ctx, response.NewError(http.StatusBadRequest, err.Error()))
 		return

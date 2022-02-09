@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-macaron/binding"
+	"github.com/grafana/metrictank/api/tz"
 	"github.com/grafana/metrictank/idx"
 	"github.com/grafana/metrictank/schema"
 	pickle "github.com/kisielk/og-rek"
@@ -41,15 +42,8 @@ import (
 //msgp:ignore SeriesTree
 //msgp:ignore SeriesTreeItem
 
-type FromTo struct {
-	From  string `json:"from" form:"from"`
-	Until string `json:"until" form:"until"`
-	To    string `json:"to" form:"to"` // graphite uses 'until' but we allow to alternatively cause it's shorter
-	Tz    string `json:"tz" form:"tz"`
-}
-
 type GraphiteRender struct {
-	FromTo
+	tz.FromTo
 	MaxDataPoints uint32   `json:"maxDataPoints" form:"maxDataPoints" binding:"Default(800)"`
 	Targets       []string `json:"target" form:"target"`
 	TargetsRails  []string `form:"target[]"` // # Rails/PHP/jQuery common practice format: ?target[]=path.1&target[]=path.2 -> like graphite, we allow this.
@@ -85,14 +79,12 @@ func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) bin
 }
 
 type GraphiteTags struct {
-	FromTo
 	Filter string `json:"filter" form:"filter"`
 }
 
 type GraphiteTagsResp []GraphiteTagResp
 
 type GraphiteAutoCompleteTags struct {
-	FromTo
 	Prefix string   `json:"tagPrefix" form:"tagPrefix"`
 	Expr   []string `json:"expr" form:"expr"`
 	Limit  uint     `json:"limit" form:"limit"`
@@ -212,7 +204,7 @@ type GraphiteTagTermsResp struct {
 }
 
 type GraphiteFind struct {
-	FromTo
+	tz.FromTo
 	Query  string `json:"query" form:"query" binding:"Required"`
 	Format string `json:"format" form:"format" binding:"In(,completer,json,treejson,msgpack,pickle)"`
 	Jsonp  string `json:"jsonp" form:"jsonp"`
