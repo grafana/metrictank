@@ -62,12 +62,8 @@ func TestAggMetricsGetOrCreate(t *testing.T) {
 	testKey1, _ := schema.AMKeyFromString("1.12345678901234567890123456789012")
 	metric := aggMetrics.GetOrCreate(testKey1.MKey, 1, 0, 10).(*AggMetric)
 
-	if metric.store != mockStore {
-		t.Fatalf("Expected metric to have mock store, but it did not")
-	}
-
-	if metric.cachePusher != mockCachePusher {
-		t.Fatalf("Expected metric to have mock cache pusher, but it did not")
+	if metric.flusher.(*AggMetrics) != aggMetrics {
+		t.Fatalf("Expected metric to have flusher referencing aggMetrics, but it did not")
 	}
 
 	if metric.key.MKey != testKey1.MKey {
@@ -78,8 +74,8 @@ func TestAggMetricsGetOrCreate(t *testing.T) {
 		t.Fatalf("Expected metric chunk span to be %d, but it was %d", 24*3600, metric.chunkSpan)
 	}
 
-	if metric.numChunks != 2 {
-		t.Fatalf("Expected metric num chunks to be 2, but it was %d", metric.numChunks)
+	if cap(metric.chunks) != 2 {
+		t.Fatalf("Expected metric num chunks to be 2, but it was %d", cap(metric.chunks))
 	}
 
 	if metric.ttl != 3600*24*365 {

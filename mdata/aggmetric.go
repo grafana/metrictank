@@ -13,7 +13,6 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata/cache"
 	"github.com/grafana/metrictank/mdata/chunk"
 	mdataerrors "github.com/grafana/metrictank/mdata/errors"
 	"github.com/grafana/metrictank/schema"
@@ -23,6 +22,12 @@ import (
 
 var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less than to")
 
+// Flusher is used to determine what should happen when chunks are ready to flushed from AggMetrics
+type Flusher interface {
+	Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
+	Store(cwr *ChunkWriteRequest)
+}
+
 // AggMetric takes in new values, updates the in-memory data and streams the points to aggregators
 // it uses a circular buffer of chunks
 // each chunk starts at their respective t0
@@ -31,15 +36,11 @@ var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less th
 // in addition, keep in mind that the last chunk is always a work in progress and not useable for aggregation
 // AggMetric is concurrency-safe
 type AggMetric struct {
-	store       Store
-	cachePusher cache.CachePusher
 	sync.RWMutex
-	key             schema.AMKey
-	rob             *ReorderBuffer
-	currentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
-	numChunks       uint32 // max size of the circular buffer
-	chunkSpan       uint32 // span of individual chunks in seconds
-	chunks          []*chunk.Chunk
+	flusher Flusher
+	key     schema.AMKey
+	rob     *ReorderBuffer
+	chunks  []*chunk.Chunk
 
 	// After NewAggMetric returns and thus before we start using the AggMetric, the contents of this slice (the pointers themselves)
 	// remains constant. The Aggregators being pointed to, will have a AggMetric pointers. Those pointers will also remain constant
@@ -47,13 +48,15 @@ type AggMetric struct {
 	// fields to hold the boundary and the data, and those are unprotected.  For read and write access to them,
 	// you should use this AggMetric's RWMutex.
 	aggregators     []*Aggregator
-	dropFirstChunk  bool
+	currentChunkPos int    // Chunks[CurrentChunkPos] is active. Others are finished. Only valid when len(chunks) > 0, e.g. when data has been written (excl ROB data)
+	chunkSpan       uint32 // span of individual chunks in seconds
 	ingestFromT0    uint32
 	futureTolerance uint32
 	ttl             uint32
 	lastSaveStart   uint32 // last chunk T0 that was added to the write Queue.
 	lastWrite       uint32 // wall clock time of when last point was successfully added (possibly to the ROB)
 	firstTs         uint32 // timestamp of first point seen
+	dropFirstChunk  bool
 }
 
 // NewAggMetric creates a metric with given key, it retains the given number of chunks each chunkSpan seconds long
@@ -62,24 +65,22 @@ type AggMetric struct {
 // it's the callers responsibility to make sure agg is not nil in that case!
 // If reorderWindow is greater than 0, a reorder buffer is enabled. In that case data points with duplicate timestamps
 // the behavior is defined by reorderAllowUpdate
-func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
+func NewAggMetric(flusher Flusher, key schema.AMKey, retentions conf.Retentions, reorderWindow, interval uint32, agg *conf.Aggregation, reorderAllowUpdate, dropFirstChunk bool, ingestFrom int64) *AggMetric {
 
 	// note: during parsing of retentions, we assure there's at least 1.
 	ret := retentions.Rets[0]
 
 	m := AggMetric{
-		cachePusher:     cachePusher,
-		store:           store,
+		flusher:         flusher,
 		key:             key,
-		chunkSpan:       ret.ChunkSpan,
-		numChunks:       ret.NumChunks,
 		chunks:          make([]*chunk.Chunk, 0, ret.NumChunks),
-		dropFirstChunk:  dropFirstChunk,
+		chunkSpan:       ret.ChunkSpan,
 		futureTolerance: uint32(ret.MaxRetention()) * uint32(futureToleranceRatio) / 100,
 		ttl:             uint32(ret.MaxRetention()),
 		// we set LastWrite here to make sure a new Chunk doesn't get immediately
 		// garbage collected right after creating it, before we can push to it.
-		lastWrite: uint32(time.Now().Unix()),
+		lastWrite:      uint32(time.Now().Unix()),
+		dropFirstChunk: dropFirstChunk,
 	}
 	if ingestFrom > 0 {
 		// we only want to ingest data that will go into chunks with a t0 >= 'ingestFrom'.
@@ -92,7 +93,7 @@ func NewAggMetric(store Store, cachePusher cache.CachePusher, key schema.AMKey, 
 	origSplits := strings.Split(retentions.Orig, ":")
 	for i, ret := range retentions.Rets[1:] {
 		retOrig := origSplits[i+1]
-		m.aggregators = append(m.aggregators, NewAggregator(store, cachePusher, key, retOrig, ret, *agg, dropFirstChunk, ingestFrom))
+		m.aggregators = append(m.aggregators, NewAggregator(flusher, key, retOrig, ret, *agg, dropFirstChunk, ingestFrom))
 	}
 
 	return &m
@@ -373,17 +374,13 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 // pushToCache adds the chunk into the cache if it is hot
 // caller must hold lock
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
-	if a.cachePusher == nil {
-		return
-	}
-	// push into cache
 	intervalHint := a.key.Archive.Span()
 
 	itergen, err := chunk.NewIterGen(c.Series.T0, intervalHint, c.Encode(a.chunkSpan))
 	if err != nil {
 		log.Errorf("AM: %s failed to generate IterGen. this should never happen: %s", a.key, err)
 	}
-	go a.cachePusher.AddIfHot(a.key, 0, itergen)
+	go a.flusher.Cache(a.key, 0, itergen)
 }
 
 // write a chunk to persistent storage.
@@ -460,7 +457,7 @@ func (a *AggMetric) persist(pos int) {
 	// before newer data.
 	for pendingChunk >= 0 {
 		log.Debugf("AM: persist(): sealing chunk %d/%d (%s:%d) and adding to write queue.", pendingChunk, len(pending), a.key, chunk.Series.T0)
-		a.store.Add(pending[pendingChunk])
+		a.flusher.Store(pending[pendingChunk])
 		pendingChunk--
 	}
 	persistDuration.Value(time.Now().Sub(pre))
@@ -594,12 +591,12 @@ func (a *AggMetric) add(ts uint32, val float64) {
 		}
 
 		a.currentChunkPos++
-		if a.currentChunkPos >= int(a.numChunks) {
+		if a.currentChunkPos >= cap(a.chunks) {
 			a.currentChunkPos = 0
 		}
 
 		chunkCreate.Inc()
-		if len(a.chunks) < int(a.numChunks) {
+		if len(a.chunks) < cap(a.chunks) {
 			a.chunks = append(a.chunks, chunk.New(t0))
 			if err := a.chunks[a.currentChunkPos].Push(ts, val); err != nil {
 				panic(fmt.Sprintf("FATAL ERROR: this should never happen. Pushing initial value <%d,%f> to new chunk at pos %d failed: %q", ts, val, a.currentChunkPos, err))
