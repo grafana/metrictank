@@ -112,7 +112,7 @@ See also:
 | linearRegression                                               |              | No         |
 | linearRegressionAnalysis                                       |              | No         |
 | lineWidth                                                      |              | No         |
-| logarithm                                                      |              | No         |
+| logarithm                                                      | log          | Stable     |
 | logit                                                          |              | No         |
 | lowest(seriesList, n, func) seriesList                         |              | Stable     |
 | lowestAverage(seriesList, n, func) seriesList                  |              | Stable     |
