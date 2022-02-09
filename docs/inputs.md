@@ -3,23 +3,21 @@
 All input options - except for the carbon input - use the [metrics 2.0](http://metrics20.org/) format.
 See [schema](https://github.com/grafana/metrictank/schema) for more details.
 
-
 ## How to send data to MT
 
 see fakemetrics, tsdb-gw, carbon
 
-
 ## Carbon
+
 useful for traditional graphite plaintext protocol.  Does not support pickle format.
 
-** Important: this input requires a
+**Important: this input requires a
 [carbon storage-schemas.conf](http://graphite.readthedocs.io/en/latest/config-carbon.html#storage-schemas-conf) file.
 Metrictank uses this file to determine the raw interval of the metrics, but it ignores all retention durations
 as well as intervals after the first, raw one since metrictank already has its own config mechanism
-for retention and aggregation. **
+for retention and aggregation.**
 
 note: it does not implement [carbon2.0](http://metrics20.org/implementations/)
-
 
 ## Kafka-mdm (recommended)
 
@@ -54,8 +52,14 @@ Note that the implementation has encode/decode function for the standard MetricP
 part of the series id.  For single-tenant environments, you can configure your producers and metrictank to not encode an org-id in all messages
 and rather just set it in configuration, this makes the message more compact, but won't work in multi-tenant environments.
 
+### MetricPointArray
+
+This format supports multiple MetricPoint values in a single Kafka message. The message format is: a single prefixed format byte `FormatMetricPointArray` (5) followed by another byte for the MetricPoint sub-format (either `FormatMetricPoint` or `FormatMetricPointWithoutOrg`). After the format bytes comes a sequence of concatenated points (in the specified sub-format) with no delimiters.
+
+This format greatly reduces the message overhead from kafka (both for producers and Metrictank).
+
 ### Future formats
 
 In the future we plan to do more optimisations such as:
-* batch encoding instead of a kafka message per point.
+
 * further compression (e.g. multiple points with shared timestamp).
