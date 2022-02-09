@@ -538,6 +538,83 @@ mt-index-prune --verbose --partition-from 0 --partition-to 8 cass -hosts cassand
 ```
 
 
+## mt-kafka-mdm-report-out-of-order
+
+```
+mt-kafka-mdm-report-out-of-order
+
+Inspects what's flowing through kafka (in mdm format) and reports out of order data grouped by metric name or tag, taking into account the reorder buffer)
+
+# Mechanism
+* it sniffs points being added on a per-series (metric Id) level
+* for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp
+* if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point
+* the reorder buffer is described by the window size
+Usage:
+  mt-kafka-mdm-report-out-of-order [flags]
+
+Example output:
+
+  total metric points count=2710806
+  total out-of-order metric points count=3878
+  out-of-order metric points grouped by name:
+  out-of-order metric points for name="fruit.weight" count=4 percentGroup=4.301075 percentClass=0.096131 percentTotal=0.000129
+  out-of-order metric points for name="fruit.height" count=1 percentGroup=4.545455 percentClass=0.024033 percentTotal=0.000032
+  ...
+  out-of-order metric points grouped by tag="fruit":
+  out-of-order metric points for tag="fruit" value="apple" count=80 percentGroup=5.856515 percentClass=2.062919 percentTotal=0.002951
+  out-of-order metric points for tag="fruit" value="orange" count=2912 percentGroup=0.306267 percentClass=75.090253 percentTotal=0.107422
+  ...
+  total duplicate metric points count=12760
+  duplicate metric points grouped by name:
+  duplicate metric points for name="fruit.width" count=105 percentGroup=19.266055 percentClass=0.760704 percentTotal=0.003397
+  duplicate metric points for name="fruit.length" count=123 percentGroup=15.688776 percentClass=0.891111 percentTotal=0.003979
+  ...
+  duplicate metric points grouped by tag="fruit":
+  duplicate metric points for tag="fruit" value="banana" count=4002 percentGroup=17.201066 percentClass=31.363636 percentTotal=0.147631
+  duplicate metric points for tag="fruit" value="orange" count=4796 percentGroup=0.504415 percentClass=37.586207 percentTotal=0.176922
+  ...
+
+Fields:
+
+  name:         the name of the metric (when grouped by name)
+  tag:          the tag key (when grouped by tag)
+  value:        the tag value (when grouped by tag)
+  count:        the number of metric points
+                the example above shows that 4002 metric points that had tag "fruit"="banana" were duplicates
+  percentGroup: the percentage of all of the metric points which had the same name/tag (depending on grouping) that were out of order/duplicates (depending on classification)
+                the example above shows that ~4.301% of all metric points with name "fruit.weight" were out of order
+  percentClass: the percentage of all of the metric points which were out of order/duplicates (depending on classification) that had this name/tag (depending on grouping)
+                the example above shows that ~2.063% of all metric points that were out of order had tag fruit=apple
+  percentTotal: the percentage of all metric points that had this name/tag (depending on grouping) and were out of order/duplicates (depending on classification)
+                the example above shows that ~0.177% of all metric points had tag "fruit"="orange" and were duplicates
+
+flags:
+  -config string
+    	configuration file path (default "/etc/metrictank/metrictank.ini")
+  -group-by-name
+    	group out-of-order metrics by name
+  -group-by-tag string
+    	group out-of-order metrics by the specified tag
+  -partition-from int
+    	the partition to load the index from
+  -partition-to int
+    	load the index from all partitions up to this one (exclusive). If unset, only the partition defined with "--partition-from" is loaded from (default -1)
+  -prefix string
+    	only report metrics with a name that has this prefix
+  -reorder-window uint
+    	the size of the reorder buffer window (default 1)
+  -run-duration duration
+    	the duration of time to run the program (default 5m0s)
+  -substr string
+    	only report metrics with a name that has this substring
+
+EXAMPLES:
+  mt-kafka-mdm-report-out-of-order -group-by-name -config metrictank.ini -partition-from 0
+  mt-kafka-mdm-report-out-of-order -group-by-name -group-by-tag namespace -config metrictank.ini -partition-from 0 -partition-to 3 -reorder-window 5 -run-duration 5m
+```
+
+
 ## mt-kafka-mdm-sniff
 
 ```
