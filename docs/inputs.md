@@ -54,9 +54,15 @@ and rather just set it in configuration, this makes the message more compact, bu
 
 ### MetricPointArray
 
-This format supports multiple MetricPoint values in a single Kafka message. The message format is: a single prefixed format byte `FormatMetricPointArray` (5) followed by another byte for the MetricPoint sub-format (either `FormatMetricPoint` or `FormatMetricPointWithoutOrg`). After the format bytes comes a sequence of concatenated points (in the specified sub-format) with no delimiters.
+This format supports multiple MetricPoint values in a single Kafka message. The message format is:
 
-This format greatly reduces the message overhead from kafka (both for producers and Metrictank).
+1. a single prefixed format byte `FormatMetricPointArray` (`0x05`) followed by
+1. another byte for the MetricPoint sub-format, one of:
+   * `FormatMetricPoint` (`0x02`)
+   * `FormatMetricPointWithoutOrg` (`0x03`)
+1. a sequence of concatenated points (in the specified sub-format) with no delimiters.
+
+Effective batching greatly reduces the message overhead from kafka (both for producers and Metrictank).
 
 ### Future formats
 
