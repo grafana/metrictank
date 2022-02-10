@@ -330,7 +330,7 @@ func BenchmarkLinearRegression10k_100AllSeriesHalfNulls(b *testing.B) {
 func BenchmarkLinearRegression10k_1000AllSeriesHalfNulls(b *testing.B) {
 	benchmarkLinearRegression(b, 1000, test.RandFloatsWithNulls10k, test.RandFloatsWithNulls10k)
 }
-func benchmarkLinearRegression(b *testing.B, numSeries int, fn0, fn1 func() []schema.Point) {
+func benchmarkLinearRegression(b *testing.B, numSeries int, fn0, fn1 test.DataFunc) {
 	var err error
 	tz.TimeZone, err = time.LoadLocation("")
 	if err != nil {
@@ -341,12 +341,11 @@ func benchmarkLinearRegression(b *testing.B, numSeries int, fn0, fn1 func() []sc
 	for i := 0; i < numSeries; i++ {
 		series := models.Series{
 			QueryPatt: strconv.Itoa(i),
-			Interval:  1,
 		}
 		if i%2 == 0 {
-			series.Datapoints = fn0()
+			series.Datapoints, series.Interval = fn0()
 		} else {
-			series.Datapoints = fn1()
+			series.Datapoints, series.Interval = fn1()
 		}
 		input = append(input, series)
 	}
