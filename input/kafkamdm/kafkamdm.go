@@ -356,6 +356,8 @@ func (k *KafkaMdm) handleMsg(data []byte, partition int32) {
 		return
 	}
 
+	// fallback to assuming schema.MetricData, such messages don't use a dedicated version byte.
+	// see schema/msg/format.go
 	md := schema.MetricData{}
 	_, err := md.UnmarshalMsg(data)
 	if err != nil {
