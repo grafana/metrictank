@@ -549,7 +549,7 @@ Inspects what's flowing through kafka (in mdm format) and reports out of order d
 * it sniffs points being added on a per-series (metric Id) level
 * for every series, tracks the last 'correct' point.  E.g. a point that was able to be added to the series because its timestamp is higher than any previous timestamp
 * if for any series, a point comes in with a timestamp equal or lower than the last point correct point - which metrictank would not add unless it falls within the reorder buffer - it triggers an event for this out-of-order point
-* the reorder buffer is described by the window size
+* unlike metrictank where different metric matching patterns can result in different reorder buffers, this tool uses a single reorder buffer size for all metrics (see -reorder-window parameter)
 Usage:
   mt-kafka-mdm-report-out-of-order [flags]
 
