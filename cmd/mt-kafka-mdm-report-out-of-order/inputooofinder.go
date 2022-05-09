@@ -56,6 +56,7 @@ func newInputOOOFinder(partitionFrom int, partitionTo int, reorderWindow uint32)
 
 func (ip *inputOOOFinder) ProcessMetricData(metric *schema.MetricData, partition int32) {
 	metricKey, err := schema.MKeyFromString(metric.Id)
+        // we loaded all definitions from cassandra at construction time, and any new MetricData in kafka should always be preceeded by the corresponding MetricDefinition (in the same kafka topic), so this should never happen
 	if err != nil {
 		log.Errorf("failed to get metric key from id=%v: %s", metric.Id, err.Error())
 		return
