@@ -42,11 +42,12 @@ func TestRemoveZeroSeriesAllow30PercentNulls(t *testing.T) {
 		[]models.Series{
 			getSeries("a", "30% zeros", a),
 			getSeries("b", "half zeros", halfZeros),
-			getSeries("c", "no nulls", noZeros),
+			getSeries("c", "no zeros", noZeros),
 			getSeries("d", "all zeros", allZeros),
 		},
 		[]models.Series{
 			getSeries("a", "30% zeros", a),
+			getSeries("b", "half zeros", halfZeros),
 			getSeries("c", "no zeros", noZeros),
 		},
 		t,
@@ -95,6 +96,7 @@ func testRemoveZeroSeries(xff float64, in []models.Series, out []models.Series, 
 	dataMap := initDataMap(in)
 
 	got, err := f.Exec(dataMap)
+
 	if err := equalOutput(out, got, nil, err); err != nil {
 		t.Fatal(err)
 	}
