@@ -80,6 +80,24 @@ var allZeros = []schema.Point{
 	{Val: 0, Ts: 60},
 }
 
+var halfZeros = []schema.Point{
+	{Val: 0, Ts: 10},
+	{Val: 0, Ts: 20},
+	{Val: 0, Ts: 30},
+	{Val: 1, Ts: 40},
+	{Val: 2, Ts: 50},
+	{Val: 3, Ts: 60},
+}
+
+var noZeros = []schema.Point{
+	{Val: 1, Ts: 10},
+	{Val: 2, Ts: 20},
+	{Val: 3, Ts: 30},
+	{Val: 4, Ts: 40},
+	{Val: 5, Ts: 50},
+	{Val: 6, Ts: 60},
+}
+
 var allNulls = []schema.Point{
 	{Val: math.NaN(), Ts: 10},
 	{Val: math.NaN(), Ts: 20},
