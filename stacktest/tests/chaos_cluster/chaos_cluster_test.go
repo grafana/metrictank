@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 	// TODO: should probably use -V flag here.
 	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
 	// but circleCI machine image still stuck with 1.14.0
-	cmd = exec.Command("docker-compose", "up", "--force-recreate")
+	cmd = exec.Command("docker-compose", "up", "--force-recreate", "--detach")
 	cmd.Dir = test.Path("docker/docker-chaos")
 	log.Println("cmd.Dir: ", cmd.Dir)
 	log.Println("test.Path: ", test.Path("docker/docker-chaos"))
