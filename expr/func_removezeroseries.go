@@ -16,7 +16,6 @@ func NewRemoveZeroSeries() GraphiteFunc {
 }
 
 func (s *FuncRemoveZeroSeries) Signature() ([]Arg, []Arg) {
-
 	return []Arg{
 			ArgSeriesList{val: &s.in},
 			ArgFloat{key: "xFilesFactor", val: &s.xFilesFactor, opt: true, validator: []Validator{WithinZeroOneInclusiveInterval}},
