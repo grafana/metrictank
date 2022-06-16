@@ -109,12 +109,12 @@ func TestMain(m *testing.M) {
 
 func TestClusterStartup(t *testing.T) {
 	matchers := []track.Matcher{
-		{Str: "metrictank0_1.*metricIndex initialized.*starting data consumption$"},
-		{Str: "metrictank1_1.*metricIndex initialized.*starting data consumption$"},
-		{Str: "metrictank2_1.*metricIndex initialized.*starting data consumption$"},
-		{Str: "metrictank3_1.*metricIndex initialized.*starting data consumption$"},
-		{Str: "metrictank4_1.*metricIndex initialized.*starting data consumption$"},
-		{Str: "metrictank5_1.*metricIndex initialized.*starting data consumption$"},
+		{Str: ".*metrictank0.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: ".*metrictank1.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: ".*metrictank2.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: ".*metrictank3.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: ".*metrictank4.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: ".*metrictank5.1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "grafana.*HTTP Server Listen.*3000"},
 		{Str: "zookeeper entered RUNNING state"},
 		{Str: "kafka entered RUNNING state"},
