@@ -65,6 +65,8 @@ func TestMain(m *testing.M) {
 	// but circleCI machine image still stuck with 1.14.0
 	cmd = exec.Command("docker-compose", "up", "--force-recreate")
 	cmd.Dir = test.Path("docker/docker-chaos")
+	log.Println("cmd.Dir: ", cmd.Dir)
+	log.Println("test.Path: ", test.Path("docker/docker-chaos"))
 	// note we rely on this technique to pass this setting on to all MT's
 	// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
@@ -77,6 +79,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	log.Println("Process: ", cmd.Process)
 
 	// note: if docker-compose didn't start properly - e.g. it bails out due to unsupported config -
 	// what typically happens is the tests will fail and we will exit, and not see the docker-compose problem
@@ -93,6 +97,8 @@ func TestMain(m *testing.M) {
 	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
 	tracker.Wait()
 	err = cmd.Wait()
+
+	log.Println("cmd.ProcessState: ", cmd.ProcessState)
 
 	// 130 means ctrl-C (interrupt) which is what we want
 	if err != nil && err.Error() != "exit status 130" {
