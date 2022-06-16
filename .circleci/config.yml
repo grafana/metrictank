@@ -58,7 +58,8 @@ jobs:
 
   qa-chaos:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
-    machine: true
+    machine:
+      image: ubuntu-2004:202010-01
     steps:
       - checkout
       - attach_workspace:
@@ -67,7 +68,7 @@ jobs:
         # docker-compose can pull these in by itself, but that would time out the test
       - run: docker pull cassandra:3.9
       - run: docker pull raintank/graphite-mt
-      - run: docker pull grafana/grafana
+      - run: docker pull grafana/grafana:8.5.6
       - run: docker pull raintank/kafka
       - run: docker pull raintank/statsdaemon
       - run: docker pull graphiteapp/graphite-statsd
