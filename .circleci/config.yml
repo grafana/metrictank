@@ -68,7 +68,7 @@ jobs:
         # docker-compose can pull these in by itself, but that would time out the test
       - run: docker pull cassandra:3.9
       - run: docker pull raintank/graphite-mt
-      - run: docker pull grafana/grafana:7.5.16
+      - run: docker pull grafana/grafana
       - run: docker pull raintank/kafka
       - run: docker pull raintank/statsdaemon
       - run: docker pull graphiteapp/graphite-statsd
