@@ -45,7 +45,7 @@ jobs:
   qa-post-build:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2204:2022.04.2
     steps:
       - checkout
       - attach_workspace:
@@ -59,7 +59,7 @@ jobs:
   qa-chaos:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
     machine:
-      image: ubuntu-2004:202010-01
+      image: ubuntu-2204:2022.04.2
     steps:
       - checkout
       - attach_workspace:
