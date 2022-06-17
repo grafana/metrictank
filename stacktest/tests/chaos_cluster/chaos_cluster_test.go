@@ -94,8 +94,6 @@ func TestMain(m *testing.M) {
 	tracker.Wait()
 	err = cmd.Wait()
 
-	log.Println("cmd.ProcessState: ", cmd.ProcessState)
-
 	// 130 means ctrl-C (interrupt) which is what we want
 	if err != nil && err.Error() != "exit status 130" {
 		log.Printf("ERROR: could not cleanly shutdown running docker-compose command: %s", err)
@@ -109,21 +107,22 @@ func TestMain(m *testing.M) {
 
 func TestClusterStartup(t *testing.T) {
 	matchers := []track.Matcher{
-		{Str: ".*metrictank0.1.*metricIndex initialized.*starting data consumption$"},
-		{Str: ".*metrictank1.1.*metricIndex initialized.*starting data consumption$"},
-		{Str: ".*metrictank2.1.*metricIndex initialized.*starting data consumption$"},
-		{Str: ".*metrictank3.1.*metricIndex initialized.*starting data consumption$"},
-		{Str: ".*metrictank4.1.*metricIndex initialized.*starting data consumption$"},
-		{Str: ".*metrictank5.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank0.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank1.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank2.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank3.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank4.1.*metricIndex initialized.*starting data consumption$"},
+		{Str: "metrictank5.1.*metricIndex initialized.*starting data consumption$"},
 		{Str: "grafana.*HTTP Server Listen.*3000"},
 		{Str: "zookeeper entered RUNNING state"},
 		{Str: "kafka entered RUNNING state"},
 	}
+	log.Println("Matchers: ", matchers)
 	select {
 	case <-tracker.Match(matchers, true):
 		log.Println("stack now running.")
 		log.Println("Go to http://localhost:3000 (and login as admin:admin) to see what's going on")
-	case <-time.After(time.Second * 120):
+	case <-time.After(time.Second * 80):
 		grafana.PostAnnotation("TestClusterStartup:FAIL")
 		t.Fatal("timed out while waiting for all metrictank instances to come up")
 	}

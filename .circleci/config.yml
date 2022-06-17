@@ -110,16 +110,16 @@ workflows:
       - build
       - test
       - qa
-      - qa-post-build:
-          requires:
-            - build
       - qa-chaos:
           requires:
             - build
+      - qa-post-build:
+          requires:
+            - build
+            - qa-chaos
       - deploy:
           requires:
             - build
             - test
             - qa
             - qa-post-build
-            - qa-chaos
