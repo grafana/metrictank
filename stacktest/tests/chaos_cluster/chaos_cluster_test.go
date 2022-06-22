@@ -69,7 +69,7 @@ func TestMain(m *testing.M) {
 	// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
-	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(cmd, true, true, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
