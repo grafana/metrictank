@@ -72,7 +72,7 @@ func TestMain(m *testing.M) {
 	// this is necessary for docker-compose to find docker.
 	cmd.Env = appendToPath(cmd.Env, "/usr/bin")
 
-	tracker, err = track.NewTracker(cmd, true, true, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -135,7 +135,6 @@ func TestClusterStartup(t *testing.T) {
 		{Str: "zookeeper entered RUNNING state"},
 		{Str: "kafka entered RUNNING state"},
 	}
-	log.Println("Matchers: ", matchers)
 	select {
 	case <-tracker.Match(matchers, true):
 		log.Println("stack now running.")
