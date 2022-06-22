@@ -69,6 +69,9 @@ func TestMain(m *testing.M) {
 	// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
 	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
 
+	// this is necessary for docker-compose to find docker.
+	cmd.Env = appendToPath(cmd.Env, "/usr/bin")
+
 	tracker, err = track.NewTracker(cmd, true, true, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
@@ -103,6 +106,21 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(retcode)
+}
+
+func appendToPath(env []string, addValue string) []string {
+	for envIdx, envVar := range env {
+		if envVar[:5] == "PATH=" {
+			if len(envVar) > len("PATH")+1 {
+				env[envIdx] = envVar + ":" + addValue
+			} else {
+				env[envIdx] = envVar + addValue
+			}
+			return env
+		}
+	}
+
+	return append(env, "PATH="+addValue)
 }
 
 func TestClusterStartup(t *testing.T) {
