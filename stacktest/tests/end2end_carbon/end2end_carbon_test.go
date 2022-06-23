@@ -62,6 +62,7 @@ func TestMain(m *testing.M) {
 		"-V",
 		"--force-recreate",
 	)
+
 	tracker, err = track.NewTracker(dockerUpCmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
