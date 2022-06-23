@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 		"grafana",
 	)
 
-	tracker, err = track.NewTracker(dockerUpCmd, false, false, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(dockerUpCmd, true, true, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
