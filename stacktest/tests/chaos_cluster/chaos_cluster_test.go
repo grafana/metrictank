@@ -4,7 +4,7 @@ import (
 	"flag"
 	"os"
 	"os/exec"
-	"syscall"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +33,7 @@ func init() {
 	log.SetFormatter(formatter)
 	log.SetLevel(log.InfoLevel)
 }
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if testing.Short() {
@@ -41,13 +42,12 @@ func TestMain(m *testing.M) {
 	}
 
 	log.Println("stopping docker-chaos stack should it be running...")
-	cmd := exec.Command("docker-compose", "down")
-	cmd.Dir = test.Path("docker/docker-chaos")
-	err := cmd.Start()
+	dockerDownCmd := dockerChaosAction(nil, "down")
+	err := dockerDownCmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	err = cmd.Wait()
+	err = dockerDownCmd.Wait()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -60,23 +60,22 @@ func TestMain(m *testing.M) {
 	log.Println(string(output))
 
 	log.Println("launching docker-chaos stack...")
-	// TODO: should probably use -V flag here.
-	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
-	// but circleCI machine image still stuck with 1.14.0
-	cmd = exec.Command("docker-compose", "up", "--force-recreate")
-	cmd.Dir = test.Path("docker/docker-chaos")
-	// note we rely on this technique to pass this setting on to all MT's
-	// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
-	cmd.Env = append(cmd.Env, "MT_CLUSTER_MIN_AVAILABLE_SHARDS=12")
+	dockerUpCmd := dockerChaosAction(map[string]string{
+		// note we rely on this technique to pass this setting on to all MT's
+		// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+		"MT_CLUSTER_MIN_AVAILABLE_SHARDS": "12",
+		"PATH":                            "/usr/bin",
+	},
+		"up",
+		"-V",
+		"--force-recreate",
+	)
 
-	// this is necessary for docker-compose to find docker.
-	cmd.Env = appendToPath(cmd.Env, "/usr/bin")
-
-	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(dockerUpCmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	err = cmd.Start()
+	err = dockerUpCmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -90,12 +89,17 @@ func TestMain(m *testing.M) {
 	fm.Close()
 
 	log.Println("stopping docker-compose stack...")
-	cmd.Process.Signal(syscall.SIGINT)
+	dockerDownCmd = dockerChaosAction(nil, "down")
+	err = dockerDownCmd.Start()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
 	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
 	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
 	tracker.Wait()
-	err = cmd.Wait()
+	err = dockerDownCmd.Wait()
 
 	// 130 means ctrl-C (interrupt) which is what we want
 	if err != nil && err.Error() != "exit status 130" {
@@ -108,19 +112,33 @@ func TestMain(m *testing.M) {
 	os.Exit(retcode)
 }
 
-func appendToPath(env []string, addValue string) []string {
-	for envIdx, envVar := range env {
-		if envVar[:5] == "PATH=" {
-			if len(envVar) > len("PATH")+1 {
-				env[envIdx] = envVar + ":" + addValue
-			} else {
-				env[envIdx] = envVar + addValue
-			}
-			return env
+func dockerChaosAction(setEnv map[string]string, action string, extraArgs ...string) *exec.Cmd {
+	cmd := exec.Command("docker-compose", append([]string{action}, extraArgs...)...)
+	cmd.Dir = test.Path("docker/docker-chaos")
+	cmd.Env = updateEnv(cmd.Env, setEnv)
+	return cmd
+}
+
+func updateEnv(env []string, setEnv map[string]string) []string {
+	for currentEnvVarIdx, currentEnvVar := range env {
+		splits := strings.SplitN(currentEnvVar, "=", 2)
+		if len(splits) < 2 {
+			// Ignore corrupt var.
+			continue
+		}
+		envVar := splits[0]
+
+		if setEnvVal, ok := setEnv[envVar]; ok {
+			env[currentEnvVarIdx] = envVar + "=" + setEnvVal
+			delete(setEnv, envVar)
 		}
 	}
 
-	return append(env, "PATH="+addValue)
+	for envVar, envVal := range setEnv {
+		env = append(env, envVar+"="+envVal)
+	}
+
+	return env
 }
 
 func TestClusterStartup(t *testing.T) {
