@@ -64,6 +64,7 @@ func TestMain(m *testing.M) {
 		"statsdaemon",
 		"bigtable",
 		"grafana",
+		"jaeger",
 	)
 
 	tracker, err = track.NewTracker(dockerUpCmd, true, true, "launch-stdout", "launch-stderr")
