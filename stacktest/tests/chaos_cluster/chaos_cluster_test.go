@@ -3,8 +3,6 @@ package chaos_cluster
 import (
 	"flag"
 	"os"
-	"os/exec"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +14,6 @@ import (
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
-	"github.com/grafana/metrictank/test"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,7 +39,7 @@ func TestMain(m *testing.M) {
 	}
 
 	log.Println("stopping docker-chaos stack should it be running...")
-	dockerDownCmd := dockerChaosAction(nil, "down")
+	dockerDownCmd := docker.DockerChaosAction("docker/docker-chaos", "down", nil)
 	err := dockerDownCmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
@@ -52,21 +49,18 @@ func TestMain(m *testing.M) {
 		log.Fatal(err.Error())
 	}
 
-	version := exec.Command("docker-compose", "version")
-	output, err := version.CombinedOutput()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	log.Println(string(output))
+	log.Println(string(docker.ComposeVersion()))
 
 	log.Println("launching docker-chaos stack...")
-	dockerUpCmd := dockerChaosAction(map[string]string{
-		// note we rely on this technique to pass this setting on to all MT's
-		// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
-		"MT_CLUSTER_MIN_AVAILABLE_SHARDS": "12",
-		"PATH":                            "/usr/bin",
-	},
+	dockerUpCmd := docker.DockerChaosAction(
+		"docker/docker-chaos",
 		"up",
+		map[string]string{
+			// note we rely on this technique to pass this setting on to all MT's
+			// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+			"MT_CLUSTER_MIN_AVAILABLE_SHARDS": "12",
+			"PATH":                            "/usr/bin",
+		},
 		"-V",
 		"--force-recreate",
 	)
@@ -89,7 +83,7 @@ func TestMain(m *testing.M) {
 	fm.Close()
 
 	log.Println("stopping docker-compose stack...")
-	dockerDownCmd = dockerChaosAction(nil, "down")
+	dockerDownCmd = docker.DockerChaosAction("docker/docker-chaos", "down", nil)
 	err = dockerDownCmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
@@ -110,35 +104,6 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(retcode)
-}
-
-func dockerChaosAction(setEnv map[string]string, action string, extraArgs ...string) *exec.Cmd {
-	cmd := exec.Command("docker-compose", append([]string{action}, extraArgs...)...)
-	cmd.Dir = test.Path("docker/docker-chaos")
-	cmd.Env = updateEnv(setEnv, cmd.Env)
-	return cmd
-}
-
-func updateEnv(setEnv map[string]string, env []string) []string {
-	for currentEnvVarIdx, currentEnvVar := range env {
-		splits := strings.SplitN(currentEnvVar, "=", 2)
-		if len(splits) < 2 {
-			// Ignore corrupt var.
-			continue
-		}
-		envVar := splits[0]
-
-		if setEnvVal, ok := setEnv[envVar]; ok {
-			env[currentEnvVarIdx] = envVar + "=" + setEnvVal
-			delete(setEnv, envVar)
-		}
-	}
-
-	for envVar, envVal := range setEnv {
-		env = append(env, envVar+"="+envVal)
-	}
-
-	return env
 }
 
 func TestClusterStartup(t *testing.T) {
