@@ -2,12 +2,14 @@ package docker
 
 import (
 	"context"
+	"log"
 	"os/exec"
 	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/grafana/metrictank/stacktest/track"
+	"github.com/grafana/metrictank/test"
 )
 
 var cli *client.Client
@@ -115,4 +117,42 @@ func IsolateOut(name, dur string, targets ...string) error {
 	}
 
 	return cmd.Start()
+}
+
+func ComposeVersion() string {
+	version := exec.Command("docker-compose", "version")
+	output, err := version.CombinedOutput()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	return string(output)
+}
+
+func DockerChaosAction(testPath, action string, setEnv map[string]string, extraArgs ...string) *exec.Cmd {
+	cmd := exec.Command("docker-compose", append([]string{action}, extraArgs...)...)
+	cmd.Dir = test.Path(testPath)
+	cmd.Env = updateEnv(setEnv, cmd.Env)
+	return cmd
+}
+
+func updateEnv(setEnv map[string]string, env []string) []string {
+	for currentEnvVarIdx, currentEnvVar := range env {
+		splits := strings.SplitN(currentEnvVar, "=", 2)
+		if len(splits) < 2 {
+			// Ignore corrupt var.
+			continue
+		}
+		envVar := splits[0]
+
+		if setEnvVal, ok := setEnv[envVar]; ok {
+			env[currentEnvVarIdx] = envVar + "=" + setEnvVal
+			delete(setEnv, envVar)
+		}
+	}
+
+	for envVar, envVal := range setEnv {
+		env = append(env, envVar+"="+envVal)
+	}
+
+	return env
 }
