@@ -119,7 +119,7 @@ func dockerChaosAction(setEnv map[string]string, action string, extraArgs ...str
 	return cmd
 }
 
-func updateEnv(env []string, setEnv map[string]string) []string {
+func updateEnv(setEnv map[string]string, env []string) []string {
 	for currentEnvVarIdx, currentEnvVar := range env {
 		splits := strings.SplitN(currentEnvVar, "=", 2)
 		if len(splits) < 2 {
