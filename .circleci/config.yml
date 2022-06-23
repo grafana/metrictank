@@ -45,7 +45,7 @@ jobs:
   qa-post-build:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
     machine:
-      image: ubuntu-1604:201903-01
+      image: ubuntu-2204:2022.04.2
     steps:
       - checkout
       - attach_workspace:
@@ -53,12 +53,13 @@ jobs:
       - run: go version
       - run: scripts/qa/docs.sh
       - run: docker load -i build_docker/metrictank.tar
-      - run: go test -v ./stacktest/tests/end2end_carbon
-      - run: go test -v ./stacktest/tests/end2end_carbon_bigtable
+      - run: GO111MODULE=off go test -v ./stacktest/tests/end2end_carbon
+      - run: GO111MODULE=off go test -v ./stacktest/tests/end2end_carbon_bigtable
 
   qa-chaos:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
-    machine: true
+    machine:
+      image: ubuntu-2204:2022.04.2
     steps:
       - checkout
       - attach_workspace:
@@ -109,16 +110,16 @@ workflows:
       - build
       - test
       - qa
-      - qa-post-build:
-          requires:
-            - build
       - qa-chaos:
           requires:
             - build
+      - qa-post-build:
+          requires:
+            - build
+            - qa-chaos
       - deploy:
           requires:
             - build
             - test
             - qa
             - qa-post-build
-            - qa-chaos

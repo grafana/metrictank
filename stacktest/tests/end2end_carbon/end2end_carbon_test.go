@@ -3,18 +3,16 @@ package end2end_carbon
 import (
 	"flag"
 	"os"
-	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/stacktest/docker"
 	"github.com/grafana/metrictank/stacktest/fakemetrics"
 	"github.com/grafana/metrictank/stacktest/grafana"
 	"github.com/grafana/metrictank/stacktest/graphite"
 	"github.com/grafana/metrictank/stacktest/track"
-	"github.com/grafana/metrictank/test"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,36 +37,37 @@ func TestMain(m *testing.M) {
 	}
 
 	log.Println("stopping docker-dev stack should it be running...")
-	cmd := exec.Command("docker-compose", "down")
-	cmd.Dir = test.Path("docker/docker-dev")
-	err := cmd.Start()
+	dockerDownCmd := docker.DockerChaosAction("docker/docker-dev", "down", nil)
+	err := dockerDownCmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	err = cmd.Wait()
+	err = dockerDownCmd.Wait()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	version := exec.Command("docker-compose", "version")
-	output, err := version.CombinedOutput()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	log.Println(string(output))
+	log.Println(string(docker.ComposeVersion()))
 
 	log.Println("launching docker-dev stack...")
-	// TODO: should probably use -V flag here.
-	// introduced here https://github.com/docker/compose/releases/tag/1.19.0
-	// but circleCI machine image still stuck with 1.14.0
-	cmd = exec.Command("docker-compose", "up", "--force-recreate")
-	cmd.Dir = test.Path("docker/docker-dev")
+	dockerUpCmd := docker.DockerChaosAction(
+		"docker/docker-dev",
+		"up",
+		map[string]string{
+			// note we rely on this technique to pass this setting on to all MT's
+			// https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+			"MT_CLUSTER_MIN_AVAILABLE_SHARDS": "12",
+			"PATH":                            "/usr/bin",
+		},
+		"-V",
+		"--force-recreate",
+	)
 
-	tracker, err = track.NewTracker(cmd, false, false, "launch-stdout", "launch-stderr")
+	tracker, err = track.NewTracker(dockerUpCmd, false, false, "launch-stdout", "launch-stderr")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	err = cmd.Start()
+	err = dockerUpCmd.Start()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -82,12 +81,17 @@ func TestMain(m *testing.M) {
 	fm.Close()
 
 	log.Println("stopping docker-compose stack...")
-	cmd.Process.Signal(syscall.SIGINT)
+	dockerDownCmd = docker.DockerChaosAction("docker/docker-dev", "down", nil)
+	err = dockerDownCmd.Start()
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	// note: even when we don't care about the output, it's best to consume it before calling cmd.Wait()
 	// even though the cmd.Wait docs say it will wait for stdout/stderr copying to complete
 	// however the docs for cmd.StdoutPipe say "it is incorrect to call Wait before all reads from the pipe have completed"
 	tracker.Wait()
-	err = cmd.Wait()
+	err = dockerDownCmd.Wait()
 
 	// 130 means ctrl-C (interrupt) which is what we want
 	if err != nil && err.Error() != "exit status 130" {
