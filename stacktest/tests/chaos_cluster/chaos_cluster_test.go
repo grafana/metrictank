@@ -115,7 +115,7 @@ func TestMain(m *testing.M) {
 func dockerChaosAction(setEnv map[string]string, action string, extraArgs ...string) *exec.Cmd {
 	cmd := exec.Command("docker-compose", append([]string{action}, extraArgs...)...)
 	cmd.Dir = test.Path("docker/docker-chaos")
-	cmd.Env = updateEnv(cmd.Env, setEnv)
+	cmd.Env = updateEnv(setEnv, cmd.Env)
 	return cmd
 }
 
