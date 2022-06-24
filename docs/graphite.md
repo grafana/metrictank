@@ -154,6 +154,7 @@ See also:
 | removeBelowValue(seriesList, n) seriesList                     |              | Stable     |
 | removeBetweenPercentile                                        |              | No         |
 | removeEmptySeries                                              |              | Stable     |
+| removeZeroSeries                                               |              | Stable     |
 | round                                                          |              | Stable     |
 | scale(seriesList, num) series                                  |              | Stable     |
 | scaleToSeconds(seriesList, seconds) seriesList                 |              | Stable     |
