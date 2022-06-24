@@ -15,12 +15,12 @@ func TestRemoveZeroSeriesIfAtLeastOneNonNull(t *testing.T) {
 			getSeries("a", "some zeros", a),
 			getSeries("b", "half zeros", halfZeros),
 			getSeries("d", "allZeros", allZeros),
-			getSeries("e", "empty series", []schema.Point{})
+			getSeries("e", "empty series", []schema.Point{}),
 		},
 		[]models.Series{
 			getSeries("a", "some zeros", a),
 			getSeries("b", "half zeros", halfZeros),
-			getSeries("d", "noZeros", noZeros)
+			getSeries("d", "noZeros", noZeros),
 		},
 		t,
 	)
@@ -83,13 +83,8 @@ func TestRemoveZeroSeriesMissingInputXFilesFactor(t *testing.T) {
 			getSeries("a", "some zeros", a),
 			getSeries("b", "half zeros", halfZeros),
 			getSeries("d", "allZeros", allZeros),
-<<<<<<< HEAD
 			getSeries("d", "noZeros", noZeros),
 			getSeries("e", "empty series", []schema.Point{}),
-||||||| parent of 74d1b274 (Update styling and add more tests with no zeroes in data)
-=======
-			getSeries("d", "noZeros", noZeros)
->>>>>>> 74d1b274 (Update styling and add more tests with no zeroes in data)
 		},
 		[]models.Series{
 			getSeries("a", "some zeros", a),
