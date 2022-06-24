@@ -15,6 +15,7 @@ func TestRemoveZeroSeriesIfAtLeastOneNonNull(t *testing.T) {
 			getSeries("a", "some zeros", a),
 			getSeries("b", "half zeros", halfZeros),
 			getSeries("d", "allZeros", allZeros),
+			getSeries("d", "noZeros", noZeros),
 			getSeries("e", "empty series", []schema.Point{}),
 		},
 		[]models.Series{
