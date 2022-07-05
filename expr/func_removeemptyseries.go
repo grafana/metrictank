@@ -12,7 +12,7 @@ type FuncRemoveEmptySeries struct {
 }
 
 func NewRemoveEmptySeries() GraphiteFunc {
-	return &FuncRemoveEmptySeries{xFilesFactor: 0}
+	return &FuncRemoveEmptySeries{xFilesFactor: 0.5}
 }
 
 func (s *FuncRemoveEmptySeries) Signature() ([]Arg, []Arg) {
