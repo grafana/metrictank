@@ -12,6 +12,10 @@ import (
 
 type mockCachePusher struct{}
 
+func (m *mockCachePusher) IsCacheable(_ schema.AMKey) bool {
+	return true
+}
+
 func (m *mockCachePusher) AddIfHot(_ schema.AMKey, _ uint32, _ chunk.IterGen) {}
 
 func NewMockCachePusher() cache.CachePusher {

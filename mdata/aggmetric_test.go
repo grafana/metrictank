@@ -25,6 +25,13 @@ type MockFlusher struct {
 	mockCache *cache.MockCache
 }
 
+func (m MockFlusher) IsCacheable(metric schema.AMKey) bool {
+	if m.mockCache == nil {
+		return false
+	}
+	return m.mockCache.IsCacheable(metric)
+}
+
 func (m MockFlusher) Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	if m.mockCache != nil {
 		m.mockCache.AddIfHot(metric, prev, itergen)

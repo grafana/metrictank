@@ -181,6 +181,13 @@ func (ms *AggMetrics) GetOrCreate(key schema.MKey, schemaId, aggId uint16, inter
 	return m
 }
 
+func (ms *AggMetrics) IsCacheable(metric schema.AMKey) bool {
+	if ms.cachePusher == nil {
+		return false
+	}
+	return ms.cachePusher.IsCacheable(metric)
+}
+
 func (ms *AggMetrics) Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	if ms.cachePusher != nil {
 		ms.cachePusher.AddIfHot(metric, prev, itergen)

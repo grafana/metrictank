@@ -24,6 +24,7 @@ var ErrInvalidRange = errors.New("AggMetric: invalid range: from must be less th
 
 // Flusher is used to determine what should happen when chunks are ready to flushed from AggMetrics
 type Flusher interface {
+	IsCacheable(metric schema.AMKey) bool
 	Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 	Store(cwr *ChunkWriteRequest)
 }
@@ -37,10 +38,10 @@ type Flusher interface {
 // AggMetric is concurrency-safe
 type AggMetric struct {
 	sync.RWMutex
-	flusher         Flusher
-	key             schema.AMKey
-	rob             *ReorderBuffer
-	chunks          []*chunk.Chunk
+	flusher Flusher
+	key     schema.AMKey
+	rob     *ReorderBuffer
+	chunks  []*chunk.Chunk
 
 	// After NewAggMetric returns and thus before we start using the AggMetric, the contents of this slice (the pointers themselves)
 	// remains constant. The Aggregators being pointed to, will have a AggMetric pointers. Those pointers will also remain constant
@@ -374,6 +375,10 @@ func (a *AggMetric) addAggregators(ts uint32, val float64) {
 // pushToCache adds the chunk into the cache if it is hot
 // caller must hold lock
 func (a *AggMetric) pushToCache(c *chunk.Chunk) {
+	// Only pay the cost of encode if this metric is cacheable
+	if !a.flusher.IsCacheable(a.key) {
+		return
+	}
 	intervalHint := a.key.Archive.Span()
 
 	itergen, err := chunk.NewIterGen(c.Series.T0, intervalHint, c.Encode(a.chunkSpan))
