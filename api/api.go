@@ -143,10 +143,12 @@ func (s *Server) Run() {
 
 func (s *Server) Stop() {
 	log.Info("API shutdown started.")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		log.Printf("HTTP Server Shutdown Error: %v", err)
+	if s.httpServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.httpServer.Shutdown(ctx); err != nil {
+			log.Printf("HTTP Server Shutdown Error: %v", err)
+		}
 	}
 }
 
