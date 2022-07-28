@@ -532,7 +532,7 @@ func shutdown() {
 	// and so will stop sending us requests.
 	cluster.Stop()
 
-	// stop API
+	// stop API gracefully
 	apiServer.Stop()
 
 	// shutdown our input plugins.  These may take a while as we allow them

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -43,9 +44,9 @@ type Server struct {
 	BackendStore    mdata.Store
 	MetaRecords     idx.MetaRecordIdx
 	Cache           cache.Cache
-	shutdown        chan struct{}
 	Tracer          opentracing.Tracer
 	prioritySetters []PrioritySetter
+	httpServer      *http.Server
 }
 
 func (s *Server) BindMetricIndex(i idx.MetricIndex) {
@@ -95,7 +96,6 @@ func NewServer() (*Server, error) {
 		SSL:      UseSSL,
 		certFile: certFile,
 		keyFile:  keyFile,
-		shutdown: make(chan struct{}),
 		Macaron:  m,
 		Tracer:   opentracing.NoopTracer{},
 	}, nil
@@ -109,30 +109,31 @@ func (s *Server) Run() {
 	}
 	log.Infof("API Listening on: %v://%s/", proto, s.Addr)
 
-	// define our own listner so we can call Close on it
+	s.httpServer = &http.Server{
+		Addr:    s.Addr,
+		Handler: s.Macaron,
+	}
+
+	// httpServer.Shutdown will close this listener for us
 	l, err := net.Listen("tcp", s.Addr)
 	if err != nil {
 		log.Fatalf("API failed to listen on %s, %s", s.Addr, err.Error())
 	}
-	go s.handleShutdown(l)
-	srv := http.Server{
-		Addr:    s.Addr,
-		Handler: s.Macaron,
-	}
+
 	if s.SSL {
 		var cert tls.Certificate
 		cert, err = tls.LoadX509KeyPair(s.certFile, s.keyFile)
 		if err != nil {
 			log.Fatalf("API Failed to start server: %v", err)
 		}
-		srv.TLSConfig = &tls.Config{
+		s.httpServer.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 			NextProtos:   []string{"http/1.1"},
 		}
-		tlsListener := tls.NewListener(tcpKeepAliveListener{l.(*net.TCPListener)}, srv.TLSConfig)
-		err = srv.Serve(tlsListener)
+		tlsListener := tls.NewListener(tcpKeepAliveListener{l.(*net.TCPListener)}, s.httpServer.TLSConfig)
+		err = s.httpServer.Serve(tlsListener)
 	} else {
-		err = srv.Serve(tcpKeepAliveListener{l.(*net.TCPListener)})
+		err = s.httpServer.Serve(tcpKeepAliveListener{l.(*net.TCPListener)})
 	}
 
 	if err != nil {
@@ -141,13 +142,12 @@ func (s *Server) Run() {
 }
 
 func (s *Server) Stop() {
-	close(s.shutdown)
-}
-
-func (s *Server) handleShutdown(l net.Listener) {
-	<-s.shutdown
 	log.Info("API shutdown started.")
-	l.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		log.Printf("HTTP Server Shutdown Error: %v", err)
+	}
 }
 
 type tcpKeepAliveListener struct {
