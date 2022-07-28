@@ -584,30 +584,40 @@ func TestPruneStaleOnLoad(t *testing.T) {
 	}
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(1).String(),
+		orgId:      1,
+		mtype:      "gauge",
 		name:       "longtermrecentenough",
 		interval:   1,
 		lastUpdate: now.Add(-350 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(2).String(),
+		orgId:      1,
+		mtype:      "gauge",
 		name:       "longtermtooold",
 		interval:   1,
 		lastUpdate: now.Add(-380 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(3).String(),
+		orgId:      1,
+		mtype:      "gauge",
 		name:       "foobarrecentenough",
 		interval:   3,
 		lastUpdate: now.Add(-5 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(4).String(),
+		orgId:      1,
+		mtype:      "gauge",
 		name:       "foobartooold",
 		interval:   3,
 		lastUpdate: now.Add(-9 * 24 * time.Hour).Unix(),
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(5).String(),
+		orgId:      1,
+		mtype:      "gauge",
 		name:       "default-super-old-but-never-pruned",
 		interval:   1,
 		lastUpdate: now.Add(-2 * 365 * 24 * time.Hour).Unix(),
@@ -661,6 +671,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(1).String(),
 		orgId:      1,
+		mtype:      "gauge",
 		partition:  1,
 		name:       "met1",
 		interval:   1,
@@ -671,6 +682,7 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(2).String(),
 		orgId:      1,
+		mtype:      "gauge",
 		partition:  1,
 		name:       "met1",
 		interval:   2,
@@ -681,20 +693,22 @@ func TestPruneStaleOnLoadWithTags(t *testing.T) {
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(3).String(),
 		orgId:      1,
+		mtype:      "gauge",
 		partition:  1,
 		name:       "met1",
 		interval:   3,
 		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one will expire
-		tags:       []string{"tag1=val1;foo=bar"},
+		tags:       []string{"tag1=val1", "foo=bar"},
 	})
 	iter.rows = append(iter.rows, cassRow{
 		id:         test.GetMKey(4).String(),
 		orgId:      1,
+		mtype:      "gauge",
 		partition:  1,
 		name:       "met1",
 		interval:   4,
 		lastUpdate: now.Add(-8 * 24 * time.Hour).Unix(), // this one won't because it doesn't match the tag
-		tags:       []string{"tag1=val1;foo=baz"},
+		tags:       []string{"tag1=val1", "foo=baz"},
 	})
 
 	idx := &CasIdx{}
