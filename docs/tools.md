@@ -298,6 +298,8 @@ cass config flags:
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
   -init-load-concurrency int
     	Number of partitions to load concurrently on startup. (default 1)
+  -init-load-retries int
+    	Number of times to retry loading a partition on startup before failing. (default 3)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -num-conns int
@@ -505,6 +507,8 @@ cass config flags:
     	comma separated list of cassandra addresses in host:port form (default "localhost:9042")
   -init-load-concurrency int
     	Number of partitions to load concurrently on startup. (default 1)
+  -init-load-retries int
+    	Number of times to retry loading a partition on startup before failing. (default 3)
   -keyspace string
     	Cassandra keyspace to store metricDefinitions in. (default "metrictank")
   -num-conns int
