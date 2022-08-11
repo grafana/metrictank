@@ -18,6 +18,7 @@ type Cache interface {
 }
 
 type CachePusher interface {
+	IsCacheable(metric schema.AMKey) bool
 	AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen)
 }
 

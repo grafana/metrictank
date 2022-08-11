@@ -114,6 +114,18 @@ func (c *CCache) DelMetric(rawMetric schema.MKey) (int, int) {
 	return series, archives
 }
 
+// IsHot returns true if the metric is in the cache
+func (c *CCache) IsCacheable(metric schema.AMKey) bool {
+	if c == nil {
+		return false
+	}
+	c.RLock()
+	defer c.RUnlock()
+
+	_, ok := c.metricCache[metric]
+	return ok
+}
+
 // adds the given chunk to the cache, but only if the metric is sufficiently hot
 func (c *CCache) AddIfHot(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
 	if c == nil {

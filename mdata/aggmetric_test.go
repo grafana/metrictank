@@ -13,11 +13,34 @@ import (
 	"github.com/grafana/metrictank/cluster"
 	"github.com/grafana/metrictank/conf"
 	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/mdata/chunk"
 	"github.com/grafana/metrictank/mdata/chunk/tsz"
 	"github.com/grafana/metrictank/test"
 )
 
 var mockstore = NewMockStore()
+
+type MockFlusher struct {
+	mockstore *MockStore
+	mockCache *cache.MockCache
+}
+
+func (m MockFlusher) IsCacheable(metric schema.AMKey) bool {
+	if m.mockCache == nil {
+		return false
+	}
+	return m.mockCache.IsCacheable(metric)
+}
+
+func (m MockFlusher) Cache(metric schema.AMKey, prev uint32, itergen chunk.IterGen) {
+	if m.mockCache != nil {
+		m.mockCache.AddIfHot(metric, prev, itergen)
+	}
+}
+
+func (m MockFlusher) Store(cwr *ChunkWriteRequest) {
+	m.mockstore.Add(cwr)
+}
 
 type point struct {
 	ts  uint32
@@ -132,7 +155,7 @@ func testMetricPersistOptionalPrimary(t *testing.T, primary bool) {
 
 	chunkAddCount, chunkSpan := uint32(10), uint32(300)
 	rets := conf.MustParseRetentions("1s:1s:5min:5:true")
-	agg := NewAggMetric(mockstore, &mockCache, test.GetAMKey(42), rets, 0, chunkSpan, nil, false, false, 0)
+	agg := NewAggMetric(MockFlusher{mockstore, &mockCache}, test.GetAMKey(42), rets, 0, chunkSpan, nil, false, false, 0)
 
 	for ts := chunkSpan; ts <= chunkSpan*chunkAddCount; ts += chunkSpan {
 		agg.Add(ts, 1)
@@ -168,7 +191,7 @@ func TestAggMetric(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
 	ret := conf.MustParseRetentions("1s:1s:2min:5:true")
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0))
+	c := NewChecker(t, NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0))
 
 	// chunk t0's: 120, 240, 360, 480, 600, 720, 840, 960
 
@@ -246,7 +269,7 @@ func TestAggMetricWithReorderBuffer(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Avg},
 	}
 	ret := conf.MustParseRetentions("1s:1s:2min:5:true")
-	c := NewChecker(t, NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 10, 1, &agg, false, false, 0))
+	c := NewChecker(t, NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 10, 1, &agg, false, false, 0))
 
 	// basic adds and verifies with test data
 	c.Add(121, 121)
@@ -284,7 +307,7 @@ func TestAggMetricDropFirstChunk(t *testing.T) {
 	cluster.Manager.SetPrimary(true)
 	mockstore.Reset()
 	rets := conf.MustParseRetentions("1s:1s:10s:5:true")
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), rets, 0, 1, nil, false, true, 0)
+	m := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), rets, 0, 1, nil, false, true, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -312,7 +335,7 @@ func TestAggMetricIngestFrom(t *testing.T) {
 	mockstore.Reset()
 	ingestFrom := int64(25)
 	ret := conf.MustParseRetentions("1s:1s:10s:5:true")
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, ingestFrom)
+	m := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, nil, false, false, ingestFrom)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -357,11 +380,11 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 
 	// with a raw retention of 600s, this will result in a future tolerance of 60s
 	futureToleranceRatio = 10
-	aggMetricTolerate60 := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+	aggMetricTolerate60 := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
 
 	// will not tolerate future datapoints at all
 	futureToleranceRatio = 0
-	aggMetricTolerate0 := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+	aggMetricTolerate0 := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
 
 	// add datapoint which is 30 seconds in the future to both aggmetrics, they should both accept it
 	// because enforcement of future tolerance is disabled, but the one with tolerance 0 should increase
@@ -396,9 +419,9 @@ func TestAggMetricFutureTolerance(t *testing.T) {
 	sampleTooFarAhead.SetUint32(0)
 	enforceFutureTolerance = true
 	futureToleranceRatio = 10
-	aggMetricTolerate60 = NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+	aggMetricTolerate60 = NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
 	futureToleranceRatio = 0
-	aggMetricTolerate0 = NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
+	aggMetricTolerate0 = NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, nil, false, false, 0)
 
 	aggMetricTolerate60.Add(uint32(time.Now().Unix()+30), 10)
 	if len(aggMetricTolerate60.chunks) != 1 {
@@ -476,7 +499,7 @@ func TestGetAggregated(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Sum},
 	}
 
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, 0)
+	m := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, 0)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -520,7 +543,7 @@ func TestGetAggregatedIngestFrom(t *testing.T) {
 		AggregationMethod: []conf.Method{conf.Sum},
 	}
 
-	m := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, ingestFrom)
+	m := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, &agg, false, false, ingestFrom)
 	m.Add(10, 10)
 	m.Add(11, 11)
 	m.Add(12, 12)
@@ -560,7 +583,7 @@ func BenchmarkAggMetricAdd(b *testing.B) {
 
 	// each chunk contains 180 points
 	rets := conf.MustParseRetentions("10s:1000000000s,30min:1")
-	metric := NewAggMetric(mockstore, &cache.MockCache{}, test.GetAMKey(0), rets, 0, 10, nil, false, false, 0)
+	metric := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(0), rets, 0, 10, nil, false, false, 0)
 
 	max := uint32(b.N*10 + 1)
 	for t := uint32(1); t < max; t += 10 {
