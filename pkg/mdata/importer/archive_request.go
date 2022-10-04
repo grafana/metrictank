@@ -8,8 +8,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/kisielk/whisper-go/whisper"
 	"github.com/tinylib/msgp/msgp"
 )

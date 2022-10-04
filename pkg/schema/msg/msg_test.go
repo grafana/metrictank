@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func TestWriteReadPointMsg(t *testing.T) {

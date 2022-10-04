@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/metrictank/tracing"
+	"github.com/grafana/metrictank/pkg/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	tags "github.com/opentracing/opentracing-go/ext"
 	log "github.com/sirupsen/logrus"

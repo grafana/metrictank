@@ -7,11 +7,11 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/idx/cassandra"
-	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/idx/cassandra"
+	"github.com/grafana/metrictank/pkg/idx/memory"
+	"github.com/grafana/metrictank/pkg/logger"
+	"github.com/grafana/metrictank/pkg/schema"
 	log "github.com/sirupsen/logrus"
 )
 

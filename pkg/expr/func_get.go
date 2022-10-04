@@ -1,7 +1,7 @@
 package expr
 
 import (
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 // internal function just for getting data

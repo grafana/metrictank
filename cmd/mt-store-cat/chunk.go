@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/grafana/metrictank/store/cassandra"
+	"github.com/grafana/metrictank/pkg/store/cassandra"
 	log "github.com/sirupsen/logrus"
 )
 

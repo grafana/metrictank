@@ -5,7 +5,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 type FuncScaleToSeconds struct {

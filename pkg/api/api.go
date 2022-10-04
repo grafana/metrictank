@@ -10,10 +10,10 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/mdata/cache"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/mdata/cache"
+	"github.com/grafana/metrictank/pkg/stats"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/macaron.v1"

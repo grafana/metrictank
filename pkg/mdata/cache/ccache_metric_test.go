@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/mdata/cache/accnt"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/pkg/mdata/cache/accnt"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/test"
 )
 
 func generateChunks(b testing.TB, startAt, count, step uint32) []chunk.IterGen {

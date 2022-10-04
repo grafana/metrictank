@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/logger"
+	"github.com/grafana/metrictank/pkg/stats"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -28,12 +28,16 @@ import (
 	"go.opencensus.io/trace/tracestate"
 )
 
+type tracer struct{}
+
+var _ Tracer = &tracer{}
+
 // Span represents a span of a trace.  It has an associated SpanContext, and
 // stores data accumulated while the span is active.
 //
 // Ideally users should interact with Spans by calling the functions in this
 // package that take a Context parameter.
-type Span struct {
+type span struct {
 	// data contains information recorded about the span.
 	//
 	// It will be non-nil if we are exporting the span or recording events for it.
@@ -42,6 +46,20 @@ type Span struct {
 	data        *SpanData
 	mu          sync.Mutex // protects the contents of *data (but not the pointer value.)
 	spanContext SpanContext
+
+	// lruAttributes are capped at configured limit. When the capacity is reached an oldest entry
+	// is removed to create room for a new entry.
+	lruAttributes *lruMap
+
+	// annotations are stored in FIFO queue capped by configured limit.
+	annotations *evictedQueue
+
+	// messageEvents are stored in FIFO queue capped by configured limit.
+	messageEvents *evictedQueue
+
+	// links are stored in FIFO queue capped by configured limit.
+	links *evictedQueue
+
 	// spanStore is the spanStore this span belongs to, if any, otherwise it is nil.
 	*spanStore
 	endOnce sync.Once
@@ -52,7 +70,7 @@ type Span struct {
 // IsRecordingEvents returns true if events are being recorded for this span.
 // Use this check to avoid computing expensive annotations when they will never
 // be used.
-func (s *Span) IsRecordingEvents() bool {
+func (s *span) IsRecordingEvents() bool {
 	if s == nil {
 		return false
 	}
@@ -95,13 +113,13 @@ type SpanContext struct {
 type contextKey struct{}
 
 // FromContext returns the Span stored in a context, or nil if there isn't one.
-func FromContext(ctx context.Context) *Span {
+func (t *tracer) FromContext(ctx context.Context) *Span {
 	s, _ := ctx.Value(contextKey{}).(*Span)
 	return s
 }
 
 // NewContext returns a new context with the given Span attached.
-func NewContext(parent context.Context, s *Span) context.Context {
+func (t *tracer) NewContext(parent context.Context, s *Span) context.Context {
 	return context.WithValue(parent, contextKey{}, s)
 }
 
@@ -152,11 +170,14 @@ func WithSampler(sampler Sampler) StartOption {
 //
 // Returned context contains the newly created span. You can use it to
 // propagate the returned span in process.
-func StartSpan(ctx context.Context, name string, o ...StartOption) (context.Context, *Span) {
+func (t *tracer) StartSpan(ctx context.Context, name string, o ...StartOption) (context.Context, *Span) {
 	var opts StartOptions
 	var parent SpanContext
-	if p := FromContext(ctx); p != nil {
-		parent = p.spanContext
+	if p := t.FromContext(ctx); p != nil {
+		if ps, ok := p.internal.(*span); ok {
+			ps.addChild()
+		}
+		parent = p.SpanContext()
 	}
 	for _, op := range o {
 		op(&opts)
@@ -165,7 +186,8 @@ func StartSpan(ctx context.Context, name string, o ...StartOption) (context.Cont
 
 	ctx, end := startExecutionTracerTask(ctx, name)
 	span.executionTracerTaskEnd = end
-	return NewContext(ctx, span), span
+	extSpan := NewSpan(span)
+	return t.NewContext(ctx, extSpan), extSpan
 }
 
 // StartSpanWithRemoteParent starts a new child span of the span from the given parent.
@@ -175,7 +197,7 @@ func StartSpan(ctx context.Context, name string, o ...StartOption) (context.Cont
 //
 // Returned context contains the newly created span. You can use it to
 // propagate the returned span in process.
-func StartSpanWithRemoteParent(ctx context.Context, name string, parent SpanContext, o ...StartOption) (context.Context, *Span) {
+func (t *tracer) StartSpanWithRemoteParent(ctx context.Context, name string, parent SpanContext, o ...StartOption) (context.Context, *Span) {
 	var opts StartOptions
 	for _, op := range o {
 		op(&opts)
@@ -183,19 +205,24 @@ func StartSpanWithRemoteParent(ctx context.Context, name string, parent SpanCont
 	span := startSpanInternal(name, parent != SpanContext{}, parent, true, opts)
 	ctx, end := startExecutionTracerTask(ctx, name)
 	span.executionTracerTaskEnd = end
-	return NewContext(ctx, span), span
+	extSpan := NewSpan(span)
+	return t.NewContext(ctx, extSpan), extSpan
 }
 
-func startSpanInternal(name string, hasParent bool, parent SpanContext, remoteParent bool, o StartOptions) *Span {
-	span := &Span{}
-	span.spanContext = parent
+func startSpanInternal(name string, hasParent bool, parent SpanContext, remoteParent bool, o StartOptions) *span {
+	s := &span{}
+	s.spanContext = parent
 
 	cfg := config.Load().(*Config)
+	if gen, ok := cfg.IDGenerator.(*defaultIDGenerator); ok {
+		// lazy initialization
+		gen.init()
+	}
 
 	if !hasParent {
-		span.spanContext.TraceID = cfg.IDGenerator.NewTraceID()
+		s.spanContext.TraceID = cfg.IDGenerator.NewTraceID()
 	}
-	span.spanContext.SpanID = cfg.IDGenerator.NewSpanID()
+	s.spanContext.SpanID = cfg.IDGenerator.NewSpanID()
 	sampler := cfg.DefaultSampler
 
 	if !hasParent || remoteParent || o.Sampler != nil {
@@ -207,49 +234,57 @@ func startSpanInternal(name string, hasParent bool, parent SpanContext, remotePa
 		if o.Sampler != nil {
 			sampler = o.Sampler
 		}
-		span.spanContext.setIsSampled(sampler(SamplingParameters{
+		s.spanContext.setIsSampled(sampler(SamplingParameters{
 			ParentContext:   parent,
-			TraceID:         span.spanContext.TraceID,
-			SpanID:          span.spanContext.SpanID,
+			TraceID:         s.spanContext.TraceID,
+			SpanID:          s.spanContext.SpanID,
 			Name:            name,
 			HasRemoteParent: remoteParent}).Sample)
 	}
 
-	if !internal.LocalSpanStoreEnabled && !span.spanContext.IsSampled() {
-		return span
+	if !internal.LocalSpanStoreEnabled && !s.spanContext.IsSampled() {
+		return s
 	}
 
-	span.data = &SpanData{
-		SpanContext:     span.spanContext,
+	s.data = &SpanData{
+		SpanContext:     s.spanContext,
 		StartTime:       time.Now(),
 		SpanKind:        o.SpanKind,
 		Name:            name,
 		HasRemoteParent: remoteParent,
 	}
+	s.lruAttributes = newLruMap(cfg.MaxAttributesPerSpan)
+	s.annotations = newEvictedQueue(cfg.MaxAnnotationEventsPerSpan)
+	s.messageEvents = newEvictedQueue(cfg.MaxMessageEventsPerSpan)
+	s.links = newEvictedQueue(cfg.MaxLinksPerSpan)
+
 	if hasParent {
-		span.data.ParentSpanID = parent.SpanID
+		s.data.ParentSpanID = parent.SpanID
 	}
 	if internal.LocalSpanStoreEnabled {
 		var ss *spanStore
 		ss = spanStoreForNameCreateIfNew(name)
 		if ss != nil {
-			span.spanStore = ss
-			ss.add(span)
+			s.spanStore = ss
+			ss.add(s)
 		}
 	}
 
-	return span
+	return s
 }
 
 // End ends the span.
-func (s *Span) End() {
+func (s *span) End() {
+	if s == nil {
+		return
+	}
+	if s.executionTracerTaskEnd != nil {
+		s.executionTracerTaskEnd()
+	}
 	if !s.IsRecordingEvents() {
 		return
 	}
 	s.endOnce.Do(func() {
-		if s.executionTracerTaskEnd != nil {
-			s.executionTracerTaskEnd()
-		}
 		exp, _ := exporters.Load().(exportersMap)
 		mustExport := s.spanContext.IsSampled() && len(exp) > 0
 		if s.spanStore != nil || mustExport {
@@ -269,22 +304,32 @@ func (s *Span) End() {
 
 // makeSpanData produces a SpanData representing the current state of the Span.
 // It requires that s.data is non-nil.
-func (s *Span) makeSpanData() *SpanData {
+func (s *span) makeSpanData() *SpanData {
 	var sd SpanData
 	s.mu.Lock()
 	sd = *s.data
-	if s.data.Attributes != nil {
-		sd.Attributes = make(map[string]interface{})
-		for k, v := range s.data.Attributes {
-			sd.Attributes[k] = v
-		}
+	if s.lruAttributes.len() > 0 {
+		sd.Attributes = s.lruAttributesToAttributeMap()
+		sd.DroppedAttributeCount = s.lruAttributes.droppedCount
+	}
+	if len(s.annotations.queue) > 0 {
+		sd.Annotations = s.interfaceArrayToAnnotationArray()
+		sd.DroppedAnnotationCount = s.annotations.droppedCount
+	}
+	if len(s.messageEvents.queue) > 0 {
+		sd.MessageEvents = s.interfaceArrayToMessageEventArray()
+		sd.DroppedMessageEventCount = s.messageEvents.droppedCount
+	}
+	if len(s.links.queue) > 0 {
+		sd.Links = s.interfaceArrayToLinksArray()
+		sd.DroppedLinkCount = s.links.droppedCount
 	}
 	s.mu.Unlock()
 	return &sd
 }
 
 // SpanContext returns the SpanContext of the span.
-func (s *Span) SpanContext() SpanContext {
+func (s *span) SpanContext() SpanContext {
 	if s == nil {
 		return SpanContext{}
 	}
@@ -292,7 +337,7 @@ func (s *Span) SpanContext() SpanContext {
 }
 
 // SetName sets the name of the span, if it is recording events.
-func (s *Span) SetName(name string) {
+func (s *span) SetName(name string) {
 	if !s.IsRecordingEvents() {
 		return
 	}
@@ -302,7 +347,7 @@ func (s *Span) SetName(name string) {
 }
 
 // SetStatus sets the status of the span, if it is recording events.
-func (s *Span) SetStatus(status Status) {
+func (s *span) SetStatus(status Status) {
 	if !s.IsRecordingEvents() {
 		return
 	}
@@ -311,64 +356,90 @@ func (s *Span) SetStatus(status Status) {
 	s.mu.Unlock()
 }
 
-// AddAttributes sets attributes in the span.
-//
-// Existing attributes whose keys appear in the attributes parameter are overwritten.
-func (s *Span) AddAttributes(attributes ...Attribute) {
+func (s *span) interfaceArrayToLinksArray() []Link {
+	linksArr := make([]Link, 0, len(s.links.queue))
+	for _, value := range s.links.queue {
+		linksArr = append(linksArr, value.(Link))
+	}
+	return linksArr
+}
+
+func (s *span) interfaceArrayToMessageEventArray() []MessageEvent {
+	messageEventArr := make([]MessageEvent, 0, len(s.messageEvents.queue))
+	for _, value := range s.messageEvents.queue {
+		messageEventArr = append(messageEventArr, value.(MessageEvent))
+	}
+	return messageEventArr
+}
+
+func (s *span) interfaceArrayToAnnotationArray() []Annotation {
+	annotationArr := make([]Annotation, 0, len(s.annotations.queue))
+	for _, value := range s.annotations.queue {
+		annotationArr = append(annotationArr, value.(Annotation))
+	}
+	return annotationArr
+}
+
+func (s *span) lruAttributesToAttributeMap() map[string]interface{} {
+	attributes := make(map[string]interface{}, s.lruAttributes.len())
+	for _, key := range s.lruAttributes.keys() {
+		value, ok := s.lruAttributes.get(key)
+		if ok {
+			keyStr := key.(string)
+			attributes[keyStr] = value
+		}
+	}
+	return attributes
+}
+
+func (s *span) copyToCappedAttributes(attributes []Attribute) {
+	for _, a := range attributes {
+		s.lruAttributes.add(a.key, a.value)
+	}
+}
+
+func (s *span) addChild() {
 	if !s.IsRecordingEvents() {
 		return
 	}
 	s.mu.Lock()
-	if s.data.Attributes == nil {
-		s.data.Attributes = make(map[string]interface{})
-	}
-	copyAttributes(s.data.Attributes, attributes)
+	s.data.ChildSpanCount++
 	s.mu.Unlock()
 }
 
-// copyAttributes copies a slice of Attributes into a map.
-func copyAttributes(m map[string]interface{}, attributes []Attribute) {
-	for _, a := range attributes {
-		m[a.key] = a.value
+// AddAttributes sets attributes in the span.
+//
+// Existing attributes whose keys appear in the attributes parameter are overwritten.
+func (s *span) AddAttributes(attributes ...Attribute) {
+	if !s.IsRecordingEvents() {
+		return
 	}
-}
-
-func (s *Span) lazyPrintfInternal(attributes []Attribute, format string, a ...interface{}) {
-	now := time.Now()
-	msg := fmt.Sprintf(format, a...)
-	var m map[string]interface{}
 	s.mu.Lock()
-	if len(attributes) != 0 {
-		m = make(map[string]interface{})
-		copyAttributes(m, attributes)
-	}
-	s.data.Annotations = append(s.data.Annotations, Annotation{
-		Time:       now,
-		Message:    msg,
-		Attributes: m,
-	})
+	s.copyToCappedAttributes(attributes)
 	s.mu.Unlock()
 }
 
-func (s *Span) printStringInternal(attributes []Attribute, str string) {
+func (s *span) printStringInternal(attributes []Attribute, str string) {
 	now := time.Now()
-	var a map[string]interface{}
-	s.mu.Lock()
+	var am map[string]interface{}
 	if len(attributes) != 0 {
-		a = make(map[string]interface{})
-		copyAttributes(a, attributes)
+		am = make(map[string]interface{}, len(attributes))
+		for _, attr := range attributes {
+			am[attr.key] = attr.value
+		}
 	}
-	s.data.Annotations = append(s.data.Annotations, Annotation{
+	s.mu.Lock()
+	s.annotations.add(Annotation{
 		Time:       now,
 		Message:    str,
-		Attributes: a,
+		Attributes: am,
 	})
 	s.mu.Unlock()
 }
 
 // Annotate adds an annotation with attributes.
 // Attributes can be nil.
-func (s *Span) Annotate(attributes []Attribute, str string) {
+func (s *span) Annotate(attributes []Attribute, str string) {
 	if !s.IsRecordingEvents() {
 		return
 	}
@@ -376,11 +447,11 @@ func (s *Span) Annotate(attributes []Attribute, str string) {
 }
 
 // Annotatef adds an annotation with attributes.
-func (s *Span) Annotatef(attributes []Attribute, format string, a ...interface{}) {
+func (s *span) Annotatef(attributes []Attribute, format string, a ...interface{}) {
 	if !s.IsRecordingEvents() {
 		return
 	}
-	s.lazyPrintfInternal(attributes, format, a...)
+	s.printStringInternal(attributes, fmt.Sprintf(format, a...))
 }
 
 // AddMessageSendEvent adds a message send event to the span.
@@ -389,13 +460,13 @@ func (s *Span) Annotatef(attributes []Attribute, format string, a ...interface{}
 // unique in this span and the same between the send event and the receive
 // event (this allows to identify a message between the sender and receiver).
 // For example, this could be a sequence id.
-func (s *Span) AddMessageSendEvent(messageID, uncompressedByteSize, compressedByteSize int64) {
+func (s *span) AddMessageSendEvent(messageID, uncompressedByteSize, compressedByteSize int64) {
 	if !s.IsRecordingEvents() {
 		return
 	}
 	now := time.Now()
 	s.mu.Lock()
-	s.data.MessageEvents = append(s.data.MessageEvents, MessageEvent{
+	s.messageEvents.add(MessageEvent{
 		Time:                 now,
 		EventType:            MessageEventTypeSent,
 		MessageID:            messageID,
@@ -411,13 +482,13 @@ func (s *Span) AddMessageSendEvent(messageID, uncompressedByteSize, compressedBy
 // unique in this span and the same between the send event and the receive
 // event (this allows to identify a message between the sender and receiver).
 // For example, this could be a sequence id.
-func (s *Span) AddMessageReceiveEvent(messageID, uncompressedByteSize, compressedByteSize int64) {
+func (s *span) AddMessageReceiveEvent(messageID, uncompressedByteSize, compressedByteSize int64) {
 	if !s.IsRecordingEvents() {
 		return
 	}
 	now := time.Now()
 	s.mu.Lock()
-	s.data.MessageEvents = append(s.data.MessageEvents, MessageEvent{
+	s.messageEvents.add(MessageEvent{
 		Time:                 now,
 		EventType:            MessageEventTypeRecv,
 		MessageID:            messageID,
@@ -428,16 +499,16 @@ func (s *Span) AddMessageReceiveEvent(messageID, uncompressedByteSize, compresse
 }
 
 // AddLink adds a link to the span.
-func (s *Span) AddLink(l Link) {
+func (s *span) AddLink(l Link) {
 	if !s.IsRecordingEvents() {
 		return
 	}
 	s.mu.Lock()
-	s.data.Links = append(s.data.Links, l)
+	s.links.add(l)
 	s.mu.Unlock()
 }
 
-func (s *Span) String() string {
+func (s *span) String() string {
 	if s == nil {
 		return "<nil>"
 	}
@@ -453,20 +524,13 @@ func (s *Span) String() string {
 var config atomic.Value // access atomically
 
 func init() {
-	gen := &defaultIDGenerator{}
-	// initialize traceID and spanID generators.
-	var rngSeed int64
-	for _, p := range []interface{}{
-		&rngSeed, &gen.traceIDAdd, &gen.nextSpanID, &gen.spanIDInc,
-	} {
-		binary.Read(crand.Reader, binary.LittleEndian, p)
-	}
-	gen.traceIDRand = rand.New(rand.NewSource(rngSeed))
-	gen.spanIDInc |= 1
-
 	config.Store(&Config{
-		DefaultSampler: ProbabilitySampler(defaultSamplingProbability),
-		IDGenerator:    gen,
+		DefaultSampler:             ProbabilitySampler(defaultSamplingProbability),
+		IDGenerator:                &defaultIDGenerator{},
+		MaxAttributesPerSpan:       DefaultMaxAttributesPerSpan,
+		MaxAnnotationEventsPerSpan: DefaultMaxAnnotationEventsPerSpan,
+		MaxMessageEventsPerSpan:    DefaultMaxMessageEventsPerSpan,
+		MaxLinksPerSpan:            DefaultMaxLinksPerSpan,
 	})
 }
 
@@ -486,6 +550,24 @@ type defaultIDGenerator struct {
 
 	traceIDAdd  [2]uint64
 	traceIDRand *rand.Rand
+
+	initOnce sync.Once
+}
+
+// init initializes the generator on the first call to avoid consuming entropy
+// unnecessarily.
+func (gen *defaultIDGenerator) init() {
+	gen.initOnce.Do(func() {
+		// initialize traceID and spanID generators.
+		var rngSeed int64
+		for _, p := range []interface{}{
+			&rngSeed, &gen.traceIDAdd, &gen.nextSpanID, &gen.spanIDInc,
+		} {
+			binary.Read(crand.Reader, binary.LittleEndian, p)
+		}
+		gen.traceIDRand = rand.New(rand.NewSource(rngSeed))
+		gen.spanIDInc |= 1
+	})
 }
 
 // NewSpanID returns a non-zero span ID from a randomly-chosen sequence.

@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/grafana/metrictank/idx"
+	"github.com/grafana/metrictank/pkg/idx"
 )
 
 //go:generate msgp

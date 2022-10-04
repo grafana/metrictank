@@ -3,9 +3,9 @@ package pointslicepool
 import (
 	"sync"
 
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/stats"
+	"github.com/grafana/metrictank/pkg/util"
 )
 
 type PointSlicePool struct {

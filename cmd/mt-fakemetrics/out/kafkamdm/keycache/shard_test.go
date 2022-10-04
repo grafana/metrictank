@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func GetKey(suffix int) schema.Key {

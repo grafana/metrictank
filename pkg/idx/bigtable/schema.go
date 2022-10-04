@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigtable"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // FormatRowKey formats an MKey and partition into a rowKey

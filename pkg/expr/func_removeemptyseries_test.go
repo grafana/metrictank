@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 func TestRemoveEmptySeriesIfAtLeastOneNonNull(t *testing.T) {

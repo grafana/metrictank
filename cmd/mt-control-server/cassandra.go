@@ -8,7 +8,7 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/cassandra"
+	"github.com/grafana/metrictank/pkg/cassandra"
 )
 
 // CliConfig is a cassandra IdxConfig. It is instantiated with default values which can then be changed.

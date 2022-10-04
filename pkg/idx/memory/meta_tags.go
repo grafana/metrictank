@@ -10,11 +10,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/grafana/metrictank/errors"
-	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/errors"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/stats"
 	log "github.com/sirupsen/logrus"
 )
 

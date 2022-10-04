@@ -1,8 +1,8 @@
 package archives
 
 import (
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/mdata"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/mdata"
 )
 
 // Archive is like conf.Retention except:

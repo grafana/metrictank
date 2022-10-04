@@ -3,9 +3,9 @@ package mdata
 import (
 	"context"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 
-	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 

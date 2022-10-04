@@ -1,6 +1,6 @@
 package expr
 
-import "github.com/grafana/metrictank/api/models"
+import "github.com/grafana/metrictank/pkg/api/models"
 
 type FuncSmartSummarize struct {
 	in          GraphiteFunc

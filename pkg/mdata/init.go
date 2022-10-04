@@ -8,8 +8,8 @@ import (
 	"io/ioutil"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/stats"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"

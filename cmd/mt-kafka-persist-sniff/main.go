@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/mdata/notifierKafka"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/logger"
+	"github.com/grafana/metrictank/pkg/mdata/notifierKafka"
+	"github.com/grafana/metrictank/pkg/stats"
 	log "github.com/sirupsen/logrus"
 )
 

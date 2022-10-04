@@ -10,15 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 
 	"github.com/gocql/gocql"
-	"github.com/grafana/metrictank/cassandra"
-	cassUtils "github.com/grafana/metrictank/cassandra"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/cassandra"
+	cassUtils "github.com/grafana/metrictank/pkg/cassandra"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/stats"
+	"github.com/grafana/metrictank/pkg/util"
 	hostpool "github.com/hailocab/go-hostpool"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
@@ -236,11 +236,11 @@ func NewCassandraStore(config *StoreConfig, ttls []uint32, schemaMaxChunkSpan ui
 // FindExistingTables set's the store's table definitions to what it can find
 // in the database.
 // WARNING:
-// * does not set the windowSize property, because we don't know what the windowFactor was
-//   we could actually figure it based on the table definition, assuming the schema isn't tampered with,
-//   but there is no use case for this so we haven't implemented this.
-// * each table covers a range of TTL's. we set the TTL to the lower limit
-//   so remember the TTL might have been up to twice as much
+//   - does not set the windowSize property, because we don't know what the windowFactor was
+//     we could actually figure it based on the table definition, assuming the schema isn't tampered with,
+//     but there is no use case for this so we haven't implemented this.
+//   - each table covers a range of TTL's. we set the TTL to the lower limit
+//     so remember the TTL might have been up to twice as much
 func (c *CassandraStore) FindExistingTables(keyspace string) error {
 
 	session := c.Session.CurrentSession()

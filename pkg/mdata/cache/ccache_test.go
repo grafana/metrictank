@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/test"
 )
 
 // getItgen returns an IterGen which holds a chunk which has directly encoded all values

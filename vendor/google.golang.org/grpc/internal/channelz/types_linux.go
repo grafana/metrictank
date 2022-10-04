@@ -1,5 +1,3 @@
-// +build !appengine,go1.7
-
 /*
  *
  * Copyright 2018 gRPC authors.

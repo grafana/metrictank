@@ -4,9 +4,9 @@ import (
 	"math"
 	"sort"
 
-	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/pkg/consolidation"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 type FuncSortBy struct {

@@ -73,7 +73,7 @@ func (o *Object) Uint64() uint64 { return o.object.Uint64() }
 // Float returns the object converted to float64 according to JavaScript type conversions (parseFloat).
 func (o *Object) Float() float64 { return o.object.Float() }
 
-// Interface returns the object converted to interface{}. See GopherJS' README for details.
+// Interface returns the object converted to interface{}. See table in package comment for details.
 func (o *Object) Interface() interface{} { return o.object.Interface() }
 
 // Unsafe returns the object as an uintptr, which can be converted via unsafe.Pointer. Not intended for public use.
@@ -112,8 +112,8 @@ func InternalObject(i interface{}) *Object {
 }
 
 // MakeFunc wraps a function and gives access to the values of JavaScript's "this" and "arguments" keywords.
-func MakeFunc(func(this *Object, arguments []*Object) interface{}) *Object {
-	return nil
+func MakeFunc(fn func(this *Object, arguments []*Object) interface{}) *Object {
+	return Global.Call("$makeFunc", InternalObject(fn))
 }
 
 // Keys returns the keys of the given JavaScript object.

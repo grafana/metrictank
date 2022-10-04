@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/grafana/metrictank/mdata/chunk/tsz/testdata"
+	"github.com/grafana/metrictank/pkg/mdata/chunk/tsz/testdata"
 )
 
 func Fuzz(data []byte) int {

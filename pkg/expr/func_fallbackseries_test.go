@@ -3,7 +3,7 @@ package expr
 import (
 	"testing"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 func TestFallbackSeriesNo(t *testing.T) {

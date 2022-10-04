@@ -7,7 +7,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	jump "github.com/dgryski/go-jump"
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/util"
 )
 
 type PartitionByMethod uint8

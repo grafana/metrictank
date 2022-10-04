@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type rule struct {

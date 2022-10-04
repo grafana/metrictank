@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/api/middleware"
-	"github.com/grafana/metrictank/api/tz"
-	"github.com/grafana/metrictank/expr"
+	"github.com/grafana/metrictank/pkg/api/middleware"
+	"github.com/grafana/metrictank/pkg/api/tz"
+	"github.com/grafana/metrictank/pkg/expr"
 	log "github.com/sirupsen/logrus"
 )
 

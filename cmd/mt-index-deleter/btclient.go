@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigtable"
-	btUtils "github.com/grafana/metrictank/bigtable"
+	btUtils "github.com/grafana/metrictank/pkg/bigtable"
 )
 
 const COLUMN_FAMILY = "idx"

@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	cassUtils "github.com/grafana/metrictank/cassandra"
-	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/idx/metatags"
-	"github.com/grafana/metrictank/util"
+	cassUtils "github.com/grafana/metrictank/pkg/cassandra"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/idx/metatags"
+	"github.com/grafana/metrictank/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -5,8 +5,8 @@ package chunk
 import (
 	"fmt"
 
-	"github.com/grafana/metrictank/mdata/chunk/tsz"
-	"github.com/grafana/metrictank/mdata/errors"
+	"github.com/grafana/metrictank/pkg/mdata/chunk/tsz"
+	"github.com/grafana/metrictank/pkg/mdata/errors"
 )
 
 // Chunk is a chunk of data. not concurrency safe.

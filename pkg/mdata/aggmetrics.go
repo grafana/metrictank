@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/mdata/cache"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/mdata/cache"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
 	log "github.com/sirupsen/logrus"
 )
 

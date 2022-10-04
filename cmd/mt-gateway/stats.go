@@ -8,23 +8,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/stats"
 )
 
-//http.ResponseWriter that saves the status code and body size
+// http.ResponseWriter that saves the status code and body size
 type responseRecorder struct {
 	http.ResponseWriter
 	status int
 	size   int
 }
 
-//delegate to the main response writer, but save the code
+// delegate to the main response writer, but save the code
 func (rec *responseRecorder) WriteHeader(code int) {
 	rec.status = code
 	rec.ResponseWriter.WriteHeader(code)
 }
 
-//delegate to the main response writer, but record the number of bytes written
+// delegate to the main response writer, but record the number of bytes written
 func (rec *responseRecorder) Write(data []byte) (int, error) {
 	size, err := rec.ResponseWriter.Write(data)
 	rec.size += size
@@ -77,7 +77,7 @@ func (r *requestStats) PathSize(path string, size int) {
 	p.Value(size)
 }
 
-//convert the request path to a metrics-safe slug
+// convert the request path to a metrics-safe slug
 func pathSlug(p string) string {
 	slug := strings.TrimPrefix(path.Clean(p), "/")
 	if slug == "" {

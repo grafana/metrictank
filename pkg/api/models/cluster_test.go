@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // TestGetDataRespV0V1Compat tests that GetDataRespV0 and GetDataRespV1 can be used interchangeably

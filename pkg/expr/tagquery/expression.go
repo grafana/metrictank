@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type InvalidExpressionError string
@@ -24,10 +24,10 @@ func (i InvalidExpressionError) HTTPStatusCode() int {
 
 type Expressions []Expression
 
-//ParseExpressions parses a list of graphite tag expressions (as used by the `seriesByTag` function).
-//tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
-//seriesBytTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
-//Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
+// ParseExpressions parses a list of graphite tag expressions (as used by the `seriesByTag` function).
+// tag expression definitions: https://graphite.readthedocs.io/en/latest/tags.html#querying
+// seriesBytTag documentation: https://graphite.readthedocs.io/en/latest/functions.html#graphite.render.functions.seriesByTag
+// Some possible tag expressions are: "status=200", "path!=/", "name=~cpu\..*" (`name` is  a special tag which is automatically applied to the metric name).
 func ParseExpressions(expressions []string) (Expressions, error) {
 	res := make(Expressions, len(expressions))
 	for i := range expressions {
@@ -466,7 +466,7 @@ func (o ExpressionOperator) StringIntoWriter(writer io.Writer) {
 
 const seriesByTagIdent = "seriesByTag("
 
-//IsSeriesByTag returns true if the given query is a `seriesByTag` query
+// IsSeriesByTag returns true if the given query is a `seriesByTag` query
 func IsSeriesByTagExpression(query string) bool {
 	return strings.HasPrefix(query, seriesByTagIdent) && query[len(query)-1:] == ")"
 }

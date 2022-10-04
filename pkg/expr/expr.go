@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/pkg/errors"
 )
 
 //go:generate stringer -type=exprType

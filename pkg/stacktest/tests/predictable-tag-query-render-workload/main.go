@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/stacktest/graphite"
+	"github.com/grafana/metrictank/pkg/logger"
+	"github.com/grafana/metrictank/pkg/stacktest/graphite"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -3,8 +3,8 @@ package expr
 import (
 	"fmt"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type FuncOffset struct {

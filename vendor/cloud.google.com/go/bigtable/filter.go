@@ -144,6 +144,18 @@ func (lnf latestNFilter) proto() *btpb.RowFilter {
 	return &btpb.RowFilter{Filter: &btpb.RowFilter_CellsPerColumnLimitFilter{CellsPerColumnLimitFilter: int32(lnf)}}
 }
 
+// LabelFilter returns a filter that applies the
+// given label to all cells in the output row.
+func LabelFilter(label string) Filter { return labelFilter(label) }
+
+type labelFilter string
+
+func (lf labelFilter) String() string { return fmt.Sprintf("apply_label(%s)", string(lf)) }
+
+func (lf labelFilter) proto() *btpb.RowFilter {
+	return &btpb.RowFilter{Filter: &btpb.RowFilter_ApplyLabelTransformer{ApplyLabelTransformer: string(lf)}}
+}
+
 // StripValueFilter returns a filter that replaces each value with the empty string.
 func StripValueFilter() Filter { return stripValueFilter{} }
 
@@ -314,7 +326,7 @@ func (clf cellsPerRowLimitFilter) proto() *btpb.RowFilter {
 	return &btpb.RowFilter{Filter: &btpb.RowFilter_CellsPerRowLimitFilter{CellsPerRowLimitFilter: int32(clf)}}
 }
 
-// RowSampleFilter returns a filter that returns each row with a probability of P (must be in the interval (0, 1)).
+// RowSampleFilter returns a filter that matches a row with a probability of p (must be in the interval (0, 1)).
 func RowSampleFilter(p float64) Filter {
 	return rowSampleFilter(p)
 }
@@ -327,4 +339,26 @@ func (rsf rowSampleFilter) String() string {
 
 func (rsf rowSampleFilter) proto() *btpb.RowFilter {
 	return &btpb.RowFilter{Filter: &btpb.RowFilter_RowSampleFilter{RowSampleFilter: float64(rsf)}}
+}
+
+// PassAllFilter returns a filter that matches everything.
+func PassAllFilter() Filter { return passAllFilter{} }
+
+type passAllFilter struct{}
+
+func (paf passAllFilter) String() string { return "passAllFilter()" }
+
+func (paf passAllFilter) proto() *btpb.RowFilter {
+	return &btpb.RowFilter{Filter: &btpb.RowFilter_PassAllFilter{PassAllFilter: true}}
+}
+
+// BlockAllFilter returns a filter that matches nothing.
+func BlockAllFilter() Filter { return blockAllFilter{} }
+
+type blockAllFilter struct{}
+
+func (baf blockAllFilter) String() string { return "blockAllFilter()" }
+
+func (baf blockAllFilter) proto() *btpb.RowFilter {
+	return &btpb.RowFilter{Filter: &btpb.RowFilter_BlockAllFilter{BlockAllFilter: true}}
 }

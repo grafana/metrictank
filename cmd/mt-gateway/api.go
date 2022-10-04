@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/stats"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
-	"github.com/grafana/metrictank/publish"
-	"github.com/grafana/metrictank/publish/kafka"
+	"github.com/grafana/metrictank/pkg/publish"
+	"github.com/grafana/metrictank/pkg/publish/kafka"
 	log "github.com/sirupsen/logrus"
 )
 
-//Maintains a set of `http.Handlers` for the different API endpoints.
-//Used to generate an http.ServeMux via `api.Mux()`
+// Maintains a set of `http.Handlers` for the different API endpoints.
+// Used to generate an http.ServeMux via `api.Mux()`
 type Api struct {
 	ingestHandler     http.Handler
 	metrictankHandler http.Handler
@@ -24,7 +24,7 @@ type Api struct {
 	bulkImportHandler http.Handler
 }
 
-//Constructs a new Api based on the passed in URLS
+// Constructs a new Api based on the passed in URLS
 func NewApi(urls Urls) Api {
 	api := Api{}
 	api.ingestHandler = withMiddleware("ingest", ingestHandler(urls))
@@ -49,7 +49,7 @@ func ingestHandler(urls Urls) http.Handler {
 
 }
 
-//Returns a proxy to the bulk importer if one is configured, otherwise a handler that always returns a 503
+// Returns a proxy to the bulk importer if one is configured, otherwise a handler that always returns a 503
 func bulkImportHandler(urls Urls) http.Handler {
 	if urls.bulkImporter.String() != "" {
 		log.WithField("url", urls.bulkImporter.String()).Info("bulk importer configured")
@@ -62,7 +62,7 @@ func bulkImportHandler(urls Urls) http.Handler {
 	})
 }
 
-//Builds an http.ServeMux based on the handlers defined in the Api
+// Builds an http.ServeMux based on the handlers defined in the Api
 func (api Api) Mux() *http.ServeMux {
 	mux := http.NewServeMux()
 	//By default everything is proxied to graphite
@@ -78,12 +78,12 @@ func (api Api) Mux() *http.ServeMux {
 	return mux
 }
 
-//Add logging and default orgId middleware to the http handler
+// Add logging and default orgId middleware to the http handler
 func withMiddleware(svc string, base http.Handler) http.Handler {
 	return defaultOrgIdMiddleware(statsMiddleware(loggingMiddleware(svc, base)))
 }
 
-//add request metrics to the given handler
+// add request metrics to the given handler
 func statsMiddleware(base http.Handler) http.Handler {
 	stats := requestStats{
 		responseCounts:    make(map[string]map[int]*stats.CounterRate32),
@@ -105,7 +105,7 @@ func statsMiddleware(base http.Handler) http.Handler {
 	})
 }
 
-//add request logging to the given handler
+// add request logging to the given handler
 func loggingMiddleware(svc string, base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		recorder := responseRecorder{w, -1, 0}
@@ -117,7 +117,7 @@ func loggingMiddleware(svc string, base http.Handler) http.Handler {
 	})
 }
 
-//Set the `X-Org-Id` header to the default if there is not one present
+// Set the `X-Org-Id` header to the default if there is not one present
 func defaultOrgIdMiddleware(base http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Org-Id") == "" && *defaultOrgId != -1 {

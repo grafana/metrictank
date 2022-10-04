@@ -1,6 +1,6 @@
 package memory
 
-import "github.com/grafana/metrictank/stats"
+import "github.com/grafana/metrictank/pkg/stats"
 
 var (
 	// metric recovered_errors.idx.memory.corrupt-index is how many times

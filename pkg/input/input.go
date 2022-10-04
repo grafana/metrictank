@@ -9,11 +9,11 @@ import (
 	"strconv"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/schema/msg"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/schema/msg"
+	"github.com/grafana/metrictank/pkg/stats"
 	log "github.com/sirupsen/logrus"
 )
 

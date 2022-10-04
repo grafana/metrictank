@@ -8,12 +8,12 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/stacktest/docker"
-	"github.com/grafana/metrictank/stacktest/fakemetrics"
-	"github.com/grafana/metrictank/stacktest/grafana"
-	"github.com/grafana/metrictank/stacktest/graphite"
-	"github.com/grafana/metrictank/stacktest/track"
+	"github.com/grafana/metrictank/pkg/logger"
+	"github.com/grafana/metrictank/pkg/stacktest/docker"
+	"github.com/grafana/metrictank/pkg/stacktest/fakemetrics"
+	"github.com/grafana/metrictank/pkg/stacktest/grafana"
+	"github.com/grafana/metrictank/pkg/stacktest/graphite"
+	"github.com/grafana/metrictank/pkg/stacktest/track"
 	log "github.com/sirupsen/logrus"
 )
 

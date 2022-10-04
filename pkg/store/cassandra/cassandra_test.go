@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/pkg/logger"
 	log "github.com/sirupsen/logrus"
 )
 

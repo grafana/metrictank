@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/kisielk/whisper-go/whisper"
 )
 

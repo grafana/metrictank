@@ -8,15 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/response"
-	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/mdata/cache"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/api/response"
+	"github.com/grafana/metrictank/pkg/cluster"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/idx/memory"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/mdata/cache"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/test"
 )
 
 func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {

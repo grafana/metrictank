@@ -3,8 +3,8 @@ package memory
 import (
 	"sync"
 
-	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // idSelector looks up ids from the metric & meta tag index according to

@@ -2,8 +2,8 @@ package api
 
 import (
 	"github.com/go-macaron/binding"
-	"github.com/grafana/metrictank/api/middleware"
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/middleware"
+	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/raintank/gziper"
 	"gopkg.in/macaron.v1"

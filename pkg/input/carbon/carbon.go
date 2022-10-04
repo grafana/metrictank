@@ -12,10 +12,10 @@ import (
 	"sync"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/input"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/cluster"
+	"github.com/grafana/metrictank/pkg/input"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/stats"
 	"github.com/metrics20/go-metrics20/carbon20"
 	log "github.com/sirupsen/logrus"
 )

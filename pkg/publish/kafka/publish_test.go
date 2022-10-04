@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/Shopify/sarama/mocks"
-	"github.com/grafana/metrictank/cluster/partitioner"
-	"github.com/grafana/metrictank/publish/kafka/keycache"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/cluster/partitioner"
+	"github.com/grafana/metrictank/pkg/publish/kafka/keycache"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/util"
 )
 
 func Test_parseTopicSettings(t *testing.T) {

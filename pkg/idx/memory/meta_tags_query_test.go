@@ -6,9 +6,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func getTestIndexWithMetaTags(t testing.TB, metaRecords []tagquery.MetaTagRecord, count uint32, tagGen func(int) []string) (*UnpartitionedMemoryIdx, []schema.MKey) {

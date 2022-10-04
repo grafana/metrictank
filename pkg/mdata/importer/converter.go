@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/kisielk/whisper-go/whisper"
 )
 

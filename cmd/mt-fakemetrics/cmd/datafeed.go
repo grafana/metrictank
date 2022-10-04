@@ -5,11 +5,11 @@ import (
 	"math"
 	"time"
 
-	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/clock"
+	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

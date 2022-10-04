@@ -5,9 +5,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/grafana/metrictank/mdata/cache/accnt"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/mdata/cache/accnt"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 )

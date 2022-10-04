@@ -8,8 +8,8 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/grafana/metrictank/stacktest/track"
-	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/pkg/stacktest/track"
+	"github.com/grafana/metrictank/pkg/test"
 )
 
 var cli *client.Client

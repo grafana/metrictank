@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/mdata/cache"
-	"github.com/grafana/metrictank/schema"
-	backendStore "github.com/grafana/metrictank/store"
+	"github.com/grafana/metrictank/pkg/cluster"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/idx/memory"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/mdata/cache"
+	"github.com/grafana/metrictank/pkg/schema"
+	backendStore "github.com/grafana/metrictank/pkg/store"
 )
 
 func TestIngestValidAndInvalidTagsAndValuesWithAndWithoutRejection(t *testing.T) {

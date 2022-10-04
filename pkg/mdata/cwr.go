@@ -3,7 +3,7 @@ package mdata
 import (
 	"time"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 //go:generate msgp

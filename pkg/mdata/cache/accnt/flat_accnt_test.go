@@ -3,9 +3,9 @@ package accnt
 import (
 	"testing"
 
-	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/pkg/test"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func resetCounters() {

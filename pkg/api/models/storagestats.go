@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/grafana/metrictank/mdata/cache"
+	"github.com/grafana/metrictank/pkg/mdata/cache"
 	opentracing "github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 )

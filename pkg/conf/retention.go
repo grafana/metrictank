@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 
-	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
 	"github.com/raintank/dur"
 )
 
@@ -80,10 +80,10 @@ func (r Retentions) Validate() error {
 }
 
 /*
-  A retention level.
+A retention level.
 
-  Retention levels describe a given archive in the database. How detailed it is and how far back
-  it records.
+Retention levels describe a given archive in the database. How detailed it is and how far back
+it records.
 */
 type Retention struct {
 	SecondsPerPoint int    // interval in seconds

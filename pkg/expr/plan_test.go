@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/consolidation"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/consolidation"
 )
 
 // TestArgs tests that after planning the given args against smartSummarize, the right error or requests come out

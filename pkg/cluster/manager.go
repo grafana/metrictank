@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/stats"
 	"github.com/hashicorp/memberlist"
 	log "github.com/sirupsen/logrus"
 )

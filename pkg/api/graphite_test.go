@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/cluster"
+	"github.com/grafana/metrictank/pkg/cluster"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/tz"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/api/tz"
 )
 
 func TestServer_renderMetrics_unknownFunctionError(t *testing.T) {

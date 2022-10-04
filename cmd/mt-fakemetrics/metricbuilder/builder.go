@@ -6,7 +6,6 @@
 // |  >1 |                          Yes | use directive to print the number |
 // |   1 |                           No |               don't use directive |
 // |  >1 |                           No |               invalid: will panic |
-//
 package metricbuilder
 
 import (
@@ -14,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type Builder interface {

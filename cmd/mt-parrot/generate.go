@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/clock"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/clock"
+	"github.com/grafana/metrictank/pkg/schema"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
 )
@@ -20,7 +20,7 @@ func produceTestMetrics(metrics []*schema.MetricData) {
 	}
 }
 
-//generateMetrics generates a MetricData that hashes to each of numPartitions partitions
+// generateMetrics generates a MetricData that hashes to each of numPartitions partitions
 func generateMetrics(numPartitions int32) []*schema.MetricData {
 	var metrics []*schema.MetricData
 	for i := int32(0); i < numPartitions; i++ {
@@ -29,7 +29,7 @@ func generateMetrics(numPartitions int32) []*schema.MetricData {
 	return metrics
 }
 
-//generateMetric generates a single MetricData that hashes to the given partition
+// generateMetric generates a single MetricData that hashes to the given partition
 func generateMetric(desiredPartition int32) *schema.MetricData {
 	metric := schema.MetricData{
 		OrgId:    orgId,
@@ -54,7 +54,7 @@ func generateMetric(desiredPartition int32) *schema.MetricData {
 
 var alphabet = []rune("abcdefghijklmnopqrstuvwxyz")
 
-//generatePartitionSuffix deterministically generates a suffix for partition by brute force
+// generatePartitionSuffix deterministically generates a suffix for partition by brute force
 func generatePartitionSuffix(i int) string {
 	if i > 25 {
 		return generatePartitionSuffix((i/26)-1) + string(alphabet[i%26])

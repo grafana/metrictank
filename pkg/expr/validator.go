@@ -3,8 +3,8 @@ package expr
 import (
 	"math"
 
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/errors"
 	"github.com/raintank/dur"
 )
 

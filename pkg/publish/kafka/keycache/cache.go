@@ -1,6 +1,6 @@
 package keycache
 
-import schema "github.com/grafana/metrictank/schema"
+import schema "github.com/grafana/metrictank/pkg/schema"
 
 // Cache is a single-tenant keycache
 // it is sharded for 2 reasons:

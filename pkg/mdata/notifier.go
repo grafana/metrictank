@@ -3,11 +3,11 @@ package mdata
 import (
 	"encoding/json"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/stats"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,7 +22,7 @@ type Notifier interface {
 	Send(SavedChunk)
 }
 
-//PersistMessage format version
+// PersistMessage format version
 const PersistMessageBatchV1 = 1
 
 type PersistMessageBatch struct {

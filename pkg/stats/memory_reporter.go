@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/util"
 )
 
 // MemoryReporter sources memory stats from the runtime and reports them

@@ -1,6 +1,6 @@
 package accnt
 
-import "github.com/grafana/metrictank/stats"
+import "github.com/grafana/metrictank/pkg/stats"
 
 var (
 

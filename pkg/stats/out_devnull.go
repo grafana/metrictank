@@ -3,7 +3,7 @@ package stats
 import (
 	"time"
 
-	"github.com/grafana/metrictank/clock"
+	"github.com/grafana/metrictank/pkg/clock"
 )
 
 func NewDevnull() {

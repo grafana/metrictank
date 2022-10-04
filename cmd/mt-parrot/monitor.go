@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	"github.com/grafana/metrictank/clock"
-	"github.com/grafana/metrictank/stacktest/graphite"
-	"github.com/grafana/metrictank/stats"
-	"github.com/grafana/metrictank/util/align"
+	"github.com/grafana/metrictank/pkg/clock"
+	"github.com/grafana/metrictank/pkg/stacktest/graphite"
+	"github.com/grafana/metrictank/pkg/stats"
+	"github.com/grafana/metrictank/pkg/util/align"
 	log "github.com/sirupsen/logrus"
 )
 

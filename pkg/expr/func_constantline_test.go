@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/test"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/test"
 )
 
 type ConstantLineTestCase struct {

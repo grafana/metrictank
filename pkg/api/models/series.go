@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/util/align"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/util/align"
 	pickle "github.com/kisielk/og-rek"
 )
 

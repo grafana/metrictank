@@ -10,8 +10,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/grafana/metrictank/api/response"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/api/response"
+	"github.com/grafana/metrictank/pkg/stats"
 )
 
 var proxyStats graphiteProxyStats

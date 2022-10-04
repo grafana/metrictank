@@ -1,8 +1,8 @@
 package mdata
 
 import (
-	"github.com/grafana/metrictank/mdata/chunk/tsz"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/mdata/chunk/tsz"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type Result struct {

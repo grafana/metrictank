@@ -6,6 +6,8 @@ package multierror
 // If err is not a multierror.Error, then it will be turned into
 // one. If any of the errs are multierr.Error, they will be flattened
 // one level into err.
+// Any nil errors within errs will be ignored. If err is nil, a new
+// *Error will be returned.
 func Append(err error, errs ...error) *Error {
 	switch err := err.(type) {
 	case *Error:
@@ -18,9 +20,13 @@ func Append(err error, errs ...error) *Error {
 		for _, e := range errs {
 			switch e := e.(type) {
 			case *Error:
-				err.Errors = append(err.Errors, e.Errors...)
+				if e != nil {
+					err.Errors = append(err.Errors, e.Errors...)
+				}
 			default:
-				err.Errors = append(err.Errors, e)
+				if e != nil {
+					err.Errors = append(err.Errors, e)
+				}
 			}
 		}
 

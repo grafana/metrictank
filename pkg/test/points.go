@@ -5,7 +5,7 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // these serve as a "cache" of clean point slices - grouped by size -

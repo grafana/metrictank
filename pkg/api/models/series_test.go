@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func TestJsonMarshal(t *testing.T) {

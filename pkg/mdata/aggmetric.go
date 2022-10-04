@@ -10,13 +10,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/mdata/chunk"
-	mdataerrors "github.com/grafana/metrictank/mdata/errors"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/cluster"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	mdataerrors "github.com/grafana/metrictank/pkg/mdata/errors"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -627,12 +627,12 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 // collectable returns whether the AggMetric is garbage collectable
 // an Aggmetric is collectable based on two conditions:
-// * the AggMetric hasn't been written to in a configurable amount of time
-//   (wether the write went to the ROB or a chunk is irrelevant)
-// * the last chunk - if any - is no longer "active".
-//   active means:
-//   any reasonable realtime stream (e.g. up to 15 min behind wall-clock)
-//   could add points to the chunk
+//   - the AggMetric hasn't been written to in a configurable amount of time
+//     (wether the write went to the ROB or a chunk is irrelevant)
+//   - the last chunk - if any - is no longer "active".
+//     active means:
+//     any reasonable realtime stream (e.g. up to 15 min behind wall-clock)
+//     could add points to the chunk
 //
 // caller must hold lock
 func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {

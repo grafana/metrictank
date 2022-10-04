@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 type FuncAggregate struct {

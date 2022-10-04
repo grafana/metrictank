@@ -4,7 +4,7 @@ package batch
 
 // aggregation functions for batches of data
 import (
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 	"math"
 	"sort"
 )

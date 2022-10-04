@@ -1,9 +1,9 @@
 package mdata
 
 import (
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // AggBoundary returns ts if it is a boundary, or the next boundary otherwise.

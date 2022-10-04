@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/seriescycle"
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/util"
-	"github.com/grafana/metrictank/util/align"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/api/seriescycle"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/util"
+	"github.com/grafana/metrictank/pkg/util/align"
 )
 
 // Normalize normalizes series to the same common LCM interval - if they don't already have the same interval

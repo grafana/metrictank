@@ -3,8 +3,8 @@ package models
 import (
 	"fmt"
 
-	"github.com/grafana/metrictank/cluster"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/cluster"
+	"github.com/grafana/metrictank/pkg/schema"
 	opentracing "github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 )

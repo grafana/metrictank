@@ -8,10 +8,10 @@ import (
 	"sync"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/mdata/cache/accnt"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/stats"
+	"github.com/grafana/metrictank/pkg/mdata/cache/accnt"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/stats"
 	opentracing "github.com/opentracing/opentracing-go"
 	log "github.com/sirupsen/logrus"
 )

@@ -3,9 +3,9 @@ package expr
 import (
 	"math"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/pkg/errors"
 )
 
 type FuncFilterSeries struct {

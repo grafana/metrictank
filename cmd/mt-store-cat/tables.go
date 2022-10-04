@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/grafana/metrictank/store/cassandra"
+	"github.com/grafana/metrictank/pkg/store/cassandra"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,7 +37,7 @@ func getTables(store *cassandra.CassandraStore, match string) ([]cassandra.Table
 	return tables, nil
 }
 
-//printTables prints all tables in the store
+// printTables prints all tables in the store
 func printTables(store *cassandra.CassandraStore) {
 	tables, err := getTables(store, "")
 	if err != nil {

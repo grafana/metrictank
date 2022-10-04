@@ -6,10 +6,10 @@ import (
 	"math"
 	"os"
 
-	"github.com/grafana/metrictank/api"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/store/cassandra"
+	"github.com/grafana/metrictank/pkg/api"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/pkg/store/cassandra"
 )
 
 // printPoints prints points in the store corresponding to the given requirements

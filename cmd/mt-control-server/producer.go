@@ -6,7 +6,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/kafka"
+	"github.com/grafana/metrictank/pkg/kafka"
 	log "github.com/sirupsen/logrus"
 )
 

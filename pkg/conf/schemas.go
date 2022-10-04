@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/alyu/configparser"
-	"github.com/grafana/metrictank/util"
+	"github.com/grafana/metrictank/pkg/util"
 )
 
 // Schemas contains schema settings
@@ -177,15 +177,16 @@ func ReadSchemas(file string) (Schemas, error) {
 //
 // When evaluating a match we start with the first schema in the index and
 // compare the regex pattern.
-// - If it matches we then just find the retention set with the best fit. The
-//   best fit is when the interval is >= the rawInterval (first retention) and
-//   less then the interval of the next rollup.
-// - If the pattern doesnt match, then we skip ahead to the next pattern.
+//   - If it matches we then just find the retention set with the best fit. The
+//     best fit is when the interval is >= the rawInterval (first retention) and
+//     less then the interval of the next rollup.
+//   - If the pattern doesnt match, then we skip ahead to the next pattern.
 //
 // eg. from the above diagram we would compare the pattern for schema0
-//     (pattern1), if it doesnt match we will then compare the pattern of
-//     schema2 (pattern2) and if that doesnt match we would try schema5
-//     (pattern3).
+//
+//	(pattern1), if it doesnt match we will then compare the pattern of
+//	schema2 (pattern2) and if that doesnt match we would try schema5
+//	(pattern3).
 func (s Schemas) Match(metric string, interval int) (uint16, Schema) {
 	i := 0
 	for i < len(s.index) {

@@ -17,10 +17,10 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/cmd-dev/mt-simulate-memory-idx-lock-contention/runner"
-	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/cmd-dev/mt-simulate-memory-idx-lock-contention/runner"
+	"github.com/grafana/metrictank/pkg/idx/memory"
+	"github.com/grafana/metrictank/pkg/logger"
+	"github.com/grafana/metrictank/pkg/schema"
 	log "github.com/sirupsen/logrus"
 )
 

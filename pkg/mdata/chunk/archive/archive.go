@@ -8,8 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 //go:generate msgp

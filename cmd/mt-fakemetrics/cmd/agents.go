@@ -22,7 +22,7 @@ import (
 
 	"time"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

@@ -5,8 +5,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/grafana/metrictank/mdata/errors"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/mdata/errors"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type prodChunk struct {

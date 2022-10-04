@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
-	btUtils "github.com/grafana/metrictank/bigtable"
-	"github.com/grafana/metrictank/expr/tagquery"
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/idx/metatags"
+	btUtils "github.com/grafana/metrictank/pkg/bigtable"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/idx/metatags"
 	log "github.com/sirupsen/logrus"
 )
 

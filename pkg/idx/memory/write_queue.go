@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/idx"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type WriteQueue struct {

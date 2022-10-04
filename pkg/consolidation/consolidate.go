@@ -3,7 +3,7 @@ package consolidation
 import (
 	"context"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // ConsolidateContext wraps a Consolidate() call with a context.Context condition
@@ -126,29 +126,29 @@ func nudgeMaybe(points []schema.Point, aggNum, interval uint32) int {
 // let's say a series has points A,B,C,D and we must consolidate with numAgg=2.
 // if we wait a step, point E appears into the visible window and A will slide out of the window.
 // there's a few approaches you can take wrt such changes across refreshes:
-// 1) naive old approach:
-//    on first load return consolidate(A,B), consolidate(C,D)
-//    after a step, return consolidate(B,C), consolidate(D,E)
-//    => this looks weird across refreshes:
-//       both the values as well as the timestamps change everywhere, points jump around on the chart
-// 2) graphite-style nudging: trim a few of the first points away as needed, such that the first TS
-//    will be the first one to fill a "full" aggregation bucket. (note: assumes input is quantized!)
-//    on first load return consolidate(A,B), consolidate(C,D)
-//    after a step, return consolidate(C,D), consolidate(E)
-//    => same points are always consolidated together, no jumping around.
-//    => simple to understand, but not the most performant (fetches/processes some points needlessly)
-//    => tends to introduce emptyness in graphs right after the requested start.
-//       (because Grafana plots from requested start, not returned start, and so there will be some empty space
-//       where we trimmed points)
-// 3) similar to 2, but don't trim, rather consolidate the leftovers both on the start and at the end.
-//    on first load return consolidate(A,B), consolidate(C,D)
-//    after a step, return consolidate(B), consolidate(C,D), consolidate(E)
-//    => same points are always consolidated together, no jumping around.
-//    => only datapoint up front and at the end may jump around, but not the vast majority
-//    => no discarding of points
-//    => requires a large code change though, as it makes it harder to honor MaxDataPoints.
-//       e.g. MDP=1, you have 5 points and aggNum is 5, if alignment is improper, it would cause
-//       2 output points, so we would have to rewrite a lot of code, no longer compute AggNum in advance etc
+//  1. naive old approach:
+//     on first load return consolidate(A,B), consolidate(C,D)
+//     after a step, return consolidate(B,C), consolidate(D,E)
+//     => this looks weird across refreshes:
+//     both the values as well as the timestamps change everywhere, points jump around on the chart
+//  2. graphite-style nudging: trim a few of the first points away as needed, such that the first TS
+//     will be the first one to fill a "full" aggregation bucket. (note: assumes input is quantized!)
+//     on first load return consolidate(A,B), consolidate(C,D)
+//     after a step, return consolidate(C,D), consolidate(E)
+//     => same points are always consolidated together, no jumping around.
+//     => simple to understand, but not the most performant (fetches/processes some points needlessly)
+//     => tends to introduce emptyness in graphs right after the requested start.
+//     (because Grafana plots from requested start, not returned start, and so there will be some empty space
+//     where we trimmed points)
+//  3. similar to 2, but don't trim, rather consolidate the leftovers both on the start and at the end.
+//     on first load return consolidate(A,B), consolidate(C,D)
+//     after a step, return consolidate(B), consolidate(C,D), consolidate(E)
+//     => same points are always consolidated together, no jumping around.
+//     => only datapoint up front and at the end may jump around, but not the vast majority
+//     => no discarding of points
+//     => requires a large code change though, as it makes it harder to honor MaxDataPoints.
+//     e.g. MDP=1, you have 5 points and aggNum is 5, if alignment is improper, it would cause
+//     2 output points, so we would have to rewrite a lot of code, no longer compute AggNum in advance etc
 //
 // note that with all 3 approaches, we always consolidate leftovers at the end together, so with any approach
 // the last point may jump around (see Consolidate function)

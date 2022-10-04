@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 func TestAliasZero(t *testing.T) {

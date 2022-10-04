@@ -3,7 +3,7 @@ package expr
 import (
 	"math"
 
-	"github.com/grafana/metrictank/api/models"
+	"github.com/grafana/metrictank/pkg/api/models"
 )
 
 type FuncRemoveEmptySeries struct {

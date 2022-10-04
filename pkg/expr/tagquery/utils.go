@@ -3,7 +3,7 @@ package tagquery
 import (
 	"strings"
 
-	"github.com/grafana/metrictank/errors"
+	"github.com/grafana/metrictank/pkg/errors"
 )
 
 // validateQueryExpressionTagKey validates the key of a tag query expression

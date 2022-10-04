@@ -3,7 +3,7 @@ package importer
 import (
 	"fmt"
 
-	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
 	"github.com/kisielk/whisper-go/whisper"
 )
 

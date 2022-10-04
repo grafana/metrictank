@@ -193,7 +193,7 @@ func (p *BinaryPropagator) Inject(
 	if err := binary.Write(carrier, binary.BigEndian, sc.parentID); err != nil {
 		return err
 	}
-	if err := binary.Write(carrier, binary.BigEndian, sc.flags); err != nil {
+	if err := binary.Write(carrier, binary.BigEndian, sc.samplingState.flags()); err != nil {
 		return err
 	}
 
@@ -215,6 +215,12 @@ func (p *BinaryPropagator) Inject(
 	return nil
 }
 
+// W3C limits https://github.com/w3c/baggage/blob/master/baggage/HTTP_HEADER_FORMAT.md#limits
+const (
+	maxBinaryBaggage      = 180
+	maxBinaryNameValueLen = 4096
+)
+
 // Extract implements Extractor of BinaryPropagator
 func (p *BinaryPropagator) Extract(abstractCarrier interface{}) (SpanContext, error) {
 	carrier, ok := abstractCarrier.(io.Reader)
@@ -222,6 +228,7 @@ func (p *BinaryPropagator) Extract(abstractCarrier interface{}) (SpanContext, er
 		return emptyContext, opentracing.ErrInvalidCarrier
 	}
 	var ctx SpanContext
+	ctx.samplingState = &samplingState{}
 
 	if err := binary.Read(carrier, binary.BigEndian, &ctx.traceID); err != nil {
 		return emptyContext, opentracing.ErrSpanContextCorrupted
@@ -232,13 +239,19 @@ func (p *BinaryPropagator) Extract(abstractCarrier interface{}) (SpanContext, er
 	if err := binary.Read(carrier, binary.BigEndian, &ctx.parentID); err != nil {
 		return emptyContext, opentracing.ErrSpanContextCorrupted
 	}
-	if err := binary.Read(carrier, binary.BigEndian, &ctx.flags); err != nil {
+
+	var flags byte
+	if err := binary.Read(carrier, binary.BigEndian, &flags); err != nil {
 		return emptyContext, opentracing.ErrSpanContextCorrupted
 	}
+	ctx.samplingState.setFlags(flags)
 
 	// Handle the baggage items
 	var numBaggage int32
 	if err := binary.Read(carrier, binary.BigEndian, &numBaggage); err != nil {
+		return emptyContext, opentracing.ErrSpanContextCorrupted
+	}
+	if numBaggage > maxBinaryBaggage {
 		return emptyContext, opentracing.ErrSpanContextCorrupted
 	}
 	if iNumBaggage := int(numBaggage); iNumBaggage > 0 {
@@ -259,6 +272,9 @@ func (p *BinaryPropagator) Extract(abstractCarrier interface{}) (SpanContext, er
 			key := buf.String()
 
 			if err := binary.Read(carrier, binary.BigEndian, &valLen); err != nil {
+				return emptyContext, opentracing.ErrSpanContextCorrupted
+			}
+			if keyLen+valLen > maxBinaryNameValueLen {
 				return emptyContext, opentracing.ErrSpanContextCorrupted
 			}
 			buf.Reset()
@@ -288,7 +304,7 @@ func (p *TextMapPropagator) parseCommaSeparatedMap(value string) map[string]stri
 	for _, kvpair := range strings.Split(value, ",") {
 		kv := strings.Split(strings.TrimSpace(kvpair), "=")
 		if len(kv) == 2 {
-			baggage[kv[0]] = kv[1]
+			baggage[strings.TrimSpace(kv[0])] = kv[1]
 		} else {
 			log.Printf("Malformed value passed in for %s", p.headerKeys.JaegerBaggageHeader)
 		}

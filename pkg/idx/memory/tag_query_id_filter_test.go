@@ -3,9 +3,9 @@ package memory
 import (
 	"testing"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 
-	"github.com/grafana/metrictank/expr/tagquery"
+	"github.com/grafana/metrictank/pkg/expr/tagquery"
 )
 
 func filterAndCompareResults(t *testing.T, expressions tagquery.Expressions, metaRecords []tagquery.MetaTagRecord, expectedMatch, expectedFail []schema.MetricDefinition) {

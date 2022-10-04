@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"github.com/grafana/metrictank/mdata/chunk"
+	"github.com/grafana/metrictank/pkg/mdata/chunk"
 )
 
 type CCacheChunk struct {

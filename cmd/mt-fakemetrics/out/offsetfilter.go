@@ -3,7 +3,7 @@ package out
 import (
 	"errors"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/raintank/dur"
 )
 
