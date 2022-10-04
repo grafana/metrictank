@@ -34,3 +34,4 @@
 build_docker
 build_pkg
 build_tmp
+vendor/
