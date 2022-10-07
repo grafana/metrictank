@@ -10,5 +10,4 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/../..
 go install 'github.com/gordonklaus/ineffassign@master'
 
-export GO111MODULE=off
 ineffassign ./...

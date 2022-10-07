@@ -109,7 +109,7 @@ func (m *MetricDefinition) PartitionID(method PartitionByMethod, partitions int3
 		}
 	case PartitionBySeriesWithTags:
 		h := xxhash.New()
-		h.WriteString(m.NameWithTags())
+		h.Write([]byte(m.NameWithTags()))
 		partition = jump.Hash(h.Sum64(), int(partitions))
 	case PartitionBySeriesWithTagsFnv:
 		h := util.NewFnv32aStringWriter()

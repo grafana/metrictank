@@ -25,7 +25,7 @@ jobs:
       - image: circleci/golang:1.17.3
     steps:
       - checkout
-      - run: GO111MODULE=off go test -v -race --short ./...
+      - run: go test -v -race --short ./...
 
   qa:
     working_directory: /go/src/github.com/grafana/metrictank
@@ -53,8 +53,8 @@ jobs:
       - run: go version
       - run: scripts/qa/docs.sh
       - run: docker load -i build_docker/metrictank.tar
-      - run: GO111MODULE=off go test -v ./stacktest/tests/end2end_carbon
-      - run: GO111MODULE=off go test -v ./stacktest/tests/end2end_carbon_bigtable
+      - run: go test -v ./pkg/stacktest/tests/end2end_carbon
+      - run: go test -v ./pkg/stacktest/tests/end2end_carbon_bigtable
 
   qa-chaos:
     working_directory: /home/circleci/.go_workspace/src/github.com/grafana/metrictank
@@ -75,7 +75,7 @@ jobs:
       - run: docker pull jaegertracing/all-in-one
         # kafka broker advertises itself as 'kafka' but that doesn't resolve. we do have a docker proxy on localhost
       - run: echo "127.0.0.1 kafka" | sudo tee -a /etc/hosts
-      - run: GO111MODULE=off go test -v ./stacktest/tests/chaos_cluster
+      - run: go test -v ./pkg/stacktest/tests/chaos_cluster
 
   deploy:
     docker:

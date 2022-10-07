@@ -643,7 +643,6 @@ func generateChunks(span uint32, start uint32, end uint32) []chunk.Chunk {
 //
 // query:                                |--------|
 // result:                            |-----|-----|
-//
 func TestGetSeriesCachedStore(t *testing.T) {
 	// reduce overhead of creating accounter over and over
 	old := accnt.EventQSize

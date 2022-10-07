@@ -2,19 +2,19 @@
 default:
 	$(MAKE) all
 test:
-	GO111MODULE=off CGO_ENABLED=1 go test -race -short ./...
+	CGO_ENABLED=1 go test -race -short ./...
 test-all:
-	GO111MODULE=off CGO_ENABLED=1 go test -race ./...
+	CGO_ENABLED=1 go test -race ./...
 benchmark:
-	GO111MODULE=off CGO_ENABLED=0 go test -count=10 -run='^$$' -bench=. -benchtime=100ms ./... | tee benchmark.txt
+	CGO_ENABLED=0 go test -count=10 -run='^$$' -bench=. -benchtime=100ms ./... | tee benchmark.txt
 
 stacktest:
 	# count=1 forces uncached runs
 	# not using stacktest/... here because Go would run them all in parallel,
 	# or at least the TestMain's, and the stacks would conflict with each other
-	GO111MODULE=off go test -count=1 -v ./stacktest/tests/chaos_cluster
-	GO111MODULE=off go test -count=1 -v ./stacktest/tests/end2end_carbon
-	GO111MODULE=off go test -count=1 -v ./stacktest/tests/end2end_carbon_bigtable
+	go test -count=1 -v ./pkg/stacktest/tests/chaos_cluster
+	go test -count=1 -v ./pkg/stacktest/tests/end2end_carbon
+	go test -count=1 -v ./pkg/stacktest/tests/end2end_carbon_bigtable
 
 check:
 	$(MAKE) test

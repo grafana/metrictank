@@ -11,10 +11,10 @@ import (
 )
 
 // SeriesLong similar to Series4h, except:
-// * it doesn't write t0 to the stream (for callers that track t0 corresponding to a chunk separately)
-// * it doesn't store an initial delta. instead, it assumes a starting delta of 60 and uses delta-of-delta
-//   encoding from the get-go.
-// * it uses a more compact way to mark end-of-stream
+//   - it doesn't write t0 to the stream (for callers that track t0 corresponding to a chunk separately)
+//   - it doesn't store an initial delta. instead, it assumes a starting delta of 60 and uses delta-of-delta
+//     encoding from the get-go.
+//   - it uses a more compact way to mark end-of-stream
 type SeriesLong struct {
 	// TODO(dgryski): timestamps in the paper are uint64
 	T0  uint32 // exposed for caller convenience. do NOT set directly. set via constructor
