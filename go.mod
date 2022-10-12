@@ -29,7 +29,7 @@ require (
 	github.com/metrics20/go-metrics20 v0.0.0-20171130201432-27c134d83f76
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/opentracing/opentracing-go v1.1.0
-	github.com/pelletier/go-toml v1.9.5
+	github.com/pelletier/go-toml v1.2.0
 	github.com/prometheus/client_golang v1.4.0
 	github.com/prometheus/procfs v0.0.8
 	github.com/raintank/dur v0.0.0-20181019115741-955e3a77c6a8
@@ -46,7 +46,7 @@ require (
 	github.com/tinylib/msgp v1.1.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	github.com/xdg/scram v0.0.1
-	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
 	gopkg.in/macaron.v1 v1.3.4
 )
@@ -125,14 +125,14 @@ require (
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 	golang.org/x/net v0.0.0-20220617184016-355a448f1bc9 // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
-	golang.org/x/sys v0.0.0-20221006211917-84dc82d7e875 // indirect
+	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	google.golang.org/api v0.85.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220725144611-272f38e5d71b // indirect
 	google.golang.org/grpc v1.48.0 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/alexcesaro/statsd.v1 v1.0.0-20160306065229-c289775e46fd // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -141,6 +141,6 @@ require (
 	gopkg.in/jcmturner/dnsutils.v1 v1.0.1 // indirect
 	gopkg.in/jcmturner/gokrb5.v7 v7.5.0 // indirect
 	gopkg.in/jcmturner/rpc.v1 v1.1.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
 )
