@@ -259,6 +259,53 @@ func TestAggMetric(t *testing.T) {
 	//	c.Verify(true, 960, 1559, 1559, 1559)
 }
 
+func TestAggMetricGC(t *testing.T) {
+	cluster.Init("default", "test", time.Now(), "http", 6060)
+
+	ret := conf.MustParseRetentions("1s:10m:2m:2,5m:180d:4h:2,1h:750d:4h:2")
+	aggConf := conf.Aggregation{
+		Name:              "Default",
+		Pattern:           regexp.MustCompile(".*"),
+		XFilesFactor:      0.5,
+		AggregationMethod: []conf.Method{conf.Sum},
+	}
+	agg := NewAggMetric(MockFlusher{mockstore, nil}, test.GetAMKey(42), ret, 0, 1, &aggConf, false, false, 0)
+
+	startTime := uint32(time.Now().Unix())
+	// Add a datapoint for t=startTime
+	agg.Add(startTime, 1)
+
+	// GC right away, shouldn't collect anything
+	points, stale := agg.GC(startTime+1, startTime-10, startTime-50)
+	if points != 0 {
+		t.Fatalf("Expected 0 points, got %d", points)
+	}
+	if stale {
+		t.Fatal("Expected not stale")
+	}
+
+	// Chunk is considered collectable 15 minutes after the span has elapsed
+	// Only "raw" should be GC'd
+	newNow := startTime + 600 + 900 + 1
+	points, stale = agg.GC(newNow, newNow-10, newNow-50)
+	if points != 1 {
+		t.Fatalf("Expected 2 points, got %d", points)
+	}
+	if stale {
+		t.Fatal("Expected not stale")
+	}
+
+	// This call should collect the aggregated points (raw point is also still there but "Finished")
+	newNow = startTime + 4*3600 + 900 + 1
+	points, stale = agg.GC(newNow, newNow-10, newNow-50)
+	if points != 3 {
+		t.Fatalf("Expected 3 points, got %d", points)
+	}
+	if !stale {
+		t.Fatal("Expected stale")
+	}
+}
+
 func TestAggMetricWithReorderBuffer(t *testing.T) {
 	cluster.Init("default", "test", time.Now(), "http", 6060)
 
