@@ -79,21 +79,21 @@ func (gr GraphiteRender) Validate(ctx *macaron.Context, errs binding.Errors) bin
 }
 
 type GraphiteTags struct {
-	tz.FromTo        // Used by GEM to decide what time range to return results for. Not used by upstream Graphite or Metrictank.
+	tz.FromTo        // Used by downstream projects to decide what time range to return results for. Not used by upstream Graphite or Metrictank.
 	Filter    string `json:"filter" form:"filter"`
 }
 
 type GraphiteTagsResp []GraphiteTagResp
 
 type GraphiteAutoCompleteTags struct {
-	tz.FromTo          // Used by GEM to decide what time range to return results for. Not used by upstream Graphite or Metrictank.
+	tz.FromTo          // Used by downstream projects to decide what time range to return results for. Not used by upstream Graphite or Metrictank.
 	Prefix    string   `json:"tagPrefix" form:"tagPrefix"`
 	Expr      []string `json:"expr" form:"expr"`
 	Limit     uint     `json:"limit" form:"limit"`
 }
 
 type GraphiteAutoCompleteTagValues struct {
-	tz.FromTo          // Used by GEM to decide what time range to return results for. Not used by upstream Graphite or Metrictank.
+	tz.FromTo          // Used by downstream projects to decide what time range to return results for. Not used by upstream Graphite or Metrictank.
 	Tag       string   `json:"tag" form:"tag"`
 	Prefix    string   `json:"valuePrefix" form:"valuePrefix"`
 	Expr      []string `json:"expr" form:"expr"`
