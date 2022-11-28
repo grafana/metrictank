@@ -13,6 +13,7 @@ import (
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
+	"gopkg.in/macaron.v1"
 )
 
 //go:generate msgp
