@@ -188,3 +188,7 @@ func updateEnv(setEnv map[string]string, env []string) []string {
 
 	return env
 }
+
+func IsDockerCompose() bool {
+	return (docker == "docker-compose")
+}

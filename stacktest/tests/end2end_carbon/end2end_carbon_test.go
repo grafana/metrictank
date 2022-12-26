@@ -106,8 +106,8 @@ func TestMain(m *testing.M) {
 
 func TestStartup(t *testing.T) {
 	matchers := []track.Matcher{
-		{Str: "metrictank.*metricIndex initialized.*starting data consumption$", Stderr: true},
-		{Str: "metrictank.*carbon-in: listening on.*2003", Stderr: true},
+		{Str: "metrictank.*metricIndex initialized.*starting data consumption$", Stderr: !docker.IsDockerCompose()},
+		{Str: "metrictank.*carbon-in: listening on.*2003", Stderr: !docker.IsDockerCompose()},
 		{Str: "grafana.*HTTP Server Listen.*3000"},
 	}
 	select {
