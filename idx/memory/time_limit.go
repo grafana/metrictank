@@ -50,15 +50,15 @@ func (l *TimeLimiter) add(now time.Time, d time.Duration) {
 }
 
 // Wait returns when we are not rate limited
-// * if we passed the window, we reset everything (this is only safe for callers
+//   - if we passed the window, we reset everything (this is only safe for callers
 //     that behave correctly, i.e. that wait the instructed time after each add)
-// * if limit is not reached, no sleep is needed
-// * if limit has been exceeded, sleep until next period + extra multiple to compensate
-//    this is perhaps best explained with an example:
-//    if window is 1s and limit 100ms, but we spent 250ms, then we spent effectively 2.5 seconds worth of work.
-//    let's say we are 800ms into the 1s window, that means we should sleep 2500-800 = 1.7s
-//    in order to maximize work while honoring the imposed limit.
-// * if limit has been met exactly, sleep until next period (this is a special case of the above)
+//   - if limit is not reached, no sleep is needed
+//   - if limit has been exceeded, sleep until next period + extra multiple to compensate
+//     this is perhaps best explained with an example:
+//     if window is 1s and limit 100ms, but we spent 250ms, then we spent effectively 2.5 seconds worth of work.
+//     let's say we are 800ms into the 1s window, that means we should sleep 2500-800 = 1.7s
+//     in order to maximize work while honoring the imposed limit.
+//   - if limit has been met exactly, sleep until next period (this is a special case of the above)
 func (l *TimeLimiter) Wait() {
 	time.Sleep(l.wait(time.Now()))
 }

@@ -318,10 +318,10 @@ func TestPlanRequests_Singles_DifferentTimeRanges(t *testing.T) {
 
 // TestPlanRequestsMaxPointsPerReqSoft tests how maxPointsPerReqSoft gets applied.
 // we validate that:
-// * requests are coarsened, PNGroup by PNGroup (we cannot predict PNGroup map iteration order, so we only test with 1 PNGroup),
-//   and singles in groups by retention (in schemaID order)
-// * PNGroups obviously will need a common interval, which gets interesting when using multiple schemas
-// * coarsening continues until all data is fetched at its coarsest. At that point we may breach soft, but never hard
+//   - requests are coarsened, PNGroup by PNGroup (we cannot predict PNGroup map iteration order, so we only test with 1 PNGroup),
+//     and singles in groups by retention (in schemaID order)
+//   - PNGroups obviously will need a common interval, which gets interesting when using multiple schemas
+//   - coarsening continues until all data is fetched at its coarsest. At that point we may breach soft, but never hard
 func TestPlanRequestsMaxPointsPerReqSoft(t *testing.T) {
 	in, out := generate(0, 1000, []reqProp{
 		// 4 singles from 2 different retentions

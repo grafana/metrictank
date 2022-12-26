@@ -5,9 +5,9 @@ import (
 	"github.com/grafana/metrictank/mdata"
 )
 
-//IntervalGetter is anything that can return the interval for the given path
-//we don't want the carbon plugin to directly talk to an index because the api
-//surface is too big and it would couple too tightly which is annoying in unit tests
+// IntervalGetter is anything that can return the interval for the given path
+// we don't want the carbon plugin to directly talk to an index because the api
+// surface is too big and it would couple too tightly which is annoying in unit tests
 type IntervalGetter interface {
 	GetInterval(name string) int
 }

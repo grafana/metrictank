@@ -144,10 +144,11 @@ func NewLagMonitor(size int, partitions []int32) *LagMonitor {
 // (minimum lag seen in last N measurements) / input rate.
 // example:
 // lag (in messages/metrics)     input rate       --->    score (seconds behind)
-//                       10k       1k/second                 10
-//                       200       1k/second                  0 (less than 1s behind)
-//                         0               *                  0 (perfectly in sync)
-//                   anything     0 (after startup)          same as lag
+//
+//	    10k       1k/second                 10
+//	    200       1k/second                  0 (less than 1s behind)
+//	      0               *                  0 (perfectly in sync)
+//	anything     0 (after startup)          same as lag
 //
 // The returned total score for the node is the max of the scores of individual partitions.
 // Note that one or more StoreOffset() (rate) calls may have been made but no StoreLag().

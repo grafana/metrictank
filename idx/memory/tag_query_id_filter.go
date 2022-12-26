@@ -132,10 +132,10 @@ func newIdFilter(expressions tagquery.Expressions, ctx *TagQueryContext) *idFilt
 // optimizations can be applied when filtering by these records. it returns two bools to
 // indicate which optimizations are or are not viable.
 //
-// * the first bool refers to the optimization for sets of records which all have only one
-//   expression and this expression is using the equal operator.
-// * the second bool refers to the optimization for sets of records which all only have
-//   expressions using the equal operator, but there may be more than one per record.
+//   - the first bool refers to the optimization for sets of records which all have only one
+//     expression and this expression is using the equal operator.
+//   - the second bool refers to the optimization for sets of records which all only have
+//     expressions using the equal operator, but there may be more than one per record.
 func viableOptimizations(records []tagquery.MetaTagRecord) (bool, bool) {
 	singleExprPerRecord := true
 	for recordIdx := range records {

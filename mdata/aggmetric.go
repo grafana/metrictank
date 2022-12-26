@@ -627,12 +627,12 @@ func (a *AggMetric) add(ts uint32, val float64) {
 
 // collectable returns whether the AggMetric is garbage collectable
 // an Aggmetric is collectable based on two conditions:
-// * the AggMetric hasn't been written to in a configurable amount of time
-//   (wether the write went to the ROB or a chunk is irrelevant)
-// * the last chunk - if any - is no longer "active".
-//   active means:
-//   any reasonable realtime stream (e.g. up to 15 min behind wall-clock)
-//   could add points to the chunk
+//   - the AggMetric hasn't been written to in a configurable amount of time
+//     (wether the write went to the ROB or a chunk is irrelevant)
+//   - the last chunk - if any - is no longer "active".
+//     active means:
+//     any reasonable realtime stream (e.g. up to 15 min behind wall-clock)
+//     could add points to the chunk
 //
 // caller must hold lock
 func (a *AggMetric) collectable(now, chunkMinTs uint32) bool {
