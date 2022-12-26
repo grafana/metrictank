@@ -1,6 +1,7 @@
 package mdata
 
 import (
+	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -47,85 +48,95 @@ func NewAggMetrics(store Store, cachePusher cache.CachePusher, dropFirstChunk bo
 	return &ms
 }
 
+func (ms *AggMetrics) runGC(now uint32) (purged int) {
+	chunkMinTs := now - uint32(ms.chunkMaxStale)
+	metricMinTs := now - uint32(ms.metricMaxStale)
+
+	// as this is the only goroutine that can delete from ms.Metrics
+	// we only need to lock long enough to get the list of orgs, then for each org
+	// get the list of active metrics.
+	// It doesn't matter if new orgs or metrics are added while we iterate these lists.
+	ms.RLock()
+	orgs := make([]uint32, 0, len(ms.Metrics))
+	for o := range ms.Metrics {
+		orgs = append(orgs, o)
+	}
+	ms.RUnlock()
+	for _, org := range orgs {
+		orgActiveMetrics := promActiveMetrics.WithLabelValues(strconv.Itoa(int(org)))
+		ms.RLock()
+		keys := make([]schema.Key, 0, len(ms.Metrics[org]))
+		for k := range ms.Metrics[org] {
+			keys = append(keys, k)
+		}
+		ms.RUnlock()
+		for _, key := range keys {
+			gcMetric.Inc()
+			ms.RLock()
+			a := ms.Metrics[org][key]
+			ms.RUnlock()
+			points, stale := a.GC(now, chunkMinTs, metricMinTs)
+			if stale {
+				log.Debugf("metric %s is stale. Purging data from memory.", key)
+				ms.Lock()
+				purged++
+				delete(ms.Metrics[org], key)
+				orgActiveMetrics.Set(float64(len(ms.Metrics[org])))
+				// note: this is racey. if a metric has just become unstale, it may have created a new chunk,
+				// pruning an older one. in which case we double-subtract those points
+				// hard to fix and super rare. see https://github.com/grafana/metrictank/pull/1242
+				totalPoints.DecUint64(uint64(points))
+				ms.Unlock()
+			}
+		}
+		ms.RLock()
+		orgActive := len(ms.Metrics[org])
+		ms.RUnlock()
+		orgActiveMetrics.Set(float64(orgActive))
+
+		// If this org has no keys, then delete the org from the map
+		if orgActive == 0 {
+			// To prevent races, we need to check that there are still no metrics for the org while holding a write lock
+			ms.Lock()
+			orgActive = len(ms.Metrics[org])
+			if orgActive == 0 {
+				delete(ms.Metrics, org)
+			}
+			ms.Unlock()
+		}
+	}
+
+	// Get the totalActive across all orgs.
+	totalActive := 0
+	ms.RLock()
+	for o := range ms.Metrics {
+		totalActive += len(ms.Metrics[o])
+	}
+	ms.RUnlock()
+	metricsActive.Set(totalActive)
+	return purged
+}
+
 // periodically scan chunks and close any that have not received data in a while
 func (ms *AggMetrics) GC() {
 	for {
-		var purged int
-
 		unix := time.Duration(time.Now().UnixNano())
 		diff := ms.gcInterval - (unix % ms.gcInterval)
 		time.Sleep(diff + time.Minute)
 		log.Info("Aggmetrics: checking for stale chunks that need persisting.")
 		nowTime := time.Now()
-		now := uint32(nowTime.Unix())
-		chunkMinTs := now - uint32(ms.chunkMaxStale)
-		metricMinTs := now - uint32(ms.metricMaxStale)
 
-		// as this is the only goroutine that can delete from ms.Metrics
-		// we only need to lock long enough to get the list of orgs, then for each org
-		// get the list of active metrics.
-		// It doesn't matter if new orgs or metrics are added while we iterate these lists.
-		ms.RLock()
-		orgs := make([]uint32, 0, len(ms.Metrics))
-		for o := range ms.Metrics {
-			orgs = append(orgs, o)
-		}
-		ms.RUnlock()
-		for _, org := range orgs {
-			orgActiveMetrics := promActiveMetrics.WithLabelValues(strconv.Itoa(int(org)))
-			ms.RLock()
-			keys := make([]schema.Key, 0, len(ms.Metrics[org]))
-			for k := range ms.Metrics[org] {
-				keys = append(keys, k)
-			}
-			ms.RUnlock()
-			for _, key := range keys {
-				gcMetric.Inc()
-				ms.RLock()
-				a := ms.Metrics[org][key]
-				ms.RUnlock()
-				points, stale := a.GC(now, chunkMinTs, metricMinTs)
-				if stale {
-					log.Debugf("metric %s is stale. Purging data from memory.", key)
-					ms.Lock()
-					purged++
-					delete(ms.Metrics[org], key)
-					orgActiveMetrics.Set(float64(len(ms.Metrics[org])))
-					// note: this is racey. if a metric has just become unstale, it may have created a new chunk,
-					// pruning an older one. in which case we double-subtract those points
-					// hard to fix and super rare. see https://github.com/grafana/metrictank/pull/1242
-					totalPoints.DecUint64(uint64(points))
-					ms.Unlock()
-				}
-			}
-			ms.RLock()
-			orgActive := len(ms.Metrics[org])
-			ms.RUnlock()
-			orgActiveMetrics.Set(float64(orgActive))
-
-			// If this org has no keys, then delete the org from the map
-			if orgActive == 0 {
-				// To prevent races, we need to check that there are still no metrics for the org while holding a write lock
-				ms.Lock()
-				orgActive = len(ms.Metrics[org])
-				if orgActive == 0 {
-					delete(ms.Metrics, org)
-				}
-				ms.Unlock()
-			}
-		}
-
-		// Get the totalActive across all orgs.
-		totalActive := 0
-		ms.RLock()
-		for o := range ms.Metrics {
-			totalActive += len(ms.Metrics[o])
-		}
-		ms.RUnlock()
-		metricsActive.Set(totalActive)
-
+		purged := ms.runGC(uint32(nowTime.Unix()))
 		log.Infof("Aggmetrics: finished GC %s. number of purged (deleted) metrics from tank: %d", time.Since(nowTime), purged)
 	}
+}
+
+func (ms *AggMetrics) ForceGC() {
+	nowTime := time.Now()
+
+	log.Info("Aggmetrics: Forcing GC for all chunks.")
+	purged := ms.runGC(math.MaxUint32)
+	log.Infof("Aggmetrics: finished ForceGC %s. number of purged (deleted) metrics from tank: %d", time.Since(nowTime), purged)
 }
 
 func (ms *AggMetrics) Get(key schema.MKey) (Metric, bool) {
