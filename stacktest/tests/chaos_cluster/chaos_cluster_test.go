@@ -108,12 +108,12 @@ func TestMain(m *testing.M) {
 
 func TestClusterStartup(t *testing.T) {
 	matchers := []track.Matcher{
-		{Str: "metrictank0.1.*metricIndex initialized", Stderr: !docker.IsDockerCompose()},
-		{Str: "metrictank1.1.*metricIndex initialized", Stderr: !docker.IsDockerCompose()},
-		{Str: "metrictank2.1.*metricIndex initialized", Stderr: !docker.IsDockerCompose()},
-		{Str: "metrictank3.1.*metricIndex initialized", Stderr: !docker.IsDockerCompose()},
-		{Str: "metrictank4.1.*metricIndex initialized", Stderr: !docker.IsDockerCompose()},
-		{Str: "metrictank5.1.*metricIndex initialized", Stderr: !docker.IsDockerCompose()},
+		{Str: "metrictank0.1.*metricIndex initialized", Stderr: docker.IsNativeDocker()},
+		{Str: "metrictank1.1.*metricIndex initialized", Stderr: docker.IsNativeDocker()},
+		{Str: "metrictank2.1.*metricIndex initialized", Stderr: docker.IsNativeDocker()},
+		{Str: "metrictank3.1.*metricIndex initialized", Stderr: docker.IsNativeDocker()},
+		{Str: "metrictank4.1.*metricIndex initialized", Stderr: docker.IsNativeDocker()},
+		{Str: "metrictank5.1.*metricIndex initialized", Stderr: docker.IsNativeDocker()},
 		{Str: "grafana.*HTTP Server Listen.*3000"},
 		{Str: "zookeeper entered RUNNING state"},
 		{Str: "kafka entered RUNNING state"},
