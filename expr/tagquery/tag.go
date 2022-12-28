@@ -13,8 +13,8 @@ import (
 //go:generate msgp
 type Tags []Tag
 
-//ParseTags parses a list of key value pairs into a list of Tags.
-//ParseTags([]string{"key=value", "name=whatever"}) -> Tags{{Key: "key", Value: "value"}, {Key: "name", Value: "whatever"}}}
+// ParseTags parses a list of key value pairs into a list of Tags.
+// ParseTags([]string{"key=value", "name=whatever"}) -> Tags{{Key: "key", Value: "value"}, {Key: "name", Value: "whatever"}}}
 func ParseTags(tags []string) (Tags, error) {
 	res := make(Tags, len(tags))
 	for i := range tags {

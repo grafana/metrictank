@@ -37,7 +37,7 @@ func getTables(store *cassandra.CassandraStore, match string) ([]cassandra.Table
 	return tables, nil
 }
 
-//printTables prints all tables in the store
+// printTables prints all tables in the store
 func printTables(store *cassandra.CassandraStore) {
 	tables, err := getTables(store, "")
 	if err != nil {

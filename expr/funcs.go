@@ -94,6 +94,7 @@ func init() {
 		"keepLastValue":                {NewKeepLastValue, true},
 		"log":                          {NewLog, true},
 		"logarithmic":                  {NewLog, true},
+		"linearRegression":             {NewLinearRegression, true},
 		"lowest":                       {NewHighestLowestConstructor("", false), true},
 		"lowestAverage":                {NewHighestLowestConstructor("average", false), true},
 		"lowestCurrent":                {NewHighestLowestConstructor("current", false), true},

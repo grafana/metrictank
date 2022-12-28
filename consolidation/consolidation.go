@@ -14,6 +14,7 @@ import (
 // mostly for use by the http api, but can also be used internally for data processing
 // note that the set of legal values is a superset of conf.Method, so you can cast from
 // conf.Method to Consolidator, but not back.
+//
 //go:generate msgp
 type Consolidator int
 

@@ -80,10 +80,10 @@ func (r Retentions) Validate() error {
 }
 
 /*
-  A retention level.
+A retention level.
 
-  Retention levels describe a given archive in the database. How detailed it is and how far back
-  it records.
+Retention levels describe a given archive in the database. How detailed it is and how far back
+it records.
 */
 type Retention struct {
 	SecondsPerPoint int    // interval in seconds

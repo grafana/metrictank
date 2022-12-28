@@ -34,13 +34,13 @@ type Graphite struct {
 	toGraphite chan []byte
 }
 
-//NewGraphite creates and starts a graphite reporter which.
-//prefix is a string prefix which is added to every metric
-//addr is the graphite address to report to
-//interval is the interval in seconds that metrics should be reported.  If interval is negative, metrics will not be reported automatically.
-//bufferSize determines how many reporting intervals should be buffered in memory.  If full, new intervals will not be reported
-//timeout determines how long to wait while reporting an interval
-//returns a new graphite instance which should only be used for manual reporting if interval is < 0
+// NewGraphite creates and starts a graphite reporter which.
+// prefix is a string prefix which is added to every metric
+// addr is the graphite address to report to
+// interval is the interval in seconds that metrics should be reported.  If interval is negative, metrics will not be reported automatically.
+// bufferSize determines how many reporting intervals should be buffered in memory.  If full, new intervals will not be reported
+// timeout determines how long to wait while reporting an interval
+// returns a new graphite instance which should only be used for manual reporting if interval is < 0
 func NewGraphite(prefix, addr string, interval, bufferSize int, timeout time.Duration) *Graphite {
 	if len(prefix) != 0 && prefix[len(prefix)-1] != '.' {
 		prefix = prefix + "."
@@ -66,8 +66,8 @@ func NewGraphite(prefix, addr string, interval, bufferSize int, timeout time.Dur
 	return g
 }
 
-//Report sends graphite metrics with the given timestamp.
-//This should only be used if a negative reporting interval has been set.
+// Report sends graphite metrics with the given timestamp.
+// This should only be used if a negative reporting interval has been set.
 func (g *Graphite) Report(now time.Time) {
 	log.Debugf("stats flushing for %s to graphite", now)
 	queueItems.Value(len(g.toGraphite))

@@ -22,7 +22,7 @@ type Notifier interface {
 	Send(SavedChunk)
 }
 
-//PersistMessage format version
+// PersistMessage format version
 const PersistMessageBatchV1 = 1
 
 type PersistMessageBatch struct {

@@ -136,7 +136,7 @@ func TestAggregateMultipleDiffQuery(t *testing.T) {
 	)
 }
 
-//mimic target=Aggregate(foo.*,foo.*,a,a)
+// mimic target=Aggregate(foo.*,foo.*,a,a)
 func TestAggregateMultipleTimesSameInput(t *testing.T) {
 	input := [][]models.Series{
 		{

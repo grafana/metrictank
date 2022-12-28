@@ -45,13 +45,14 @@ func NewArchiveBare(name string) Archive {
 
 // The MetricIndex interface supports Graphite style queries.
 // Note:
-// * metrictank is a multi-tenant system where different orgs cannot see each
-//   other's data, and any given metric name may appear multiple times,
-//   under different organisations
 //
-// * Each metric path can be mapped to multiple metricDefinitions in the case that
-//   fields other then the Name vary.  The most common occurrence of this is when
-//   the Interval at which the metric is being collected has changed.
+//   - metrictank is a multi-tenant system where different orgs cannot see each
+//     other's data, and any given metric name may appear multiple times,
+//     under different organisations
+//
+//   - Each metric path can be mapped to multiple metricDefinitions in the case that
+//     fields other then the Name vary.  The most common occurrence of this is when
+//     the Interval at which the metric is being collected has changed.
 type MetricIndex interface {
 	// Init initializes the index at startup and
 	// blocks until the index is ready for use.

@@ -13,6 +13,7 @@ import (
 )
 
 var cli *client.Client
+var docker = ""
 
 func init() {
 	var err error
@@ -20,6 +21,21 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	if _, err := exec.LookPath("docker-compose"); err == nil {
+		docker = "docker-compose"
+		return
+	}
+
+	if _, err := exec.LookPath("docker"); err == nil {
+		cmd := exec.Command("docker", "compose", "version")
+		if err := cmd.Run(); err == nil {
+			docker = "docker"
+			return
+		}
+	}
+
+	log.Fatal("these tests require either 'docker-compose' or 'docker compose' to run")
 }
 
 /* not currently used, but useful later
@@ -120,7 +136,15 @@ func IsolateOut(name, dur string, targets ...string) error {
 }
 
 func ComposeVersion() string {
-	version := exec.Command("docker-compose", "version")
+	var version *exec.Cmd
+	if docker == "docker-compose" {
+		version = exec.Command("docker-compose", "version")
+	} else if docker == "docker" {
+		version = exec.Command("docker", "compose", "version")
+	} else {
+		log.Fatal("these tests require either 'docker-compose' or 'docker compose' to run")
+	}
+
 	output, err := version.CombinedOutput()
 	if err != nil {
 		log.Fatal(err.Error())
@@ -129,7 +153,15 @@ func ComposeVersion() string {
 }
 
 func DockerChaosAction(testPath, action string, setEnv map[string]string, extraArgs ...string) *exec.Cmd {
-	cmd := exec.Command("docker-compose", append([]string{action}, extraArgs...)...)
+	var cmd *exec.Cmd
+	if docker == "docker-compose" {
+		cmd = exec.Command("docker-compose", append([]string{action}, extraArgs...)...)
+	} else if docker == "docker" {
+		cmd = exec.Command("docker", append([]string{"compose", action}, extraArgs...)...)
+	} else {
+		log.Fatal("these tests require either 'docker-compose' or 'docker compose' to run")
+	}
+
 	cmd.Dir = test.Path(testPath)
 	cmd.Env = updateEnv(setEnv, cmd.Env)
 	return cmd
@@ -155,4 +187,8 @@ func updateEnv(setEnv map[string]string, env []string) []string {
 	}
 
 	return env
+}
+
+func IsNativeDocker() bool {
+	return (docker == "docker")
 }

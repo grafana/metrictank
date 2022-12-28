@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-//Set up a mock http.ServeMux that returns the name of the service routed to.
-//We then verify that we're routing to the expected service
+// Set up a mock http.ServeMux that returns the name of the service routed to.
+// We then verify that we're routing to the expected service
 func TestApi(t *testing.T) {
 	mux := Api{
 		ingestHandler:     stubHandler("ingest"),
@@ -66,7 +66,7 @@ func TestApi(t *testing.T) {
 
 }
 
-//creates a new http.Handler that always responds with the name of the service
+// creates a new http.Handler that always responds with the name of the service
 func stubHandler(svc string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(svc))
