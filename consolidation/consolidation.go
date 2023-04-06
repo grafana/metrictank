@@ -66,6 +66,34 @@ func (c Consolidator) String() string {
 	panic(fmt.Sprintf("Consolidator.String(): unknown consolidator %d", c))
 }
 
+func (c Consolidator) ToConsolidateBy() string {
+  switch c {
+  case Avg:
+    return "avg"
+  case Cnt:
+    return "count"
+  case Lst:
+    return "last"
+  case Min:
+    return "min"
+  case Max:
+    return "max"
+  case Mult:
+    return "mult"
+  case Med:
+    return "med"
+  case Diff:
+    return "diff"
+  case StdDev:
+    return "stddev"
+  case Range:
+    return "range"
+  case Sum:
+    return "sum"
+  }
+  panic(fmt.Sprintf("Consolidator.ToConsolidateBy(): unknown consolidator %d", c))
+}
+
 // provide the name of a stored archive
 // see aggregator.go for which archives are available
 func (c Consolidator) Archive() schema.Method {
