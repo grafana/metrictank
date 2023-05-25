@@ -5,10 +5,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/grafana/metrictank/api/models"
-	"github.com/grafana/metrictank/api/tz"
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/pkg/api/models"
+	"github.com/grafana/metrictank/pkg/api/tz"
+	"github.com/grafana/metrictank/pkg/mdata"
+	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type FuncLinearRegression struct {
