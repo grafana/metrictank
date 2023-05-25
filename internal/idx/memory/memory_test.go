@@ -17,9 +17,9 @@ import (
 	"github.com/grafana/metrictank/internal/idx"
 	"github.com/grafana/metrictank/internal/mdata"
 	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/pkg/conf"
 	"github.com/grafana/metrictank/pkg/expr/tagquery"
-	"github.com/grafana/metrictank/pkg/test"
 	. "github.com/smartystreets/goconvey/convey"
 )
 

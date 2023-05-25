@@ -34,12 +34,11 @@ import (
 	"github.com/grafana/metrictank/internal/mdata/notifierKafka"
 	"github.com/grafana/metrictank/internal/stats"
 	statsConfig "github.com/grafana/metrictank/internal/stats/config"
-	"github.com/grafana/metrictank/internal/store/cassandra"
+	bigtableStore "github.com/grafana/metrictank/internal/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/api"
 	"github.com/grafana/metrictank/pkg/logger"
-	bigtableStore "github.com/grafana/metrictank/pkg/store/bigtable"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )

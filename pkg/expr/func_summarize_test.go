@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/internal/util/align"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/test"
 )
 
 var abSummarize = []schema.Point{

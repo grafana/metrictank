@@ -22,10 +22,9 @@ import (
 	"github.com/grafana/metrictank/internal/mdata"
 	"github.com/grafana/metrictank/internal/mdata/chunk"
 	"github.com/grafana/metrictank/internal/mdata/importer"
-	"github.com/grafana/metrictank/internal/store/cassandra"
+	bigTableStore "github.com/grafana/metrictank/internal/store/bigtable"
 	cassandraStore "github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/pkg/logger"
-	bigTableStore "github.com/grafana/metrictank/pkg/store/bigtable"
 )
 
 var (

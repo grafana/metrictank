@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/metrictank/internal/tracing"
 	"github.com/grafana/metrictank/internal/util"
-	"github.com/grafana/metrictank/pkg/tracing"
 
 	log "github.com/sirupsen/logrus"
 	macaron "gopkg.in/macaron.v1"

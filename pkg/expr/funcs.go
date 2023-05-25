@@ -1,8 +1,8 @@
 package expr
 
 import (
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/consolidation"
 )
 
 // Context describes a series timeframe and consolidator

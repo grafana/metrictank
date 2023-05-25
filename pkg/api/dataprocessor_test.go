@@ -7,17 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/metrictank/internal/cluster"
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/internal/mdata"
 	"github.com/grafana/metrictank/internal/mdata/cache"
 	"github.com/grafana/metrictank/internal/mdata/cache/accnt"
 	"github.com/grafana/metrictank/internal/mdata/chunk"
 	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/seriescycle"
-	"github.com/grafana/metrictank/pkg/cluster"
 	"github.com/grafana/metrictank/pkg/conf"
-	"github.com/grafana/metrictank/pkg/consolidation"
-	"github.com/grafana/metrictank/pkg/test"
 )
 
 func init() {

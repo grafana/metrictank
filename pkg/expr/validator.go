@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/pkg/errors"
 	"github.com/raintank/dur"
 )

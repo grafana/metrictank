@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigtable"
+	btUtils "github.com/grafana/metrictank/internal/bigtable"
 	"github.com/grafana/metrictank/internal/mdata"
 	"github.com/grafana/metrictank/internal/mdata/chunk"
 	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/internal/stats"
 	"github.com/grafana/metrictank/internal/util"
-	btUtils "github.com/grafana/metrictank/pkg/bigtable"
 	"github.com/jpillora/backoff"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/raintank/dur"

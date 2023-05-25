@@ -17,9 +17,9 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/grafana/globalconf"
+	"github.com/grafana/metrictank/internal/cmd-dev/mt-simulate-memory-idx-lock-contention/runner"
 	"github.com/grafana/metrictank/internal/idx/memory"
 	"github.com/grafana/metrictank/internal/schema"
-	"github.com/grafana/metrictank/pkg/cmd-dev/mt-simulate-memory-idx-lock-contention/runner"
 	"github.com/grafana/metrictank/pkg/logger"
 	log "github.com/sirupsen/logrus"
 )

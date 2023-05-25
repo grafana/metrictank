@@ -3,7 +3,7 @@ package accnt
 import (
 	"testing"
 
-	"github.com/grafana/metrictank/pkg/test"
+	"github.com/grafana/metrictank/internal/test"
 )
 
 func TestLRU(t *testing.T) {

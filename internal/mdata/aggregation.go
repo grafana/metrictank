@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/grafana/metrictank/pkg/consolidation"
+	"github.com/grafana/metrictank/internal/consolidation"
 	log "github.com/sirupsen/logrus"
 )
 

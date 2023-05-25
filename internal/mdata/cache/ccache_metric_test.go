@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/metrictank/internal/mdata/cache/accnt"
 	"github.com/grafana/metrictank/internal/mdata/chunk"
 	"github.com/grafana/metrictank/internal/schema"
-	"github.com/grafana/metrictank/pkg/test"
+	"github.com/grafana/metrictank/internal/test"
 )
 
 func generateChunks(b testing.TB, startAt, count, step uint32) []chunk.IterGen {

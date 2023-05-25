@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/test"
 )
 
 func TestFilterSeriesEqual(t *testing.T) {

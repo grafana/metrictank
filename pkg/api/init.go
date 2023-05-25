@@ -1,9 +1,9 @@
 package api
 
 import (
+	"github.com/grafana/metrictank/internal/pointslicepool"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/expr"
-	"github.com/grafana/metrictank/pkg/pointslicepool"
 )
 
 var pointSlicePool *pointslicepool.PointSlicePool

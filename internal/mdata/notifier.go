@@ -5,9 +5,9 @@ import (
 
 	"github.com/grafana/metrictank/internal/schema"
 
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/internal/idx"
 	"github.com/grafana/metrictank/internal/stats"
-	"github.com/grafana/metrictank/pkg/consolidation"
 	log "github.com/sirupsen/logrus"
 )
 

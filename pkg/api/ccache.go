@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/grafana/metrictank/internal/cluster"
 	"github.com/grafana/metrictank/internal/idx"
 	"github.com/grafana/metrictank/pkg/api/middleware"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/response"
-	"github.com/grafana/metrictank/pkg/cluster"
 	"github.com/grafana/metrictank/pkg/expr/tagquery"
 	log "github.com/sirupsen/logrus"
 )

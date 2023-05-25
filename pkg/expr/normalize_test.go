@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/seriescycle"
-	"github.com/grafana/metrictank/pkg/consolidation"
 )
 
 func TestNormalizeOneSeriesAdjustWithPreCanonicalize(t *testing.T) {

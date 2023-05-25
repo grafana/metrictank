@@ -5,11 +5,11 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/internal/mdata"
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/conf"
-	"github.com/grafana/metrictank/pkg/consolidation"
-	"github.com/grafana/metrictank/pkg/test"
 )
 
 func getReqMap(reqs []models.Req) *ReqMap {

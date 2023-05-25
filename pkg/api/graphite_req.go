@@ -3,8 +3,8 @@ package api
 import (
 	"fmt"
 
+	"github.com/grafana/metrictank/internal/archives"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/archives"
 )
 
 // ReqMap is a map of requests of data,

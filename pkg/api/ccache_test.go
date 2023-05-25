@@ -13,10 +13,10 @@ import (
 	"github.com/grafana/metrictank/internal/mdata"
 	"github.com/grafana/metrictank/internal/mdata/cache"
 	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/response"
 	"github.com/grafana/metrictank/pkg/conf"
-	"github.com/grafana/metrictank/pkg/test"
 )
 
 func newSrv(delSeries, delArchives int) (*Server, *cache.MockCache) {

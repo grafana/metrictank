@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/test"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/tz"
-	"github.com/grafana/metrictank/pkg/test"
 )
 
 func TestLinearRegression(t *testing.T) {

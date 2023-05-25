@@ -5,8 +5,8 @@ import (
 
 	"github.com/grafana/metrictank/internal/schema"
 
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/internal/mdata/chunk"
-	"github.com/grafana/metrictank/pkg/consolidation"
 	opentracing "github.com/opentracing/opentracing-go"
 )
 

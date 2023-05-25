@@ -7,7 +7,7 @@ import (
 
 	"github.com/grafana/metrictank/internal/schema"
 
-	"github.com/grafana/metrictank/pkg/batch"
+	"github.com/grafana/metrictank/internal/batch"
 )
 
 // consolidator is a highlevel description of a point consolidation method

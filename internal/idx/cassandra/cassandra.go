@@ -17,7 +17,6 @@ import (
 	"github.com/grafana/metrictank/internal/idx/memory"
 	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/internal/stats"
-	"github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/expr/tagquery"
 	log "github.com/sirupsen/logrus"

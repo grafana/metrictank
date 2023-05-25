@@ -17,12 +17,11 @@ import (
 	"github.com/grafana/metrictank/internal/cluster"
 	"github.com/grafana/metrictank/internal/idx/cassandra"
 	"github.com/grafana/metrictank/internal/stats"
-	"github.com/grafana/metrictank/internal/store/cassandra"
+	"github.com/grafana/metrictank/internal/tracing"
 	"github.com/grafana/metrictank/pkg/api/middleware"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/response"
 	"github.com/grafana/metrictank/pkg/expr/tagquery"
-	"github.com/grafana/metrictank/pkg/tracing"
 	log "github.com/sirupsen/logrus"
 	"github.com/tinylib/msgp/msgp"
 )

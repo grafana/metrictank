@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/grafana/metrictank/internal/schema"
-	"github.com/grafana/metrictank/pkg/test"
+	"github.com/grafana/metrictank/internal/test"
 )
 
 type testCase struct {

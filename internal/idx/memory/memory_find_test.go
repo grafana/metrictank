@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/metrictank/internal/cluster"
 	"github.com/grafana/metrictank/internal/idx"
 	"github.com/grafana/metrictank/internal/schema"
-	"github.com/grafana/metrictank/pkg/cluster"
 	"github.com/grafana/metrictank/pkg/expr/tagquery"
 	log "github.com/sirupsen/logrus"
 )

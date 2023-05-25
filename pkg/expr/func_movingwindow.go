@@ -5,13 +5,13 @@ import (
 	"math"
 	"strings"
 
+	"github.com/grafana/metrictank/internal/batch"
 	"github.com/grafana/metrictank/internal/schema"
-	"github.com/grafana/metrictank/pkg/batch"
 	"github.com/grafana/metrictank/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/consolidation"
 	"github.com/raintank/dur"
 )
 

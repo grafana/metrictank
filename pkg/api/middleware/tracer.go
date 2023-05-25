@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/grafana/metrictank/internal/tracing"
 	"github.com/grafana/metrictank/internal/util"
-	"github.com/grafana/metrictank/pkg/tracing"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	log "github.com/sirupsen/logrus"

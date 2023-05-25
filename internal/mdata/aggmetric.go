@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/internal/cluster"
+	"github.com/grafana/metrictank/internal/consolidation"
 	"github.com/grafana/metrictank/internal/mdata/chunk"
 	mdataerrors "github.com/grafana/metrictank/internal/mdata/errors"
 	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/conf"
-	"github.com/grafana/metrictank/pkg/consolidation"
 	log "github.com/sirupsen/logrus"
 )
 
