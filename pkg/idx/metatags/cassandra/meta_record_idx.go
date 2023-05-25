@@ -154,35 +154,44 @@ func (m *MetaRecordIdx) loadMetaRecords() {
 		var expressions, metatags string
 		q = fmt.Sprintf("SELECT expressions, metatags FROM %s WHERE batchid=? AND orgid=?", m.cfg.metaRecordTable)
 
-		session := m.session.CurrentSession()
-		iter = session.Query(q, batchId, orgId).RetryPolicy(&metaRecordRetryPolicy).Iter()
+		for attempts := 0; true; attempts++ {
+			if attempts%20 == 1 {
+				log.Warnf("Retrying metarecord load: failedAttempts = %d", attempts)
+			}
+			session := m.session.CurrentSession()
+			iter = session.Query(q, batchId, orgId).RetryPolicy(&metaRecordRetryPolicy).Iter()
 
-		var records []tagquery.MetaTagRecord
-		for iter.Scan(&expressions, &metatags) {
-			record := tagquery.MetaTagRecord{}
-			err = json.Unmarshal([]byte(expressions), &record.Expressions)
-			if err != nil {
-				log.Errorf("cass-meta-record-idx: LoadMetaRecords() could not parse stored expressions (%s): %s", expressions, err)
+			var records []tagquery.MetaTagRecord
+			for iter.Scan(&expressions, &metatags) {
+				record := tagquery.MetaTagRecord{}
+				err = json.Unmarshal([]byte(expressions), &record.Expressions)
+				if err != nil {
+					log.Errorf("cass-meta-record-idx: LoadMetaRecords() could not parse stored expressions (%s): %s", expressions, err)
+					continue
+				}
+
+				err = json.Unmarshal([]byte(metatags), &record.MetaTags)
+				if err != nil {
+					log.Errorf("cass-meta-record-idx: LoadMetaRecords() could not parse stored metatags (%s): %s", metatags, err)
+					continue
+				}
+
+				records = append(records, record)
+			}
+
+			if err = iter.Close(); err != nil {
+				log.Errorf("cass-meta-record-idx: Error when reading meta records: %s", err.Error())
 				continue
 			}
 
-			err = json.Unmarshal([]byte(metatags), &record.MetaTags)
-			if err != nil {
-				log.Errorf("cass-meta-record-idx: LoadMetaRecords() could not parse stored metatags (%s): %s", metatags, err)
+			if err = m.memoryIdx.MetaTagRecordSwap(orgId, records); err != nil {
+				log.Errorf("cass-meta-record-idx: Error when swapping batch of meta records: %s", err.Error())
 				continue
 			}
 
-			records = append(records, record)
-		}
-
-		if err = iter.Close(); err != nil {
-			log.Errorf("cass-meta-record-idx: Error when reading meta records: %s", err.Error())
-			continue
-		}
-
-		if err = m.memoryIdx.MetaTagRecordSwap(orgId, records); err != nil {
-			log.Errorf("cass-meta-record-idx: Error when swapping batch of meta records: %s", err.Error())
-			continue
+			// Success, exit loop
+			log.Infof("cass-meta-record-idx: Loaded meta record batch %s of org %d in %d attempts", batchId.String(), orgId, attempts+1)
+			break
 		}
 	}
 }

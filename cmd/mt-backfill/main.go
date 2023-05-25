@@ -258,6 +258,8 @@ func handlerTimeout() {
 
 // normal shutdown
 func shutdown() {
+	// Force all data to flush
+	aggMetrics.ForceGC()
 	cluster.Stop()
 	timer := time.NewTimer(time.Second * 20)
 	kafkaStopped := make(chan bool)

@@ -145,7 +145,7 @@ func ParseRetentions(defs string) (Retentions, error) {
 	}
 	cnt := strings.Count(defs, ",")
 	if cnt > 254 {
-		return retentions, errors.New("no more than 255 individual retensions per rule supported")
+		return retentions, errors.New("no more than 255 individual retentions per rule supported")
 	}
 	for i, def := range strings.Split(defs, ",") {
 		def = strings.TrimSpace(def)
