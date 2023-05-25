@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/grafana/metrictank/internal/stats"
+	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/response"
 	"github.com/grafana/metrictank/pkg/archives"
-	"github.com/grafana/metrictank/pkg/stats"
-	"github.com/grafana/metrictank/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/metrictank/pkg/cluster"
-
+	"github.com/grafana/metrictank/internal/cluster"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/tz"
 )

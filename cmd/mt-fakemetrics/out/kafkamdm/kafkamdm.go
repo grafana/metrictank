@@ -9,9 +9,9 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/kafkamdm/keycache"
-	p "github.com/grafana/metrictank/pkg/cluster/partitioner"
-	"github.com/grafana/metrictank/pkg/schema"
-	"github.com/grafana/metrictank/pkg/schema/msg"
+	p "github.com/grafana/metrictank/internal/cluster/partitioner"
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/schema/msg"
 	"github.com/raintank/met"
 	log "github.com/sirupsen/logrus"
 )

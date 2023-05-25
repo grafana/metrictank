@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/grafana/metrictank/pkg/idx"
+	"github.com/grafana/metrictank/internal/idx"
 )
 
 func TestEmptySeriesTree(t *testing.T) {

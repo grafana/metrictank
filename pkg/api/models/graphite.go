@@ -7,9 +7,9 @@ import (
 	"strconv"
 
 	"github.com/go-macaron/binding"
+	"github.com/grafana/metrictank/internal/idx"
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/tz"
-	"github.com/grafana/metrictank/pkg/idx"
-	"github.com/grafana/metrictank/pkg/schema"
 	pickle "github.com/kisielk/og-rek"
 	opentracing "github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"

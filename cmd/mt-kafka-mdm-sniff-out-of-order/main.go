@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
-	inKafkaMdm "github.com/grafana/metrictank/pkg/input/kafkamdm"
+	inKafkaMdm "github.com/grafana/metrictank/internal/input/kafkamdm"
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/schema/msg"
+	"github.com/grafana/metrictank/internal/stats"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/schema"
-	"github.com/grafana/metrictank/pkg/schema/msg"
-	"github.com/grafana/metrictank/pkg/stats"
 	log "github.com/sirupsen/logrus"
 )
 

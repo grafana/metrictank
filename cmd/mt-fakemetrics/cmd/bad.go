@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 	"github.com/spf13/cobra"
 )

@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func BenchmarkHttpRespPickleEmptySeries(b *testing.B) {

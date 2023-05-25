@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/grafana/metrictank/internal/idx"
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/idx"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func TestJson(t *testing.T) {

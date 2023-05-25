@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/schema"
 )
 
 type InvalidExpressionError string

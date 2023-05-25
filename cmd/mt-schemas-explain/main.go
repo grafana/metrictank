@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/pkg/conf"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/store/cassandra"
 	log "github.com/sirupsen/logrus"
 )
 

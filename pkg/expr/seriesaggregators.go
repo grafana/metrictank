@@ -5,8 +5,8 @@ import (
 	"math"
 	"sort"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type seriesAggregator struct {

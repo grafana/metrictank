@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/schema"
 
-	"github.com/grafana/metrictank/pkg/mdata/chunk"
+	"github.com/grafana/metrictank/internal/mdata/chunk"
 	"github.com/raintank/dur"
 )
 

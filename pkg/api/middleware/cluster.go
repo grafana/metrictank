@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/grafana/metrictank/pkg/cluster"
+	"github.com/grafana/metrictank/internal/cluster"
 	macaron "gopkg.in/macaron.v1"
 )
 

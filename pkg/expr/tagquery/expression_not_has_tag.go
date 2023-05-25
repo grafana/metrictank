@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/schema"
 )
 
 type expressionNotHasTag struct {

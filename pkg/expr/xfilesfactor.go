@@ -3,8 +3,8 @@ package expr
 import (
 	"math"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 func skipCrossSeriesXff(xFilesFactor float64) bool {

@@ -1,8 +1,8 @@
 package tagquery
 
 import (
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/errors"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type MetaTagRecord struct {

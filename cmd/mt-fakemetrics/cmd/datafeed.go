@@ -8,8 +8,8 @@ import (
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/metricbuilder"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
-	"github.com/grafana/metrictank/pkg/clock"
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/clock"
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/raintank/worldping-api/pkg/log"
 )
 

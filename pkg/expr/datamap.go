@@ -3,8 +3,8 @@ package expr
 import (
 	"fmt"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 // Datamap contains all series to feed into the processing chain or generated therein:

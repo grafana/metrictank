@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/metrictank/internal/mdata"
+	"github.com/grafana/metrictank/internal/mdata/cache"
+	"github.com/grafana/metrictank/internal/mdata/cache/accnt"
+	"github.com/grafana/metrictank/internal/mdata/chunk"
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/api/seriescycle"
 	"github.com/grafana/metrictank/pkg/cluster"
 	"github.com/grafana/metrictank/pkg/conf"
 	"github.com/grafana/metrictank/pkg/consolidation"
-	"github.com/grafana/metrictank/pkg/mdata"
-	"github.com/grafana/metrictank/pkg/mdata/cache"
-	"github.com/grafana/metrictank/pkg/mdata/cache/accnt"
-	"github.com/grafana/metrictank/pkg/mdata/chunk"
-	"github.com/grafana/metrictank/pkg/schema"
 	"github.com/grafana/metrictank/pkg/test"
 )
 

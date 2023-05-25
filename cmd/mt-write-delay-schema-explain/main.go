@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/grafana/metrictank/internal/util/align"
 	"github.com/grafana/metrictank/pkg/conf"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/util/align"
 	log "github.com/sirupsen/logrus"
 )
 

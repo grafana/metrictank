@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/errors"
-	"github.com/grafana/metrictank/pkg/schema"
-	"github.com/grafana/metrictank/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 

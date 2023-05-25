@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/grafana/metrictank/pkg/store/cassandra"
+	"github.com/grafana/metrictank/internal/store/cassandra"
 	log "github.com/sirupsen/logrus"
 )
 

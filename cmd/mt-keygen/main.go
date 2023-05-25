@@ -9,8 +9,8 @@ import (
 	"os/exec"
 	"runtime"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/schema"
 	log "github.com/sirupsen/logrus"
 )
 

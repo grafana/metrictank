@@ -7,9 +7,9 @@ import (
 
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/gnet"
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/stats"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/schema"
-	"github.com/grafana/metrictank/pkg/stats"
 	"github.com/raintank/met/statsd"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/errors"
-	"github.com/grafana/metrictank/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
+	"github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/store/cassandra"
 	hostpool "github.com/hailocab/go-hostpool"
 	log "github.com/sirupsen/logrus"
 )

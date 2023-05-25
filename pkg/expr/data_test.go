@@ -3,8 +3,8 @@ package expr
 import (
 	"math"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 var a = []schema.Point{

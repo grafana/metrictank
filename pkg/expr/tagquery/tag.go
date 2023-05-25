@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/errors"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 //go:generate msgp

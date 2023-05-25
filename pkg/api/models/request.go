@@ -3,13 +3,13 @@ package models
 import (
 	"fmt"
 
+	"github.com/grafana/metrictank/internal/idx"
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/archives"
-	"github.com/grafana/metrictank/pkg/idx"
-	"github.com/grafana/metrictank/pkg/schema"
-
 	"github.com/grafana/metrictank/pkg/cluster"
+
+	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/consolidation"
-	"github.com/grafana/metrictank/pkg/util"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 )

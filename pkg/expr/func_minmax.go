@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/grafana/metrictank/internal/schema"
 	"github.com/grafana/metrictank/pkg/api/models"
 	"github.com/grafana/metrictank/pkg/batch"
-	"github.com/grafana/metrictank/pkg/schema"
 )
 
 type FuncMinMax struct {

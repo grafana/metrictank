@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/pkg/stats"
+	"github.com/grafana/metrictank/internal/stats"
 )
 
 // http.ResponseWriter that saves the status code and body size

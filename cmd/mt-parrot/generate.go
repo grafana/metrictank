@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/pkg/clock"
-	"github.com/grafana/metrictank/pkg/schema"
-	log "github.com/sirupsen/logrus"
 	"sync/atomic"
+
+	"github.com/grafana/metrictank/internal/clock"
+	"github.com/grafana/metrictank/internal/schema"
+	log "github.com/sirupsen/logrus"
 )
 
 func produceTestMetrics(metrics []*schema.MetricData) {

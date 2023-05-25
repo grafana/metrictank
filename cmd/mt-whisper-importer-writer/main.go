@@ -11,20 +11,21 @@ import (
 	"time"
 
 	"github.com/grafana/globalconf"
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/cluster"
+	"github.com/grafana/metrictank/internal/schema"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/grafana/metrictank/pkg/cluster"
-	"github.com/grafana/metrictank/pkg/cluster/partitioner"
-	"github.com/grafana/metrictank/pkg/idx"
-	"github.com/grafana/metrictank/pkg/idx/bigtable"
-	"github.com/grafana/metrictank/pkg/idx/cassandra"
+	"github.com/grafana/metrictank/internal/cluster/partitioner"
+	"github.com/grafana/metrictank/internal/idx"
+	"github.com/grafana/metrictank/internal/idx/bigtable"
+	"github.com/grafana/metrictank/internal/idx/cassandra"
+	"github.com/grafana/metrictank/internal/mdata"
+	"github.com/grafana/metrictank/internal/mdata/chunk"
+	"github.com/grafana/metrictank/internal/mdata/importer"
+	"github.com/grafana/metrictank/internal/store/cassandra"
+	cassandraStore "github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/mdata"
-	"github.com/grafana/metrictank/pkg/mdata/chunk"
-	"github.com/grafana/metrictank/pkg/mdata/importer"
 	bigTableStore "github.com/grafana/metrictank/pkg/store/bigtable"
-	cassandraStore "github.com/grafana/metrictank/pkg/store/cassandra"
 )
 
 var (

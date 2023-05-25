@@ -1,9 +1,9 @@
 package tagquery
 
 import (
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/errors"
-	"github.com/grafana/metrictank/pkg/schema"
-	"github.com/grafana/metrictank/pkg/util"
 )
 
 var (

@@ -3,7 +3,7 @@ package tagquery
 import (
 	"io"
 
-	"github.com/grafana/metrictank/pkg/schema"
+	"github.com/grafana/metrictank/internal/schema"
 )
 
 type expressionMatchNone struct {

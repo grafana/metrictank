@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/grafana/metrictank/internal/mdata/chunk"
+	"github.com/grafana/metrictank/internal/stats"
+	"github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/mdata/chunk"
-	"github.com/grafana/metrictank/pkg/stats"
-	"github.com/grafana/metrictank/pkg/store/cassandra"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )

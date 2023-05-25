@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gocql/gocql"
-	"github.com/grafana/metrictank/pkg/cluster/partitioner"
+	"github.com/grafana/metrictank/internal/cluster/partitioner"
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/util"
 	"github.com/grafana/metrictank/pkg/logger"
-	"github.com/grafana/metrictank/pkg/schema"
-	"github.com/grafana/metrictank/pkg/util"
 	log "github.com/sirupsen/logrus"
 )
 

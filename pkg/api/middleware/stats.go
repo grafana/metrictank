@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/metrictank/pkg/stats"
+	"github.com/grafana/metrictank/internal/stats"
 	"gopkg.in/macaron.v1"
 )
 
