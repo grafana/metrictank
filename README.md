@@ -1,5 +1,9 @@
 <img src="docs/assets/metrictank-logo.png" height="150px" alt="Metrictank logo">
 
+# UNMAINTAINED
+
+As of August 2023, Grafana is no longer maintaining this repository. Our primary compatibility with Graphite is provided by [carbonapi](https://github.com/go-graphite/carbonapi), using [Mimir](https://github.com/grafana/mimir) as our backing database.
+
 # Grafana Metrictank
 
 [![Circle CI](https://circleci.com/gh/grafana/metrictank.svg?style=shield)](https://circleci.com/gh/grafana/metrictank)
