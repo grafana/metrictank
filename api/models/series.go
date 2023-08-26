@@ -291,7 +291,7 @@ func (series SeriesByTarget) MarshalJSONFast(b []byte) ([]byte, error) {
 		b = append(b, `,"datapoints":[`...)
 		for _, p := range s.Datapoints {
 			b = append(b, '[')
-			if math.IsNaN(p.Val) {
+			if math.IsNaN(p.Val) || math.IsInf(p.Val, 0) {
 				b = append(b, `null,`...)
 			} else {
 				b = strconv.AppendFloat(b, p.Val, 'f', -1, 64)
@@ -330,7 +330,7 @@ func (series SeriesByTarget) MarshalJSONFastWithMeta(b []byte) ([]byte, error) {
 		b = append(b, `,"datapoints":[`...)
 		for _, p := range s.Datapoints {
 			b = append(b, '[')
-			if math.IsNaN(p.Val) {
+			if math.IsNaN(p.Val) || math.IsInf(p.Val, 0) {
 				b = append(b, `null,`...)
 			} else {
 				b = strconv.AppendFloat(b, p.Val, 'f', -1, 64)

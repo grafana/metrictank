@@ -41,6 +41,18 @@ func TestJsonMarshal(t *testing.T) {
 		{
 			in: []Series{
 				{
+					Target: `a`,
+					Datapoints: []schema.Point{
+						{Val: math.Inf(1), Ts: 60},
+					},
+					Interval: 60,
+				},
+			},
+			out: `[{"target":"a","datapoints":[[null,60]]}]`,
+		},
+		{
+			in: []Series{
+				{
 					Target: "a",
 					Datapoints: []schema.Point{
 						{Val: 123, Ts: 60},
