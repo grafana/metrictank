@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-index-cat/out"
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/idx/bigtable"
-	"github.com/grafana/metrictank/idx/cassandra"
-	"github.com/grafana/metrictank/idx/memory"
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/internal/idx/bigtable"
+	"github.com/grafana/metrictank/internal/idx/cassandra"
+	"github.com/grafana/metrictank/internal/idx/memory"
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/logger"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )

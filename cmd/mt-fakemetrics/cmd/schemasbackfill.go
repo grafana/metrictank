@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
-	"github.com/grafana/metrictank/conf"
+	"github.com/grafana/metrictank/pkg/conf"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

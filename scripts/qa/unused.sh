@@ -15,8 +15,6 @@ go install github.com/Dieterbe/go-misc/deadcode@latest
 
 ret=0
 
-export GO111MODULE=off
-
 echo "## running staticcheck"
 staticcheck -checks U1000 ./...
 r=$?

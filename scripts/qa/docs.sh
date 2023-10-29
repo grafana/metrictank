@@ -32,8 +32,7 @@ if ! diff docs/config.md $tmp; then
 fi
 
 echo "checking metrics.md"
-export GO111MODULE=off
-go get -u github.com/Dieterbe/metrics2docs || exit 2
+GO111MODULE=off go get -u github.com/Dieterbe/metrics2docs || exit 2
 metrics2docs . > $tmp
 diff docs/metrics.md $tmp
 ret=$?

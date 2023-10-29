@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/internal/schema"
 )
 
 type Builder interface {

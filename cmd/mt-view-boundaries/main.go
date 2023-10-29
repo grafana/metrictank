@@ -6,9 +6,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/store/cassandra"
+	"github.com/grafana/metrictank/internal/mdata/chunk"
+	"github.com/grafana/metrictank/internal/store/cassandra"
+	"github.com/grafana/metrictank/pkg/logger"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )

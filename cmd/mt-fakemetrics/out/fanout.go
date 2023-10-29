@@ -1,6 +1,6 @@
 package out
 
-import "github.com/grafana/metrictank/schema"
+import "github.com/grafana/metrictank/internal/schema"
 
 type multiErr struct {
 	errors []error

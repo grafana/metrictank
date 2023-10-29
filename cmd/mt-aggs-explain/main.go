@@ -6,9 +6,9 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/consolidation"
-	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/internal/consolidation"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/logger"
 	log "github.com/sirupsen/logrus"
 )
 

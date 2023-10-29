@@ -17,9 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/logger"
-	"github.com/grafana/metrictank/mdata/importer"
+	"github.com/grafana/metrictank/internal/mdata/importer"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/logger"
 	"github.com/kisielk/whisper-go/whisper"
 	log "github.com/sirupsen/logrus"
 )

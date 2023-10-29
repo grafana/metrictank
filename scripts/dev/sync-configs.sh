@@ -17,5 +17,5 @@ done
 echo "updating docs/config.md"
 ./scripts/dev/config-to-doc.sh > docs/config.md
 
-go install github.com/Dieterbe/metrics2docs@latest
+GO111MODULE=off go get -u github.com/Dieterbe/metrics2docs@latest
 metrics2docs . > docs/metrics.md

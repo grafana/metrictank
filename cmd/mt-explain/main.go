@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/grafana/metrictank/expr"
-	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/pkg/expr"
+	"github.com/grafana/metrictank/pkg/logger"
 	"github.com/raintank/dur"
 	log "github.com/sirupsen/logrus"
 )

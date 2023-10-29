@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/grafana/metrictank/mdata"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/internal/mdata"
+	"github.com/grafana/metrictank/internal/schema"
 	log "github.com/sirupsen/logrus"
 )
 

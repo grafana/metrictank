@@ -8,5 +8,4 @@ DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 echo $DIR
 cd ${DIR}/../..
 go install golang.org/x/lint/golint@latest
-export GO111MODULE=off
 golint $(go list ./... | grep -v vendor)

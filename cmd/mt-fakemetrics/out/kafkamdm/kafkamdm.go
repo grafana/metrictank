@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	p "github.com/grafana/metrictank/cluster/partitioner"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out/kafkamdm/keycache"
-	"github.com/grafana/metrictank/schema"
-	"github.com/grafana/metrictank/schema/msg"
+	p "github.com/grafana/metrictank/internal/cluster/partitioner"
+	"github.com/grafana/metrictank/internal/schema"
+	"github.com/grafana/metrictank/internal/schema/msg"
 	"github.com/raintank/met"
 	log "github.com/sirupsen/logrus"
 )

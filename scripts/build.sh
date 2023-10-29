@@ -2,8 +2,6 @@
 
 set -e
 
-export GO111MODULE=off
-
 # Find the directory we exist within
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 cd ${DIR}/..
@@ -34,23 +32,18 @@ function fail () {
 }
 
 # Build binary
-cd cmd
-for bin in ${target}; do
-  cd $bin
+for bin in $(ls -1 cmd/); do
+  echo Building $bin
   if [ "$1" == "-race" ]
   then
-    set -x
     # -race requires CGO
-    CGO_ENABLED=1 go build -race -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail
+    CGO_ENABLED=1 go build -race -ldflags "-X main.version=$version" -o $BUILDDIR/$bin "github.com/grafana/metrictank/cmd/${bin}" || fail
   elif [ "$1" == "-debug" ]
   then
-    set -x
     # -debug flags
-    CGO_ENABLED=0 go build -gcflags "all=-N -l" -ldflags "-X main.version=${version}-debug" -o $BUILDDIR/$bin || fail
+    CGO_ENABLED=0 go build -gcflags "all=-N -l" -ldflags "-X main.version=${version}-debug" -o $BUILDDIR/$bin "github.com/grafana/metrictank/cmd/${bin}" || fail
   else
-    set -x
-    go build -ldflags "-X main.version=$version" -o $BUILDDIR/$bin || fail
+    go build -ldflags "-X main.version=$version" -o $BUILDDIR/$bin "github.com/grafana/metrictank/cmd/${bin}" || fail
   fi
   set +x
-  cd ..
 done

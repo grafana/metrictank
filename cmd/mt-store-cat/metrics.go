@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/internal/schema"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/grafana/metrictank/idx/cassandra"
+	"github.com/grafana/metrictank/internal/idx/cassandra"
 )
 
 type Metric struct {

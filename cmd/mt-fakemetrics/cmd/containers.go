@@ -24,10 +24,10 @@ import (
 
 	"time"
 
-	"github.com/grafana/metrictank/clock"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/out"
 	"github.com/grafana/metrictank/cmd/mt-fakemetrics/policy"
-	"github.com/grafana/metrictank/schema"
+	"github.com/grafana/metrictank/internal/clock"
+	"github.com/grafana/metrictank/internal/schema"
 	log "github.com/sirupsen/logrus"
 )
 

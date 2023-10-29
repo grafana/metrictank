@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gosuri/uilive"
-	"github.com/grafana/metrictank/conf"
-	"github.com/grafana/metrictank/logger"
+	"github.com/grafana/metrictank/pkg/conf"
+	"github.com/grafana/metrictank/pkg/logger"
 	log "github.com/sirupsen/logrus"
 )
 

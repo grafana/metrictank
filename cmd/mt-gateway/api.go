@@ -2,16 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/grafana/metrictank/stats"
 	"net/http"
 	"net/http/httputil"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/grafana/metrictank/internal/stats"
+
 	"github.com/grafana/metrictank/cmd/mt-gateway/ingest"
-	"github.com/grafana/metrictank/publish"
-	"github.com/grafana/metrictank/publish/kafka"
+	"github.com/grafana/metrictank/internal/publish"
+	"github.com/grafana/metrictank/internal/publish/kafka"
 	log "github.com/sirupsen/logrus"
 )
 

@@ -8,8 +8,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/grafana/metrictank/mdata/chunk"
-	"github.com/grafana/metrictank/store/cassandra"
+	"github.com/grafana/metrictank/internal/mdata/chunk"
+	"github.com/grafana/metrictank/internal/store/cassandra"
 	"github.com/raintank/dur"
 )
 
